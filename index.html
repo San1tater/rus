@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
+<title>廢土求生 v16</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;font-size:12px;touch-action:manipulation;user-select:none;overscroll-behavior:none}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#content{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+#zone1{flex:1 1 0;min-height:0;position:relative;overflow:hidden;background:#1a1510}
+#lower{flex:1 1 0;min-height:0;display:flex}
+#zone2{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;background:#151210;border-right:1px solid #2a231c}
+#zone3{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;display:flex;flex-direction:column;background:#12100e}
+#tabbar{flex:0 0 54px;display:flex;background:#1a1510;border-top:1px solid #2a231c;padding-bottom:env(safe-area-inset-bottom)}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#7a6f60;font-size:11px;gap:2px}
+.tab.active{color:#e8a33d}
+.tab .ico{font-size:18px}
+.toast{position:fixed;top:22%;left:50%;transform:translateX(-50%);background:rgba(30,24,19,.96);border:1px solid #e8a33d;border-radius:8px;padding:10px 16px;color:#e8a33d;font-size:12px;z-index:10000;max-width:82%;text-align:center;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.7)}
+.toast.error{border-color:#e05252;color:#e05252}
+.toast.ok{border-color:#4caf50;color:#4caf50}
+.scene{position:absolute;inset:0}
+.bg-scroll{position:absolute;inset:0;display:flex;overflow:hidden}
+.bg-layer{flex:0 0 100%;height:100%;background-size:100% 100%;background-position:center;background-repeat:no-repeat;animation:bgscroll var(--spd,10s) linear infinite}
+@keyframes bgscroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+.groundline{position:absolute;left:0;right:0;bottom:28%;height:2px;background:rgba(232,163,61,.15)}
+.hero-wrap{position:absolute;left:50%;bottom:28%;transform:translateX(-50%);height:60%;aspect-ratio:400/520;z-index:5;pointer-events:none;display:flex;align-items:flex-end;justify-content:center}
+.hero-canvas{width:100%;height:100%;display:block}
+.zone-title{position:absolute;left:8px;top:8px;font-size:11px;color:#e8a33d;background:rgba(14,12,10,.7);padding:3px 8px;border-radius:10px;border:1px solid #3a2f25;z-index:6}
+.zone-badge{position:absolute;right:8px;top:8px;font-size:10px;color:#a89a85;background:rgba(14,12,10,.7);padding:3px 8px;border-radius:10px;border:1px solid #3a2f25;z-index:6}
+.silhouette{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36%;height:78%;background-image:url('images/hero_idle.png');background-size:contain;background-position:center bottom;background-repeat:no-repeat;filter:grayscale(1) brightness(0.45) contrast(1.15);opacity:0.55;pointer-events:none}
+.slot{position:absolute;width:21%;aspect-ratio:1;border-radius:5px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;display:flex;align-items:center;justify-content:center;font-size:9px;color:#7a6f60;cursor:pointer;overflow:hidden;z-index:3}
+.slot:active{transform:scale(.94)}
+.slot.filled{border-color:#e8a33d}
+.slot.fixed{border-color:#8a5f18}
+.slot.empty{border-color:#2a231c}
+.slot .slot-img{width:72%;height:72%;object-fit:contain;display:block}
+.slot .lbl{position:absolute;bottom:1px;left:0;right:0;text-align:center;font-size:7px;background:rgba(0,0,0,.55);color:#a89a85;padding:1px 0}
+.slot .nm{font-size:8px;font-weight:bold;text-align:center;line-height:1.1;padding:0 2px;word-break:break-all;overflow:hidden;max-height:22px}
+.slot.empty .nm{color:#4a4038;font-weight:normal}
+.player-stat-panel{position:absolute;background:rgba(14,12,10,.92);border:1px solid #3a2f25;border-radius:6px;padding:4px 6px;font-size:9px;z-index:4}
+.player-stat-panel .row{display:flex;justify-content:space-between;color:#a89a85;line-height:1.5}
+.player-stat-panel .row b{color:#e8a33d}
+.z3-head{flex:0 0 30px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border-bottom:1px solid #2a231c;background:#17140f}
+.z3-title{font-size:11px;color:#e8a33d;font-weight:bold}
+.z3-btn{font-size:10px;color:#a89a85;background:#241d16;border:1px solid #3a2f25;padding:3px 8px;border-radius:8px}
+.logbox{flex:1;min-height:0;overflow-y:auto;padding:5px 7px;font-size:10px;line-height:1.45}
+.logbox::-webkit-scrollbar{width:3px}
+.logbox::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:2px}
+.logline{padding:2px 0;border-bottom:1px dashed #241d16;color:#bfb3a0;word-break:break-word}
+.logline .tm{color:#6a5f4d}
+.logline .pl{color:#e8a33d;font-weight:bold}
+.logline .win{color:#4caf50;font-weight:bold}
+.logline .lose{color:#e05252;font-weight:bold}
+.logline .run{color:#e8741e;font-weight:bold}
+.logline .itm{cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+.r-破舊{color:#b87333}
+.r-一般{color:#e0e0e0}
+.r-庫存{color:#4caf50}
+.r-精品{color:#2196f3}
+.r-傳奇{color:#ffb300}
+.r-具名{color:#a45ede}
+#modal-layer{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center}
+#modal-layer.on{display:flex}
+.modal-bd{position:absolute;inset:0;background:rgba(0,0,0,.7)}
+.modal{position:relative;background:#1e1813;border:1px solid #3a2f25;border-radius:10px;width:88%;max-width:420px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.7);overflow:hidden;z-index:1}
+.modal.full{width:100%;height:100%;max-width:none;max-height:none;border-radius:0}
+.modal-hd{flex:0 0 auto;padding:10px 12px;border-bottom:1px solid #2a231c;font-size:13px;color:#e8a33d;font-weight:bold;display:flex;justify-content:space-between;align-items:center}
+.modal-hd .x{font-size:18px;color:#7a6f60;padding:0 6px;cursor:pointer}
+.modal-bd-inner{flex:1;min-height:0;overflow-y:auto;padding:10px 12px}
+.modal-ft{flex:0 0 auto;padding:8px;border-top:1px solid #2a231c;display:flex;gap:6px}
+.btn{flex:1;padding:10px;border:none;border-radius:8px;background:#2c2419;color:#ddd;font-size:12px;font-weight:bold;cursor:pointer}
+.btn.primary{background:#8a5f18;color:#fff}
+.btn.danger{background:#6a2a2a}
+.btn.ghost{background:#1a1510;border:1px solid #3a2f25}
+.btn:disabled{opacity:.4}
+.item-row{display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;background:#241d16;margin-bottom:5px;cursor:pointer;border:1px solid #2a231c}
+.item-row .icon{flex:0 0 32px;height:32px;background:#151210;border-radius:5px;display:flex;align-items:center;justify-content:center;border:1px solid #3a2f25;overflow:hidden}
+.item-row .icon img{width:100%;height:100%;object-fit:contain;display:block}
+.item-row .info{flex:1;min-width:0}
+.item-row .nm{font-size:11px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-row .sub{font-size:9px;color:#7a6f60;margin-top:2px}
+.item-row .cnt{font-size:11px;color:#e8a33d;font-weight:bold}
+.cat-header{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin:6px 0 4px;cursor:pointer;color:#e8a33d;font-size:11px;font-weight:bold}
+.cost-ok{color:#4caf50;margin-right:6px;display:inline-block}
+.cost-no{color:#e05252;margin-right:6px;display:inline-block}
+.detail-title{font-size:15px;font-weight:bold;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.detail-title img{width:30px;height:30px;object-fit:contain}
+.detail-sub{font-size:10px;color:#7a6f60;margin-bottom:10px}
+.stat-line{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #2a231c;font-size:11px}
+.stat-line .k{color:#7a6f60}
+.stat-line .v{color:#e8a33d;font-weight:bold}
+.cmp-header{display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px solid #2a231c;margin-bottom:6px}
+.cmp-name{font-size:11px;font-weight:bold;flex:1;text-align:center}
+.cmp-name.old{color:#a89a85}
+.cmp-name.new{color:#e8a33d}
+.cmp-title{text-align:center;font-size:10px;color:#7a6f60;padding:4px 0;margin-bottom:4px}
+.cmp-row{display:flex;align-items:center;padding:7px 4px;border-bottom:1px dashed #2a231c}
+.cmp-val{flex:1;text-align:center;font-size:13px}
+.cmp-val.old{color:#a89a85}
+.cmp-val.new{font-weight:bold;color:#e8a33d}
+.cmp-val.new.up{color:#4caf50}
+.cmp-val.new.down{color:#e05252}
+.cmp-lbl{flex:0 0 70px;text-align:center;color:#7a6f60;font-size:10px}
+.boss-list{position:absolute;inset:0;overflow-y:auto;padding:8px}
+.boss-card{background:#1e1813;border:1px solid #3a2f25;border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center}
+.boss-card.locked{opacity:.5}
+.boss-avatar{flex:0 0 48px;height:48px;background:#2a1e15;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #5a3a1a;overflow:hidden}
+.boss-avatar img{width:100%;height:100%;object-fit:contain;display:block}
+.boss-info{flex:1;min-width:0}
+.boss-info .bn{font-size:13px;font-weight:bold;color:#e8a33d}
+.boss-info .bd{font-size:10px;color:#7a6f60;margin-top:2px;line-height:1.4}
+.seal-tag{font-size:9px;color:#4caf50;background:#1a2a1a;padding:2px 6px;border-radius:6px;display:inline-block;margin-top:4px}
+.seal-tag.none{color:#e05252;background:#2a1a1a}
+.battle-scene{position:absolute;inset:0;overflow:hidden;background:#241a10}
+.battle-bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 90%,#3a2818,#140e08)}
+.range-indicator{position:absolute;top:0;bottom:0;background:rgba(232,163,61,.08);border-left:1px dashed rgba(232,163,61,.45);border-right:1px dashed rgba(232,163,61,.45);pointer-events:none;z-index:1}
+.damage-header{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:rgba(14,12,10,.85);border:1px solid #8a5f18;border-radius:10px;padding:4px 12px;font-size:11px;color:#e8a33d;z-index:20;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.6);text-align:center;font-weight:bold}
+.damage-header .num{color:#ffb300}
+.damage-header .bar{width:180px;height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-top:4px}
+.damage-header .bar .fill{height:100%;background:linear-gradient(90deg,#e05252,#ffb300);transition:width .2s}
+.fighter{position:absolute;transform:translateX(-50%);z-index:3}
+.fighter .sprite{border-radius:6px;position:relative;cursor:crosshair;background-size:contain;background-position:center;background-repeat:no-repeat}
+.hero-f .sprite{width:40px;height:52px;position:relative;cursor:crosshair}
+.hero-f .sprite canvas{width:100%;height:100%;display:block}
+.boss-f .sprite{width:80px;height:80px}
+.boss-f .sprite img{width:100%;height:100%;object-fit:contain;display:block}
+.hpbar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:60px;bottom:calc(100% + 4px)}
+.hpbar-wrap .bar{height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-bottom:2px;position:relative}
+.hpbar-wrap .bar .fill{height:100%;transition:width .15s}
+.hpbar-wrap .bar.hp .fill{background:#e05252}
+.hpbar-wrap .bar.ap .fill{background:#4a90d9}
+.hpbar-wrap .nm{font-size:8px;color:#e8a33d;text-align:center;white-space:nowrap;text-shadow:0 0 3px #000;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%)}
+.bullet{position:absolute;width:5px;height:5px;background:#ffe08a;border-radius:50%;box-shadow:0 0 6px #ffb300;transform:translate(-50%,-50%)}
+.bullet.enemy{background:#ff5252;box-shadow:0 0 6px #e05252}
+.hit-fx{position:absolute;font-size:20px;font-weight:bold;color:#ffb300;transform:translate(-50%,-50%);pointer-events:none;animation:hitup 1.1s ease-out forwards;text-shadow:0 0 4px #000,0 0 8px #000,0 0 12px #000;z-index:50;-webkit-text-stroke:1px #000}
+.hit-fx.crit{color:#ff3030;font-size:26px;-webkit-text-stroke:1.5px #000}
+.hit-fx.enemy{color:#ff5252}
+.hit-fx.armor{color:#5ab0ff}
+@keyframes hitup{0%{transform:translate(-50%,-50%) scale(0.5);opacity:0}15%{transform:translate(-50%,-70%) scale(1.3);opacity:1}100%{transform:translate(-50%,-260%) scale(1);opacity:0}}
+.aim-marker{position:absolute;width:14px;height:14px;border:2px solid #ffb300;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10;box-shadow:0 0 6px #ffb300}
+.joystick{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;height:120px;border-radius:50%;background:rgba(232,163,61,.08);border:2px solid rgba(232,163,61,.3);touch-action:none}
+.joystick .stick{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:52px;height:52px;border-radius:50%;background:rgba(232,163,61,.5);border:2px solid #e8a33d}
+.z2-hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:9px;color:#5a5040}
+.ctrl-wrap{position:absolute;inset:0;display:flex;flex-direction:column;padding:6px;gap:5px}
+.fire-modes{display:flex;gap:3px;flex-wrap:wrap}
+.fm-btn{flex:1;min-width:0;padding:6px 2px;font-size:9px;border-radius:6px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;text-align:center;cursor:pointer}
+.fm-btn.on{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.weapon-slot-btn{padding:7px;border-radius:6px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;font-size:10px;text-align:center;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.weapon-slot-btn.on{background:#3a2a15;border-color:#e8a33d;color:#e8a33d}
+.fire-btn{flex:0 0 auto;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#d94a4a,#6a1a1a);border:3px solid #8a2a2a;color:#fff;font-size:16px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;aspect-ratio:1/1}
+.fire-btn.disabled{background:#3a1a1a;border-color:#5a2a2a;color:#7a6f60}
+.ammo-info{font-size:10px;color:#e8a33d;text-align:center;padding:3px}
+.build-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:3px;padding:5px}
+.cell{background:#1e1813;border:1px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;color:#7a6f60;cursor:pointer;text-align:center;padding:2px;position:relative}
+.cell.built{background:linear-gradient(180deg,#3a2a15,#241d16);border-color:#8a5f18;color:#e8a33d}
+.cell.core{background:linear-gradient(180deg,#5a3a1a,#3a2510);border-color:#e8a33d;color:#ffe0a0}
+.cell .cico{width:60%;height:52%;display:flex;align-items:center;justify-content:center}
+.cell .cico img{width:100%;height:100%;object-fit:contain;display:block}
+.cell .cnm{font-size:8px;margin-top:1px}
+.cell .clv{position:absolute;top:2px;right:3px;font-size:7px;color:#4caf50}
+.prof-area{flex:1;min-height:0;overflow-y:auto;padding:7px;font-size:10px}
+.prof-sec{margin-bottom:8px;border:1px solid #2a231c;border-radius:6px;overflow:hidden}
+.prof-sec h4{font-size:10px;color:#e8a33d;padding:6px 8px;background:#1a1510;display:flex;justify-content:space-between;cursor:pointer;border-bottom:1px solid #2a231c}
+.prof-sec.collapsed h4{border-bottom:none}
+.prof-sec.collapsed .prof-body{display:none}
+.prof-body{padding:4px 8px 6px}
+.prof-line{display:flex;justify-content:space-between;padding:3px 0;font-size:10px;color:#bfb3a0}
+.prof-line .v{color:#4caf50;font-weight:bold}
+.pref-btn{padding:7px;background:#2c2419;border:1px solid #3a2f25;border-radius:6px;color:#e8a33d;font-size:10px;font-weight:bold;text-align:center;margin:5px;cursor:pointer}
+.region-area{flex:1;min-height:0;overflow-y:auto;padding:7px;font-size:10px}
+.reg-item{display:flex;align-items:flex-start;gap:5px;padding:5px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin-bottom:4px;cursor:pointer}
+.reg-item.on{border-color:#e8a33d;background:#241d16}
+.reg-item.locked{opacity:.5;cursor:not-allowed}
+.reg-item .chk{flex:0 0 14px;height:14px;border:1px solid #3a2f25;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#e8a33d;margin-top:1px}
+.reg-item.on .chk{background:#8a5f18;border-color:#e8a33d;color:#fff}
+.reg-item .rn{font-size:10px;font-weight:bold;color:#e8a33d}
+.reg-item .rd{font-size:9px;color:#7a6f60;margin-top:1px;line-height:1.3}
+.reg-item .lock-hint{font-size:9px;color:#e05252;margin-top:2px}
+.mode-sel{display:flex;gap:4px;padding:5px 7px}
+.mode-btn{flex:1;padding:6px;font-size:10px;border-radius:6px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;text-align:center;cursor:pointer}
+.mode-btn.on{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.divider{height:1px;background:#2a231c;margin:6px 0}
+.empty-hint{color:#4a4038;font-size:10px;text-align:center;padding:14px 6px}
+.drag-handle{color:#7a6f60;padding:0 6px;cursor:grab;font-size:14px}
+.dragging{opacity:.4}
+.craft-slot{display:flex;gap:4px;align-items:center;padding:6px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin-bottom:4px;font-size:10px}
+.craft-slot .progress{flex:1;height:4px;background:#2a231c;border-radius:2px;overflow:hidden;margin-top:4px}
+.craft-slot .progress .fill{height:100%;background:#4caf50}
+.armor-class{font-size:8px;color:#4a90d9;font-weight:bold;margin-left:2px}
+.mod-opt{padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:11px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mod-opt.on{border-color:#a45ede;background:#241d30}
+.mod-opt .nm{color:#e8a33d;font-weight:bold;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mod-opt .bonus{color:#4caf50;font-weight:bold;font-size:11px;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="content">
+    <div id="zone1"></div>
+    <div id="lower">
+      <div id="zone2"></div>
+      <div id="zone3"></div>
+    </div>
+  </div>
+  <nav id="tabbar">
+    <div class="tab active" data-tab="explore"><div class="ico">🧭</div><div>探索</div></div>
+    <div class="tab" data-tab="combat"><div class="ico">⚔️</div><div>戰鬥</div></div>
+    <div class="tab" data-tab="base"><div class="ico">🏗️</div><div>基地</div></div>
+  </nav>
+</div>
+
+<div id="modal-layer"><div class="modal-bd"></div><div class="modal"></div></div>
+
+<script>
+"use strict";
+const VERSION='v16.4';
+const EVENT_INTERVAL_MS = 10000;
+const REGION_KEYS = {'廢棄工廠':'factory','廢棄實驗室':'lab','郊區公路':'road','輻射沼澤':'swamp','廢土核心':'core'};
+const RARITY_ORDER=['破舊','一般','庫存','精品','傳奇','具名'];
+const RARITY_MULT={'破舊':0.8,'一般':1.0,'庫存':1.5,'精品':2.5,'傳奇':5.0,'具名':5.0};
+const RARITY_ICON={'破舊':'▪','一般':'▫','庫存':'◆','精品':'★','傳奇':'✦','具名':'✦'};
+const MODE_ACCURACY={'點射':1.5,'短點射':1.2,'長點射':1.0,'掃射':0.8,'近戰':1.0,'投擲':1.0};
+const MAX_PROF_LEVEL=50;
+const MELEE_DURATION=2;
+
+// ============================================================
+// 人物分層方塊人系統
+// ============================================================
+const HERO_LAYERS = [
+  { id:'torso',     z:30, x:0.4988267105991183, y:0.2718062750037742, w:0.30292654375182904, h:0.4165172528481853, pivot:{x:0.5,y:0.10}, color:'#4a6741' },
+  { id:'head',      z:45, x:0.5315650262874505, y:0.21609302602726957, w:0.2048853174957016, h:0.1678138818570858, pivot:{x:0.5,y:0.92}, color:'#c89870' },
+  { id:'back_arm',  z:55, x:0.8007345624817089, y:0.3625097451274363, w:0.10585308750365811, h:0.10433116774945865, pivot:{x:0.5,y:0.5},  color:'#3d3020' },
+  { id:'front_arm', z:62, x:0.27942213493081464, y:0.37367258611091586, w:0.3682976675103344, h:0.08917208062635361, pivot:{x:0.05,y:0.5}, color:'#5a4a35' },
+];
+const HERO_ANIM_POSITIONS = {
+  switch_secondary: { front_arm: { x:0.3614221349308147, y:0.37367258611091586, w:0.3682976675103344, h:0.08917208062635361 } },
+  fire_secondary:   { front_arm: { x:0.3494221349308147, y:0.37367258611091586, w:0.3682976675103344, h:0.08917208062635361 } },
+  attack_melee:     { front_arm: { x:0.2614221349308146, y:0.36767258611091586, w:0.3682976675103344, h:0.08917208062635361 } },
+};
+const HERO_ANIMS = {
+  walk: { frameCount:8, fps:10, loop:true, showEq:'primary', keys:{
+    head:      Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+    torso:     Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+    back_arm:  Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+    front_arm: Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+  }},
+  idle: { frameCount:4, fps:4, loop:true, showEq:'primary', keys:{
+    head:      Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
+    torso:     Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
+    back_arm:  Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
+    front_arm: Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
+  }},
+  fire_primary: { frameCount:4, fps:16, loop:false, showEq:'primary', keys:{
+    head:      [{rot:0,dx:0,dy:0},{rot:1,dx:0,dy:-1},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+    torso:     [{rot:0,dx:0,dy:0},{rot:2,dx:0,dy:-1},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+    back_arm:  [{rot:0,dx:0,dy:0},{rot:4,dx:0,dy:-1},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+    front_arm: [{rot:0,dx:0,dy:0},{rot:8,dx:-3,dy:-1},{rot:3,dx:-1,dy:0},{rot:0,dx:0,dy:0}],
+  }},
+  reload: { frameCount:10, fps:10, loop:false, showEq:'primary', keys:{
+    head:      Array(10).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,-1,0,0][i];return {rot:0,dx:0,dy:p*0.3};}),
+    torso:     Array(10).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,-1,0,0][i];return {rot:0,dx:0,dy:p*0.5};}),
+    back_arm:  [0,-15,-30,-35,-25,-10,5,15,5,0].map(r=>({rot:r,dx:0,dy:0})),
+    front_arm: [
+      {rot:0,dx:0,dy:0},{rot:-20,dx:-5,dy:1},{rot:-40,dx:-8,dy:2},{rot:-45,dx:-8,dy:2.5},
+      {rot:-30,dx:-5,dy:1.5},{rot:-10,dx:-2,dy:0.5},{rot:15,dx:5,dy:-0.5},{rot:30,dx:10,dy:-1.5},
+      {rot:10,dx:5,dy:-0.5},{rot:0,dx:0,dy:0},
+    ],
+  }},
+  switch_secondary: { frameCount:8, fps:10, loop:false, showEq:'secondary', keys:{
+    head:      Array(8).fill(0).map((_,i)=>{const p=[0,1,2,2,1,0,-1,-1][i];return {rot:0,dx:0,dy:p*0.3};}),
+    torso:     Array(8).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,0][i];return {rot:0,dx:0,dy:p*0.4};}),
+    back_arm:  [{rot:0,dx:0,dy:0},{rot:-8,dx:-2,dy:0},{rot:-15,dx:-4,dy:0},{rot:-12,dx:-3,dy:0},{rot:-8,dx:-2,dy:0},{rot:-4,dx:-1,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+    front_arm: [
+      {rot:0,dx:0,dy:0},{rot:-15,dx:-3,dy:1},{rot:-25,dx:-5,dy:2},{rot:-15,dx:-3,dy:1.5},
+      {rot:-5,dx:-1,dy:0.5},{rot:0,dx:0,dy:-0.5},{rot:3,dx:0,dy:-1},{rot:3,dx:0,dy:-1},
+    ],
+  }},
+  fire_secondary: { frameCount:4, fps:14, loop:false, showEq:'secondary', keys:{
+    head:      Array(4).fill({rot:0,dx:0,dy:0}),
+    torso:     Array(4).fill({rot:0,dx:0,dy:0}),
+    back_arm:  Array(4).fill({rot:0,dx:0,dy:0}),
+    front_arm: [{rot:3,dx:0,dy:-1},{rot:-6,dx:0,dy:-2},{rot:0,dx:0,dy:-1.2},{rot:3,dx:0,dy:-1}],
+  }},
+  switch_melee: { frameCount:8, fps:10, loop:false, showEq:'melee', keys:{
+    head:      Array(8).fill(0).map((_,i)=>{const p=[0,1,2,2,1,0,-1,-1][i];return {rot:0,dx:0,dy:p*0.3};}),
+    torso:     Array(8).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,0][i];return {rot:0,dx:0,dy:p*0.4};}),
+    back_arm:  [0,-8,-15,-15,-10,-5,5,10].map(r=>({rot:r,dx:0,dy:0})),
+    front_arm: [
+      {rot:0,dx:0,dy:0},{rot:-15,dx:-3,dy:1},{rot:-25,dx:-5,dy:2},{rot:-10,dx:-2,dy:1.5},
+      {rot:10,dx:0,dy:0.5},{rot:20,dx:2,dy:0},{rot:15,dx:2,dy:-1},{rot:10,dx:1,dy:-1},
+    ],
+  }},
+  attack_melee: { frameCount:8, fps:14, loop:false, showEq:'melee', keys:{
+    head:      [{rot:0,dx:0,dy:0},{rot:-2,dx:0,dy:0},{rot:-3,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:3,dx:0,dy:0},{rot:2,dx:0,dy:0},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+    torso:     [{rot:0,dx:0,dy:0},{rot:-3,dx:-1,dy:0},{rot:-6,dx:-2,dy:0},{rot:0,dx:0,dy:0},{rot:6,dx:2,dy:0},{rot:3,dx:1,dy:0},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+    back_arm:  [10,-10,-25,-10,15,5,5,10].map(r=>({rot:r,dx:0,dy:0})),
+    front_arm: [
+      {rot:10,dx:1,dy:-1},{rot:-15,dx:-2,dy:-1},{rot:-40,dx:-5,dy:-2},{rot:0,dx:0,dy:-1},
+      {rot:60,dx:10,dy:0},{rot:100,dx:15,dy:1},{rot:60,dx:8,dy:0},{rot:10,dx:1,dy:-1},
+    ],
+  }},
+};
+
+const heroIconCache = {};
+function getHeroIconImg(id){
+  if(!id) return null;
+  const rid = (typeof resolveIconId==='function') ? resolveIconId(id) : id;
+  if(!heroIconCache[rid]){
+    const img = new Image();
+    img.src = `icons/items/${rid}.png`;
+    heroIconCache[rid] = img;
+  }
+  return heroIconCache[rid];
+}
+
+const heroRenderState = {
+  anim: 'walk',
+  frame: 0,
+  lastTime: 0,
+  nextAnim: null,
+};
+function setHeroAnim(animName, nextAnim){
+  if(!HERO_ANIMS[animName]) animName = 'idle';
+  if(heroRenderState.anim === animName && !nextAnim) return;
+  heroRenderState.anim = animName;
+  heroRenderState.frame = 0;
+  heroRenderState.nextAnim = nextAnim || null;
+}
+function renderHeroCanvas(canvas){
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const A = HERO_ANIMS[heroRenderState.anim] || HERO_ANIMS.idle;
+  const frame = Math.min(heroRenderState.frame, A.frameCount - 1);
+  const showEq = A.showEq || 'primary';
+  const eqForLayer = {};
+  if(typeof state !== 'undefined' && state && state.player){
+    if(state.player.equipped.head) eqForLayer.head = state.player.equipped.head;
+    if(state.player.equipped.top) eqForLayer.torso = state.player.equipped.top;
+    let weaponSlot = null;
+    if(showEq === 'primary') weaponSlot = 'primary';
+    else if(showEq === 'secondary') weaponSlot = 'secondary';
+    else if(showEq === 'melee') weaponSlot = 'melee';
+    else if(showEq === 'context'){
+      weaponSlot = state.player.equipped.primary ? 'primary'
+                 : state.player.equipped.secondary ? 'secondary'
+                 : state.player.equipped.melee ? 'melee' : null;
+    }
+    if(weaponSlot && state.player.equipped[weaponSlot]) eqForLayer.front_arm = state.player.equipped[weaponSlot];
+  }
+  const animOv = HERO_ANIM_POSITIONS[heroRenderState.anim] || {};
+  const sorted = HERO_LAYERS.slice().sort((a,b) => a.z - b.z);
+  const B = {x:30, y:30, w:340, h:460};
+  for(const L of sorted){
+    const pos = animOv[L.id] || L;
+    const keysArr = A.keys && A.keys[L.id];
+    const key = keysArr ? (keysArr[Math.min(frame, keysArr.length-1)] || {rot:0,dx:0,dy:0}) : {rot:0,dx:0,dy:0};
+    const cx = B.x + B.w * (pos.x + (key.dx||0) * 0.01);
+    const cy = B.y + B.h * (pos.y + (key.dy||0) * 0.01);
+    const w = B.w * pos.w;
+    const h = B.h * pos.h;
+    const px = w * L.pivot.x;
+    const py = h * L.pivot.y;
+    const rad = (key.rot||0) * Math.PI / 180;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rad);
+    ctx.translate(-px, -py);
+    const eqId = eqForLayer[L.id];
+    if(eqId){
+      const img = getHeroIconImg(eqId);
+      if(img && img.complete && img.naturalWidth){
+        const iAr = img.naturalWidth / img.naturalHeight;
+        const bAr = w / h;
+        let dw, dh;
+        if(iAr > bAr){ dw = w; dh = w / iAr; } else { dh = h; dw = h * iAr; }
+        ctx.drawImage(img, (w-dw)/2, (h-dh)/2, dw, dh);
+      }
+    } else {
+      ctx.save();
+      ctx.fillStyle = L.color;
+      ctx.globalAlpha = 0.4;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = L.color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, w-1, h-1);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+}
+function heroLoop(now){
+  if(!heroRenderState.lastTime) heroRenderState.lastTime = now;
+  const delta = (now - heroRenderState.lastTime) / 1000;
+  heroRenderState.lastTime = now;
+  const A = HERO_ANIMS[heroRenderState.anim];
+  if(A){
+    const frameDuration = 1 / A.fps;
+    if(delta >= frameDuration){
+      if(A.loop !== false){
+        heroRenderState.frame = (heroRenderState.frame + 1) % A.frameCount;
+      } else {
+        if(heroRenderState.frame < A.frameCount - 1){
+          heroRenderState.frame++;
+        } else {
+          if(heroRenderState.nextAnim){
+            heroRenderState.anim = heroRenderState.nextAnim;
+            heroRenderState.frame = 0;
+            heroRenderState.nextAnim = null;
+          } else {
+            heroRenderState.anim = 'idle';
+            heroRenderState.frame = 0;
+          }
+        }
+      }
+    }
+  }
+  const canvases = document.querySelectorAll('canvas.hero-canvas');
+  canvases.forEach(c => renderHeroCanvas(c));
+  requestAnimationFrame(heroLoop);
+}
+
+const TK_MAG={aks74u:30,aks74un:30,ak74n:30,ak74m:30,akm:30,akms:30,akMN:30,ak103:30,ak104:30,ak105:30,ak12:30,an94:30,asval:20,'9a91':20,sr3m:30,vss:10,svd:10,sv98:10,rpk16:60,rpk74:45,pkm:100,pkp:100,pp19:30,pm:8,pb:8,mp443:17,aps:20,mp133:6,mp153:7,mp155:6,saiga12:8,toz106:2,ks23:3};
+const TK_ARMOR={ssh68:20,ssh68m:22,kolpak:30,'6b47':40,'6b47m':45,altyn:50,kiver:40,kiverrsp:40,maska:45,zsh12m:50,rbrp:30,caiman:50,'6b26':25,balaclava:5,shemagh:5,gaiter:5,gp7:15,pmk2:18,pmk3:20,pmks:18,alfa:15,tacgoggle:5,ballglasses:5,nomexhood:5,paca:45,'6b13':65,'6b13m':65,'6b23':70,'6b231':70,'6b43':85,zhuk6a:85,zhuk3:75,defender2:75,korakulon:80,cargopants:5,'6sh122':25,'6sh104':25,'6sh112':25,workboots:5,tactboots:15,lowaz:22,haix:25,belleville:20};
+
+function armorClass(armor){if(!armor||armor<=0)return '';if(armor<=25)return 'I';if(armor<=40)return 'II';if(armor<=55)return 'III';if(armor<=70)return 'IV';if(armor<=80)return 'V';return 'VI';}
+
+const ARMOR={
+  ssh68:{name:'SSh-68 頭盔',slot:'head',armor:TK_ARMOR.ssh68},
+  ssh68m:{name:'SSh-68M 頭盔',slot:'head',armor:TK_ARMOR.ssh68m},
+  kolpak:{name:'Kolpak-1S 頭盔',slot:'head',armor:TK_ARMOR.kolpak},
+  '6b47':{name:'6B47 頭盔',slot:'head',armor:TK_ARMOR['6b47']},
+  '6b47m':{name:'6B47M 頭盔',slot:'head',armor:TK_ARMOR['6b47m']},
+  altyn:{name:'Altyn 頭盔',slot:'head',armor:TK_ARMOR.altyn},
+  kiver:{name:'Kiver-M 頭盔',slot:'head',armor:TK_ARMOR.kiver},
+  kiverrsp:{name:'Kiver RSP 頭盔',slot:'head',armor:TK_ARMOR.kiverrsp},
+  maska:{name:'Maska-1SCh 頭盔',slot:'head',armor:TK_ARMOR.maska},
+  zsh12m:{name:'ZSh-1-2M 頭盔',slot:'head',armor:TK_ARMOR.zsh12m},
+  rbrp:{name:'RBR-P 頭盔',slot:'head',armor:TK_ARMOR.rbrp},
+  caiman:{name:'Caiman 頭盔',slot:'head',armor:TK_ARMOR.caiman},
+  '6b26':{name:'6B26 頭盔',slot:'head',armor:TK_ARMOR['6b26']},
+  balaclava:{name:'巴拉克拉法面罩',slot:'face',armor:TK_ARMOR.balaclava},
+  shemagh:{name:'阿拉伯方巾',slot:'face',armor:TK_ARMOR.shemagh},
+  gaiter:{name:'護頸圍脖',slot:'face',armor:TK_ARMOR.gaiter},
+  gp7:{name:'GP-7 防毒面具',slot:'face',armor:TK_ARMOR.gp7},
+  pmk2:{name:'PMK-2 防毒面具',slot:'face',armor:TK_ARMOR.pmk2},
+  pmk3:{name:'PMK-3 防毒面具',slot:'face',armor:TK_ARMOR.pmk3},
+  pmks:{name:'PMK-S 防毒面具',slot:'face',armor:TK_ARMOR.pmks},
+  alfa:{name:'ALFA 防毒面具',slot:'face',armor:TK_ARMOR.alfa},
+  tacgoggle:{name:'戰術護目鏡',slot:'face',armor:TK_ARMOR.tacgoggle},
+  ballglasses:{name:'彈道眼鏡',slot:'face',armor:TK_ARMOR.ballglasses},
+  nomexhood:{name:'Nomex 防火頭套',slot:'face',armor:TK_ARMOR.nomexhood},
+  paca:{name:'PACA 軟甲',slot:'top',armor:TK_ARMOR.paca},
+  '6b13':{name:'6B13 防彈衣',slot:'top',armor:TK_ARMOR['6b13']},
+  '6b13m':{name:'6B13-M 防彈衣',slot:'top',armor:TK_ARMOR['6b13m']},
+  '6b23':{name:'6B23 防彈衣',slot:'top',armor:TK_ARMOR['6b23']},
+  '6b231':{name:'6B23-1 防彈衣',slot:'top',armor:TK_ARMOR['6b231']},
+  '6b43':{name:'6B43 防彈衣',slot:'top',armor:TK_ARMOR['6b43']},
+  zhuk6a:{name:'Zhuk-6a 防彈衣',slot:'top',armor:TK_ARMOR.zhuk6a},
+  zhuk3:{name:'Zhuk-3 防彈衣',slot:'top',armor:TK_ARMOR.zhuk3},
+  defender2:{name:'Defender 2 防彈衣',slot:'top',armor:TK_ARMOR.defender2},
+  korakulon:{name:'Kora Kulon 防彈衣',slot:'top',armor:TK_ARMOR.korakulon},
+  cargopants:{name:'工裝褲',slot:'pants',armor:TK_ARMOR.cargopants},
+  '6sh122':{name:'6Sh122 作戰褲',slot:'pants',armor:TK_ARMOR['6sh122']},
+  '6sh104':{name:'6Sh104 作戰褲',slot:'pants',armor:TK_ARMOR['6sh104']},
+  '6sh112':{name:'6Sh112 作戰褲',slot:'pants',armor:TK_ARMOR['6sh112']},
+  workboots:{name:'工作靴',slot:'shoes',armor:TK_ARMOR.workboots},
+  tactboots:{name:'戰術靴',slot:'shoes',armor:TK_ARMOR.tactboots},
+  lowaz:{name:'Lowa Zephyr',slot:'shoes',armor:TK_ARMOR.lowaz},
+  haix:{name:'Haix 軍靴',slot:'shoes',armor:TK_ARMOR.haix},
+  belleville:{name:'Belleville 軍靴',slot:'shoes',armor:TK_ARMOR.belleville},
+  bplarge:{name:'探險背包',slot:'backpack',armor:0,fixed:true},
+};
+
+const WEAPONS={
+  aks74u:{name:'AKS-74U',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.aks74u,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
+  aks74un:{name:'AKS-74UN',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.aks74un,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
+  ak74n:{name:'AK-74N',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74n,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
+  ak74m:{name:'AK-74M',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74m,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
+  akm:{name:'AKM',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akm,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
+  akms:{name:'AKMS',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akms,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.6},
+  akMN:{name:'AKMN',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akMN,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
+  ak103:{name:'AK-103',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak103,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
+  ak104:{name:'AK-104',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak104,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.6},
+  ak105:{name:'AK-105',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak105,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
+  ak12:{name:'AK-12',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak12,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.65},
+  an94:{name:'AN-94',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.an94,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
+  asval:{name:'AS VAL',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.asval,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.5},
+  '9a91':{name:'9A-91',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG['9a91'],modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.5},
+  sr3m:{name:'SR-3M',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.sr3m,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.5},
+  vss:{name:'VSS Vintorez',slot:'primary',type:'狙擊槍',cal:'9x39',mag:TK_MAG.vss,modes:['點射'],rpm:700,range:0.55},
+  svd:{name:'SVD',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.svd,modes:['點射'],rpm:180,range:0.9},
+  sv98:{name:'SV-98',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.sv98,modes:['點射'],rpm:60,range:0.95},
+  rpk16:{name:'RPK-16',slot:'primary',type:'機槍',cal:'5.45',mag:TK_MAG.rpk16,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.65},
+  rpk74:{name:'RPK-74',slot:'primary',type:'機槍',cal:'5.45',mag:TK_MAG.rpk74,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.7},
+  pkm:{name:'PKM',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkm,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
+  pkp:{name:'PKP Pecheneg',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkp,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
+  pp19:{name:'PP-19-01 Vityaz',slot:'primary',type:'衝鋒槍',cal:'9x19',mag:TK_MAG.pp19,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.45},
+  pm:{name:'PM 手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pm,modes:['點射'],rpm:400,range:0.35},
+  pb:{name:'PB 微聲手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pb,modes:['點射'],rpm:400,range:0.35},
+  mp443:{name:'MP-443 Grach',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.mp443,modes:['點射'],rpm:400,range:0.4},
+  aps:{name:'APS 斯捷奇金',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.aps,modes:['點射','短點射','長點射','掃射'],rpm:800,range:0.35},
+  mp133:{name:'MP-133 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp133,modes:['點射'],rpm:60,range:0.4},
+  mp153:{name:'MP-153 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp153,modes:['點射'],rpm:70,range:0.42},
+  mp155:{name:'MP-155 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp155,modes:['點射'],rpm:70,range:0.4},
+  saiga12:{name:'Saiga-12',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.saiga12,modes:['點射'],rpm:300,range:0.45},
+  toz106:{name:'TOZ-106',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.toz106,modes:['點射'],rpm:40,range:0.35},
+  ks23:{name:'KS-23',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.ks23,modes:['點射'],rpm:40,range:0.45},
+  '6kh2':{name:'6Kh2 刺刀',slot:'melee',type:'刺刀',dmg:25,modes:['近戰'],rpm:120,range:0.15},
+  '6kh5':{name:'6Kh5 刺刀',slot:'melee',type:'刺刀',dmg:26,modes:['近戰'],rpm:120,range:0.15},
+  m9bayonet:{name:'M9 刺刀',slot:'melee',type:'刺刀',dmg:28,modes:['近戰'],rpm:120,range:0.15},
+  kukri:{name:'Kukri 彎刀',slot:'melee',type:'刀',dmg:32,modes:['近戰'],rpm:100,range:0.18},
+  kabar:{name:'Ka-Bar 戰鬥刀',slot:'melee',type:'刀',dmg:30,modes:['近戰'],rpm:110,range:0.16},
+  f1:{name:'F-1 手榴彈',slot:'throwable',type:'手榴彈',dmg:80,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  rgd5:{name:'RGD-5 手榴彈',slot:'throwable',type:'手榴彈',dmg:60,modes:['投擲'],rpm:60,range:0.5,explosive:true},
+  rgo:{name:'RGO 手榴彈',slot:'throwable',type:'手榴彈',dmg:100,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  rgn:{name:'RGN 手榴彈',slot:'throwable',type:'手榴彈',dmg:90,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  vog17:{name:'VOG-17 手榴彈',slot:'throwable',type:'手榴彈',dmg:75,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+  vog25:{name:'VOG-25 手榴彈',slot:'throwable',type:'手榴彈',dmg:78,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+};
+
+const AMMO={
+  '9x18_pst':{name:'9×18mm PSt',cal:'9x18',dmg:50,pen:2,rarity:'破舊'},
+  '9x18_ps':{name:'9×18mm PS',cal:'9x18',dmg:50,pen:3,rarity:'一般'},
+  '9x18_pbm':{name:'9×18mm PBM',cal:'9x18',dmg:62,pen:4,rarity:'庫存'},
+  '9x18_pbp':{name:'9×18mm PBP',cal:'9x18',dmg:69,pen:5,rarity:'精品'},
+  '9x19_ps':{name:'9×19mm PS',cal:'9x19',dmg:50,pen:2,rarity:'破舊'},
+  '9x19_pst':{name:'9×19mm PSt',cal:'9x19',dmg:54,pen:3,rarity:'一般'},
+  '9x19_ap':{name:'9×19mm AP',cal:'9x19',dmg:60,pen:4,rarity:'庫存'},
+  '9x19_pbp':{name:'9×19mm PBP',cal:'9x19',dmg:64,pen:5,rarity:'精品'},
+  '5.45_ps':{name:'5.45×39mm PS',cal:'5.45',dmg:40,pen:2,rarity:'破舊'},
+  '5.45_us':{name:'5.45×39mm US',cal:'5.45',dmg:42,pen:3,rarity:'一般'},
+  '5.45_bt':{name:'5.45×39mm BT',cal:'5.45',dmg:47,pen:4,rarity:'庫存'},
+  '5.45_bp':{name:'5.45×39mm BP',cal:'5.45',dmg:50,pen:5,rarity:'精品'},
+  '5.45_bs':{name:'5.45×39mm BS',cal:'5.45',dmg:51,pen:6,rarity:'傳奇'},
+  '7.62_ps':{name:'7.62×39mm PS',cal:'7.62',dmg:57,pen:2,rarity:'破舊'},
+  '7.62_t45':{name:'7.62×39mm T45M',cal:'7.62',dmg:60,pen:3,rarity:'一般'},
+  '7.62_bp':{name:'7.62×39mm BP',cal:'7.62',dmg:58,pen:4,rarity:'庫存'},
+  '7.62_bs':{name:'7.62×39mm BS',cal:'7.62',dmg:57,pen:5,rarity:'精品'},
+  '7.62_ma':{name:'7.62×39mm MAI AP',cal:'7.62',dmg:62,pen:6,rarity:'傳奇'},
+  '7.62x54_lps':{name:'7.62×54mmR LPS',cal:'7.62x54',dmg:72,pen:2,rarity:'破舊'},
+  '7.62x54_ps':{name:'7.62×54mmR PS',cal:'7.62x54',dmg:79,pen:3,rarity:'一般'},
+  '7.62x54_bt':{name:'7.62×54mmR BT',cal:'7.62x54',dmg:78,pen:4,rarity:'庫存'},
+  '7.62x54_snb':{name:'7.62×54mmR SNB',cal:'7.62x54',dmg:75,pen:5,rarity:'精品'},
+  '7.62x54_bs':{name:'7.62×54mmR BS',cal:'7.62x54',dmg:70,pen:6,rarity:'傳奇'},
+  '9x39_sp5':{name:'9×39mm SP-5',cal:'9x39',dmg:68,pen:3,rarity:'一般'},
+  '9x39_sp6':{name:'9×39mm SP-6',cal:'9x39',dmg:58,pen:4,rarity:'庫存'},
+  '9x39_pab9':{name:'9×39mm PAB-9',cal:'9x39',dmg:62,pen:5,rarity:'精品'},
+  '9x39_bp':{name:'9×39mm BP',cal:'9x39',dmg:60,pen:6,rarity:'傳奇'},
+  '12ga_buck':{name:'12/70 鹿彈',cal:'12ga',dmg:50,pen:1,rarity:'破舊',pellets:8},
+  '12ga_magnum':{name:'12/70 強化鹿彈',cal:'12ga',dmg:50,pen:2,rarity:'一般',pellets:8},
+  '12ga_slug':{name:'12/70 獨頭彈',cal:'12ga',dmg:190,pen:3,rarity:'庫存',pellets:1},
+  '12ga_flechette':{name:'12/70 箭形彈',cal:'12ga',dmg:25,pen:4,rarity:'精品',pellets:8},
+  '12ga_ap20':{name:'12/70 AP-20',cal:'12ga',dmg:164,pen:5,rarity:'傳奇',pellets:1},
+};
+
+const CONSUMABLES={bandage:{name:'繃帶',heal:15},water:{name:'瓶裝水',heal:5},ai2:{name:'AI-2 急救包',heal:30},painkiller:{name:'止痛藥',heal:10},tushonka:{name:'燉肉罐頭',heal:15},splint:{name:'夾板',heal:10},salewa:{name:'Salewa 急救包',heal:60},ifak:{name:'IFAK 急救包',heal:50},grizzly:{name:'Grizzly 醫療包',heal:100},surv12:{name:'Surv12 野戰包',heal:70}};
+const MATERIALS={wood:{name:'木材'},metal:{name:'金屬廢料'},screws:{name:'螺絲'},cloth:{name:'布料'},gears:{name:'齒輪'},electronics:{name:'電子零件'}};
+
+const WEAPON_MOD_RULES={
+  aks74u:{mags:[45,60],scopes:[]},aks74un:{mags:[45,60],scopes:['1P87','EKP-8-02','PK-06']},
+  ak74n:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},ak74m:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},
+  akm:{mags:[45,75],scopes:[]},akms:{mags:[45,75],scopes:[]},akMN:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},
+  ak103:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},ak104:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},
+  ak105:{mags:[45,60],scopes:['1P87','PSO-1']},ak12:{mags:[45,60,95],scopes:['1P87','PSO-1']},an94:{mags:[45,60],scopes:['1P87']},
+  asval:{mags:[30],scopes:['PSO-1','1P87']},'9a91':{mags:[],scopes:['PSO-1']},sr3m:{mags:[],scopes:['1P87']},
+  vss:{mags:[20,30],scopes:['PSO-1']},svd:{mags:[15,20],scopes:['PSO-1']},sv98:{mags:[],scopes:['PSO-1','1P87']},
+  rpk16:{mags:[95],scopes:['1P87','PSO-1']},rpk74:{mags:[95],scopes:['PSO-1']},pkm:{mags:[200],scopes:[]},
+  pkp:{mags:[200],scopes:['1P87','PSO-1']},pp19:{mags:[],scopes:['1P87','PK-06']},
+  pm:{mags:[10],scopes:[]},pb:{mags:[10],scopes:[]},mp443:{mags:[20],scopes:[]},aps:{mags:[30],scopes:[]},
+};
+const SCOPE_BONUS={'1P87':5,'PSO-1':8,'EKP-8-02':4,'PK-06':6};
+const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-02 紅點','PK-06':'PK-06 紅點'};
+
+const ALL_ITEMS={};Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS);
+function itemDef(id){return ALL_ITEMS[id]||null;}
+function resolveIconId(id){
+  if(!id) return '';
+  if(id.startsWith('named_')){
+    const parts=id.split('_');
+    if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];
+  }
+  return id;
+}
+function itemIcon(id,size){
+  const s=size||24;
+  const rid=resolveIconId(id);
+  return `<img src="icons/items/${rid}.png" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+}
+function bossIcon(id){return `<img src="icons/bosses/${id}.png" alt="">`;}
+function buildingIcon(id){return `<img src="icons/buildings/${id}.png" alt="">`;}
+function itemCat(id){
+  if(ARMOR[id])return 'armor';if(WEAPONS[id])return 'weapon';
+  if(AMMO[id])return 'ammo';if(CONSUMABLES[id])return 'consume';
+  if(MATERIALS[id])return 'material';
+  const d=ALL_ITEMS[id];if(d&&d.named)return 'weapon';
+  return 'misc';
+}
+function hasVariableRarity(id){const d=ALL_ITEMS[id];if(d&&d.named)return false;const c=itemCat(id);return c==='armor'||c==='weapon'||c==='consume'||c==='material';}
+function rollRarity(){const r=Math.random();if(r<0.35)return '破舊';if(r<0.65)return '一般';if(r<0.85)return '庫存';if(r<0.97)return '精品';return '傳奇';}
+function isFixedItem(id){const d=ARMOR[id];return d&&d.fixed===true;}
+function getDefaultAmmo(cal){for(const k in AMMO){if(AMMO[k].cal===cal&&AMMO[k].rarity==='一般')return k;}for(const k in AMMO){if(AMMO[k].cal===cal)return k;}return null;}
+function getMeleeHits(rpm){return Math.max(1,Math.round((rpm||60)*MELEE_DURATION/60));}
+
+function namedWeaponName(baseId,mag,scope){
+  const base=WEAPONS[baseId]||ALL_ITEMS[baseId];if(!base)return '未知';
+  const parts=[base.name];
+  if(mag&&mag!==base.mag)parts.push(mag);
+  if(scope)parts.push(scope);
+  return parts.join('-');
+}
+function getNamedId(baseId,mag,scope){return `named_${baseId}_${mag||'x'}_${scope||'x'}`;}
+function getOrCreateNamedItem(baseId,mag,scope){
+  const id=getNamedId(baseId,mag,scope);
+  if(!ALL_ITEMS[id]){
+    const base=WEAPONS[baseId];
+    const name=namedWeaponName(baseId,mag,scope);
+    const effMag=(mag&&mag>base.mag)?mag:base.mag;
+    ALL_ITEMS[id]={name:name,slot:base.slot,type:base.type,cal:base.cal,mag:effMag,modes:base.modes,rpm:base.rpm,range:base.range,named:true,scope:scope||null,scopeBonus:scope?(SCOPE_BONUS[scope]||0):0,baseId:baseId};
+  }
+  return id;
+}
+function isProfMaxed(weaponType){return Math.floor(state.proficiency[weaponType]||0)>=MAX_PROF_LEVEL;}
+function calcModCost(baseId,mag,scope){
+  const cost={};
+  const baseMag=WEAPONS[baseId].mag;
+  if(mag&&mag>baseMag){cost.metal=(cost.metal||0)+8+Math.ceil((mag-baseMag)/5);cost.screws=(cost.screws||0)+5;}
+  if(scope){cost.electronics=(cost.electronics||0)+10;cost.metal=(cost.metal||0)+3;cost.gears=(cost.gears||0)+2;}
+  return cost;
+}
+function calcModTime(baseId,mag,scope){let t=0;const bm=WEAPONS[baseId].mag;if(mag&&mag>bm)t+=30;if(scope)t+=45;return t;}
+
+const ENEMIES={mutant_squirrel:{name:'變異松鼠',hp:10,dmg:3},mutant_rat:{name:'變異巨鼠',hp:20,dmg:5},ghoul:{name:'食屍鬼',hp:35,dmg:10},raider:{name:'掠奪者',hp:45,dmg:12},raider_vet:{name:'掠奪者老兵',hp:80,dmg:18},mutant_wolf:{name:'變異狼',hp:55,dmg:15},mutant_bear:{name:'變異熊',hp:150,dmg:30}};
+
+const REGIONS={
+  '廢棄工廠':{name:'廢棄工廠',desc:'生鏽的機械與堆積的貨櫃',enemies:['mutant_squirrel','mutant_rat','raider','ghoul'],loot:['wood','metal','screws','cloth','9x18_ps','9x19_ps','12ga_buck','5.45_us','pp19','aks74u','pm','mp133','6kh2','rgd5','ssh68','balaclava','paca','cargopants','workboots','ai2','bandage','water'],combat:{attack:0.55,stealth:0.22},seal:'seal_factory',sealRate:0.03},
+  '廢棄實驗室':{name:'廢棄實驗室',desc:'冷白的燈管與腐蝕的培養槽',enemies:['ghoul','raider','raider_vet','mutant_rat'],loot:['electronics','metal','screws','cloth','9x19_pbp','5.45_bt','9x39_sp5','ak74m','9a91','pb','m9bayonet','f1','kolpak','6b47','nomexhood','gp7','6b23','6sh122','tactboots','salewa','painkiller','splint'],combat:{attack:0.6,stealth:0.28},seal:'seal_lab',sealRate:0.02},
+  '郊區公路':{name:'郊區公路',desc:'翻覆的車隊與荒廢的加油站',enemies:['raider','raider_vet','mutant_wolf','mutant_rat'],loot:['metal','gears','cloth','screws','7.62_ps','12ga_buck','12ga_slug','5.45_bt','akm','aks74u','ak74n','mp443','aps','rgd5','f1','kiver','kolpak','shemagh','6b23','6sh122','tactboots','painkiller','tushonka','water','ai2'],combat:{attack:0.62,stealth:0.3},seal:'seal_road',sealRate:0.02},
+  '輻射沼澤':{name:'輻射沼澤',desc:'發綠的水窪與扭曲的枯樹',enemies:['mutant_bear','mutant_wolf','ghoul','raider_vet'],loot:['electronics','gears','cloth','metal','5.45_bp','7.62_bp','7.62x54_bt','9x39_sp6','sv98','ak103','rpk16','vss','saiga12','f1','rgo','altyn','kiver','zhuk6a','6sh122','tactboots','salewa','splint','tushonka'],combat:{attack:0.7,stealth:0.35},seal:'seal_swamp',sealRate:0.015,needUnlock:true,unlockHint:'擊敗 實驗室女王 · 白蝕 解鎖'},
+  '廢土核心':{name:'廢土核心',desc:'鋼鐵巨構與永不熄滅的火光',enemies:['mutant_bear','raider_vet','raider_vet','mutant_wolf'],loot:['electronics','gears','metal','cloth','7.62_bp','5.45_bp','7.62x54_snb','9x39_sp6','pkp','svd','vss','asval','rpk16','saiga12','rgo','f1','altyn','zhuk6a','6b43','salewa','tushonka','splint'],combat:{attack:0.75,stealth:0.4},seal:'seal_core',sealRate:0.008,needUnlock:true,unlockHint:'擊敗 沼澤九頭 · 腐母 解鎖'},
+};
+
+const ROUTES={
+  '廢棄工廠':[{name:'東線',nodes:['東門','休息室一樓','休息室二樓','回廊','檢修通道','儲油罐','車床','經理室']},{name:'西線',nodes:['西側卸貨區','倉庫','裝卸平台','車間','鍋爐房','經理室']},{name:'地下線',nodes:['地下入口','排水管道','維修隧道','動力室','經理室']}],
+  '廢棄實驗室':[{name:'主樓',nodes:['正門大廳','接待處','電梯井','B1 實驗區','樣本室','主控室']},{name:'側翼',nodes:['側門','更衣室','消毒通道','培養槽區','觀察室','主控室']},{name:'地下',nodes:['貨梯','儲藏間','冷凍庫','動物房','主控室']}],
+  '郊區公路':[{name:'主幹道',nodes:['收費站','翻覆車隊','加油站','休息區','隧道口','集結點']},{name:'繞行路',nodes:['小路','廢棄農舍','涵洞','山脊','集結點']},{name:'鐵軌',nodes:['鐵道口','信號塔','貨運列車','集結點']}],
+  '輻射沼澤':[{name:'淺灘',nodes:['灘頭','枯樹林','泥沼','廢船','祭壇','沼心']},{name:'深沼',nodes:['腐水區','孢子林','沉沒教堂','沼心']}],
+  '廢土核心':[{name:'外環',nodes:['外圍防線','哨塔','斷裂高架','中央熔爐','核心']},{name:'內環',nodes:['通風井','管道區','反應爐','核心']}],
+};
+
+const BOSSES={
+  factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:1000,armor:40,dmg:25,pen:2,seal:'seal_factory',unlock:'廢棄實驗室',skills:['衝撞','咆哮'],drops:['zhuk6a','sv98','6b23','rpk16','vss']},
+  lab_queen:{name:'實驗室女王 · 白蝕',region:'廢棄實驗室',hp:2500,armor:120,dmg:45,pen:3,seal:'seal_lab',unlock:'郊區公路',skills:['衝撞','咆哮','毒霧'],drops:['altyn','saiga12','sv98','rpk16','asval']},
+  road_tyrant:{name:'公路暴君 · 鐵鎚',region:'郊區公路',hp:5000,armor:250,dmg:70,pen:4,seal:'seal_road',unlock:'輻射沼澤',skills:['衝撞','咆哮'],drops:['zhuk6a','rpk16','svd','pkp','asval']},
+  swamp_hydra:{name:'沼澤九頭 · 腐母',region:'輻射沼澤',hp:9000,armor:400,dmg:100,pen:5,seal:'seal_swamp',unlock:'廢土核心',skills:['衝撞','咆哮','毒霧'],drops:['svd','pkp','altyn','zhuk6a','6b43']},
+  core_omega:{name:'核心終焉 · OMEGA',region:'廢土核心',hp:16000,armor:600,dmg:130,pen:6,seal:'seal_core',unlock:null,skills:['衝撞','咆哮','毒霧','EMP'],drops:['pkp','svd','altyn','6b43','zhuk6a']},
+};
+
+const BUILDINGS={
+  workbench:{name:'工作台',desc:'改造傳奇武器',cost:{wood:20,metal:10,screws:5}},
+  storage:{name:'倉庫',desc:'掉落物數量加成',cost:{wood:15,metal:5}},
+  toilet:{name:'厠所',desc:'熟練度加成',cost:{wood:10,cloth:5}},
+  rest:{name:'休息室',desc:'生命值成長加成',cost:{wood:20,cloth:10}},
+  generator:{name:'發電機',desc:'加速製造與冷卻',cost:{metal:20,gears:5,electronics:3}},
+  medbay:{name:'醫療站',desc:'加強消耗品恢復',cost:{wood:15,cloth:10,metal:5}},
+  radio:{name:'無線電',desc:'定期資源補給',cost:{electronics:5,metal:10,gears:3}},
+  armory:{name:'軍械庫',desc:'產出主副彈藥',cost:{metal:25,gears:8,screws:10}},
+};
+
+const SAVE_KEY='wasteland_save_v16';
+const DEFAULT_WEAPON_PRIORITY=['primary','secondary','melee','throwable'];
+const DEFAULT_AMMO_RARITY=['傳奇','精品','庫存','一般','破舊'];
+const DEFAULT_CONSUME_RARITY=['傳奇','精品','庫存','一般','破舊'];
+
+function defaultState(){
+  return {
+    player:{level:1,exp:0,hp:100,maxHp:100,armor:0,maxArmor:0,equipped:{head:null,face:null,top:null,pants:null,shoes:null,backpack:'bplarge',primary:null,secondary:null,melee:null,throwable:null},equippedRarity:{backpack:'傳奇'},throwableStock:0},
+    inventory:{},logs:[],pendingSalvageEquipped:{},
+    proficiency:{primary:0,secondary:0,melee:0,throwable:0,'突擊步槍':0,'機槍':0,'衝鋒槍':0,'狙擊槍':0,'手槍':0,'霰彈槍':0,'刺刀':0,'刀':0,'斧':0,'錘':0,'棍':0,'工具':0,'手榴彈':0,'煙霧':0,'閃光':0,'燃燒':0,craft:0,salvage:0,drop:0},
+    preferences:{weaponPriority:DEFAULT_WEAPON_PRIORITY.slice(),ammoRarity:DEFAULT_AMMO_RARITY.slice(),consumeRarity:DEFAULT_CONSUME_RARITY.slice(),autoConsumeThreshold:0.3,actionMode:'attack',regions:['廢棄工廠']},
+    regionProgress:{},activeRegion:null,stashedWeapons:{},
+    base:{slots:new Array(12).fill(null).map((_,i)=>i===0?{id:'control',lv:1}:null)},
+    seals:{},defeatedBosses:[],unlockedRegions:['廢棄工廠','廢棄實驗室'],
+    lastSeen:Date.now(),radioLastTick:0,armoryLastTick:0,crafting:[],
+    stats:{kills:0,deaths:0,bossKills:0},
+  };
+}
+let state=defaultState();
+
+function save(){state.lastSeen=Date.now();try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch(e){}}
+function load(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);if(!raw)return false;
+    const s=JSON.parse(raw);const d=defaultState();
+    state=Object.assign(d,s);
+    state.player=Object.assign(d.player,s.player||{});
+    state.player.equipped=Object.assign(d.player.equipped,(s.player&&s.player.equipped)||{});
+    state.player.throwableStock=parseInt(state.player.throwableStock||0,10);
+    state.proficiency=Object.assign(d.proficiency,s.proficiency||{});
+    state.preferences=Object.assign(d.preferences,s.preferences||{});
+    delete state.preferences.autoSalvage;
+    state.base=Object.assign(d.base,s.base||{});
+    state.regionProgress=Object.assign({},s.regionProgress||{});
+    state.pendingSalvageEquipped=s.pendingSalvageEquipped||{};
+    state.stashedWeapons=s.stashedWeapons||{};
+    const vw=['primary','secondary','melee','throwable'];
+    let wp=Array.isArray(state.preferences.weaponPriority)?state.preferences.weaponPriority.filter(x=>vw.includes(x)):[];
+    for(const v of vw)if(!wp.includes(v))wp.push(v);state.preferences.weaponPriority=wp;
+    let ar=Array.isArray(state.preferences.ammoRarity)?state.preferences.ammoRarity.filter(x=>RARITY_ORDER.includes(x)):[];
+    for(const v of RARITY_ORDER)if(!ar.includes(v))ar.push(v);state.preferences.ammoRarity=ar;
+    let cr=Array.isArray(state.preferences.consumeRarity)?state.preferences.consumeRarity.filter(x=>RARITY_ORDER.includes(x)):[];
+    for(const v of RARITY_ORDER)if(!cr.includes(v))cr.push(v);state.preferences.consumeRarity=cr;
+    for(const k in state.seals){state.seals[k]=parseInt(state.seals[k]||0,10);}
+    if(!state.player.equipped.backpack){state.player.equipped.backpack='bplarge';state.player.equippedRarity.backpack='傳奇';}
+    for(const k in state.inventory){const [id]=k.split('@');if(!ALL_ITEMS[id] && !id.startsWith('named_')){delete state.inventory[k];}}
+    for(const slot in state.player.equipped){const id=state.player.equipped[slot];if(id && !ALL_ITEMS[id] && !id.startsWith('named_')){state.player.equipped[slot]=null;delete state.player.equippedRarity[slot];}}
+    for(const k in state.inventory){const [id]=k.split('@');if(id.startsWith('named_')){const parts=id.split('_');if(parts.length>=4){const baseId=parts[1];const mag=parts[2]==='x'?null:parseInt(parts[2],10);const scope=parts[3]==='x'?null:parts[3];if(WEAPONS[baseId])getOrCreateNamedItem(baseId,mag,scope);}}}
+    for(const slot in state.player.equipped){const id=state.player.equipped[slot];if(id && id.startsWith('named_')){const parts=id.split('_');if(parts.length>=4){const baseId=parts[1];const mag=parts[2]==='x'?null:parseInt(parts[2],10);const scope=parts[3]==='x'?null:parts[3];if(WEAPONS[baseId])getOrCreateNamedItem(baseId,mag,scope);}}}
+    return true;
+  }catch(e){return false;}
+}
+
+function $(s,e){return(e||document).querySelector(s);}
+function $$(s,e){return Array.from((e||document).querySelectorAll(s));}
+function el(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function pickN(a,n){const c=a.slice(),r=[];for(let i=0;i<n&&c.length;i++)r.push(c.splice(Math.floor(Math.random()*c.length),1)[0]);return r;}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function rnd(a,b){return a+Math.random()*(b-a);}
+function rndInt(a,b){return Math.floor(rnd(a,b+1));}
+function fmtTime(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');}
+function rarityClass(r){return 'r-'+r;}
+function invKey(id,r){return id+'@'+r;}
+function invAddRaw(id,r,c){if(c<=0)return;const k=invKey(id,r);state.inventory[k]=(state.inventory[k]||0)+c;}
+function invRemove(id,r,c){const k=invKey(id,r);if(!state.inventory[k]||state.inventory[k]<c)return false;state.inventory[k]-=c;if(state.inventory[k]<=0)delete state.inventory[k];return true;}
+function invCount(id,r){return state.inventory[invKey(id,r)]||0;}
+function invList(){const l=[];for(const k in state.inventory){const [id,r]=k.split('@');l.push({id,rarity:r,count:state.inventory[k],def:itemDef(id)});}return l;}
+function getAmmoByCal(cal){const l=[];for(const k in state.inventory){const p=k.split('@');if(p.length!==2)continue;const id=p[0],r=p[1];const d=AMMO[id];if(!d||d.cal!==cal)continue;const cnt=state.inventory[k];if(!cnt||cnt<=0)continue;l.push({id,rarity:r,count:cnt,def:d});}return l;}
+function pickAmmoByPreference(cal){const l=getAmmoByCal(cal);if(!l.length)return null;const ord=state.preferences.ammoRarity;for(const rar of ord){const s=l.filter(a=>a.rarity===rar);if(s.length)return pick(s);}return pick(l);}
+function equippedWeapon(slot){const id=state.player.equipped[slot];if(!id)return null;const rar=state.player.equippedRarity[slot]||'一般';const def=itemDef(id);if(!def)return null;return{id,rarity:rar,def,slot};}
+function getBuildingLv(id){for(const s of state.base.slots)if(s&&s.id===id)return s.lv||1;return 0;}
+function buildingBonusText(bid,lv){
+  switch(bid){case 'workbench':return `改造隊列 +${lv}`;case 'storage':return `掉落數量 +${lv*10}%`;
+  case 'toilet':return `熟練度獲取 +${lv*10}%`;case 'rest':return `生命值成長 +${lv*2}%`;
+  case 'generator':return `製造/冷卻加速 +${lv*20}%`;case 'medbay':return `消耗品恢復 +${lv*15}%`;
+  case 'radio':return `補給間隔 -${Math.round(lv*20/(1+lv*0.2))}%`;case 'armory':return `產出主副彈藥（品質依等級）`;default:return '';}
+}
+function calcMaxHp(){const rl=getBuildingLv('rest');const rb=1+rl*0.02;return Math.round(100*Math.pow(1.01,state.player.level-1)*rb);}
+function equipArmorValue(id,rarity){const def=ARMOR[id];if(!def)return 0;if(def.slot==='backpack')return 0;let base=def.armor||0;if(base<5)base=5;return Math.round(base*(RARITY_MULT[rarity]||1));}
+function refreshPlayerStats(){
+  state.player.maxHp=calcMaxHp();
+  let armor=0;
+  for(const slot of ['head','face','top','pants','shoes']){const id=state.player.equipped[slot];if(id){const rarity=state.player.equippedRarity[slot]||'一般';armor+=equipArmorValue(id,rarity);}}
+  state.player.maxArmor=armor;
+  if(state.player.hp>state.player.maxHp)state.player.hp=state.player.maxHp;
+  if(state.player.armor>state.player.maxArmor)state.player.armor=state.player.maxArmor;
+}
+function addExp(n){
+  state.player.exp+=n;let need=Math.round(50*Math.pow(1.15,state.player.level-1));
+  while(state.player.exp>=need){state.player.exp-=need;state.player.level++;refreshPlayerStats();state.player.hp=state.player.maxHp;notify(`🎉 升級至 Lv.${state.player.level}（HP ${state.player.maxHp}）`,'ok');pushLog(`<span class="pl">玩家</span> 升級至 <b>Lv.${state.player.level}</b>，最大生命 ${state.player.maxHp}。`,[],'explore');need=Math.round(50*Math.pow(1.15,state.player.level-1));}
+}
+function addProf(cat,n){const tl=getBuildingLv('toilet');const m=1+tl*0.1;state.proficiency[cat]=(state.proficiency[cat]||0)+n*m;}
+function getHitRate(weaponType,mode,scopeBonus){
+  let base=10,p=0;
+  const w=state.player.equipped.primary,s=state.player.equipped.secondary,m=state.player.equipped.melee,t=state.player.equipped.throwable;
+  if(WEAPONS[w]&&WEAPONS[w].type===weaponType)p+=Math.floor(state.proficiency.primary||0);
+  if(WEAPONS[s]&&WEAPONS[s].type===weaponType)p+=Math.floor(state.proficiency.secondary||0);
+  if(WEAPONS[m]&&WEAPONS[m].type===weaponType)p+=Math.floor(state.proficiency.melee||0);
+  if(WEAPONS[t]&&WEAPONS[t].type===weaponType)p+=Math.floor(state.proficiency.throwable||0);
+  p+=Math.floor(state.proficiency[weaponType]||0);
+  return clamp(Math.round((base+p)*(MODE_ACCURACY[mode]||1)+(scopeBonus||0)),5,95);
+}
+function calcCritRate(wr,ar){return clamp(Math.round(20*(RARITY_MULT[wr]||1)*(RARITY_MULT[ar]||1))/100,0,0.85);}
+function calcCritMult(wr,ar){return 1.5*(RARITY_MULT[wr]||1)*(RARITY_MULT[ar]||1);}
+
+function applyDamage(target,rawDmg,penetration){
+  const A=Math.round(target.armor);const pen=penetration||0;
+  const result={armorLost:0,hpLost:0,finalDmg:0,overkill:false};
+  if(A<=0){const hpDmg=Math.round(rawDmg*1.2);target.hp=Math.max(0,Math.round(target.hp-hpDmg));result.hpLost=hpDmg;result.finalDmg=hpDmg;result.overkill=true;return result;}
+  const penFactor=clamp(1-pen/12,0.2,1);
+  const effA=A*penFactor;
+  let reduction=Math.round((2/3)*effA);
+  const maxReduction=Math.round(rawDmg*0.8);
+  if(reduction>maxReduction)reduction=maxReduction;
+  const finalDmg=Math.max(0,Math.round(rawDmg-reduction));
+  const armorDmg=Math.max(1,Math.round((1/3)*finalDmg+rawDmg*0.08));
+  const armorLost=Math.min(A,armorDmg);
+  target.armor=Math.max(0,A-armorLost);
+  result.armorLost=armorLost;result.finalDmg=finalDmg;
+  if(target.armor<=0){const hpDmg=Math.round(Math.max(1,finalDmg)*1.2);target.hp=Math.max(0,Math.round(target.hp-hpDmg));result.hpLost=hpDmg;result.overkill=true;}
+  return result;
+}
+
+function notify(msg,type){const n=el('div','toast'+(type?' '+type:''),msg);document.body.appendChild(n);setTimeout(()=>{n.classList.add('out');},1800);setTimeout(()=>{n.remove();},2300);}
+function pushLog(html,items,type){state.logs.push({t:Date.now(),html,items:items||[],type:type||'explore'});if(state.logs.length>500)state.logs.splice(0,state.logs.length-500);if(currentTab==='explore')renderZone3Log();}
+function renderZone3Log(){
+  const box=$('#logbox');if(!box)return;box.innerHTML='';
+  const logs=state.logs.filter(l=>l.type!=='combat').slice(-60);
+  for(const l of logs){const line=el('div','logline');line.innerHTML=`<span class="tm">${fmtTime(l.t)}</span> ${l.html}`;box.appendChild(line);}
+  box.scrollTop=box.scrollHeight;
+}
+
+function salvageToMaterials(id,rarity,count){
+  const cat=itemCat(id);const mult={'破舊':1,'一般':2,'庫存':3,'精品':5,'傳奇':8,'具名':8}[rarity]||1;
+  let mats=[];
+  if(cat==='armor')mats=[['cloth',mult],['metal',mult]];
+  else if(cat==='weapon'){mats=[['metal',mult],['screws',mult]];const def=itemDef(id);if(def&&def.cal){const mag=def.mag||10;const ammos=Object.keys(AMMO).filter(k=>AMMO[k].cal===def.cal);if(ammos.length){const aid=pick(ammos);invAddRaw(aid,AMMO[aid].rarity,mag*count);}}}
+  else if(cat==='ammo')mats=[['metal',Math.max(1,Math.floor(mult/2))]];
+  else if(cat==='consume')mats=[['cloth',mult]];else return false;
+  for(const [m,c] of mats)invAddRaw(m,'一般',c*count);
+  addProf('salvage',0.5*count);return true;
+}
+function invAdd(id,rarity,count){
+  if(count<=0)return;
+  const cat=itemCat(id);
+  if(cat==='weapon'||cat==='armor'){
+    const newMult=RARITY_MULT[rarity]||1;
+    let maxInvMult=0,maxInvKey=null;
+    for(const k in state.inventory){const [iid,irar]=k.split('@');if(iid!==id)continue;const m=RARITY_MULT[irar]||1;if(m>maxInvMult){maxInvMult=m;maxInvKey=k;}}
+    let maxEqMult=0,maxEqSlot=null;
+    for(const s in state.player.equipped){if(state.player.equipped[s]===id){const eRar=state.player.equippedRarity[s]||'一般';const m=RARITY_MULT[eRar]||1;if(m>maxEqMult){maxEqMult=m;maxEqSlot=s;}}}
+    const maxExisting=Math.max(maxInvMult,maxEqMult);
+    if(maxExisting>0){
+      if(newMult<=maxExisting){salvageToMaterials(id,rarity,count);return;}
+      else{
+        if(maxInvKey){const [iid,irar]=maxInvKey.split('@');const cnt=state.inventory[maxInvKey];delete state.inventory[maxInvKey];salvageToMaterials(id,irar,cnt);}
+        if(maxEqSlot){state.pendingSalvageEquipped=state.pendingSalvageEquipped||{};state.pendingSalvageEquipped[maxEqSlot]=true;}
+      }
+    }
+  }
+  invAddRaw(id,rarity,count);
+}
+function materialEquivalent(id){let eq=0;for(const k in state.inventory){const [iid,irar]=k.split('@');if(iid!==id)continue;eq+=state.inventory[k]*(RARITY_MULT[irar]||1);}return Math.round(eq);}
+function consumeMaterial(id,amount){
+  const order=['破舊','一般','庫存','精品','傳奇'];
+  let remaining=amount;
+  for(const rar of order){
+    if(remaining<=0)break;
+    const k=invKey(id,rar);const have=state.inventory[k]||0;if(have<=0)continue;
+    const mult=RARITY_MULT[rar];const needThisRar=Math.ceil(remaining/mult);
+    const useThisRar=Math.min(have,needThisRar);
+    if(useThisRar>0){state.inventory[k]-=useThisRar;if(state.inventory[k]<=0)delete state.inventory[k];remaining-=useThisRar*mult;}
+  }
+  return remaining<=0.01;
+}
+
+function equipThrowable(id,rarity){const k=invKey(id,rarity);const total=state.inventory[k]||0;delete state.inventory[k];state.player.throwableStock=total;state.player.equipped.throwable=id;state.player.equippedRarity.throwable=rarity;}
+function unequipThrowable(){const id=state.player.equipped.throwable;if(!id)return;const rarity=state.player.equippedRarity.throwable||'一般';const cnt=state.player.throwableStock||0;if(cnt>0)invAddRaw(id,rarity,cnt);state.player.throwableStock=0;state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;}
+function getThrowableCount(){return parseInt(state.player.throwableStock||0,10);}
+function ensureThrowableFromBackpack(){
+  if(getThrowableCount()>0)return true;
+  const opts=[];
+  for(const k in state.inventory){const [id,r]=k.split('@');const d=WEAPONS[id];if(d&&d.slot==='throwable'&&state.inventory[k]>0)opts.push({id,rarity:r,count:state.inventory[k]});}
+  if(!opts.length)return false;
+  opts.sort((a,b)=>{const da=(WEAPONS[a.id].dmg||0)*(RARITY_MULT[a.rarity]||1);const db=(WEAPONS[b.id].dmg||0)*(RARITY_MULT[b.rarity]||1);return db-da;});
+  const best=opts[0];
+  delete state.inventory[invKey(best.id,best.rarity)];
+  state.player.equipped.throwable=best.id;
+  state.player.equippedRarity.throwable=best.rarity;
+  state.player.throwableStock=best.count;
+  return true;
+}
+
+function getActiveRegions(){const l=state.preferences.regions.filter(r=>REGIONS[r]&&(!REGIONS[r].needUnlock||state.unlockedRegions.includes(r)));return l.length?l:['廢棄工廠'];}
+function getCurrentNode(region){
+  const routes=ROUTES[region];if(!routes||!routes.length)return{path:'',node:'未知',pathIdx:0,nodeIdx:0};
+  let prog=state.regionProgress[region];
+  if(!prog||prog.pathIdx==null||prog.pathIdx<0||prog.pathIdx>=routes.length){prog={pathIdx:rndInt(0,routes.length-1),nodeIdx:0};state.regionProgress[region]=prog;}
+  const path=routes[prog.pathIdx];
+  if(prog.nodeIdx>=path.nodes.length){prog.pathIdx=rndInt(0,routes.length-1);prog.nodeIdx=0;}
+  return{path:path.name,node:path.nodes[prog.nodeIdx],pathIdx:prog.pathIdx,nodeIdx:prog.nodeIdx};
+}
+function advanceNode(region){
+  const routes=ROUTES[region];if(!routes)return false;
+  let prog=state.regionProgress[region];if(!prog)return false;
+  prog.nodeIdx++;
+  const path=routes[prog.pathIdx];
+  if(prog.nodeIdx>=path.nodes.length){prog.pathIdx=rndInt(0,routes.length-1);prog.nodeIdx=0;return true;}
+  return false;
+}
+function getCurrentBg(){
+  const region=state.activeRegion;
+  if(!region)return '';
+  const prog=state.regionProgress[region];
+  if(!prog)return '';
+  const key=REGION_KEYS[region];
+  if(!key)return '';
+  const routes=ROUTES[region];
+  const pathIdx=clamp(prog.pathIdx||0,0,(routes?routes.length:1)-1);
+  const nodeIdx=clamp(prog.nodeIdx||0,0,(routes&&routes[pathIdx]?routes[pathIdx].nodes.length:1)-1);
+  return `images/bg/${key}_r${pathIdx}_n${nodeIdx}.png`;
+}
+function updateExploreBg(){
+  const layers=document.querySelectorAll('#zone1 .bg-layer');
+  if(!layers.length)return;
+  const bg=getCurrentBg();
+  if(bg)layers.forEach(l=>{l.style.backgroundImage=`url('${bg}')`;});
+  const t=$('#zone1 .zone-title');
+  if(t){const region=state.activeRegion||'';const cur=region?getCurrentNode(region):null;if(cur)t.innerHTML=`🧭 ${region} · ${cur.node}`;}
+}
+
+function genEnemies(region,count){const r=REGIONS[region];const arr=[];for(let i=0;i<count;i++){const eid=pick(r.enemies);const e=ENEMIES[eid];arr.push({id:eid,name:e.name,hp:e.hp,maxHp:e.hp,dmg:e.dmg,armor:0,maxArmor:0});}return arr;}
+function spawnCount(){const r=Math.random();if(r<0.4)return 1;if(r<0.75)return 2;if(r<0.92)return 3;return 5;}
+
+function chooseCombatWeaponVerbose(){
+  const v=['primary','secondary','melee','throwable'];
+  let order=Array.isArray(state.preferences.weaponPriority)?state.preferences.weaponPriority.slice():[];
+  order=order.filter(x=>v.includes(x));for(const x of v)if(!order.includes(x))order.push(x);
+  const trace=[];
+  for(const slot of order){
+    const w=equippedWeapon(slot);if(!w){trace.push(`${slot}:未裝備`);continue;}
+    const def=itemDef(w.id);if(!def){trace.push(`${slot}:非武器`);continue;}
+    if(def.cal){const ammo=pickAmmoByPreference(def.cal);if(ammo){trace.push(`${slot}:${def.name}✓`);return{slot,weapon:w,ammo,trace};}else{trace.push(`${slot}:${def.name}無彈`);continue;}}
+    if(slot==='throwable'){if(getThrowableCount()<=0){if(ensureThrowableFromBackpack()){const w2=equippedWeapon('throwable');trace.push(`${slot}:${w2.def.name}×${getThrowableCount()}✓`);return{slot,weapon:w2,ammo:null,trace};}trace.push(`${slot}:${def.name}耗盡`);continue;}trace.push(`${slot}:${def.name}×${getThrowableCount()}✓`);return{slot,weapon:w,ammo:null,trace};}
+    trace.push(`${slot}:${def.name}✓`);return{slot,weapon:w,ammo:null,trace};
+  }
+  return{slot:null,weapon:null,ammo:null,trace};
+}
+function chooseCombatWeapon(){const r=chooseCombatWeaponVerbose();if(r.slot)return{slot:r.slot,weapon:r.weapon,ammo:r.ammo};return null;}
+function isSemiAutoOnly(def){if(!def.modes)return false;return def.modes.length===1&&def.modes[0]==='點射';}
+function chooseFireMode(weapon,ec,ac){
+  const def=weapon.def;if(!def.modes)return '點射';const m=def.modes;
+  if(!def.cal)return m[0];
+  if(!m.includes('掃射')){if(ec<=1&&m.includes('點射'))return '點射';if(m.includes('短點射'))return '短點射';return m[0];}
+  const mag=def.mag||30;
+  if(ec>=4&&ac>=mag&&m.includes('掃射'))return '掃射';
+  if(ec>=3&&ac>=15&&m.includes('長點射'))return '長點射';
+  if(ec>=2&&ac>=9&&m.includes('短點射'))return '短點射';
+  return m.includes('點射')?m[0]:m[0];
+}
+function modeBulletsPerTarget(mode){return{'點射':1,'短點射':3,'長點射':7,'掃射':99,'近戰':1,'投擲':1}[mode]||1;}
+function fmtItemSpan(id,r,c){return `<span class="${rarityClass(r)} itm" data-iid="${id}" data-irar="${r}">${itemDef(id).name}*${c}</span>`;}
+function fmtEnemies(enemies){const map={};for(const e of enemies){const k=e.id;if(!map[k])map[k]={...e,count:0};map[k].count++;}return Object.values(map).map(g=>`${g.name}*${g.count}(HP:${g.maxHp}*${g.count})`).join('、');}
+function checkThrowableUnequip(){const tid=state.player.equipped.throwable;if(!tid)return;if(getThrowableCount()<=0){const def=itemDef(tid);state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;state.player.throwableStock=0;refreshPlayerStats();notify(`${def?def.name:tid} 已用盡，自動卸下`,'error');}}
+function applyDropBonus(count){const sl=getBuildingLv('storage');return Math.max(1,Math.round(count*(1+sl*0.1)));}
+
+function autoCombat(region,node,enemies){
+  try{
+    const choice=chooseCombatWeaponVerbose();
+    const totalEnemyHp=enemies.reduce((s,e)=>s+e.hp,0);
+    if(!choice.slot){pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 遭遇了 ${fmtEnemies(enemies)}，<span class="lose">手無寸鐵，只能逃跑。</span>`,[],'explore');return{victory:false,loot:[]};}
+    const {slot,weapon,ammo}=choice;const def=weapon.def;
+    addProf(slot,0.1);if(def.type)addProf(def.type,0.1);
+    const ec=enemies.length;let bulletsUsed=0,hits=0,dmgDealt=0,crits=0;
+    let mode='點射',rounds=1;
+    const critRate=calcCritRate(weapon.rarity,ammo?ammo.rarity:'一般');
+    const critMult=calcCritMult(weapon.rarity,ammo?ammo.rarity:'一般');
+    const scopeBonus=def.scopeBonus||0;
+
+    if(def.cal&&isSemiAutoOnly(def)){
+      mode='點射';
+      const hitRate=getHitRate(def.type,'點射',scopeBonus);
+      const baseDmg=Math.round(ammo.def.dmg*(RARITY_MULT[ammo.rarity]||1));
+      const magCap=def.mag||1;const maxBullets=Math.min(magCap,ammo.count);
+      const maxRounds=Math.max(1,Math.floor(maxBullets/Math.max(1,ec)));
+      const profLevel=Math.floor(state.proficiency[def.type]||0);
+      const extraChance=Math.min(1,profLevel*0.02);
+      rounds=1;while(rounds<maxRounds&&Math.random()<extraChance)rounds++;
+      const remaining=enemies.map(e=>({...e}));
+      for(let r=0;r<rounds;r++){const alive=remaining.filter(e=>e.hp>0);if(!alive.length)break;for(const target of alive){if(bulletsUsed>=maxBullets)break;bulletsUsed++;if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}if(remaining.every(e=>e.hp<=0))break;}
+      if(bulletsUsed>0)invRemove(ammo.id,ammo.rarity,bulletsUsed);
+    } else if(def.cal){
+      mode=chooseFireMode(weapon,ec,ammo.count);
+      const hitRate=getHitRate(def.type,mode,scopeBonus);
+      const perTarget=modeBulletsPerTarget(mode);
+      let needBullets=0;
+      if(mode==='掃射')needBullets=Math.min(def.mag||30,ammo.count);else needBullets=perTarget*ec;
+      needBullets=Math.min(needBullets,ammo.count);bulletsUsed=needBullets;
+      if(bulletsUsed>0)invRemove(ammo.id,ammo.rarity,bulletsUsed);
+      const baseDmg=Math.round(ammo.def.dmg*(RARITY_MULT[ammo.rarity]||1));
+      const pellets=ammo.def.pellets||1;
+      let remaining=enemies.map(e=>({...e}));let bi=bulletsUsed;
+      while(bi>0&&remaining.some(e=>e.hp>0)){const alive=remaining.filter(e=>e.hp>0);if(!alive.length)break;const target=pick(alive);bi--;for(let p=0;p<pellets;p++){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}if(remaining.every(e=>e.hp<=0))break;}
+    } else if(def.explosive){
+      mode=def.modes?def.modes[0]:'投擲';
+      if(getThrowableCount()<=0){if(!ensureThrowableFromBackpack()){pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');return{victory:false,loot:[]};}}
+      state.player.throwableStock--;bulletsUsed=1;setTimeout(checkThrowableUnequip,0);
+      const hitRate=getHitRate(def.type,mode)+10;
+      const baseDmg=Math.round(def.dmg*(RARITY_MULT[weapon.rarity]||1));
+      for(const target of enemies){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-5,5);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}
+    } else {
+      mode=def.modes?def.modes[0]:'近戰';
+      const hitRate=getHitRate(def.type,mode)+10;
+      const baseDmg=Math.round((def.dmg||0)*(RARITY_MULT[weapon.rarity]||1));
+      if(def.slot==='throwable'){
+        if(getThrowableCount()<=0){if(!ensureThrowableFromBackpack()){pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，投擲物不足。`,[],'explore');return{victory:false,loot:[]};}}
+        state.player.throwableStock--;bulletsUsed=1;setTimeout(checkThrowableUnequip,0);
+        const alive=enemies.map(e=>({...e}));const target=pick(alive);
+        const d=baseDmg+rndInt(-3,3);
+        if(Math.random()*100<hitRate){target.hp-=d;dmgDealt+=d;hits=1;}
+      } else {
+        const attackTimes=getMeleeHits(def.rpm);
+        bulletsUsed=attackTimes;
+        const alive=enemies.filter(e=>e.hp>0);
+        if(alive.length){const target=pick(alive);for(let i=0;i<attackTimes;i++){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);dmgDealt+=Math.max(1,d);hits++;}}}
+      }
+    }
+    const reallyVictory=dmgDealt>=totalEnemyHp&&hits>0;
+    const ammoTxt=def.cal?`消耗 ${ammo.def.name}子彈${bulletsUsed}發`:(def.explosive?`投出 ${def.name}×1`:'');
+    const isMelee=def.slot==='melee';
+    const meleeHits=isMelee?getMeleeHits(def.rpm):0;
+    const hitTxt=def.cal?`(命中:${hits}/${bulletsUsed}，暴擊:${crits}，傷害:${dmgDealt}/${totalEnemyHp})`:(isMelee?`(近戰 ${meleeHits} 次，命中:${hits}，暴擊:${crits}，傷害:${dmgDealt}/${totalEnemyHp})`:`(命中:${hits}，暴擊:${crits}，傷害:${dmgDealt}/${totalEnemyHp})`);
+    const modeDisplay=(def.cal&&isSemiAutoOnly(def)&&rounds>1)?`${rounds}輪點射`:mode;
+    let resultTxt='',loot=[];
+    if(reallyVictory){
+      resultTxt=`<span class="win">勝利</span>`;state.stats.kills+=enemies.length;
+      const dropN=rndInt(1,2);
+      for(let i=0;i<dropN;i++){const lid=pick(REGIONS[region].loot);const ldef=itemDef(lid);if(!ldef)continue;const rar=hasVariableRarity(lid)?rollRarity():ldef.rarity;let cnt=(itemCat(lid)==='ammo')?rndInt(10,30):(itemCat(lid)==='material'?rndInt(2,6):1);cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);loot.push({id:lid,rarity:rar,count:cnt});}
+      addExp(enemies.length*3);
+      if(REGIONS[region].seal&&Math.random()<REGIONS[region].sealRate){state.seals[REGIONS[region].seal]=parseInt(state.seals[REGIONS[region].seal]||0,10)+1;pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 撿到了 <b>Boss 信物</b>！`,[],'explore');}
+    } else {
+      resultTxt=`<span class="run">逃跑</span>`;
+      if(Math.random()<0.5){const lid=pick(REGIONS[region].loot);const ldef=itemDef(lid);if(ldef){const rar=hasVariableRarity(lid)?rollRarity():ldef.rarity;let cnt=(itemCat(lid)==='ammo')?rndInt(3,8):1;cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);loot.push({id:lid,rarity:rar,count:cnt});}}
+      addExp(1);
+    }
+    const lootTxt=loot.length?`，${resultTxt}:獲得 ${loot.map(l=>fmtItemSpan(l.id,l.rarity,l.count)).join('、')}`:`，${resultTxt}`;
+    const html=`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 遭遇了 ${fmtEnemies(enemies)}，使用 ${def.name} 進行了 ${modeDisplay}，${ammoTxt}${hitTxt}${lootTxt}。`;
+    pushLog(html,loot,'explore');
+    return{victory:reallyVictory,loot};
+  }catch(e){console.error(e);pushLog(`<span class="lose">戰鬥結算異常：${e.message}</span>`,[],'explore');return{victory:false,loot:[]};}
+}
+function searchEvent(region,node){
+  const r=REGIONS[region];const roll=Math.random();
+  if(roll<0.35){
+    const lid=pick(r.loot.filter(id=>WEAPONS[id]||ARMOR[id]));
+    if(lid){const ldef=itemDef(lid);const rar=rollRarity();invAdd(lid,rar,1);pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 開啓了 武器櫃，獲得 ${fmtItemSpan(lid,rar,1)}。`,[{id:lid,rarity:rar,count:1}],'explore');addProf('drop',1);addExp(2);return;}
+  }
+  if(roll<0.75){
+    const lid=pick(r.loot.filter(id=>AMMO[id]||MATERIALS[id]||CONSUMABLES[id]));
+    if(lid){const ldef=itemDef(lid);const rar=hasVariableRarity(lid)?rollRarity():ldef.rarity;let cnt=AMMO[lid]?rndInt(15,45):(MATERIALS[lid]?rndInt(2,7):1);cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 發現了 補給箱，獲得 ${fmtItemSpan(lid,rar,cnt)}。`,[{id:lid,rarity:rar,count:cnt}],'explore');addProf('drop',1);addExp(1);return;}
+  }
+  pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 沒有發現任何東西。`,[],'explore');
+}
+function doExploreTick(){
+  const regions=getActiveRegions();
+  if(!state.activeRegion||!regions.includes(state.activeRegion)){state.activeRegion=pick(regions);}
+  const region=state.activeRegion;
+  const mode=state.preferences.actionMode;const r=REGIONS[region];
+  const cur=getCurrentNode(region);const node=cur.node;
+  const cc0=mode==='attack'?r.combat.attack:r.combat.stealth;
+  const sb=(state.proficiency.drop||0)*0.001;
+  const cc=clamp(cc0-(mode==='stealth'?sb:0),0.05,0.9);
+  if(Math.random()<cc){const n=spawnCount();const enemies=genEnemies(region,n);autoCombat(region,node,enemies);}
+  else searchEvent(region,node);
+  const finished=advanceNode(region);
+  if(finished){state.activeRegion=pick(regions);}
+  updateExploreBg();
+  refreshPlayerStats();autoConsumeIfLow();
+}
+function autoConsumeIfLow(){
+  const thr=state.preferences.autoConsumeThreshold||0.3;
+  if(state.player.hp/state.player.maxHp>=thr)return;
+  const ord=state.preferences.consumeRarity;
+  for(const rar of ord){
+    for(const k in state.inventory){const [id,r]=k.split('@');if(r!==rar)continue;if(!CONSUMABLES[id])continue;const medbayLv=getBuildingLv('medbay');const actualHeal=Math.round(CONSUMABLES[id].heal*(RARITY_MULT[r]||1)*(1+medbayLv*0.15));state.player.hp=Math.min(state.player.maxHp,state.player.hp+actualHeal);invRemove(id,r,1);pushLog(`<span class="pl">玩家</span> 自動使用 ${itemDef(id).name}，恢復 ${actualHeal} HP。`,[],'explore');return;}
+  }
+}
+function buildingTick(){
+  const now=Date.now();
+  const genLv=getBuildingLv('generator');const genMult=1+genLv*0.2;
+  const radioLv=getBuildingLv('radio');
+  if(radioLv>0){
+    const last=state.radioLastTick||0;const interval=5*60*1000/genMult;
+    if(now-last>interval){state.radioLastTick=now;const mats=['wood','metal','screws','cloth','gears','electronics'];const m=pick(mats);const cnt=rndInt(3,8)*radioLv;invAdd(m,'一般',cnt);notify(`📡 無線電補給：${MATERIALS[m].name}*${cnt}`,'ok');}
+  }
+  const armoryLv=getBuildingLv('armory');
+  if(armoryLv>0){
+    const last=state.armoryLastTick||0;const interval=3*60*1000/genMult;
+    if(now-last>interval){
+      state.armoryLastTick=now;
+      let targetPen=2;
+      if(armoryLv<=5)targetPen=2;else if(armoryLv<=10)targetPen=3;else if(armoryLv<=15)targetPen=4;else if(armoryLv<=20)targetPen=5;else targetPen=6;
+      const pw=equippedWeapon('primary'),sw=equippedWeapon('secondary');
+      const cals=[];
+      if(pw&&pw.def.cal)cals.push(pw.def.cal);
+      if(sw&&sw.def.cal&&(!pw||sw.def.cal!==pw.def.cal))cals.push(sw.def.cal);
+      if(!cals.length)cals.push('9x19');
+      for(const cal of cals){const ammos=Object.keys(AMMO).filter(k=>AMMO[k].cal===cal);if(!ammos.length)continue;let best=null,bestDiff=999;for(const a of ammos){const diff=Math.abs(AMMO[a].pen-targetPen);if(diff<bestDiff){bestDiff=diff;best=a;}}if(best){const cnt=rndInt(15,30)*Math.max(1,Math.ceil(armoryLv/3));invAdd(best,AMMO[best].rarity,cnt);notify(`🔫 軍械庫產出：${AMMO[best].name}*${cnt}`,'ok');}}
+    }
+  }
+  processCrafting();
+}
+function processCrafting(){
+  if(!state.crafting||!state.crafting.length)return;
+  const now=Date.now();const genLv=getBuildingLv('generator');const sm=1+genLv*0.2;
+  for(let i=state.crafting.length-1;i>=0;i--){
+    const c=state.crafting[i];
+    if(c.type==='mod'){
+      const t=c.time*1000/sm;
+      if(now-c.startTime>=t){
+        const info=c.modInfo;
+        const namedId=getOrCreateNamedItem(info.baseId,info.mag,info.scope);
+        if(info.fromEquippedSlot){state.player.equipped[info.fromEquippedSlot]=namedId;state.player.equippedRarity[info.fromEquippedSlot]='具名';}
+        else{invRemove(info.baseId,info.baseRarity,1);invAddRaw(namedId,'具名',1);}
+        notify(`✅ 改造完成：${itemDef(namedId).name}`,'ok');
+        pushLog(`<span class="pl">玩家</span> 完成改造：<b class="r-具名">${itemDef(namedId).name}</b>。`,[],'explore');
+        state.crafting.splice(i,1);addProf('craft',1);refreshPlayerStats();save();
+      }
+      continue;
+    }
+  }
+}
+function offlineSettle(){
+  const now=Date.now();
+  const lastLogTime=state.logs.length?state.logs[state.logs.length-1].t:0;
+  const baseTime=Math.max(state.lastSeen||0,lastLogTime);
+  const elapsed=now-baseTime;
+  if(elapsed<60000){state.lastSeen=now;return 0;}
+  const maxMs=8*3600*1000;
+  const effMs=Math.min(elapsed,maxMs);
+  const hours=effMs/3600000;
+  const events=Math.floor(hours*rnd(1,2));
+  if(events<=0){state.lastSeen=now;return 0;}
+  let wins=0,runs=0,lootCount=0;
+  const regionPool=getActiveRegions();
+  for(let i=0;i<events;i++){
+    const region=pick(regionPool);const mode=state.preferences.actionMode;const r=REGIONS[region];
+    const cc=mode==='attack'?r.combat.attack:r.combat.stealth;
+    const cur=getCurrentNode(region);
+    if(Math.random()<cc){const n=spawnCount();const enemies=genEnemies(region,n);const res=autoCombat(region,cur.node,enemies);if(res.victory)wins++;else runs++;lootCount+=res.loot.length;}
+    else searchEvent(region,cur.node);
+    advanceNode(region);
+  }
+  const overtime=elapsed>maxMs;
+  let summary=`離線 ${(elapsed/3600000).toFixed(1)} 小時，共 ${events} 次事件（勝利 ${wins}／逃跑 ${runs}），獲得 ${lootCount} 類物資。`;
+  if(overtime)summary+=`（超過 8 小時，已進入休息模式）`;
+  state.logs.push({t:now,html:`<b style="color:#4a90d9">[離線摘要]</b> ${summary}`,items:[],type:'offline'});
+  state.lastSeen=now;
+  return events;
+}
+
+function renderExplore(){
+  const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
+  const regions=getActiveRegions();
+  const region=state.activeRegion||regions[0]||'廢棄工廠';
+  if(state.activeRegion!==region)state.activeRegion=region;
+  const cur=getCurrentNode(region);
+  const bg=getCurrentBg();
+  const spd=Math.round(EVENT_INTERVAL_MS/1000);
+  z1.innerHTML=`
+    <div class="scene">
+      <div class="bg-scroll" style="--spd:${spd}s"><div class="bg-layer" style="background-image:url('${bg}')"></div><div class="bg-layer" style="background-image:url('${bg}')"></div></div>
+      <div class="groundline"></div>
+      <div class="hero-wrap"><canvas class="hero-canvas" width="400" height="520"></canvas></div>
+      <div class="zone-title">🧭 ${region} · ${cur.node}</div>
+      <div class="zone-badge">${state.preferences.actionMode==='attack'?'⚔ 攻擊前進':'🥷 潛行蒐集'}</div>
+    </div>`;
+  setHeroAnim('walk');
+  renderEquipZone(z2);
+  z3.innerHTML=`<div class="z3-head"><div class="z3-title">📜 日誌</div><div class="z3-btn" id="log-history-btn">查看記錄</div></div><div class="logbox" id="logbox"></div>`;
+  renderZone3Log();
+  $('#log-history-btn').onclick=openLogHistory;
+}
+function renderEquipZone(z2){
+  const slots=[
+    {key:'head',label:'頭部',pos:{left:'40%',top:'6%'}},
+    {key:'face',label:'臉部',pos:{left:'40%',top:'22%'}},
+    {key:'top',label:'上衣',pos:{left:'40%',top:'38%'}},
+    {key:'pants',label:'褲子',pos:{left:'40%',top:'56%'}},
+    {key:'shoes',label:'鞋子',pos:{left:'40%',top:'74%'}},
+    {key:'backpack',label:'背包',pos:{left:'3%',top:'38%'}},
+    {key:'primary',label:'主武器',pos:{right:'3%',top:'10%'}},
+    {key:'secondary',label:'副武器',pos:{right:'3%',top:'32%'}},
+    {key:'melee',label:'近戰',pos:{right:'3%',top:'54%'}},
+    {key:'throwable',label:'投擲',pos:{right:'3%',top:'76%'}},
+  ];
+  let html='<div class="silhouette"></div>';
+  for(const s of slots){
+    const id=state.player.equipped[s.key];
+    const def=id?itemDef(id):null;
+    const style=Object.entries(s.pos).map(([k,v])=>`${k}:${v}`).join(';');
+    const isFixed=def&&def.fixed;
+    html+=`<div class="slot ${def?'filled':'empty'} ${isFixed?'fixed':''}" style="${style}" data-slot="${s.key}">
+      ${def?`<img class="slot-img" src="icons/items/${resolveIconId(id)}.png" alt=""><div class="lbl">${s.label}</div>`:`<div class="nm">${s.label}</div>`}
+    </div>`;
+  }
+  html+=`<div class="player-stat-panel" style="left:3%;top:6%;width:34%">
+    <div class="row"><span>等級</span><b>Lv.${state.player.level}</b></div>
+    <div class="row"><span>❤️ 生命</span><b>${Math.round(state.player.hp)}/${state.player.maxHp}</b></div>
+    <div class="row"><span>🛡️ 裝甲</span><b>${Math.round(state.player.armor)}/${state.player.maxArmor}</b></div>
+  </div>`;
+  z2.innerHTML=html;
+  $$('.slot',z2).forEach(e=>{e.onclick=()=>openSlotDetail(e.dataset.slot);});
+}
+
+const modalLayer=$('#modal-layer');
+const modalEl=$('.modal',modalLayer);
+function openModal({title,body,footer,full}){
+  modalEl.className='modal'+(full?' full':'');modalEl.innerHTML='';
+  if(title!==false){const hd=el('div','modal-hd');hd.innerHTML=`<div>${title||''}</div><div class="x">✕</div>`;hd.querySelector('.x').onclick=closeModal;modalEl.appendChild(hd);}
+  const bd=el('div','modal-bd-inner');
+  if(typeof body==='string')bd.innerHTML=body;else if(body)bd.appendChild(body);
+  modalEl.appendChild(bd);
+  if(footer){const ft=el('div','modal-ft');if(typeof footer==='string')ft.innerHTML=footer;else ft.appendChild(footer);modalEl.appendChild(ft);}
+  modalLayer.classList.add('on');return bd;
+}
+let modQueueTimer=null;
+function closeModal(){if(modQueueTimer){clearInterval(modQueueTimer);modQueueTimer=null;}modalLayer.classList.remove('on');modalEl.innerHTML='';}
+$('.modal-bd',modalLayer).onclick=closeModal;
+
+function openSlotDetail(slot){
+  const labels={head:'頭部',face:'臉部',top:'上衣',pants:'褲子',shoes:'鞋子',backpack:'背包',primary:'主武器',secondary:'副武器',melee:'近戰武器',throwable:'投擲物'};
+  const id=state.player.equipped[slot];
+  const def=id?itemDef(id):null;
+  const rar=state.player.equippedRarity[slot]||'一般';
+  let body='';
+  if(def){
+    const ac=def.armor!=null?armorClass(def.armor):'';
+    const aVal=def.armor!=null?equipArmorValue(id,rar):0;
+    const dVal=def.dmg!=null?Math.round(def.dmg*(RARITY_MULT[rar]||1)):null;
+    const isArmor=slot==='head'||slot==='face'||slot==='top'||slot==='pants'||slot==='shoes';
+    body=`<div class="detail-title ${rarityClass(rar)}">${itemIcon(id,30)} ${def.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div>
+      <div class="detail-sub">${labels[slot]} · 稀有度：${rar}</div>
+      <div class="stat-line"><span class="k">類型</span><span class="v">${def.type||(def.slot?'裝備':'—')}</span></div>
+      ${def.armor!=null?`<div class="stat-line"><span class="k">裝甲值</span><span class="v">${aVal}${ac?` (${ac}級)`:''}</span></div>`:''}
+      ${def.cal?`<div class="stat-line"><span class="k">口徑</span><span class="v">${def.cal}</span></div>`:''}
+      ${def.mag?`<div class="stat-line"><span class="k">彈匣</span><span class="v">${def.mag}</span></div>`:''}
+      ${!isArmor&&def.rpm?`<div class="stat-line"><span class="k">射速</span><span class="v">${def.rpm} RPM</span></div>`:''}
+      ${dVal!=null?`<div class="stat-line"><span class="k">傷害</span><span class="v">${dVal}</span></div>`:''}
+      ${def.modes?`<div class="stat-line"><span class="k">射擊模式</span><span class="v">${def.modes.join('/')}</span></div>`:''}
+      ${def.explosive?`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸（群傷）</span></div>`:''}
+      ${slot==='melee'?`<div class="stat-line"><span class="k">每輪攻擊次數</span><span class="v">${getMeleeHits(def.rpm)}</span></div>`:''}
+      ${def.scopeBonus?`<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+${def.scopeBonus}% 命中</span></div>`:''}
+      ${def.fixed?`<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>`:''}
+      ${slot==='throwable'?`<div class="stat-line"><span class="k">庫存</span><span class="v">${getThrowableCount()}</span></div>`:''}`;
+  } else {
+    body=`<div class="detail-title">空槽位</div><div class="detail-sub">${labels[slot]} 尚未裝備任何物品</div>`;
+  }
+  const ft=el('div','modal-ft');
+  if(slot==='backpack'||isFixedItem(id)){ft.innerHTML=`<button class="btn primary" id="m-open">打開</button><button class="btn ghost" id="m-exit">退出</button>`;}
+  else{ft.innerHTML=`<button class="btn" id="m-change">更換</button><button class="btn ghost" id="m-exit">退出</button>`;}
+  openModal({title:`${labels[slot]} 詳情`,body,footer:ft});
+  ft.querySelector('#m-exit').onclick=closeModal;
+  const op=ft.querySelector('#m-open');if(op)op.onclick=()=>{closeModal();openInventory();};
+  const ch=ft.querySelector('#m-change');if(ch)ch.onclick=()=>{closeModal();openSlotPicker(slot);};
+}
+function openSlotPicker(slot){
+  const list=[];
+  for(const it of invList()){const d=it.def;if(!d)continue;if(d.slot===slot)list.push(it);}
+  list.sort((a,b)=>RARITY_ORDER.indexOf(b.rarity)-RARITY_ORDER.indexOf(a.rarity));
+  let body='';
+  if(!list.length)body='<div class="empty-hint">倉庫中沒有可裝備於此槽位的物品</div>';
+  else{for(const it of list){body+=`<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${it.def.name}</div><div class="sub">${it.def.type||slot} · ${it.rarity}</div></div><div class="cnt">*${it.count}</div></div>`;}}
+  const bd=openModal({title:`選擇 ${slot} 裝備`,body});
+  $$('.item-row',bd).forEach(row=>{row.onclick=()=>{const iid=row.dataset.iid,irar=row.dataset.irar;closeModal();openEquipmentCompare(slot,iid,irar);};});
+}
+function getDisplayStat(id,rarity,key){
+  const d=itemDef(id);if(!d)return null;
+  const mult=RARITY_MULT[rarity]||1;
+  if(key==='dmg'&&d.dmg!=null)return Math.round(d.dmg*mult);
+  if(key==='armor'&&d.armor!=null&&d.armor>0)return equipArmorValue(id,rarity);
+  if(key==='heal'&&d.heal!=null)return Math.round(d.heal*mult);
+  return d[key]!=null?d[key]:null;
+}
+function openEquipmentCompare(slot,newId,newRarity){
+  const oldId=state.player.equipped[slot];
+  const oldRarity=state.player.equippedRarity[slot]||'一般';
+  const newDef=itemDef(newId);
+  const oldDef=oldId?itemDef(oldId):null;
+  const labels={head:'頭部',face:'臉部',top:'上衣',pants:'褲子',shoes:'鞋子',backpack:'背包',primary:'主武器',secondary:'副武器',melee:'近戰武器',throwable:'投擲物'};
+  const isArmorSlot=slot==='head'||slot==='face'||slot==='top'||slot==='pants'||slot==='shoes';
+  let body='';
+  if(oldDef){
+    body+=`<div class="cmp-header"><div class="cmp-name old">${oldDef.name}<br>（${oldRarity}）</div><div class="cmp-name new">${newDef.name}<br>（${newRarity}）</div></div>`;
+    body+=`<div class="cmp-title">← 舊裝備 &nbsp;|&nbsp; 屬性 &nbsp;|&nbsp; 新裝備 →</div>`;
+    const stats=[{key:'dmg',label:'基礎傷害'},{key:'armor',label:'裝甲值'},{key:'pen',label:'穿甲'},{key:'mag',label:'彈匣'},{key:'rpm',label:'射速'},{key:'range',label:'射程'},{key:'heal',label:'治療'}];
+    for(const st of stats){
+      if(isArmorSlot&&(st.key==='rpm'||st.key==='pen'||st.key==='mag'||st.key==='range'))continue;
+      const oldVal=oldDef?getDisplayStat(oldId,oldRarity,st.key):null;
+      const newVal=getDisplayStat(newId,newRarity,st.key);
+      if(oldVal==null&&newVal==null)continue;
+      let deltaClass='';let arrow='';
+      if(oldVal!=null&&newVal!=null){if(newVal>oldVal){deltaClass='up';arrow=' ▲';}else if(newVal<oldVal){deltaClass='down';arrow=' ▼';}}
+      body+=`<div class="cmp-row"><div class="cmp-val old">${oldVal!=null?oldVal:'—'}</div><div class="cmp-lbl">${st.label}</div><div class="cmp-val new ${deltaClass}">${newVal!=null?newVal:'—'}${arrow}</div></div>`;
+    }
+    if(!isArmorSlot){body+=`<div class="cmp-row"><div class="cmp-val old">×${RARITY_MULT[oldRarity]||1}</div><div class="cmp-lbl">稀有度倍率</div><div class="cmp-val new ${(RARITY_MULT[newRarity]||1)>(RARITY_MULT[oldRarity]||1)?'up':((RARITY_MULT[newRarity]||1)<(RARITY_MULT[oldRarity]||1)?'down':'')}">×${RARITY_MULT[newRarity]||1}${(RARITY_MULT[newRarity]||1)>(RARITY_MULT[oldRarity]||1)?' ▲':((RARITY_MULT[newRarity]||1)<(RARITY_MULT[oldRarity]||1)?' ▼':'')}</div></div>`;}
+    const oldCal=oldDef?oldDef.cal:null;const newCal=newDef?newDef.cal:null;
+    const oldAmmoId=oldCal?getDefaultAmmo(oldCal):null;const newAmmoId=newCal?getDefaultAmmo(newCal):null;
+    if(oldAmmoId||newAmmoId){
+      body+=`<div class="cmp-title" style="margin-top:6px;color:#8a5f18">默認彈藥（一般稀有度）</div>`;
+      body+=`<div class="cmp-row"><div class="cmp-val old" style="font-size:10px">${oldAmmoId?AMMO[oldAmmoId].name:'—'}</div><div class="cmp-lbl">彈藥</div><div class="cmp-val new up" style="font-size:10px">${newAmmoId?AMMO[newAmmoId].name:'—'}</div></div>`;
+      const oldAdmg=oldAmmoId?AMMO[oldAmmoId].dmg:null;const newAdmg=newAmmoId?AMMO[newAmmoId].dmg:null;
+      if(oldAdmg!=null||newAdmg!=null){let dClass='';let arrow2='';if(oldAdmg!=null&&newAdmg!=null){if(newAdmg>oldAdmg){dClass='up';arrow2=' ▲';}else if(newAdmg<oldAdmg){dClass='down';arrow2=' ▼';}}body+=`<div class="cmp-row"><div class="cmp-val old">${oldAdmg!=null?oldAdmg:'—'}</div><div class="cmp-lbl">彈藥傷害</div><div class="cmp-val new ${dClass}">${newAdmg!=null?newAdmg:'—'}${arrow2}</div></div>`;}
+    }
+    if((newDef.slot==='melee'||(oldDef&&oldDef.slot==='melee'))&&!isArmorSlot){
+      const oldHits=oldDef&&oldDef.slot==='melee'?getMeleeHits(oldDef.rpm):null;
+      const newHits=newDef.slot==='melee'?getMeleeHits(newDef.rpm):null;
+      if(oldHits!=null||newHits!=null){let dClass='',arrow3='';if(oldHits!=null&&newHits!=null){if(newHits>oldHits){dClass='up';arrow3=' ▲';}else if(newHits<oldHits){dClass='down';arrow3=' ▼';}}body+=`<div class="cmp-row"><div class="cmp-val old">${oldHits!=null?oldHits+' 次':'—'}</div><div class="cmp-lbl">每輪攻擊</div><div class="cmp-val new ${dClass}">${newHits!=null?newHits+' 次':'—'}${arrow3}</div></div>`;}
+    }
+  } else {
+    const ac=(newDef.armor!=null&&newDef.armor>0)?armorClass(newDef.armor):'';
+    const aVal=(newDef.armor!=null)?equipArmorValue(newId,newRarity):0;
+    const dVal=(newDef.dmg!=null)?Math.round(newDef.dmg*(RARITY_MULT[newRarity]||1)):null;
+    body+=`<div class="detail-title ${rarityClass(newRarity)}">${itemIcon(newId,30)} ${newDef.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div>`;
+    body+=`<div class="detail-sub">稀有度：${newRarity}</div>`;
+    body+=`<div class="stat-line"><span class="k">裝備槽</span><span class="v">${labels[slot]}</span></div>`;
+    if(newDef.armor!=null)body+=`<div class="stat-line"><span class="k">裝甲值</span><span class="v">${aVal}</span></div>`;
+    if(dVal!=null)body+=`<div class="stat-line"><span class="k">傷害</span><span class="v">${dVal}</span></div>`;
+    if(newDef.cal){const aid=getDefaultAmmo(newDef.cal);if(aid)body+=`<div class="stat-line"><span class="k">默認彈藥</span><span class="v">${AMMO[aid].name}（${AMMO[aid].dmg}）</span></div>`;}
+    if(newDef.mag)body+=`<div class="stat-line"><span class="k">彈匣</span><span class="v">${newDef.mag}</span></div>`;
+    if(newDef.rpm&&!isArmorSlot)body+=`<div class="stat-line"><span class="k">射速</span><span class="v">${newDef.rpm} RPM</span></div>`;
+    if(newDef.slot==='melee')body+=`<div class="stat-line"><span class="k">每輪攻擊</span><span class="v">${getMeleeHits(newDef.rpm)} 次</span></div>`;
+    if(newDef.scopeBonus)body+=`<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+${newDef.scopeBonus}% 命中</span></div>`;
+    if(newDef.explosive)body+=`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸（群傷）</span></div>`;
+  }
+  const ft=el('div','modal-ft');
+  ft.innerHTML=`<button class="btn primary" id="m-confirm">確定</button><button class="btn ghost" id="m-exit">退出</button>`;
+  openModal({title:`更換 ${labels[slot]}`,body,footer:ft});
+  ft.querySelector('#m-exit').onclick=closeModal;
+  ft.querySelector('#m-confirm').onclick=()=>{
+    const oldId2=state.player.equipped[slot];
+    if(oldId2){
+      const o=state.player.equippedRarity[slot]||'一般';
+      if(slot==='throwable'){unequipThrowable();}
+      else if(state.pendingSalvageEquipped&&state.pendingSalvageEquipped[slot]){salvageToMaterials(oldId2,o,1);delete state.pendingSalvageEquipped[slot];}
+      else invAddRaw(oldId2,o,1);
+    }
+    if(slot==='throwable'){equipThrowable(newId,newRarity);}
+    else{invRemove(newId,newRarity,1);state.player.equipped[slot]=newId;state.player.equippedRarity[slot]=newRarity;}
+    refreshPlayerStats();save();closeModal();renderCurrentTab();
+    notify(`已更換：${itemDef(newId).name}`,'ok');
+  };
+}
+const inventoryCollapsed={};
+function openInventory(){
+  const list=invList().sort((a,b)=>RARITY_ORDER.indexOf(b.rarity)-RARITY_ORDER.indexOf(a.rarity));
+  let body='';
+  if(!list.length)body+='<div class="empty-hint">倉庫空空如也</div>';
+  else{
+    const groups={weapon:[],armor:[],ammo:[],consume:[],material:[],misc:[]};
+    for(const it of list)groups[itemCat(it.id)].push(it);
+    const names={weapon:'⚔️ 武器',armor:'🛡️ 裝備',ammo:'🔫 彈藥',consume:'💊 消耗品',material:'🔧 材料',misc:'📦 其他'};
+    for(const g in groups){
+      if(!groups[g].length)continue;
+      const collapsed=inventoryCollapsed[g];
+      body+=`<div class="cat-header" data-cat="${g}"><span>${names[g]} (${groups[g].length})</span><span>${collapsed?'▶':'▼'}</span></div>`;
+      if(!collapsed){
+        for(const it of groups[g]){
+          const ac=(it.def.armor!=null&&it.def.armor>0)?armorClass(it.def.armor):'';
+          const aVal=(it.def.armor!=null)?equipArmorValue(it.id,it.rarity):0;
+          const dVal=(it.def.dmg!=null)?Math.round(it.def.dmg*(RARITY_MULT[it.rarity]||1)):null;
+          const isArmorDef=it.def.slot==='head'||it.def.slot==='face'||it.def.slot==='top'||it.def.slot==='pants'||it.def.slot==='shoes';
+          body+=`<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${it.def.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div><div class="sub">${it.rarity}${it.def.type?' · '+it.def.type:''}${it.def.cal?' · '+it.def.cal:''}${!isArmorDef&&it.def.pen?' · 穿甲'+it.def.pen:''}${dVal!=null?' · 傷'+dVal:''}${aVal>0?' · 甲'+aVal:''}</div></div><div class="cnt">*${it.count}</div></div>`;
+        }
+      }
+    }
+  }
+  const bd=openModal({title:'📦 物品倉庫',body});
+  $$('.cat-header',bd).forEach(h=>{h.onclick=()=>{const cat=h.dataset.cat;inventoryCollapsed[cat]=!inventoryCollapsed[cat];closeModal();openInventory();};});
+  $$('.item-row',bd).forEach(row=>{row.onclick=()=>openItemDetail(row.dataset.iid,row.dataset.irar);});
+}
+function openItemDetail(id,rarity){
+  const d=itemDef(id);if(!d)return;
+  const ac=(d.armor!=null&&d.armor>0)?armorClass(d.armor):'';
+  const aVal=(d.armor!=null)?equipArmorValue(id,rarity):0;
+  const dVal=(d.dmg!=null)?Math.round(d.dmg*(RARITY_MULT[rarity]||1)):null;
+  const ammoId=d.cal?getDefaultAmmo(d.cal):null;
+  const isArmorDef=d.slot==='head'||d.slot==='face'||d.slot==='top'||d.slot==='pants'||d.slot==='shoes';
+  let body=`<div class="detail-title ${rarityClass(rarity)}">${itemIcon(id,30)} ${d.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div>
+    <div class="detail-sub">稀有度：${rarity}</div>
+    <div class="stat-line"><span class="k">持有</span><span class="v">${invCount(id,rarity)}</span></div>
+    <div class="stat-line"><span class="k">類別</span><span class="v">${itemCat(id)}</span></div>
+    ${d.type?`<div class="stat-line"><span class="k">類型</span><span class="v">${d.type}</span></div>`:''}
+    ${d.slot?`<div class="stat-line"><span class="k">裝備槽</span><span class="v">${d.slot}</span></div>`:''}
+    ${d.armor!=null?`<div class="stat-line"><span class="k">裝甲值</span><span class="v">${aVal}${ac?` (${ac}級)`:''}</span></div>`:''}
+    ${d.cal?`<div class="stat-line"><span class="k">口徑</span><span class="v">${d.cal}</span></div>`:''}
+    ${ammoId?`<div class="stat-line"><span class="k">默認彈藥</span><span class="v">${AMMO[ammoId].name}（${AMMO[ammoId].dmg}）</span></div>`:''}
+    ${dVal!=null?`<div class="stat-line"><span class="k">傷害</span><span class="v">${dVal}</span></div>`:''}
+    ${!isArmorDef&&d.pen?`<div class="stat-line"><span class="k">穿甲</span><span class="v">${d.pen}</span></div>`:''}
+    ${d.pellets?`<div class="stat-line"><span class="k">彈丸數</span><span class="v">${d.pellets}</span></div>`:''}
+    ${d.mag?`<div class="stat-line"><span class="k">彈匣</span><span class="v">${d.mag}</span></div>`:''}
+    ${!isArmorDef&&d.rpm?`<div class="stat-line"><span class="k">射速</span><span class="v">${d.rpm} RPM</span></div>`:''}
+    ${d.modes?`<div class="stat-line"><span class="k">模式</span><span class="v">${d.modes.join('/')}</span></div>`:''}
+    ${d.heal?`<div class="stat-line"><span class="k">治療</span><span class="v">${Math.round(d.heal*(RARITY_MULT[rarity]||1))}</span></div>`:''}
+    ${d.explosive?`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>`:''}
+    ${d.slot==='melee'?`<div class="stat-line"><span class="k">每輪攻擊次數</span><span class="v">${getMeleeHits(d.rpm)}</span></div>`:''}
+    ${d.scopeBonus?`<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+${d.scopeBonus}% 命中</span></div>`:''}
+    ${d.fixed?`<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>`:''}`;
+  const ft=el('div','modal-ft');
+  if(d.slot&&!d.fixed)ft.innerHTML=`<button class="btn primary" id="m-equip">裝備</button><button class="btn ghost" id="m-close">關閉</button>`;
+  else ft.innerHTML=`<button class="btn ghost" id="m-close">關閉</button>`;
+  openModal({title:'物品詳情',body,footer:ft});
+  ft.querySelector('#m-close').onclick=closeModal;
+  const eqb=ft.querySelector('#m-equip');
+  if(eqb)eqb.onclick=()=>{const slot=d.slot;closeModal();openEquipmentCompare(slot,id,rarity);};
+}
+function openLogHistory(){
+  let body='<div style="font-size:10px">';
+  const logs=state.logs.slice().reverse();
+  if(!logs.length)body+='<div class="empty-hint">暫無記錄</div>';
+  for(const l of logs)body+=`<div class="logline" style="padding:5px 0">${l.html}</div>`;
+  body+='</div>';
+  const bd=openModal({title:'📜 歷史記錄',body,full:true});
+  $$('.itm',bd).forEach(e=>{e.onclick=()=>openItemDetail(e.dataset.iid,e.dataset.irar);});
+}
+
+let battle=null;
+
+function renderCombat(){
+  const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
+  if(battle&&battle.active){renderBattleScene(z1);renderBattleJoystick(z2);renderBattleControls(z3);return;}
+  let listHtml='<div class="boss-list">';
+  for(const bid in BOSSES){
+    const b=BOSSES[bid];
+    const seals=parseInt(state.seals[b.seal]||0,10);
+    const defeated=state.defeatedBosses.includes(bid);
+    const can=seals>0;
+    listHtml+=`<div class="boss-card ${can?'':'locked'}"><div class="boss-avatar">${bossIcon(bid)}</div><div class="boss-info"><div class="bn">${b.name}${defeated?' ✅':''}</div><div class="bd">地區：${b.region} ｜ HP ${b.hp} ｜ 裝甲 ${b.armor} ｜ 傷害 ${b.dmg} ｜ 穿透 ${b.pen||0}</div><div class="seal-tag ${seals>0?'':'none'}">信物 *${seals}</div></div><button class="btn ${can?'primary':''}" data-bid="${bid}" ${can?'':'disabled'} style="flex:0 0 auto;padding:8px 10px;font-size:11px">${can?'挑戰':'無信物'}</button></div>`;
+  }
+  listHtml+='</div>';
+  z1.innerHTML=listHtml;
+  renderEquipZone(z2);
+  z3.innerHTML=`<div class="z3-head"><div class="z3-title">⚔️ Boss 挑戰</div></div>
+    <div class="logbox" style="padding:10px">
+      <div style="color:#e8a33d;font-weight:bold;margin-bottom:6px">挑戰說明</div>
+      <div style="line-height:1.7;font-size:10px;color:#bfb3a0">
+        · 進入戰鬥後，需主動前進至 Boss 警戒範圍才會觸發攻擊<br>
+        · 只要在武器射程內即可對 Boss 開火造成傷害<br>
+        · 傷害計算：穿透會降低 Boss 有效護甲；減傷上限 80%<br>
+        · 護甲未破時傷害由護甲吸收；護甲歸零後 HP 承受 120% 傷害<br>
+        · 拖動搖桿可左右上下移動<br>
+        · 點擊 Boss 身體部位設定瞄準點<br>
+        · 彈藥用盡會自動裝填，並播放換彈動作
+      </div>
+    </div>`;
+  $$('.boss-card .btn',z1).forEach(btn=>{btn.onclick=()=>startBossBattle(btn.dataset.bid);});
+}
+function renderBattleScene(z1){
+  const b=battle;
+  const rLeft=Math.max(0,(b.px-(b.playerWeaponRange||0.5)))*100;
+  const rRight=Math.min(1,(b.px+(b.playerWeaponRange||0.5)))*100;
+  const rWidth=rRight-rLeft;
+  const totalHp=b.bossMaxHp+b.bossMaxArmor;
+  const dealtPct=Math.min(100,(b.damageDealt/totalHp)*100);
+  z1.innerHTML=`
+    <div class="battle-scene">
+      <div class="battle-bg"></div>
+      <div class="range-indicator" id="range-indicator" style="left:${rLeft}%;width:${rWidth}%"></div>
+      <div class="damage-header"><div>對 Boss 傷害 <span class="num">${Math.round(b.damageDealt)}</span> / ${totalHp}</div><div class="bar"><div class="fill" id="dmg-bar" style="width:${dealtPct}%"></div></div></div>
+      <div class="fighter boss-f" id="fighter-boss" style="left:${b.bx*100}%;top:${b.by*100}%">
+        <div class="hpbar-wrap"><div class="nm">${b.bossName}</div><div class="bar ap"><div class="fill" id="boss-ap" style="width:${(b.bossArmor/b.bossMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:${(b.bossHp/b.bossMaxHp*100)}%"></div></div></div>
+        <div class="sprite" id="boss-sprite">${bossIcon(b.bossId)}</div>
+      </div>
+      <div class="fighter hero-f" id="fighter-hero" style="left:${b.px*100}%;top:${b.py*100}%">
+        <div class="hpbar-wrap"><div class="nm">玩家</div><div class="bar ap"><div class="fill" id="hero-ap" style="width:${(b.playerArmor/b.playerMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="hero-hp" style="width:${(b.playerHp/b.playerMaxHp*100)}%"></div></div></div>
+        <div class="sprite"><canvas class="hero-canvas" width="400" height="520"></canvas></div>
+      </div>
+      <div id="battle-fx"></div>
+      ${b.aimPoint?`<div class="aim-marker" id="aim-marker" style="left:${b.aimX*100}%;top:${b.aimY*100}%"></div>`:''}
+      ${!b.engaged?`<div style="position:absolute;bottom:8px;left:8px;right:8px;text-align:center;font-size:11px;color:#e8a33d;background:rgba(0,0,0,.7);padding:6px;border-radius:8px;border:1px solid #8a5f18;z-index:20">準備中… 點擊 Boss 設定瞄準點，拖動搖桿前進至警戒範圍觸發戰鬥</div>`:''}
+    </div>`;
+  setHeroAnim('idle');
+  updateFighterPos();
+  const bs=$('#boss-sprite');
+  if(bs)bs.onclick=(e)=>{
+    const scene=document.querySelector('.battle-scene');
+    if(!scene)return;
+    const rect=scene.getBoundingClientRect();
+    const vx=clamp((e.clientX-rect.left)/rect.width,0,1);
+    const vy=clamp((e.clientY-rect.top)/rect.height,0,1);
+    battle.aimX=vx;battle.aimY=vy;battle.aimPoint=true;
+    const marker=$('#aim-marker');if(marker)marker.remove();
+    const fx=$('#battle-fx');
+    if(fx){const m=el('div','aim-marker');m.id='aim-marker';m.style.left=(vx*100)+'%';m.style.top=(vy*100)+'%';fx.appendChild(m);}
+  };
+}
+function updateFighterPos(){
+  if(!battle)return;
+  const h=$('#fighter-hero'),b=$('#fighter-boss');
+  if(h){h.style.left=(battle.px*100)+'%';h.style.top=(battle.py*100)+'%';}
+  if(b){b.style.left=(battle.bx*100)+'%';b.style.top=(battle.by*100)+'%';}
+  const ri=$('#range-indicator');
+  if(ri){const r=battle.playerWeaponRange||0.5;const rLeft=Math.max(0,(battle.px-r))*100;const rRight=Math.min(1,(battle.px+r))*100;ri.style.left=rLeft+'%';ri.style.width=(rRight-rLeft)+'%';}
+  const dmgBar=$('#dmg-bar');
+  if(dmgBar){const totalHp=battle.bossMaxHp+battle.bossMaxArmor;dmgBar.style.width=Math.min(100,(battle.damageDealt/totalHp)*100)+'%';}
+  const dmgHd=$('.damage-header');
+  if(dmgHd){dmgHd.querySelector('.num').textContent=Math.round(battle.damageDealt);}
+}
+function renderBattleJoystick(z2){
+  z2.innerHTML=`<div class="joystick" id="joystick"><div class="stick" id="stick"></div></div><div class="z2-hint">拖動搖桿移動</div>`;
+  const joy=$('#joystick'),stick=$('#stick');
+  let touchId=null,cx,cy,radius;
+  function start(e){const r=joy.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;radius=r.width/2;const t=e.changedTouches?e.changedTouches[0]:e;touchId=e.changedTouches?t.identifier:null;move(e);}
+  function move(e){
+    if(!battle||!battle.active)return;
+    let t=e;if(e.changedTouches)t=Array.from(e.changedTouches).find(x=>x.identifier===touchId)||e.changedTouches[0];
+    let dx=t.clientX-cx;let dy=t.clientY-cy;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>radius){dx=dx/dist*radius;dy=dy/dist*radius;}
+    stick.style.left=(radius+dx)+'px';stick.style.top=(radius+dy)+'px';stick.style.transform='translate(-50%,-50%)';
+    battle.moveDir=dx/radius;
+    battle.moveDirY=dy/radius;
+  }
+  function end(e){
+    if(e.changedTouches&&touchId!==null){const found=Array.from(e.changedTouches).find(x=>x.identifier===touchId);if(!found)return;}
+    touchId=null;if(battle){battle.moveDir=0;battle.moveDirY=0;}
+    stick.style.left='50%';stick.style.top='50%';
+  }
+  joy.addEventListener('touchstart',e=>{e.preventDefault();start(e);},{passive:false});
+  joy.addEventListener('touchmove',e=>{e.preventDefault();move(e);},{passive:false});
+  joy.addEventListener('touchend',e=>{e.preventDefault();end(e);},{passive:false});
+  joy.addEventListener('touchcancel',e=>end(e));
+  joy.addEventListener('mousedown',e=>{start(e);const mm=ev=>move(ev);const mu=()=>{end({});document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);});
+}
+function renderBattleControls(z3){
+  const w=battle.weapon;
+  const wdef=w?w.def:null;
+  const modes=wdef&&wdef.modes?wdef.modes:['點射'];
+  const ammoInMag=battle.ammoInMag;
+  const ammoTotal=battle.ammoRef?battle.ammoRef.count:0;
+  const canFire=!battle.reloading&&!battle.consuming;
+  z3.innerHTML=`
+    <div class="ctrl-wrap">
+      <div class="ammo-info">${wdef?`${wdef.name} ｜ ${ammoInMag}/${wdef.mag||0} ｜ 備彈 ${ammoTotal}${battle.reloading?'｜裝填中…':''}`:'無武器'}</div>
+      <div class="fire-modes">${modes.map(m=>`<div class="fm-btn ${m===battle.fireMode?'on':''}" data-mode="${m}">${m}</div>`).join('')}</div>
+      <div style="display:flex;gap:4px">
+        <div class="weapon-slot-btn ${battle.weaponSlot==='primary'?'on':''}" data-slot="primary" style="flex:1">主武器</div>
+        <div class="weapon-slot-btn ${battle.weaponSlot==='secondary'?'on':''}" data-slot="secondary" style="flex:1">副武器</div>
+        <div class="weapon-slot-btn ${battle.weaponSlot==='melee'?'on':''}" data-slot="melee" style="flex:1">近戰</div>
+        <div class="weapon-slot-btn ${battle.weaponSlot==='throwable'?'on':''}" data-slot="throwable" style="flex:1">投擲</div>
+      </div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center">
+        <div class="fire-btn ${canFire?'':'disabled'}" id="fire-btn">${battle.reloading?'裝填':(battle.consuming?'使用中':'攻擊')}</div>
+      </div>
+      <div class="ammo-info" style="color:#7a6f60">對 Boss 傷害：${Math.round(battle.damageDealt)} ｜ ${battle.engaged?'⚔️ 已交戰':'⏸️ 準備中'}</div>
+    </div>`;
+  $$('.fm-btn',z3).forEach(b=>{b.onclick=()=>{battle.fireMode=b.dataset.mode;renderBattleControls(z3);};});
+  $$('.weapon-slot-btn',z3).forEach(b=>{b.onclick=()=>switchBattleWeapon(b.dataset.slot);});
+  const fb=$('#fire-btn');
+  fb.addEventListener('touchstart',e=>{e.preventDefault();if(!battle.reloading&&!battle.consuming)battle.firing=true;},{passive:false});
+  fb.addEventListener('touchend',e=>{e.preventDefault();battle.firing=false;},{passive:false});
+  fb.addEventListener('touchcancel',()=>{battle.firing=false;});
+  fb.addEventListener('mousedown',()=>{if(!battle.reloading&&!battle.consuming)battle.firing=true;});
+  fb.addEventListener('mouseup',()=>{battle.firing=false;});
+  fb.addEventListener('mouseleave',()=>{battle.firing=false;});
+}
+function switchBattleWeapon(slot){
+  if(slot==='throwable'&&getThrowableCount()<=0){ensureThrowableFromBackpack();}
+  const w=equippedWeapon(slot);if(!w||!itemDef(w.id))return;
+  const def=itemDef(w.id);
+  battle.weaponStates=battle.weaponStates||{};
+  if(battle.weaponSlot&&battle.weaponStates[battle.weaponSlot]){battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;battle.weaponStates[battle.weaponSlot].ammoRef=battle.ammoRef;}
+  else if(battle.weaponSlot){battle.weaponStates[battle.weaponSlot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};}
+  if(battle.reloading){battle.reloading=false;}
+  battle.weapon=w;battle.weaponSlot=slot;
+  battle.fireMode=def.modes?def.modes[0]:'點射';
+  battle.playerWeaponRange=def.range||0.5;
+  const prevSt=battle.weaponStates[slot];
+  if(prevSt){battle.ammoInMag=prevSt.ammoInMag||0;battle.ammoRef=prevSt.ammoRef;}
+  else if(def.cal){const ammo=pickAmmoByPreference(def.cal);if(!ammo){battle.ammoRef=null;battle.ammoInMag=0;}else{battle.ammoRef={...ammo};battle.ammoInMag=Math.min(def.mag||30,ammo.count);}battle.weaponStates[slot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};}
+  else{battle.ammoRef=null;battle.ammoInMag=def.slot==='throwable'?getThrowableCount():1;battle.weaponStates[slot]={ammoInMag:battle.ammoInMag,ammoRef:null};}
+  if(slot==='primary') setHeroAnim('idle');
+  else if(slot==='secondary') setHeroAnim('switch_secondary','idle');
+  else if(slot==='melee') setHeroAnim('switch_melee','idle');
+  renderBattleControls($('#zone3'));
+}
+function startBossBattle(bid){
+  const b=BOSSES[bid];if(!b)return;
+  const seals=parseInt(state.seals[b.seal]||0,10);
+  if(seals<=0){notify('沒有對應的 Boss 信物','error');return;}
+  state.seals[b.seal]=seals-1;
+  state.player.hp=state.player.maxHp;
+  state.player.armor=state.player.maxArmor;
+  refreshPlayerStats();
+  const w=chooseCombatWeapon();
+  const startSlot=w?w.slot:'melee';
+  battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossPen:b.pen||0,skills:b.skills||[],playerHp:state.player.hp,playerMaxHp:state.player.maxHp,playerArmor:state.player.armor,playerMaxArmor:Math.max(1,state.player.maxArmor),px:0.15,py:0.65,bx:0.75,by:0.65,moveDir:0,moveDirY:0,bullets:[],firing:false,reloading:false,consuming:false,lastShot:0,lastBossShot:0,damageDealt:0,weapon:null,weaponSlot:startSlot,playerWeaponRange:0.5,fireMode:'點射',ammoRef:null,ammoInMag:0,weaponStates:{},engaged:false,engagedRange:0.35,startTime:Date.now(),aimPoint:false,aimX:0.75,aimY:0.7,players:[{id:'local',isLocal:true}]};
+  switchBattleWeapon(startSlot);
+  renderCombat();
+  battle.lastTime=performance.now();
+  requestAnimationFrame(battleLoop);
+}
+function battleLoop(now){
+  if(!battle||!battle.active)return;
+  const dt=Math.min(0.05,(now-battle.lastTime)/1000);battle.lastTime=now;
+  const moveSpd=0.35*dt;
+  if(battle.moveDir)battle.px=clamp(battle.px+battle.moveDir*moveSpd,0.05,0.95);
+  if(battle.moveDirY)battle.py=clamp(battle.py+battle.moveDirY*moveSpd,0.40,0.85);
+  const dx=battle.bx-battle.px;const dist=Math.abs(dx);
+  if(!battle.engaged&&dist<battle.engagedRange){battle.engaged=true;notify('⚠️ 進入交戰狀態！','error');}
+  if(battle.engaged){
+    const bRange=0.4;
+    if(dist>bRange+0.05){const bspd=0.03*dt;battle.bx+=Math.sign(dx)*Math.min(bspd,Math.abs(dist-bRange));}
+    battle.bx=clamp(battle.bx,0.1,0.9);
+    if(now-battle.lastBossShot>1200&&dist<bRange){battle.lastBossShot=now;battle.bullets.push({sx:battle.bx,sy:battle.by,tx:battle.px,ty:battle.py,t:0,enemy:true,dmg:battle.bossDmg,pen:battle.bossPen||0});}
+  }
+  if(battle.firing&&!battle.reloading&&!battle.consuming){
+    const interval=fireInterval(battle.fireMode,battle.weapon);
+    if(now-battle.lastShot>interval){battle.lastShot=now;playerShoot();}
+  }
+  updateBullets(dt);updateFighterPos();
+  const heroHp=$('#hero-hp'),heroAp=$('#hero-ap'),bossHp=$('#boss-hp'),bossAp=$('#boss-ap');
+  if(heroHp)heroHp.style.width=Math.max(0,battle.playerHp/battle.playerMaxHp*100)+'%';
+  if(heroAp)heroAp.style.width=Math.max(0,battle.playerArmor/battle.playerMaxArmor*100)+'%';
+  if(bossHp)bossHp.style.width=Math.max(0,battle.bossHp/battle.bossMaxHp*100)+'%';
+  if(bossAp)bossAp.style.width=Math.max(0,battle.bossArmor/battle.bossMaxArmor*100)+'%';
+  if(!battle.consuming&&battle.playerHp/battle.playerMaxHp<(state.preferences.autoConsumeThreshold||0.3))autoConsumeInBattle();
+  requestAnimationFrame(battleLoop);
+}
+function autoConsumeInBattle(){
+  if(battle.consuming)return;
+  const ord=state.preferences.consumeRarity;
+  for(const rar of ord){
+    for(const k in state.inventory){
+      const [id,r]=k.split('@');if(r!==rar)continue;if(!CONSUMABLES[id])continue;
+      battle.consuming=true;battle.firing=false;
+      notify(`使用 ${itemDef(id).name}…`,'ok');
+      setTimeout(()=>{
+        if(!battle||!battle.active)return;
+        const medbayLv=getBuildingLv('medbay');
+        const actualHeal=Math.round(CONSUMABLES[id].heal*(RARITY_MULT[r]||1)*(1+medbayLv*0.15));
+        battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
+        invRemove(id,r,1);battle.consuming=false;
+        pushLog(`<span class="pl">玩家</span> 使用 ${itemDef(id).name}，恢復 ${actualHeal} HP。`,[],'combat');
+      },1200);
+      return;
+    }
+  }
+}
+function fireInterval(mode,weapon){
+  const def=weapon?weapon.def:null;
+  const rpm=def&&def.rpm?def.rpm:600;
+  const maxInterval=60000/rpm;
+  let base={'點射':350,'短點射':180,'長點射':120,'掃射':90,'近戰':500,'投擲':800}[mode]||300;
+  if(mode==='點射')base=maxInterval;
+  if(mode==='短點射'||mode==='長點射'||mode==='掃射')base=Math.max(maxInterval,90);
+  return Math.max(maxInterval,base);
+}
+function showHeroReloadAnim(){
+  setHeroAnim('reload','idle');
+}
+function playerShoot(){
+  let w=battle.weapon;if(!w||battle.reloading||battle.consuming)return;
+  let def=w.def;
+  const dist=Math.abs(battle.bx-battle.px);
+  if(dist>battle.playerWeaponRange+0.05){if(Math.random()<0.05)notify('超出武器射程','error');return;}
+  if(def.cal){
+    if(battle.ammoInMag<=0){
+      if(battle.ammoRef&&battle.ammoRef.count>0){
+        battle.reloading=true;battle.firing=false;renderBattleControls($('#zone3'));showHeroReloadAnim();
+        const currentSlot=battle.weaponSlot;
+        setTimeout(()=>{
+          if(!battle||!battle.active)return;
+          if(battle.weaponSlot!==currentSlot)return;
+          const need=def.mag||30;const take=Math.min(need,battle.ammoRef.count);
+          battle.ammoInMag=take;battle.ammoRef.count-=take;
+          if(battle.ammoRef.count<=0)invRemove(battle.ammoRef.id,battle.ammoRef.rarity,take);
+          battle.weaponStates[battle.weaponSlot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};
+          battle.reloading=false;renderBattleControls($('#zone3'));
+        },1700);
+        return;
+      }
+      const sw=equippedWeapon('secondary');
+      if(sw&&itemDef(sw.id)&&battle.weaponSlot==='primary'){battle.firing=false;switchBattleWeapon('secondary');notify('主武器彈藥耗盡，切換至副武器','error');return;}
+      battle.firing=false;return;
+    }
+    battle.ammoInMag--;
+    if(battle.ammoRef){invRemove(battle.ammoRef.id,battle.ammoRef.rarity,1);battle.ammoRef.count--;}
+    const sx=battle.px,sy=battle.py;
+    const tx=battle.aimPoint?battle.aimX:battle.bx;
+    const ty=battle.aimPoint?battle.aimY:battle.by;
+    battle.bullets.push({sx,sy,tx,ty,t:0,player:true});
+    if(battle.weaponSlot==='primary') setHeroAnim('fire_primary','idle');
+    else if(battle.weaponSlot==='secondary') setHeroAnim('fire_secondary','idle');
+    const hitRate=getHitRate(def.type,battle.fireMode,def.scopeBonus||0);
+    const baseDmg=Math.round(battle.ammoRef?AMMO[battle.ammoRef.id].dmg*(RARITY_MULT[battle.ammoRef.rarity]||1):20);
+    const ammoPen=battle.ammoRef?(AMMO[battle.ammoRef.id].pen||0):0;
+    const critRate=calcCritRate(w.rarity,battle.ammoRef?battle.ammoRef.rarity:'一般');
+    const critMult=calcCritMult(w.rarity,battle.ammoRef?battle.ammoRef.rarity:'一般');
+    const pellets=battle.ammoRef?AMMO[battle.ammoRef.id].pellets||1:1;
+    for(let p=0;p<pellets;p++){
+      if(Math.random()*100<hitRate){
+        let dmg=baseDmg;let isCrit=false;
+        if(Math.random()<critRate){dmg=Math.round(dmg*critMult);isCrit=true;}
+        applyBossDamage(dmg,isCrit,ammoPen);
+      }
+    }
+  } else {
+    if(def.slot==='throwable'){
+      if(getThrowableCount()<=0){if(!ensureThrowableFromBackpack()){battle.firing=false;notify('沒有可用的投擲物','error');return;}const nw=equippedWeapon('throwable');if(nw){battle.weapon=nw;w=nw;def=nw.def;}}
+      state.player.throwableStock--;
+      battle.ammoInMag=getThrowableCount();
+      if(battle.weaponStates[battle.weaponSlot])battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;
+      if(state.player.throwableStock<=0){if(ensureThrowableFromBackpack()){const nw=equippedWeapon('throwable');if(nw){battle.weapon=nw;w=nw;def=nw.def;}battle.ammoInMag=getThrowableCount();if(battle.weaponStates[battle.weaponSlot])battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;}}
+    }
+    if(def.slot==='melee') setHeroAnim('attack_melee','idle');
+    const hitRate=getHitRate(def.type,battle.fireMode)+10;
+    const baseDmg=Math.round((def.dmg||0)*(RARITY_MULT[w.rarity]||1));
+    const critRate=calcCritRate(w.rarity,'一般');
+    const critMult=calcCritMult(w.rarity,'一般');
+    battle.bullets.push({sx:battle.px,sy:battle.py,tx:battle.bx,ty:battle.by,t:0,player:true,big:true});
+    const isMelee=def.slot==='melee';
+    const hits=isMelee?getMeleeHits(def.rpm):1;
+    for(let i=0;i<hits;i++){
+      if(Math.random()*100<hitRate){
+        let dmg=baseDmg;let isCrit=false;
+        if(Math.random()<critRate){dmg=Math.round(dmg*critMult);isCrit=true;}
+        applyBossDamage(dmg,isCrit,0);
+      }
+    }
+  }
+  addProf(battle.weaponSlot,0.01);
+  if(def.type)addProf(def.type,0.01);
+  renderBattleControls($('#zone3'));
+}
+function applyBossDamage(dmg,isCrit,pen){
+  const target={hp:battle.bossHp,armor:battle.bossArmor};
+  const res=applyDamage(target,dmg,pen||0);
+  battle.bossHp=target.hp;battle.bossArmor=target.armor;battle.damageDealt+=dmg;
+  spawnHitFx(battle.bx,battle.by,`-${Math.round(dmg)}${isCrit?'!':''}`,isCrit?'crit':(res.hpLost>0?'':'armor'));
+  if(battle.bossHp<=0)endBattle(true);
+}
+function spawnHitFx(x,y,txt,cls){
+  const layer=$('#battle-fx');if(!layer)return;
+  const e=el('div','hit-fx'+(cls?' '+cls:''),txt);
+  e.style.left=(x*100)+'%';e.style.top=(y*100)+'%';
+  layer.appendChild(e);setTimeout(()=>e.remove(),1100);
+}
+function updateBullets(dt){
+  const layer=$('#battle-fx');if(!layer)return;
+  for(let i=battle.bullets.length-1;i>=0;i--){
+    const b=battle.bullets[i];b.t+=dt*3.5;
+    if(b.t>=1){
+      if(b.enemy){
+        const dodge=clamp(0.15+state.player.level*0.005,0,0.5);
+        if(Math.random()>dodge){
+          const target={hp:battle.playerHp,armor:battle.playerArmor};
+          const res=applyDamage(target,b.dmg,b.pen||0);
+          battle.playerHp=target.hp;battle.playerArmor=target.armor;
+          spawnHitFx(battle.px,battle.py,`-${Math.round(b.dmg)}`,res.hpLost>0?'enemy':'armor');
+          if(battle.playerHp<=0){endBattle(false);return;}
+        }
+      }
+      battle.bullets.splice(i,1);continue;
+    }
+  }
+  layer.querySelectorAll('.bullet').forEach(e=>{if(e.id!=='aim-marker')e.remove();});
+  for(const b of battle.bullets){
+    const x=b.sx+(b.tx-b.sx)*b.t,y=b.sy+(b.ty-b.sy)*b.t;
+    const e=el('div','bullet'+(b.enemy?' enemy':''));
+    e.style.left=(x*100)+'%';e.style.top=(y*100)+'%';
+    if(b.big)e.style.transform='translate(-50%,-50%) scale(1.8)';
+    layer.appendChild(e);
+  }
+}
+function endBattle(victory){
+  if(!battle)return;
+  const b=battle;b.active=false;
+  state.player.hp=Math.max(1,Math.round(b.playerHp));
+  state.player.armor=Math.max(0,Math.round(b.playerArmor));
+  addProf(b.weaponSlot,3);
+  if(b.weapon&&b.weapon.def.type)addProf(b.weapon.def.type,3);
+  let resultHtml='',loot=[];
+  const bossDef=BOSSES[b.bossId];
+  if(victory){
+    state.stats.bossKills++;
+    if(!state.defeatedBosses.includes(b.bossId))state.defeatedBosses.push(b.bossId);
+    if(bossDef.unlock&&!state.unlockedRegions.includes(bossDef.unlock)){state.unlockedRegions.push(bossDef.unlock);pushLog(`<span class="win">解鎖新地區：${bossDef.unlock}</span>`,[],'combat');}
+    const drops=pickN(bossDef.drops,Math.min(2,bossDef.drops.length));
+    for(const did of drops){const dd=itemDef(did);if(!dd)continue;const rar=rollRarity();invAdd(did,rar,1);loot.push({id:did,rarity:rar,count:1});}
+    addExp(50);
+    resultHtml=`<span class="win">勝利！</span> 擊敗 <b>${bossDef.name}</b>。對 Boss 傷害：${Math.round(b.damageDealt)}`;
+  } else {
+    state.stats.deaths++;
+    const total=b.bossMaxHp+b.bossMaxArmor;
+    const ratio=clamp(b.damageDealt/total,0,1);
+    const n=Math.max(0,Math.round(ratio*2));
+    for(let i=0;i<n;i++){const did=pick(bossDef.drops);const dd=itemDef(did);if(!dd)continue;const rar=rollRarity();invAdd(did,rar,1);loot.push({id:did,rarity:rar,count:1});}
+    resultHtml=`<span class="lose">失敗…</span> 對 Boss 傷害：${Math.round(b.damageDealt)} / ${total}（${(ratio*100).toFixed(1)}%）<br><span style="color:#4a90d9;font-size:10px">下次進入將自動回滿血量</span>`;
+  }
+  const lootTxt=loot.length?`獲得：${loot.map(l=>fmtItemSpan(l.id,l.rarity,l.count)).join('、')}`:'無戰利品';
+  pushLog(`<span class="pl">玩家</span> 挑戰 <b>${bossDef.name}</b>：${resultHtml}，${lootTxt}。`,loot,'combat');
+  const body=`<div class="detail-title ${victory?'r-傳奇':'r-破舊'}">${victory?'⚔️ 勝利':'💀 失敗'}</div>
+    <div class="detail-sub">${bossDef.name}</div>
+    <div class="stat-line"><span class="k">造成傷害</span><span class=""v">${Math.round(b.damageDealt)}</span></div>
+    <div class="stat-line"><span class="k">剩餘 HP</span><span class="v">${Math.max(0,Math.round(b.playerHp))}</span></div>
+    <div class="divider"></div>
+    <div style="font-size:11px;color:#e8a33d;margin-bottom:6px">戰利品</div>
+    ${loot.length?loot.map(l=>`<div class="item-row" data-iid="${l.id}" data-irar="${l.rarity}"><div class="icon">${itemIcon(l.id,30)}</div><div class="info"><div class="nm ${rarityClass(l.rarity)}">${itemDef(l.id).name}</div><div class="sub">${l.rarity}</div></div><div class="cnt">*${l.count}</div></div>`).join(''):'<div class="empty-hint">無</div>'}`;
+  const ft=el('div','modal-ft');ft.innerHTML=`<button class="btn primary" id="m-ok">確認</button>`;
+  const bd=openModal({title:'戰鬥結算',body,footer:ft});
+  ft.querySelector('#m-ok').onclick=()=>{closeModal();battle=null;save();renderCombat();};
+  $$('.item-row',bd).forEach(r=>{r.onclick=()=>openItemDetail(r.dataset.iid,r.dataset.irar);});
+  save();
+}
+
+const collapsedSections={weapons:false,types:false,other:false};
+function profDisplay(v){v=v||0;const lv=Math.floor(v),pct=Math.round((v-lv)*100);return `Lv.${lv} (${pct}%)`;}
+function renderBase(){
+  const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
+  let html='<div class="build-grid">';
+  for(let i=0;i<12;i++){
+    const slot=state.base.slots[i];
+    if(i===0)html+=`<div class="cell core" data-i="${i}"><div class="cico">${buildingIcon('control')}</div><div class="cnm">控制中心</div><div class="clv">Lv.1</div></div>`;
+    else if(slot){const b=BUILDINGS[slot.id]||{name:'未知'};html+=`<div class="cell built" data-i="${i}"><div class="cico">${buildingIcon(slot.id)}</div><div class="cnm">${b.name}</div><div class="clv">Lv.${slot.lv}</div></div>`;}
+    else html+=`<div class="cell" data-i="${i}"><div class="cico">＋</div><div class="cnm">空地</div></div>`;
+  }
+  html+='</div>';z1.innerHTML=html;
+  $$('.cell',z1).forEach(c=>{c.onclick=()=>onBuildCell(parseInt(c.dataset.i));});
+  const p=state.proficiency;
+  const types=['突擊步槍','機槍','衝鋒槍','狙擊槍','手槍','霰彈槍','刺刀','刀','斧','錘','棍','工具','手榴彈','煙霧','閃光','燃燒'];
+  z2.innerHTML=`
+    <div class="prof-area">
+      <div class="prof-sec ${collapsedSections.weapons?'collapsed':''}" data-sec="weapons">
+        <h4 data-toggle="weapons"><span>🔫 武器使用（大類）</span><span>▼</span></h4>
+        <div class="prof-body">
+          <div class="prof-line"><span>主武器</span><span class="v">${profDisplay(p.primary)}</span></div>
+          <div class="prof-line"><span>副武器</span><span class="v">${profDisplay(p.secondary)}</span></div>
+          <div class="prof-line"><span>近戰武器</span><span class="v">${profDisplay(p.melee)}</span></div>
+          <div class="prof-line"><span>投擲物</span><span class="v">${profDisplay(p.throwable)}</span></div>
+        </div>
+      </div>
+      <div class="prof-sec ${collapsedSections.types?'collapsed':''}" data-sec="types">
+        <h4 data-toggle="types"><span>🎯 具體武器類型</span><span>▼</span></h4>
+        <div class="prof-body">${types.map(t=>`<div class="prof-line"><span>${t}</span><span class="v">${profDisplay(p[t])}</span></div>`).join('')}</div>
+      </div>
+      <div class="prof-sec ${collapsedSections.other?'collapsed':''}" data-sec="other">
+        <h4 data-toggle="other"><span>🛠️ 其他</span><span>▼</span></h4>
+        <div class="prof-body">
+          <div class="prof-line"><span>物品製造</span><span class="v">${profDisplay(p.craft)}</span></div>
+          <div class="prof-line"><span>物品拆解</span><span class="v">${profDisplay(p.salvage)}</span></div>
+          <div class="prof-line"><span>物品掉落</span><span class="v">${profDisplay(p.drop)}</span></div>
+        </div>
+      </div>
+      <div style="color:#7a6f60;font-size:9px;line-height:1.5;padding:5px 0">
+        熟練度上限 Lv.${MAX_PROF_LEVEL}，滿級後可改造對應武器<br>
+        命中率 =（基礎10% + 熟練度）× 模式加成 + 瞄具加成，上限95%
+      </div>
+      <div class="pref-btn" id="pref-btn">⚙️ 偏好設定</div>
+    </div>`;
+  $$('.prof-sec h4',z2).forEach(h=>{h.onclick=()=>{const key=h.dataset.toggle;collapsedSections[key]=!collapsedSections[key];h.parentElement.classList.toggle('collapsed');};});
+  $('#pref-btn').onclick=openPreference;
+  renderRegionArea(z3);
+}
+function renderRegionArea(z3){
+  if(!state.preferences.regions.length)state.preferences.regions=['廢棄工廠'];
+  let html=`<div class="z3-head"><div class="z3-title">🗺️ 探索區域</div></div>
+    <div class="mode-sel">
+      <div class="mode-btn ${state.preferences.actionMode==='attack'?'on':''}" data-mode="attack">⚔ 攻擊前進</div>
+      <div class="mode-btn ${state.preferences.actionMode==='stealth'?'on':''}" data-mode="stealth">🥷 潛行蒐集</div>
+    </div>
+    <div class="region-area">`;
+  for(const rid in REGIONS){
+    const r=REGIONS[rid];
+    const unlocked=!r.needUnlock||state.unlockedRegions.includes(rid);
+    const on=state.preferences.regions.includes(rid);
+    html+=`<div class="reg-item ${on?'on':''} ${unlocked?'':'locked'}" data-rid="${rid}" data-locked="${unlocked?0:1}">
+      <div class="chk">${on?'✓':''}</div>
+      <div class="ri"><div class="rn">${r.name}${unlocked?'':' 🔒'}</div>
+      <div class="rd">${r.desc}<br>戰鬥率 ${(r.combat.attack*100).toFixed(0)}% / ${(r.combat.stealth*100).toFixed(0)}% ｜ 信物 ${(r.sealRate*100).toFixed(1)}%</div>
+      ${!unlocked&&r.unlockHint?`<div class="lock-hint">🔒 ${r.unlockHint}</div>`:''}
+      </div>
+    </div>`;
+  }
+  html+=`</div><div style="padding:6px;font-size:9px;color:#5a5040;border-top:1px solid #2a231c">可多選。鎖定區域需擊敗對應 Boss 解鎖。</div>`;
+  z3.innerHTML=html;
+  $$('.mode-btn',z3).forEach(b=>{b.onclick=()=>setActionMode(b.dataset.mode);});
+  $$('.reg-item',z3).forEach(item=>{
+    item.onclick=()=>{
+      if(item.dataset.locked==='1'){notify('區域尚未解鎖','error');return;}
+      const rid=item.dataset.rid;
+      const idx=state.preferences.regions.indexOf(rid);
+      if(idx>=0){if(state.preferences.regions.length>1)state.preferences.regions.splice(idx,1);}
+      else state.preferences.regions.push(rid);
+      save();renderRegionArea(z3);notify('探索區域已更新','ok');
+    };
+  });
+}
+function setActionMode(mode){
+  const oldMode=state.preferences.actionMode;if(oldMode===mode)return;
+  if(mode==='stealth'){
+    state.stashedWeapons=state.stashedWeapons||{};
+    for(const slot of ['primary','secondary']){
+      const id=state.player.equipped[slot];
+      if(id){state.stashedWeapons[slot]={id,rarity:state.player.equippedRarity[slot]||'一般'};invAddRaw(id,state.player.equippedRarity[slot]||'一般',1);state.player.equipped[slot]=null;delete state.player.equippedRarity[slot];}
+    }
+  } else {
+    if(state.stashedWeapons){
+      for(const slot of ['primary','secondary']){
+        if(state.stashedWeapons[slot]){
+          const {id,rarity}=state.stashedWeapons[slot];
+          const curId=state.player.equipped[slot];
+          const curRarity=state.player.equippedRarity[slot];
+          if(curId&&(curId!==id||curRarity!==rarity)){invAddRaw(curId,curRarity||'一般',1);}
+          let taken=false;
+          if(invCount(id,rarity)>0){invRemove(id,rarity,1);state.player.equipped[slot]=id;state.player.equippedRarity[slot]=rarity;taken=true;}
+          else{for(const k in state.inventory){const [iid,irar]=k.split('@');if(iid===id){invRemove(iid,irar,1);state.player.equipped[slot]=iid;state.player.equippedRarity[slot]=irar;taken=true;break;}}}
+          delete state.stashedWeapons[slot];
+        }
+      }
+    }
+  }
+  state.preferences.actionMode=mode;
+  refreshPlayerStats();save();renderCurrentTab();
+  notify(mode==='stealth'?'切換至潛行蒐集，主副武器已卸下':'切換至攻擊前進','ok');
+}
+function onBuildCell(i){
+  if(i===0){openModal({title:'🏛️ 控制中心',body:'<div class="empty-hint">基地核心，無法升級。</div>'});return;}
+  const slot=state.base.slots[i];
+  if(slot){
+    const b=BUILDINGS[slot.id];
+    const upCost={wood:20*slot.lv,metal:15*slot.lv,screws:5*slot.lv};
+    const curBonus=buildingBonusText(slot.id,slot.lv);
+    const nextBonus=buildingBonusText(slot.id,slot.lv+1);
+    let body=`<div class="detail-title">${buildingIcon(slot.id)} ${b.name} Lv.${slot.lv}</div>
+      <div class="detail-sub">${b.desc}</div>
+      <div class="stat-line"><span class="k">當前效果</span><span class="v">${curBonus}</span></div>
+      <div class="stat-line"><span class="k">升級後</span><span class="v">${nextBonus}</span></div>
+      <div class="divider"></div>
+      <div style="font-size:11px;color:#e8a33d;margin-bottom:4px">升級需求（等值一般）</div>`;
+    for(const [k,v] of Object.entries(upCost)){const have=materialEquivalent(k);const ok=have>=v;body+=`<div class="stat-line"><span class="k">${MATERIALS[k].name}</span><span class="v" style="color:${ok?'#4caf50':'#e05252'}">${have}/${v}</span></div>`;}
+    const ft=el('div','modal-ft');
+    const isWorkbench=slot.id==='workbench';
+    ft.innerHTML=`<button class="btn primary" id="m-up">升級</button>${isWorkbench?'<button class="btn" id="m-craft">🔧 改造</button>':''}<button class="btn ghost" id="m-dem">拆除</button><button class="btn ghost" id="m-close">關閉</button>`;
+    openModal({title:b.name,body,footer:ft});
+    ft.querySelector('#m-close').onclick=closeModal;
+    ft.querySelector('#m-up').onclick=()=>{
+      for(const [k,v] of Object.entries(upCost))if(materialEquivalent(k)<v){notify('材料不足，無法升級','error');return;}
+      for(const [k,v] of Object.entries(upCost))consumeMaterial(k,v);
+      slot.lv++;refreshPlayerStats();save();closeModal();renderBase();
+      notify(`${b.name} 升級至 Lv.${slot.lv}`,'ok');
+    };
+    const craftBtn=ft.querySelector('#m-craft');
+    if(craftBtn)craftBtn.onclick=()=>{closeModal();openModding(slot.lv);};
+    ft.querySelector('#m-dem').onclick=()=>{
+      for(const [k,v] of Object.entries(upCost)){const back=Math.floor(v/2);if(back>0)invAddRaw(k,'一般',back);}
+      state.base.slots[i]=null;refreshPlayerStats();save();closeModal();renderBase();notify('已拆除設施','ok');
+    };
+    return;
+  }
+  const builtSet=new Set();
+  state.base.slots.forEach((s,idx)=>{if(s&&idx!==i)builtSet.add(s.id);});
+  const available=[],taken=[];
+  for(const bid in BUILDINGS){if(builtSet.has(bid))taken.push(bid);else available.push(bid);}
+  let body='<div style="font-size:11px;color:#e8a33d;margin-bottom:6px">選擇要建造的設施</div>';
+  for(const bid of available){
+    const b=BUILDINGS[bid];
+    let costHtml='';
+    for(const [k,v] of Object.entries(b.cost)){const have=materialEquivalent(k);const ok=have>=v;costHtml+=`<span class="${ok?'cost-ok':'cost-no'}">${MATERIALS[k].name} ${have}/${v}</span>`;}
+    body+=`<div class="item-row" data-bid="${bid}"><div class="icon">${buildingIcon(bid)}</div><div class="info"><div class="nm">${b.name}</div><div class="sub">${b.desc}</div><div class="sub">${costHtml}</div><div class="sub" style="color:#4caf50">效果：${buildingBonusText(bid,1)}</div></div></div>`;
+  }
+  if(taken.length){
+    body+=`<div class="divider"></div><div style="color:#5a5040;font-size:10px;margin:4px 0 6px">已建造（不可重複）</div>`;
+    for(const bid of taken){const b=BUILDINGS[bid];body+=`<div class="item-row" style="opacity:.35;background:#151210;cursor:not-allowed;border-color:#241d16"><div class="icon" style="filter:grayscale(1)">${buildingIcon(bid)}</div><div class="info"><div class="nm" style="color:#7a6f60">${b.name}</div><div class="sub">已建造</div></div></div>`;}
+  }
+  const bd=openModal({title:'建造設施',body});
+  $$('.item-row[data-bid]',bd).forEach(r=>{
+    r.onclick=()=>{
+      const bid=r.dataset.bid;const b=BUILDINGS[bid];
+      for(const [k,v] of Object.entries(b.cost))if(materialEquivalent(k)<v){notify('材料不足，無法建造','error');return;}
+      for(const [k,v] of Object.entries(b.cost))consumeMaterial(k,v);
+      state.base.slots[i]={id:bid,lv:1};addProf('craft',1);refreshPlayerStats();save();closeModal();renderBase();
+      notify(`建造完成：${b.name}`,'ok');
+    };
+  });
+}
+function renderModQueueHtml(workbenchLv){
+  if(!state.crafting||!state.crafting.length)return '';
+  const now=Date.now();
+  const genLv=getBuildingLv('generator');const sm=1+genLv*0.2;
+  let html=`<div style="font-size:11px;color:#4caf50;font-weight:bold;margin:8px 0 6px">📋 改造隊列（${state.crafting.filter(c=>c.type==='mod').length}/${workbenchLv}）</div>`;
+  for(const c of state.crafting){
+    if(c.type!=='mod')continue;
+    const info=c.modInfo;
+    const total=c.time*1000/sm;
+    const elapsed=now-c.startTime;
+    const pct=Math.min(100,(elapsed/total)*100);
+    const remain=Math.max(0,Math.ceil((total-elapsed)/1000));
+    const newName=namedWeaponName(info.baseId,info.mag,info.scope);
+    html+=`<div class="craft-slot"><div style="flex:1"><div style="color:#e8a33d;font-weight:bold;font-size:11px">${newName}</div><div class="progress"><div class="fill" style="width:${pct}%"></div></div><div style="font-size:9px;color:#7a6f60;margin-top:2px">剩餘 ${remain}s</div></div></div>`;
+  }
+  html+='<div class="divider"></div>';
+  return html;
+}
+function openModding(workbenchLv){
+  const candidates=[];
+  for(const slot of ['primary','secondary']){
+    const id=state.player.equipped[slot];const rar=state.player.equippedRarity[slot];
+    if(id&&rar==='傳奇'&&WEAPONS[id]&&WEAPON_MOD_RULES[id]){const rules=WEAPON_MOD_RULES[id];if((rules.mags&&rules.mags.length)||(rules.scopes&&rules.scopes.length))candidates.push({id,rarity:rar,count:1,equippedSlot:slot});}
+  }
+  for(const k in state.inventory){
+    const [id,r]=k.split('@');
+    if(r==='傳奇'&&WEAPONS[id]&&WEAPON_MOD_RULES[id]){const rules=WEAPON_MOD_RULES[id];if((rules.mags&&rules.mags.length)||(rules.scopes&&rules.scopes.length))candidates.push({id,rarity:r,count:state.inventory[k],equippedSlot:null});}
+  }
+  let body='<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:6px">🔧 改造傳奇武器</div>';
+  body+='<div style="font-size:9px;color:#7a6f60;margin-bottom:8px">改造需要：對應武器熟練度滿級（Lv.'+MAX_PROF_LEVEL+'）</div>';
+  body+=`<div id="mod-queue-area">${renderModQueueHtml(workbenchLv)}</div>`;
+  if(!candidates.length){
+    body+='<div class="empty-hint">沒有可改造的傳奇武器</div>';
+    body+='<div style="font-size:9px;color:#7a6f60;margin-top:8px;padding:6px;background:#1a1510;border-radius:4px">可改造的傳奇武器需：<br>· 稀有度為傳奇<br>· 具備改造槽位（彈匣/瞄具）</div>';
+    openModal({title:'工作台',body});
+    return;
+  }
+  for(const c of candidates){
+    const wdef=WEAPONS[c.id];
+    const rules=WEAPON_MOD_RULES[c.id];
+    const typeMaxed=isProfMaxed(wdef.type);
+    const eqLabel=c.equippedSlot?'（裝備中）':`×${c.count}`;
+    body+=`<div class="item-row" data-mid="${c.id}" data-mrar="${c.rarity}" data-eq="${c.equippedSlot||''}" style="${typeMaxed?'':'opacity:.5'}"><div class="icon">${itemIcon(c.id,30)}</div><div class="info"><div class="nm r-傳奇">${wdef.name} ${eqLabel}</div><div class="sub">彈匣：${(rules.mags||[]).join('/')||'—'} ｜ 瞄具：${(rules.scopes||[]).join('/')||'—'}</div><div class="sub" style="color:${typeMaxed?'#4caf50':'#e05252'}">熟練度 ${Math.floor(state.proficiency[wdef.type]||0)}/${MAX_PROF_LEVEL}</div></div></div>`;
+  }
+  const bd=openModal({title:'工作台 · 改造',body});
+  if(modQueueTimer){clearInterval(modQueueTimer);modQueueTimer=null;}
+  modQueueTimer=setInterval(()=>{const qa=document.getElementById('mod-queue-area');if(!qa){if(modQueueTimer){clearInterval(modQueueTimer);modQueueTimer=null;}return;}qa.innerHTML=renderModQueueHtml(workbenchLv);},500);
+  $$('.item-row[data-mid]',bd).forEach(r=>{
+    r.onclick=()=>{
+      const id=r.dataset.mid;const rarity=r.dataset.mrar;const eqSlot=r.dataset.eq||null;
+      const wdef=WEAPONS[id];
+      if(!isProfMaxed(wdef.type)){notify(`${wdef.type} 熟練度未滿級`,'error');return;}
+      closeModal();
+      openModdingOptions(id,rarity,eqSlot,workbenchLv,null);
+    };
+  });
+}
+function openModdingOptions(baseId,baseRarity,equippedSlot,workbenchLv,state_mod){
+  const wdef=WEAPONS[baseId];
+  const rules=WEAPON_MOD_RULES[baseId]||{mags:[],scopes:[]};
+  if(!state_mod)state_mod={mag:null,scope:null};
+  function renderModBody(){
+    let body='';
+    body+=`<div style="font-size:12px;font-weight:bold;color:#e8a33d;margin-bottom:4px">${wdef.name} <span class="r-傳奇">(傳奇)</span></div>`;
+    body+=`<div style="font-size:10px;color:#7a6f60;margin-bottom:8px">基礎彈匣：${wdef.mag}｜口徑：${wdef.cal}</div>`;
+    if(rules.mags&&rules.mags.length){
+      const validMags=rules.mags.filter(m=>m>wdef.mag).sort((a,b)=>b-a);
+      if(validMags.length){
+        body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:8px 0 4px">彈匣擴展（可選）</div>`;
+        body+=`<div class="mod-opt ${state_mod.mag===null?'on':''}" data-opt="mag" data-val=""><div class="nm">保持原彈匣（${wdef.mag}）</div><div class="bonus">—</div></div>`;
+        for(const m of validMags){const bonus=m-wdef.mag;body+=`<div class="mod-opt ${state_mod.mag===m?'on':''}" data-opt="mag" data-val="${m}"><div class="nm">${m} 發彈匣</div><div class="bonus">容量 +${bonus}</div></div>`;}
+      }
+    }
+    if(rules.scopes&&rules.scopes.length){
+      const sortedScopes=rules.scopes.slice().sort((a,b)=>(SCOPE_BONUS[b]||0)-(SCOPE_BONUS[a]||0));
+      body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:8px 0 4px">瞄具（可選）</div>`;
+      body+=`<div class="mod-opt ${state_mod.scope===null?'on':''}" data-opt="scope" data-val=""><div class="nm">不裝瞄具</div><div class="bonus">—</div></div>`;
+      for(const s of sortedScopes){body+=`<div class="mod-opt ${state_mod.scope===s?'on':''}" data-opt="scope" data-val="${s}"><div class="nm">${SCOPE_NAME[s]||s}</div><div class="bonus">命中 +${SCOPE_BONUS[s]||0}%</div></div>`;}
+    }
+    const mag=state_mod.mag;const scope=state_mod.scope;
+    if(mag||scope){
+      const newName=namedWeaponName(baseId,mag,scope);
+      const totalCost={};
+      if(mag){const c=calcModCost(baseId,mag,null);for(const k in c)totalCost[k]=(totalCost[k]||0)+c[k];}
+      if(scope){const c=calcModCost(baseId,null,scope);for(const k in c)totalCost[k]=(totalCost[k]||0)+c[k];}
+      const totalTime=calcModTime(baseId,mag,scope);
+      body+=`<div class="divider"></div>`;
+      body+=`<div style="color:#a45ede;font-weight:bold;font-size:12px;margin:4px 0">${newName}</div>`;
+      let ok=true;
+      for(const [k,v] of Object.entries(totalCost)){const have=materialEquivalent(k);const ok2=have>=v;if(!ok2)ok=false;body+=`<div class="stat-line"><span class="k">${MATERIALS[k].name}</span><span class="v" style="color:${ok2?'#4caf50':'#e05252'}">${have}/${v}</span></div>`;}
+      body+=`<div class="stat-line"><span class="k">花費時間</span><span class="v">${totalTime} 秒</span></div>`;
+      return {body,ok,totalCost,totalTime};
+    }
+    return {body,ok:false,totalCost:{},totalTime:0};
+  }
+  const result=renderModBody();
+  const ft=el('div','modal-ft');
+  ft.innerHTML=`<button class="btn primary" id="m-confirm" ${result.ok?'':'disabled'}>確定改造</button><button class="btn ghost" id="m-exit">退出</button>`;
+  const bd=openModal({title:`改造 ${wdef.name}`,body:result.body,footer:ft});
+  $$('.mod-opt',bd).forEach(o=>{
+    o.onclick=()=>{
+      const opt=o.dataset.opt;const val=o.dataset.val;
+      if(opt==='mag')state_mod.mag=val?parseInt(val,10):null;
+      if(opt==='scope')state_mod.scope=val||null;
+      closeModal();
+      openModdingOptions(baseId,baseRarity,equippedSlot,workbenchLv,state_mod);
+    };
+  });
+  ft.querySelector('#m-exit').onclick=closeModal;
+  ft.querySelector('#m-confirm').onclick=()=>{
+    const r=renderModBody();
+    if(!r.ok){notify('材料不足','error');return;}
+    const maxQueue=workbenchLv||1;
+    if(!state.crafting)state.crafting=[];
+    if(state.crafting.length>=maxQueue){notify(`改造隊列已滿（上限 ${maxQueue}）`,'error');return;}
+    for(const [k,v] of Object.entries(r.totalCost))consumeMaterial(k,v);
+    state.crafting.push({type:'mod',modInfo:{baseId,baseRarity,mag:state_mod.mag,scope:state_mod.scope,fromEquippedSlot:equippedSlot},time:r.totalTime,startTime:Date.now()});
+    save();closeModal();
+    notify('已加入改造隊列','ok');
+  };
+}
+function openPreference(){
+  const p=state.preferences;
+  let body='';
+  body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin-bottom:6px">🔫 武器使用偏好（拖動調整）</div><div id="wp-list">`;
+  const slots=[{k:'primary',n:'主武器'},{k:'secondary',n:'副武器'},{k:'melee',n:'近戰武器'},{k:'throwable',n:'投擲物'}];
+  p.weaponPriority.forEach((slot,i)=>{const s=slots.find(x=>x.k===slot);body+=`<div class="item-row draggable" data-wp="${slot}"><div class="drag-handle">☰</div><div class="icon">${i+1}</div><div class="info"><div class="nm">${s?s.n:slot}</div></div></div>`;});
+  body+=`</div>`;
+  body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:10px 0 6px">🎯 彈藥稀有度優先（拖動）</div><div id="ar-list">`;
+  p.ammoRarity.forEach((r,i)=>{body+=`<div class="item-row draggable" data-ar="${r}"><div class="drag-handle">☰</div><div class="icon">${RARITY_ICON[r]}</div><div class="info"><div class="nm ${rarityClass(r)}">${r}</div></div></div>`;});
+  body+=`</div>`;
+  body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:10px 0 6px">💊 消耗品使用優先（拖動）</div><div id="cr-list">`;
+  p.consumeRarity.forEach((r,i)=>{body+=`<div class="item-row draggable" data-cr="${r}"><div class="drag-handle">☰</div><div class="icon">${RARITY_ICON[r]}</div><div class="info"><div class="nm ${rarityClass(r)}">${r}</div></div></div>`;});
+  body+=`</div>`;
+  body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:10px 0 6px">🩸 自動使用消耗品血量閾值：${Math.round(p.autoConsumeThreshold*100)}%</div><input type="range" min="5" max="90" value="${Math.round(p.autoConsumeThreshold*100)}" id="thr-slider" style="width:100%">`;
+  const bd=openModal({title:'⚙️ 偏好設定',body});
+  const wpList=bd.querySelector('#wp-list');
+  setupDragList(wpList,()=>{state.preferences.weaponPriority=$$('.draggable',wpList).map(x=>x.dataset.wp);save();});
+  const arList=bd.querySelector('#ar-list');
+  setupDragList(arList,()=>{state.preferences.ammoRarity=$$('.draggable',arList).map(x=>x.dataset.ar);save();});
+  const crList=bd.querySelector('#cr-list');
+  setupDragList(crList,()=>{state.preferences.consumeRarity=$$('.draggable',crList).map(x=>x.dataset.cr);save();});
+  const slider=bd.querySelector('#thr-slider');
+  if(slider)slider.oninput=()=>{state.preferences.autoConsumeThreshold=parseInt(slider.value)/100;slider.previousElementSibling.textContent=`🩸 自動使用消耗品血量閾值：${slider.value}%`;save();};
+}
+function setupDragList(container,onReorder){
+  let dragEl=null;
+  const items=$$('.draggable',container);
+  items.forEach(item=>{
+    item.addEventListener('touchstart',()=>{dragEl=item;item.classList.add('dragging');},{passive:true});
+    item.addEventListener('touchmove',e=>{if(!dragEl)return;const t=e.touches[0];const afterEl=getDragAfterElement(container,t.clientY);if(afterEl==null)container.appendChild(dragEl);else container.insertBefore(dragEl,afterEl);},{passive:true});
+    item.addEventListener('touchend',()=>{if(dragEl){dragEl.classList.remove('dragging');dragEl=null;onReorder();}});
+    item.setAttribute('draggable','true');
+    item.addEventListener('dragstart',()=>{dragEl=item;item.classList.add('dragging');});
+    item.addEventListener('dragend',()=>{if(dragEl){dragEl.classList.remove('dragging');dragEl=null;onReorder();}});
+  });
+  container.addEventListener('dragover',e=>{e.preventDefault();if(!dragEl)return;const afterEl=getDragAfterElement(container,e.clientY);if(afterEl==null)container.appendChild(dragEl);else container.insertBefore(dragEl,afterEl);});
+}
+function getDragAfterElement(container,y){
+  const els=$$('.draggable:not(.dragging)',container);
+  return els.reduce((closest,child)=>{const box=child.getBoundingClientRect();const offset=y-box.top-box.height/2;if(offset<0&&offset>closest.offset)return{offset,element:child};return closest;},{offset:Number.NEGATIVE_INFINITY}).element;
+}
+
+let currentTab='explore';
+function renderCurrentTab(){
+  if(currentTab==='explore')renderExplore();
+  else if(currentTab==='combat')renderCombat();
+  else if(currentTab==='base')renderBase();
+}
+$$('.tab').forEach(t=>{
+  t.onclick=()=>{
+    if(battle&&battle.active){if(!confirm('戰鬥尚未結束，確定要離開嗎？'))return;battle.active=false;battle=null;}
+    currentTab=t.dataset.tab;
+    $$('.tab').forEach(x=>x.classList.toggle('active',x===t));
+    renderCurrentTab();
+  };
+});
+let lastTickTime=Date.now();
+function onlineTick(){
+  const now=Date.now();const dt=now-lastTickTime;lastTickTime=now;
+  if(dt>EVENT_INTERVAL_MS*2){console.log('[tick] 偵測到離線中斷，時間差:',(dt/1000).toFixed(1),'秒');offlineSettle();return;}
+  if(battle&&battle.active)return;
+  doExploreTick();
+}
+setInterval(()=>{onlineTick();save();},EVENT_INTERVAL_MS);
+setInterval(()=>{buildingTick();},30000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){save();}else{offlineSettle();refreshPlayerStats();save();renderCurrentTab();}});
+window.addEventListener('beforeunload',save);
+function init(){
+  const loaded=load();
+  if(loaded){
+    const elapsed=Date.now()-(state.lastSeen||Date.now());
+    if(elapsed>60000){console.log('[init] 距上次儲存',(elapsed/1000).toFixed(1),'秒，觸發離線結算');offlineSettle();}
+  } else {
+    invAddRaw('6kh2','一般',1);
+    invAddRaw('bandage','一般',3);
+    invAddRaw('ai2','一般',1);
+    invAddRaw('5.45_us','一般',30);
+    invAddRaw('9x19_ps','一般',16);
+    state.player.equipped.melee='6kh2';
+    state.player.equippedRarity.melee='一般';
+    invRemove('6kh2','一般',1);
+    state.player.equipped.backpack='bplarge';
+    state.player.equippedRarity.backpack='傳奇';
+    pushLog('<span class="pl">玩家</span> 在廢土中醒來，身上只有一把 <span class="r-一般">6Kh2 刺刀</span> 和一個 <span class="r-傳奇">探險背包</span>。',[],'explore');
+  }
+  refreshPlayerStats();
+  if(state.player.hp<=0)state.player.hp=state.player.maxHp;
+  state.player.armor=Math.min(state.player.armor||0,state.player.maxArmor);
+  lastTickTime=Date.now();
+  save();renderCurrentTab();
+  console.log('=== 廢土求生',VERSION,'啟動 ===');
+}
+init();
+document.addEventListener('click',e=>{
+  const t=e.target.closest('.itm');
+  if(t&&t.dataset.iid)openItemDetail(t.dataset.iid,t.dataset.irar);
+});
+window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,addProf,notify,offlineSettle,getMeleeHits,getOrCreateNamedItem};
+</script>
+</body>
+</html>
