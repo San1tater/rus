@@ -122,7 +122,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .seal-tag.none{color:#e05252;background:#2a1a1a}
 .battle-scene{position:absolute;inset:0;overflow:hidden;background:#241a10}
 .battle-bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 90%,#3a2818,#140e08)}
-/* ★ battle-fx 必須完整覆蓋戰鬥場景，才能作為座標系基準 */
 #battle-fx{position:absolute;inset:0;pointer-events:none;z-index:8}
 .range-indicator{position:absolute;top:0;bottom:0;background:rgba(232,163,61,.08);border-left:1px dashed rgba(232,163,61,.45);border-right:1px dashed rgba(232,163,61,.45);pointer-events:none;z-index:1}
 .damage-header{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:rgba(14,12,10,.85);border:1px solid #8a5f18;border-radius:10px;padding:4px 12px;font-size:11px;color:#e8a33d;z-index:20;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.6);text-align:center;font-weight:bold}
@@ -133,7 +132,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .fighter .sprite{border-radius:6px;position:relative;cursor:crosshair;background-size:contain;background-position:center;background-repeat:no-repeat}
 .hero-f .sprite{width:88px;height:118px;background-image:none}
 .hero-f .sprite canvas{width:100%;height:100%;display:block}
-/* Boss sprite 尺寸由 battleLoop 依 zone1 高度動態設定；這裡只給佔位值 */
 .boss-f .sprite{width:280px;height:280px}
 .boss-f .sprite img{width:100%;height:100%;object-fit:contain;display:block}
 .boss-f .hpbar-wrap{width:min(50%,200px)}
@@ -204,6 +202,12 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .mod-opt.on{border-color:#a45ede;background:#241d30}
 .mod-opt .nm{color:#e8a33d;font-weight:bold;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mod-opt .bonus{color:#4caf50;font-weight:bold;font-size:11px;white-space:nowrap}
+/* ============================================================
+   ★ BOSS MODULE STYLES
+   所有 Boss 專屬 CSS 一律加在此區塊，類別名稱以 boss- 開頭。
+   ============================================================ */
+.boss-f .sprite canvas{width:100%;height:100%;display:block}
+/* 未來技能預警圈、震波、毒霧等特效類別加在這裡 */
 </style>
 </head>
 <body>
@@ -225,6 +229,11 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 <script>
 "use strict";
 const VERSION='v17.5';
+/* ★ 資源版本（由 probeAssetVersion 探測 Last-Modified 後填入） */
+let ASSET_VERSION = localStorage.getItem('wasteland_asset_version') || '';
+const ASSET_PROBE_URL = 'icons/buildings/control.png';
+const ASSET_CACHE_KEY = 'wasteland_asset_version';
+
 const EVENT_INTERVAL_MS = 10000;
 const REGION_KEYS = {'廢棄工廠':'factory','廢棄實驗室':'lab','郊區公路':'road','輻射沼澤':'swamp','廢土核心':'core'};
 const RARITY_ORDER=['破舊','一般','庫存','精品','傳奇','具名'];
@@ -237,13 +246,10 @@ const MELEE_DURATION=2;
 const CHAR_HEIGHT_FACTOR = 0.58;
 const CHAR_HEIGHT_FACTOR_BATTLE = 0.667;
 const EXPLORE_HERO_X_RATIO = 0.25;
-/* ★ 戰鬥佈局常數：
-   BATTLE_GROUND_TOP_RATIO = 1.0 → 角色腳底貼齊 zone1 的下邊緣
-   BATTLE_BOSS_HEIGHT_RATIO = 0.75 → Boss sprite 佔 zone1 高度 3/4
-   BATTLE_HERO_SPRITE_H = 118 → 玩家 sprite 固定 88x118 px */
 const BATTLE_GROUND_TOP_RATIO = 1.0;
 const BATTLE_BOSS_HEIGHT_RATIO = 0.75;
 const BATTLE_HERO_SPRITE_H = 118;
+const BATTLE_HERO_FOOT_Y_RATIO = 0.95;
 
 const TK_MAG={aks74u:30,aks74un:30,ak74:30,ak74n:30,ak74m:30,akm:30,akms:30,akMN:30,ak103:30,ak104:30,ak105:30,ak12:30,asval:20,'9a91':20,sr3m:30,vss:10,svd:10,sv98:10,rpk16:60,rpd:100,pkm:100,pkp:100,ash12:20,pp19:30,pm:8,pb:8,mp443:17,aps:20,mp133:6,mp153:7,mp155:6,saiga12:8,toz106:2,ks23:3};
 const TK_ARMOR={ssh68:20,ssh68m:22,kolpak:30,'6b47':40,'6b47m':45,altyn:50,kiver:40,maska:45,zsh12m:50,balaclava:5,shemagh:5,gp7:15,ballglasses:5,paca:45,'6b13':65,'6b13m':65,'6b23':70,'6b231':70,'6b232':70,'6b43':85,zhuk6a:85,zhuk3:75,defender2:75,cargopants:5,'6sh122':25,'6sh104':25,'6sh112':25,workboots:5,tactboots:15,lowaz:22,haix:25,belleville:20};
@@ -402,22 +408,56 @@ const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-
 const ALL_ITEMS={};Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS);
 function itemDef(id){return ALL_ITEMS[id]||null;}
 function resolveIconId(id){if(!id) return '';if(id.startsWith('named_')){const parts=id.split('_');if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];}return id;}
+
+function assetSuffix(){ return ASSET_VERSION ? ('?v=' + ASSET_VERSION) : ''; }
 function rarityBg(rarity){return RARITY_BG[rarity]||'#151210';}
 function itemIcon(id,size){
   const s=size||24;
   if(!id) return '';
+  const v=assetSuffix();
   if(MATERIAL_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${MATERIAL_EMOJI[id]}</span>`;
   if(PANTS_SHOES_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${PANTS_SHOES_EMOJI[id]}</span>`;
   const ammoDef=AMMO[id];
   if(ammoDef && ammoDef.cal){
     const f=AMMO_ICON_BY_CAL[ammoDef.cal];
-    if(f) return `<img src="icons/items/${f}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+    if(f) return `<img src="icons/items/${f}${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
   }
   const rid=resolveIconId(id);
-  return `<img src="icons/items/${rid}.png" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+  return `<img src="icons/items/${rid}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
 }
-function bossIcon(id){return `<img src="icons/bosses/${id}.png" alt="">`;}
-function buildingIcon(id){return `<img src="icons/buildings/${id}.png" alt="">`;}
+function bossIcon(id){return `<img src="icons/bosses/${id}.png${assetSuffix()}" alt="">`;}
+function buildingIcon(id){return `<img src="icons/buildings/${id}.png${assetSuffix()}" alt="">`;}
+
+/* ============================================================
+   ★ 資源版本探測：用 HEAD 請求讀 Last-Modified
+   若與上次記錄的版本不同，則：
+     1. 更新 ASSET_VERSION
+     2. 清空 heroImgCache
+     3. 重新渲染當前 tab（新 URL 會自動繞過瀏覽器快取）
+   ============================================================ */
+async function probeAssetVersion(){
+  try{
+    const url = ASSET_PROBE_URL + '?probe=' + Date.now();
+    const res = await fetch(url, { method:'HEAD', cache:'no-store' });
+    if(!res.ok) return false;
+    const lm = res.headers.get('Last-Modified') || '';
+    const etag = res.headers.get('ETag') || '';
+    const v = lm || etag;
+    if(!v) return false;
+    const encoded = encodeURIComponent(v);
+    const prev = localStorage.getItem(ASSET_CACHE_KEY) || '';
+    if(prev === encoded) return false;
+    ASSET_VERSION = encoded;
+    localStorage.setItem(ASSET_CACHE_KEY, encoded);
+    if(typeof heroImgCache !== 'undefined') heroImgCache.clear();
+    console.log('[assets] 資源版本更新:', prev || '(無)', '→', encoded);
+    return true;
+  }catch(e){
+    console.warn('[assets] 探測失敗:', e);
+    return false;
+  }
+}
+
 function itemCat(id){if(ARMOR[id])return 'armor';if(WEAPONS[id])return 'weapon';if(AMMO[id])return 'ammo';if(CONSUMABLES[id])return 'consume';if(MATERIALS[id])return 'material';const d=ALL_ITEMS[id];if(d&&d.named)return 'weapon';return 'misc';}
 function hasVariableRarity(id){const d=ALL_ITEMS[id];if(d&&d.named)return false;const c=itemCat(id);return c==='armor'||c==='weapon'||c==='consume'||c==='material';}
 function rollRarity(){const r=Math.random();if(r<0.35)return '破舊';if(r<0.65)return '一般';if(r<0.85)return '庫存';if(r<0.97)return '精品';return '傳奇';}
@@ -460,7 +500,12 @@ const ROUTES={
 };
 
 /* ============================================================
-   ★ BOSS 模組 — 資料區（BOSSES 常數）
+   ★ BOSS MODULE — 資料區
+   - BOSSES     ：Boss 基本屬性與掉落（既有）
+   - BOSS_LAYERS：Boss 方塊骨架（canvas 尺寸、腳點、圖層）
+   - BOSS_ANIMS ：Boss 動畫（沿用玩家 keys[frameIdx]={rot,dx,dy} 格式）
+   - BOSS_SKILLS：Boss 技能（含動畫綁定、冷卻、判定影格）
+   此四表為純資料，未來可直接搬到 boss-data.js。
    ============================================================ */
 const BOSSES={
   factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:1000,armor:40,dmg:25,pen:2,seal:'seal_factory',unlock:'廢棄實驗室',skills:['衝撞','咆哮'],drops:['zhuk6a','sv98','6b23','rpk16','vss']},
@@ -468,6 +513,118 @@ const BOSSES={
   road_tyrant:{name:'公路暴君 · 鐵鎚',region:'郊區公路',hp:5000,armor:250,dmg:70,pen:4,seal:'seal_road',unlock:'輻射沼澤',skills:['衝撞','咆哮'],drops:['zhuk6a','rpk16','svd','pkp','asval']},
   swamp_hydra:{name:'沼澤九頭 · 腐母',region:'輻射沼澤',hp:9000,armor:400,dmg:100,pen:5,seal:'seal_swamp',unlock:'廢土核心',skills:['衝撞','咆哮','毒霧'],drops:['svd','pkp','altyn','zhuk6a','6b43']},
   core_omega:{name:'核心終焉 · OMEGA',region:'廢土核心',hp:16000,armor:600,dmg:130,pen:6,seal:'seal_core',unlock:null,skills:['衝撞','咆哮','毒霧','EMP'],drops:['pkp','svd','altyn','6b43','zhuk6a']},
+};
+
+/* ---- BOSS_LAYERS：方塊骨架 ---- */
+const BOSS_LAYERS = {
+  factory_king: {
+    canvas: { w: 400, h: 500 },
+    foot:   { x: 0.50, y: 0.98 },
+    layers: [
+      { id:'leg_l',      z:20, color:'#3a2a1a', pivot:{x:0.5, y:0.05}, x:0.28, y:0.58, w:0.14, h:0.40 },
+      { id:'leg_r',      z:20, color:'#3a2a1a', pivot:{x:0.5, y:0.05}, x:0.58, y:0.58, w:0.14, h:0.40 },
+      { id:'torso',      z:30, color:'#5a4a35', pivot:{x:0.5, y:0.10}, x:0.25, y:0.22, w:0.50, h:0.42 },
+      { id:'shoulder_l', z:35, color:'#6a3a1a', pivot:{x:0.5, y:0.50}, x:0.15, y:0.18, w:0.16, h:0.16 },
+      { id:'shoulder_r', z:35, color:'#6a3a1a', pivot:{x:0.5, y:0.50}, x:0.69, y:0.18, w:0.16, h:0.16 },
+      { id:'arm_l',      z:40, color:'#4a3020', pivot:{x:0.5, y:0.10}, x:0.10, y:0.36, w:0.12, h:0.32 },
+      { id:'arm_r',      z:40, color:'#4a3020', pivot:{x:0.5, y:0.10}, x:0.78, y:0.36, w:0.12, h:0.32 },
+      { id:'head',       z:50, color:'#c89870', pivot:{x:0.5, y:0.90}, x:0.40, y:0.06, w:0.20, h:0.18 },
+    ]
+  }
+};
+
+/* ---- BOSS_ANIMS：動畫 ---- */
+const BOSS_ANIMS = {
+  factory_king: {
+    idle: {
+      frameCount: 4, fps: 4, loop: true,
+      keys: {
+        head:       [0,-2,-3,-2].map(v=>({rot:0, dx:0, dy:v})),
+        torso:      [0,-2,-3,-2].map(v=>({rot:0, dx:0, dy:v})),
+        shoulder_l: [0,-1,-2,-1].map(v=>({rot:0, dx:0, dy:v})),
+        shoulder_r: [0,-1,-2,-1].map(v=>({rot:0, dx:0, dy:v})),
+        arm_l:      [0,-2,-3,-2].map(v=>({rot:0, dx:0, dy:v})),
+        arm_r:      [0,-2,-3,-2].map(v=>({rot:0, dx:0, dy:v})),
+        leg_l:      [{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+        leg_r:      [{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+      }
+    },
+    walk: {
+      frameCount: 8, fps: 10, loop: true,
+      keys: {
+        head:       Array(8).fill(0).map((_,i)=>({rot:0, dx:0, dy:i%2?-1:0})),
+        torso:      Array(8).fill(0).map((_,i)=>({rot:0, dx:0, dy:i%2?-1:0})),
+        shoulder_l: Array(8).fill(0).map((_,i)=>({rot:0, dx:0, dy:i%2?-1:0})),
+        shoulder_r: Array(8).fill(0).map((_,i)=>({rot:0, dx:0, dy:i%2?-1:0})),
+        arm_l:      [-8,-4,0,4,8,4,0,-4].map(r=>({rot:r, dx:0, dy:0})),
+        arm_r:      [ 8, 4,0,-4,-8,-4,0, 4].map(r=>({rot:r, dx:0, dy:0})),
+        leg_l:      [-10,-5,0,5,10,5,0,-5].map(r=>({rot:r, dx:0, dy:0})),
+        leg_r:      [ 10, 5,0,-5,-10,-5,0, 5].map(r=>({rot:r, dx:0, dy:0})),
+      }
+    },
+    attack_swipe: {
+      frameCount: 6, fps: 14, loop: false,
+      keys: {
+        head:       Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        torso:      [{rot:0,dx:0,dy:0},{rot:-3,dx:0,dy:0},{rot:5,dx:0,dy:0},{rot:3,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+        shoulder_l: Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        shoulder_r: Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        arm_l:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        arm_r:      [{rot:0,dx:0,dy:0},{rot:-30,dx:0,dy:0},{rot:40,dx:0,dy:0},{rot:60,dx:0,dy:0},{rot:20,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+        leg_l:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        leg_r:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+      }
+    },
+    skill_charge: {
+      frameCount: 8, fps: 10, loop: false,
+      keys: {
+        head:       [{rot:0,dx:0,dy:0},{rot:-3,dx:0,dy:0},{rot:-6,dx:0,dy:0},{rot:-8,dx:0,dy:0},{rot:-6,dx:0,dy:0},{rot:4,dx:0,dy:0},{rot:6,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+        torso:      [{rot:0,dx:0,dy:0},{rot:-5,dx:0,dy:0},{rot:-10,dx:0,dy:0},{rot:-12,dx:0,dy:0},{rot:-10,dx:0,dy:0},{rot:8,dx:0,dy:0},{rot:12,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+        shoulder_l: Array(8).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        shoulder_r: Array(8).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        arm_l:      [{rot:0,dx:0,dy:0},{rot:20,dx:0,dy:0},{rot:30,dx:0,dy:0},{rot:35,dx:0,dy:0},{rot:25,dx:0,dy:0},{rot:-20,dx:0,dy:0},{rot:-30,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+        arm_r:      [{rot:0,dx:0,dy:0},{rot:-20,dx:0,dy:0},{rot:-30,dx:0,dy:0},{rot:-35,dx:0,dy:0},{rot:-25,dx:0,dy:0},{rot:20,dx:0,dy:0},{rot:30,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+        leg_l:      Array(8).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        leg_r:      Array(8).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+      }
+    },
+    hurt: {
+      frameCount: 4, fps: 12, loop: false,
+      keys: {
+        head:       [{dx:0},{dx:-4},{dx:4},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+        torso:      [{dx:0},{dx:-3},{dx:3},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+        shoulder_l: [{dx:0},{dx:-2},{dx:2},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+        shoulder_r: [{dx:0},{dx:-2},{dx:2},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+        arm_l:      [{dx:0},{dx:-2},{dx:2},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+        arm_r:      [{dx:0},{dx:-2},{dx:2},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+        leg_l:      [{dx:0},{dx:-1},{dx:1},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+        leg_r:      [{dx:0},{dx:-1},{dx:1},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+      }
+    },
+    death: {
+      frameCount: 6, fps: 8, loop: false,
+      keys: {
+        head:       [{rot:0,dy:0},{rot:20,dy:0},{rot:40,dy:5},{rot:55,dy:10},{rot:70,dy:15},{rot:80,dy:20}],
+        torso:      [{rot:0,dy:0},{rot:15,dy:0},{rot:35,dy:5},{rot:55,dy:12},{rot:70,dy:20},{rot:80,dy:25}],
+        shoulder_l: Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        shoulder_r: Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        arm_l:      Array(6).fill(0).map((_,i)=>({rot: i*10, dx:0, dy:0})),
+        arm_r:      Array(6).fill(0).map((_,i)=>({rot:-i*10, dx:0, dy:0})),
+        leg_l:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        leg_r:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+      }
+    },
+  }
+};
+
+/* ---- BOSS_SKILLS：技能 ---- */
+const BOSS_SKILLS = {
+  factory_king: [
+    { id:'charge', name:'衝撞', cd:8,  range:0.60, dmg:35, pen:2,
+      anim:'skill_charge', telegraph:1200, hitFrame:5, aoe:false, knockback:0.15 },
+    { id:'roar',   name:'咆哮', cd:15, range:0.35, dmg:20, pen:1,
+      anim:'skill_charge', telegraph:800,  hitFrame:5, aoe:true,  knockback:0.10 },
+  ]
 };
 
 const BUILDINGS={
@@ -651,10 +808,12 @@ const HERO_VISIBLE_EQ = {
 const heroImgCache = new Map();
 function getHeroImg(src){
   if(!src) return null;
-  if(heroImgCache.has(src)) return heroImgCache.get(src);
+  const v = assetSuffix();
+  const cacheKey = src;
+  if(heroImgCache.has(cacheKey)) return heroImgCache.get(cacheKey);
   const img = new Image();
-  img.src = src;
-  heroImgCache.set(src, img);
+  img.src = src + v;
+  heroImgCache.set(cacheKey, img);
   return img;
 }
 
@@ -974,6 +1133,101 @@ function renderZone2Silhouette(){
   drawSilhouette(ctx, w, h, topY, bottomY);
 }
 
+/* ============================================================
+   ★ BOSS MODULE — 繪製區
+   drawBlockBoss / renderBossBattleCanvas / updateBattleBossAnim
+   完全不依賴玩家的 drawBlockHero 與 battleHeroAnim，獨立運作。
+   ============================================================ */
+const battleBossAnim = { name:'idle', frame:0, lastUpdate:0, forcedEnd:0 };
+const BATTLE_BOSS_ONESHOT = ['attack_swipe','skill_charge','hurt','death'];
+
+function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
+  const def = BOSS_LAYERS[bossId];
+  if(!def) return;
+  const anims = BOSS_ANIMS[bossId];
+  if(!anims) return;
+  const anim = anims[animName] || anims.idle;
+  if(!anim) return;
+  const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
+
+  const sx = canvasW / def.canvas.w;
+  const sy = canvasH / def.canvas.h;
+
+  ctx.save();
+  ctx.scale(sx, sy);
+
+  const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
+  for(const L of sorted){
+    const keys = (anim.keys && anim.keys[L.id]) || [];
+    const key = keys[fi] || {rot:0, dx:0, dy:0};
+    const cx = def.canvas.w * (L.x + (key.dx||0) * 0.01);
+    const cy = def.canvas.h * (L.y + (key.dy||0) * 0.01);
+    const w  = def.canvas.w * L.w;
+    const h  = def.canvas.h * L.h;
+    const px = w * L.pivot.x;
+    const py = h * L.pivot.y;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((key.rot || 0) * Math.PI / 180);
+    ctx.translate(-px, -py);
+    ctx.fillStyle = L.color;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, w - 2, h - 2);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function renderBossBattleCanvas(){
+  if(!battle || !battle.active) return;
+  if(!BOSS_LAYERS[battle.bossId]) return;
+  const canvas = document.getElementById('boss-battle-canvas');
+  if(!canvas) return;
+  const sprite = canvas.parentElement;
+  const w = sprite.clientWidth  || 280;
+  const h = sprite.clientHeight || 280;
+  if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  drawBlockBoss(ctx, w, h, battle.bossId, battleBossAnim.name, battleBossAnim.frame);
+}
+
+function updateBattleBossAnim(now){
+  const bossId = battle ? battle.bossId : null;
+  if(!bossId) return;
+  const anims = BOSS_ANIMS[bossId];
+  if(!anims) return;
+  const a = anims[battleBossAnim.name] || anims.idle;
+  if(!a) return;
+  const interval = 1000 / a.fps;
+  if(now - battleBossAnim.lastUpdate >= interval){
+    battleBossAnim.lastUpdate = now;
+    if(a.loop){
+      battleBossAnim.frame = (battleBossAnim.frame + 1) % a.frameCount;
+    } else {
+      if(battleBossAnim.frame < a.frameCount - 1){
+        battleBossAnim.frame++;
+      } else if(battleBossAnim.forcedEnd && now > battleBossAnim.forcedEnd){
+        battleBossAnim.name = 'idle';
+        battleBossAnim.frame = 0;
+        battleBossAnim.forcedEnd = 0;
+      }
+    }
+  }
+}
+
+function playBossOneshot(animName, durationMs){
+  if(!battle || !BOSS_ANIMS[battle.bossId]) return;
+  const anims = BOSS_ANIMS[battle.bossId];
+  if(!anims[animName]) return;
+  battleBossAnim.name = animName;
+  battleBossAnim.frame = 0;
+  battleBossAnim.lastUpdate = performance.now();
+  battleBossAnim.forcedEnd = performance.now() + (durationMs || 900);
+}
+
 function spawnExploreBullets(n){
   const fx = document.getElementById('explore-fx');
   if(!fx) return;
@@ -1248,7 +1502,7 @@ function getCurrentBg(){
   const routes=ROUTES[region];
   const pathIdx=clamp(prog.pathIdx||0,0,(routes?routes.length:1)-1);
   const nodeIdx=clamp(prog.nodeIdx||0,0,(routes&&routes[pathIdx]?routes[pathIdx].nodes.length:1)-1);
-  return `images/bg/${key}_r${pathIdx}_n${nodeIdx}.png`;
+  return `images/bg/${key}_r${pathIdx}_n${nodeIdx}.png${assetSuffix()}`;
 }
 function updateExploreBg(){
   const layers=document.querySelectorAll('#zone1 .bg-layer');
@@ -1542,7 +1796,7 @@ function renderEquipZone(z2){
       if(PANTS_SHOES_EMOJI[id]){
         inner=`<span style="font-size:34px;line-height:1">${PANTS_SHOES_EMOJI[id]}</span><div class="lbl">${s.label}</div>`;
       } else {
-        inner=`<img class="slot-img" src="icons/items/${resolveIconId(id)}.png" alt=""><div class="lbl">${s.label}</div>`;
+        inner=`<img class="slot-img" src="icons/items/${resolveIconId(id)}.png${assetSuffix()}" alt=""><div class="lbl">${s.label}</div>`;
       }
     } else {
       inner=`<div class="nm">${s.label}</div>`;
@@ -1797,8 +2051,6 @@ function openLogHistory(){
 
 /* ============================================================
    ★★★ BOSS MODULE — 戰鬥邏輯區 ★★★
-   以下所有函式與狀態，皆屬於 Boss 戰鬥模組。若未來要拆分成
-   獨立檔案（例如 boss.js），整段可以原封不動搬移過去。
    ============================================================ */
 let battle=null;
 const BATTLE_ONESHOT_ANIMS=['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
@@ -1825,7 +2077,7 @@ function renderCombat(){
         · 只要在武器射程內即可對 Boss 開火造成傷害<br>
         · 傷害計算：穿透會降低 Boss 有效護甲；減傷上限 80%<br>
         · 護甲未破時傷害由護甲吸收；護甲歸零後 HP 承受 120% 傷害<br>
-        · 拖動搖桿可左右移動，移動時不能攻擊、攻擊時不能移動<br>
+        · 拖動搖桿可左右移動（無垂直移動），移動時不能攻擊、攻擊時不能移動<br>
         · 點擊 Boss 身體部位設定瞄準點<br>
         · 彈藥用盡會自動裝填，並播放換彈動作<br>
         · 近戰武器不發射子彈，直接以刀鋒造成傷害
@@ -1848,7 +2100,7 @@ function renderBattleScene(z1){
       <div class="damage-header"><div>對 Boss 傷害 <span class="num">${Math.round(b.damageDealt)}</span> / ${totalHp}</div><div class="bar"><div class="fill" id="dmg-bar" style="width:${dealtPct}%"></div></div></div>
       <div class="fighter boss-f" id="fighter-boss" style="left:${b.bx*100}%;top:${b.by*100}%">
         <div class="hpbar-wrap"><div class="nm">${b.bossName}</div><div class="bar ap"><div class="fill" id="boss-ap" style="width:${(b.bossArmor/b.bossMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:${(b.bossHp/b.bossMaxHp*100)}%"></div></div></div>
-        <div class="sprite" id="boss-sprite">${bossIcon(b.bossId)}</div>
+        <div class="sprite" id="boss-sprite">${BOSS_LAYERS[b.bossId] ? '<canvas id="boss-battle-canvas"></canvas>' : bossIcon(b.bossId)}</div>
       </div>
       <div class="fighter hero-f" id="fighter-hero" style="left:${b.px*100}%;top:${b.py*100}%">
         <div class="hpbar-wrap"><div class="nm">玩家</div><div class="bar ap"><div class="fill" id="hero-ap" style="width:${(b.playerArmor/b.playerMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="hero-hp" style="width:${(b.playerHp/b.playerMaxHp*100)}%"></div></div></div>
@@ -1860,9 +2112,9 @@ function renderBattleScene(z1){
     </div>`;
   updateFighterPos();
   requestAnimationFrame(()=>{
-    /* 場景重建後，下一個 battleLoop 會依 lastH 變動重算佈局 */
     if(battle) battle.lastH = 0;
     renderBattleHeroCanvas();
+    renderBossBattleCanvas();
   });
   const bs=$('#boss-sprite');
   if(bs)bs.onclick=(e)=>{
@@ -1896,7 +2148,6 @@ function renderBattleJoystick(z2){
   function start(e){const r=joy.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;radius=r.width/2;const t=e.changedTouches?e.changedTouches[0]:e;touchId=e.changedTouches?t.identifier:null;move(e);}
   function move(e){
     if(!battle||!battle.active)return;
-    /* 攻擊中 / 裝填中 / 使用中，不能移動 */
     if(battle.firing || battle.reloading || battle.consuming){
       stick.style.left='50%';stick.style.top='50%';
       battle.moveDir=0;
@@ -1907,7 +2158,6 @@ function renderBattleJoystick(z2){
     const dist=Math.sqrt(dx*dx+dy*dy);
     if(dist>radius){dx=dx/dist*radius;dy=dy/dist*radius;}
     stick.style.left=(radius+dx)+'px';stick.style.top=(radius+dy)+'px';stick.style.transform='translate(-50%,-50%)';
-    /* 只取水平分量；垂直軸由佈局邏輯控制 */
     battle.moveDir=dx/radius;
   }
   function end(e){
@@ -2011,20 +2261,65 @@ function startBossBattle(bid){
   battleHeroAnim.frame=0;
   battleHeroAnim.lastUpdate=performance.now();
   battleHeroAnim.forcedEnd=0;
+  battleBossAnim.name='idle';
+  battleBossAnim.frame=0;
+  battleBossAnim.lastUpdate=performance.now();
+  battleBossAnim.forcedEnd=0;
   switchBattleWeapon(startSlot);
   renderCombat();
   battle.lastTime=performance.now();
   requestAnimationFrame(battleLoop);
 }
+
+/* ============================================================
+   ★ BOSS MODULE — 行為 AI
+   ============================================================ */
+function updateBossAI(dt, now){
+  const b = battle;
+  const dx   = b.bx - b.px;
+  const dist = Math.abs(dx);
+
+  if(!b.engaged && dist < b.engagedRange){
+    b.engaged = true;
+    notify('⚠️ 進入交戰狀態！','error');
+  }
+  if(!b.engaged) return;
+
+  const bRange = 0.4;
+  let bossMoving = false;
+
+  if(dist > bRange + 0.05){
+    const bspd = 0.03 * dt;
+    const step = Math.sign(dx) * Math.min(bspd, Math.abs(dist - bRange));
+    if(Math.abs(step) > 0.0001){
+      b.bx += step;
+      bossMoving = true;
+    }
+  }
+  b.bx = clamp(b.bx, 0.1, 0.9);
+
+  if(now - b.lastBossShot > 1200 && dist < bRange){
+    b.lastBossShot = now;
+    b.bullets.push({sx:b.bx, sy:b.by, tx:b.px, ty:b.py, t:0, enemy:true, dmg:b.bossDmg, pen:b.bossPen||0});
+  }
+
+  if(BATTLE_BOSS_ONESHOT.indexOf(battleBossAnim.name) === -1){
+    const want = bossMoving ? 'walk' : 'idle';
+    if(battleBossAnim.name !== want){
+      battleBossAnim.name = want;
+      battleBossAnim.frame = 0;
+      battleBossAnim.lastUpdate = performance.now();
+    }
+  }
+
+  /* === 預留：技能觸發點 === */
+}
+
 function battleLoop(now){
   if(!battle||!battle.active)return;
   const dt=Math.min(0.05,(now-battle.lastTime)/1000);battle.lastTime=now;
   const moveSpd=0.35*dt;
 
-  /* ★ 一次性佈局：玩家與 Boss 腳底都貼齊 zone1 下邊緣（1.0）
-     - 玩家 sprite 高 118px
-     - Boss sprite 尺寸 = zone1 高度 × 0.75
-     使用 #battle-fx 的 clientHeight（已設為 inset:0，覆蓋整個 battle-scene）。 */
   const fxEl = document.getElementById('battle-fx');
   if(fxEl){
     const H = fxEl.clientHeight;
@@ -2036,14 +2331,16 @@ function battleLoop(now){
         bossSprite.style.width = bossSize + 'px';
         bossSprite.style.height = bossSize + 'px';
       }
-      const footY = BATTLE_GROUND_TOP_RATIO;
-      battle.py = clamp(footY - BATTLE_HERO_SPRITE_H / H, 0, 1);
-      battle.by = clamp(footY - bossSize / H, 0, 1);
+      const groundY = BATTLE_GROUND_TOP_RATIO;
+      const playerFootPx = BATTLE_HERO_SPRITE_H * BATTLE_HERO_FOOT_Y_RATIO;
+      battle.py = clamp(groundY - playerFootPx / H, 0, 1);
+      const bossDef = BOSS_LAYERS[battle.bossId];
+      const bossFootY = bossDef ? bossDef.foot.y : 1.0;
+      battle.by = clamp(groundY - (bossSize * bossFootY) / H, 0, 1);
       updateFighterPos();
     }
   }
 
-  /* ★ 只有水平移動；攻擊 / 裝填 / 使用中不能移動 */
   const canMove = !battle.firing && !battle.reloading && !battle.consuming;
   const hasMoveInput = (battle.moveDir !== 0);
 
@@ -2051,7 +2348,6 @@ function battleLoop(now){
     battle.px = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
   }
 
-  /* ★ 動畫狀態：不在一次性動畫中時，依移動與否切走/待機 */
   if(BATTLE_ONESHOT_ANIMS.indexOf(battleHeroAnim.name) === -1){
     if(canMove && hasMoveInput){
       if(battleHeroAnim.name !== 'walk'){
@@ -2068,26 +2364,17 @@ function battleLoop(now){
     }
   }
 
-  const dx=battle.bx-battle.px;const dist=Math.abs(dx);
-  if(!battle.engaged&&dist<battle.engagedRange){battle.engaged=true;notify('⚠️ 進入交戰狀態！','error');}
-  if(battle.engaged){
-    const bRange=0.4;
-    if(dist>bRange+0.05){const bspd=0.03*dt;battle.bx+=Math.sign(dx)*Math.min(bspd,Math.abs(dist-bRange));}
-    battle.bx=clamp(battle.bx,0.1,0.9);
-    if(now-battle.lastBossShot>1200&&dist<bRange){
-      battle.lastBossShot=now;
-      /* ★ Boss 子彈從身體中心發射（by 為精靈頂端，向下偏移 sprite 高度一半） */
-      const bossCenterY = battle.by + BATTLE_BOSS_HEIGHT_RATIO / 2;
-      battle.bullets.push({sx:battle.bx, sy:bossCenterY, tx:battle.px, ty:battle.py, t:0, enemy:true, dmg:battle.bossDmg, pen:battle.bossPen||0});
-    }
-  }
+  updateBossAI(dt, now);
+
   if(battle.firing&&!battle.reloading&&!battle.consuming){
     const interval=fireInterval(battle.fireMode,battle.weapon);
     if(now-battle.lastShot>interval){battle.lastShot=now;playerShoot();}
   }
   updateBullets(dt);updateFighterPos();
   updateBattleHeroAnim(now);
+  updateBattleBossAnim(now);
   renderBattleHeroCanvas();
+  renderBossBattleCanvas();
   const heroHp=$('#hero-hp'),heroAp=$('#hero-ap'),bossHp=$('#boss-hp'),bossAp=$('#boss-ap');
   if(heroHp)heroHp.style.width=Math.max(0,battle.playerHp/battle.playerMaxHp*100)+'%';
   if(heroAp)heroAp.style.width=Math.max(0,battle.playerArmor/battle.playerMaxArmor*100)+'%';
@@ -2318,13 +2605,17 @@ function endBattle(victory){
   $$('.item-row',bd).forEach(r=>{r.onclick=()=>openItemDetail(r.dataset.iid,r.dataset.irar);});
   save();
 }
+/* ★ BOSS 模組對外介面 */
 const BossModule = {
   get battle(){ return battle; },
   set battle(v){ battle = v; },
   isActive(){ return !!(battle && battle.active); },
   render(){ renderCombat(); },
   start(bid){ startBossBattle(bid); },
-  heroAnim: battleHeroAnim
+  heroAnim: battleHeroAnim,
+  bossAnim: battleBossAnim,
+  playBossOneshot: playBossOneshot,
+  hasSkeleton(bid){ return !!BOSS_LAYERS[bid]; }
 };
 window.BossModule = BossModule;
 
@@ -2698,6 +2989,7 @@ window.addEventListener('resize', () => {
   if(currentTab === 'combat' && BossModule.isActive()) {
     if(BossModule.battle) BossModule.battle.lastH = 0;
     renderBattleHeroCanvas();
+    renderBossBattleCanvas();
   }
   if(currentTab === 'explore' || currentTab === 'combat') renderZone2Silhouette();
 });
@@ -2729,6 +3021,17 @@ function init(){
   lastTickTime=Date.now();
   save();renderCurrentTab();
   console.log('=== 廢土求生',VERSION,'啟動 ===');
+
+  /* ★ 資源版本探測：若 Last-Modified 與上次不同，重新渲染當前 tab
+     這樣玩家更新 icon 後，即使瀏覽器快取了舊圖，也會因為 URL 帶新版本參數而取得新圖。
+     延遲 500ms 執行，避免與首次渲染競爭。 */
+  setTimeout(async ()=>{
+    const changed = await probeAssetVersion();
+    if(changed){
+      console.log('[assets] 重新渲染以套用新版資源');
+      renderCurrentTab();
+    }
+  }, 500);
 }
 init();
 
@@ -2737,7 +3040,7 @@ document.addEventListener('click',e=>{
   if(t&&t.dataset.iid)openItemDetail(t.dataset.iid,t.dataset.irar);
 });
 
-window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,addProf,notify,offlineSettle,getMeleeHits,getOrCreateNamedItem,BossModule};
+window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,addProf,notify,offlineSettle,getMeleeHits,getOrCreateNamedItem,BossModule,probeAssetVersion,get assetVersion(){return ASSET_VERSION;}};
 </script>
 </body>
 </html>
