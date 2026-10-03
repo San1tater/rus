@@ -430,10 +430,6 @@ function buildingIcon(id){return `<img src="icons/buildings/${id}.png${assetSuff
 
 /* ============================================================
    ★ 資源版本探測：用 HEAD 請求讀 Last-Modified
-   若與上次記錄的版本不同，則：
-     1. 更新 ASSET_VERSION
-     2. 清空 heroImgCache
-     3. 重新渲染當前 tab（新 URL 會自動繞過瀏覽器快取）
    ============================================================ */
 async function probeAssetVersion(){
   try{
@@ -501,11 +497,6 @@ const ROUTES={
 
 /* ============================================================
    ★ BOSS MODULE — 資料區
-   - BOSSES     ：Boss 基本屬性與掉落（既有）
-   - BOSS_LAYERS：Boss 方塊骨架（canvas 尺寸、腳點、圖層）
-   - BOSS_ANIMS ：Boss 動畫（沿用玩家 keys[frameIdx]={rot,dx,dy} 格式）
-   - BOSS_SKILLS：Boss 技能（含動畫綁定、冷卻、判定影格）
-   此四表為純資料，未來可直接搬到 boss-data.js。
    ============================================================ */
 const BOSSES={
   factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:1000,armor:40,dmg:25,pen:2,seal:'seal_factory',unlock:'廢棄實驗室',skills:['衝撞','咆哮'],drops:['zhuk6a','sv98','6b23','rpk16','vss']},
@@ -1135,8 +1126,6 @@ function renderZone2Silhouette(){
 
 /* ============================================================
    ★ BOSS MODULE — 繪製區
-   drawBlockBoss / renderBossBattleCanvas / updateBattleBossAnim
-   完全不依賴玩家的 drawBlockHero 與 battleHeroAnim，獨立運作。
    ============================================================ */
 const battleBossAnim = { name:'idle', frame:0, lastUpdate:0, forcedEnd:0 };
 const BATTLE_BOSS_ONESHOT = ['attack_swipe','skill_charge','hurt','death'];
@@ -1347,7 +1336,8 @@ function buildingBonusText(bid,lv){
   switch(bid){case 'workbench':return `改造隊列 +${lv}`;case 'storage':return `掉落數量 +${lv*10}%`;
   case 'toilet':return `熟練度獲取 +${lv*10}%`;case 'rest':return `生命值成長 +${lv*2}%`;
   case 'generator':return `製造/冷卻加速 +${lv*20}%`;case 'medbay':return `消耗品恢復 +${lv*15}%`;
-  case 'radio':return `補給間隔 -${Math.round(lv*20/(1+lv*0.2))}%`;case 'armory':return `產出主副彈藥（品質依等級）`;default:return '';}
+  case 'radio':return `補給量 ×${lv}`;
+  case 'armory':return `產出主副彈藥`;default:return '';}
 }
 function calcMaxHp(){const rl=getBuildingLv('rest');const rb=1+rl*0.02;return Math.round(100*Math.pow(1.01,state.player.level-1)*rb);}
 function equipArmorValue(id,rarity){const def=ARMOR[id];if(!def)return 0;if(def.slot==='backpack')return 0;let base=def.armor||0;if(base<5)base=5;return Math.round(base*(RARITY_MULT[rarity]||1));}
@@ -2179,9 +2169,17 @@ function renderBattleControls(z3){
   const ammoTotal=battle.ammoRef?battle.ammoRef.count:0;
   const canFire=!battle.reloading&&!battle.consuming;
   const isMeleeW = wdef && wdef.slot === 'melee';
+  const isThrowableW = wdef && wdef.slot === 'throwable';
+  /* ★ 修正：投擲物沒有彈匣概念（mag 為 undefined），舊版顯示成「N/0 ｜ 備彈 0」。
+     改為專屬格式，顯示目前投擲庫存。 */
+  let weaponInfo;
+  if(!wdef) weaponInfo = '無武器';
+  else if(isMeleeW) weaponInfo = `${wdef.name} ｜ 近戰`;
+  else if(isThrowableW) weaponInfo = `${wdef.name} ｜ ×${getThrowableCount()}`;
+  else weaponInfo = `${wdef.name} ｜ ${ammoInMag}/${wdef.mag||0} ｜ 備彈 ${ammoTotal}${battle.reloading?'｜裝填中…':''}`;
   z3.innerHTML=`
     <div class="ctrl-wrap">
-      <div class="ammo-info">${wdef?`${wdef.name} ｜ ${isMeleeW?'—':ammoInMag+'/'+(wdef.mag||0)} ｜ 備彈 ${isMeleeW?'—':ammoTotal}${battle.reloading?'｜裝填中…':''}`:'無武器'}</div>
+      <div class="ammo-info">${weaponInfo}</div>
       <div class="fire-modes">${modes.map(m=>`<div class="fm-btn ${m===battle.fireMode?'on':''}" data-mode="${m}">${m}</div>`).join('')}</div>
       <div style="display:flex;gap:4px">
         <div class="weapon-slot-btn ${battle.weaponSlot==='primary'?'on':''}" data-slot="primary" style="flex:1">主武器</div>
@@ -2226,7 +2224,21 @@ function switchBattleWeapon(slot){
   battle.playerWeaponRange=def.range||0.5;
   const prevSt=battle.weaponStates[slot];
   if(prevSt){battle.ammoInMag=prevSt.ammoInMag||0;battle.ammoRef=prevSt.ammoRef;}
-  else if(def.cal){const ammo=pickAmmoByPreference(def.cal);if(!ammo){battle.ammoRef=null;battle.ammoInMag=0;}else{battle.ammoRef={...ammo};battle.ammoInMag=Math.min(def.mag||30,ammo.count);}battle.weaponStates[slot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};}
+  else if(def.cal){
+    /* ★ 修正：初始裝填時直接從庫存扣除，並讓 ammoRef.count 只代表「後備彈藥」。
+       舊版射擊時同時扣 ammoRef.count 與庫存，裝填時又從 ammoRef.count 扣除並在歸零時重複扣一次庫存，
+       導致長期戰鬥子彈憑空消失或複製。 */
+    const ammo=pickAmmoByPreference(def.cal);
+    if(!ammo){battle.ammoRef=null;battle.ammoInMag=0;}
+    else{
+      const need=def.mag||30;
+      const take=Math.min(need, ammo.count);
+      invRemove(ammo.id, ammo.rarity, take);
+      battle.ammoRef={id:ammo.id, rarity:ammo.rarity, count:ammo.count - take};
+      battle.ammoInMag=take;
+    }
+    battle.weaponStates[slot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};
+  }
   else{battle.ammoRef=null;battle.ammoInMag=def.slot==='throwable'?getThrowableCount():1;battle.weaponStates[slot]={ammoInMag:battle.ammoInMag,ammoRef:null};}
   if(slot === 'secondary'){
     battleHeroAnim.name='switch_secondary';
@@ -2459,8 +2471,10 @@ function playerShoot(){
           if(!battle||!battle.active)return;
           if(battle.weaponSlot!==currentSlot)return;
           const need=def.mag||30;const take=Math.min(need,battle.ammoRef.count);
+          /* ★ 修正：從後備（ammoRef.count）取彈到彈匣時，才從倉庫扣除；
+             射擊階段只扣彈匣，不再碰庫存，避免重複扣除。 */
+          invRemove(battle.ammoRef.id,battle.ammoRef.rarity,take);
           battle.ammoInMag=take;battle.ammoRef.count-=take;
-          if(battle.ammoRef.count<=0)invRemove(battle.ammoRef.id,battle.ammoRef.rarity,take);
           battle.weaponStates[battle.weaponSlot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};
           battle.reloading=false;
           if(battleHeroAnim.name==='reload'){battleHeroAnim.name='idle';battleHeroAnim.frame=0;}
@@ -2472,8 +2486,8 @@ function playerShoot(){
       if(sw&&itemDef(sw.id)&&battle.weaponSlot==='primary'){battle.firing=false;switchBattleWeapon('secondary');notify('主武器彈藥耗盡，切換至副武器','error');return;}
       battle.firing=false;return;
     }
+    /* ★ 修正：只扣彈匣，不再同時扣庫存（庫存已在裝填階段扣除）。 */
     battle.ammoInMag--;
-    if(battle.ammoRef){invRemove(battle.ammoRef.id,battle.ammoRef.rarity,1);battle.ammoRef.count--;}
     const mz = getPlayerMuzzlePos();
     const tx=battle.aimPoint?battle.aimX:battle.bx;
     const ty=battle.aimPoint?battle.aimY:battle.by;
@@ -2528,7 +2542,10 @@ function playerShoot(){
 function applyBossDamage(dmg,isCrit,pen){
   const target={hp:battle.bossHp,armor:battle.bossArmor};
   const res=applyDamage(target,dmg,pen||0);
-  battle.bossHp=target.hp;battle.bossArmor=target.armor;battle.damageDealt+=dmg;
+  battle.bossHp=target.hp;battle.bossArmor=target.armor;
+  /* ★ 修正：統計「實際從 Boss 血池扣除的量」＝護甲消耗 + HP 消耗，
+     而非原始傷害。否則穿透不足時 UI 會顯示虛高的傷害數字。 */
+  battle.damageDealt += (res.armorLost + res.hpLost);
   spawnHitFx(battle.bx,battle.by,`-${Math.round(dmg)}${isCrit?'!':''}`,isCrit?'crit':(res.hpLost>0?'':'armor'));
   if(battle.bossHp<=0)endBattle(true);
 }
@@ -3022,9 +3039,6 @@ function init(){
   save();renderCurrentTab();
   console.log('=== 廢土求生',VERSION,'啟動 ===');
 
-  /* ★ 資源版本探測：若 Last-Modified 與上次不同，重新渲染當前 tab
-     這樣玩家更新 icon 後，即使瀏覽器快取了舊圖，也會因為 URL 帶新版本參數而取得新圖。
-     延遲 500ms 執行，避免與首次渲染競爭。 */
   setTimeout(async ()=>{
     const changed = await probeAssetVersion();
     if(changed){
