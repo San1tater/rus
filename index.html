@@ -17,9 +17,15 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#7a6f60;font-size:11px;gap:2px}
 .tab.active{color:#e8a33d}
 .tab .ico{font-size:18px}
-.toast{position:fixed;top:22%;left:50%;transform:translateX(-50%);background:rgba(30,24,19,.96);border:1px solid #e8a33d;border-radius:8px;padding:10px 16px;color:#e8a33d;font-size:12px;z-index:10000;max-width:82%;text-align:center;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.7)}
+.toast{position:fixed;top:22%;left:50%;background:rgba(30,24,19,.96);border:1px solid #e8a33d;border-radius:8px;padding:10px 16px;color:#e8a33d;font-size:12px;z-index:10000;max-width:82%;text-align:center;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.7);animation:toastFloat 2.2s ease-out forwards}
 .toast.error{border-color:#e05252;color:#e05252}
 .toast.ok{border-color:#4caf50;color:#4caf50}
+@keyframes toastFloat{
+  0%{opacity:0;transform:translate(-50%,18px)}
+  12%{opacity:1;transform:translate(-50%,0)}
+  70%{opacity:1;transform:translate(-50%,-12px)}
+  100%{opacity:0;transform:translate(-50%,-56px)}
+}
 .scene{position:absolute;inset:0}
 .bg-scroll{position:absolute;inset:0;display:flex;overflow:hidden}
 .bg-layer{flex:0 0 100%;height:100%;background-size:100% 100%;background-position:center;background-repeat:no-repeat;animation:bgscroll var(--spd,10s) linear infinite}
@@ -28,7 +34,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .hero-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
 .explore-fx{position:absolute;inset:0;pointer-events:none;z-index:7;overflow:hidden}
 .explore-bullet{position:absolute;width:7px;height:7px;border-radius:50%;background:#ffe08a;box-shadow:0 0 8px #ffb300,0 0 14px #ff8800;transform:translate(-50%,-50%);pointer-events:none}
-.explore-muzzle{position:absolute;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle,rgba(255,224,138,.9),rgba(255,150,0,0) 70%);transform:translate(-50%,-50%);pointer-events:none}
 .zone-title{position:absolute;left:8px;top:8px;font-size:11px;color:#e8a33d;background:rgba(14,12,10,.7);padding:3px 8px;border-radius:10px;border:1px solid #3a2f25;z-index:6}
 .zone-badge{position:absolute;right:8px;top:8px;font-size:10px;color:#a89a85;background:rgba(14,12,10,.7);padding:3px 8px;border-radius:10px;border:1px solid #3a2f25;z-index:6}
 .zone2-silhouette{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
@@ -40,8 +45,9 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .slot .lbl{position:absolute;bottom:1px;left:0;right:0;text-align:center;font-size:7px;background:rgba(0,0,0,.55);color:#a89a85;padding:1px 0}
 .slot .nm{font-size:8px;font-weight:bold;text-align:center;line-height:1.1;padding:0 2px;word-break:break-all;overflow:hidden;max-height:22px}
 .slot.empty .nm{color:#4a4038;font-weight:normal}
-.player-stat-panel{position:absolute;background:rgba(14,12,10,.92);border:1px solid #3a2f25;border-radius:6px;padding:4px 6px;font-size:9px;z-index:4}
-.player-stat-panel .row{display:flex;justify-content:space-between;color:#a89a85;line-height:1.5;flex-wrap:wrap;gap:2px}
+.player-stat-panel{position:absolute;background:rgba(14,12,10,.92);border:1px solid #3a2f25;border-radius:6px;padding:4px 6px;font-size:9px;z-index:4;max-width:36%}
+.player-stat-panel .row{display:flex;justify-content:space-between;align-items:center;color:#a89a85;line-height:1.5;gap:4px;flex-wrap:wrap}
+.player-stat-panel .row.lv-row{justify-content:flex-end}
 .player-stat-panel .row b{color:#e8a33d}
 .z3-head{flex:0 0 30px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border-bottom:1px solid #2a231c;background:#17140f}
 .z3-title{font-size:11px;color:#e8a33d;font-weight:bold}
@@ -116,6 +122,8 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .seal-tag.none{color:#e05252;background:#2a1a1a}
 .battle-scene{position:absolute;inset:0;overflow:hidden;background:#241a10}
 .battle-bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 90%,#3a2818,#140e08)}
+/* ★ battle-fx 必須完整覆蓋戰鬥場景，才能作為座標系基準 */
+#battle-fx{position:absolute;inset:0;pointer-events:none;z-index:8}
 .range-indicator{position:absolute;top:0;bottom:0;background:rgba(232,163,61,.08);border-left:1px dashed rgba(232,163,61,.45);border-right:1px dashed rgba(232,163,61,.45);pointer-events:none;z-index:1}
 .damage-header{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:rgba(14,12,10,.85);border:1px solid #8a5f18;border-radius:10px;padding:4px 12px;font-size:11px;color:#e8a33d;z-index:20;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.6);text-align:center;font-weight:bold}
 .damage-header .num{color:#ffb300}
@@ -125,8 +133,10 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .fighter .sprite{border-radius:6px;position:relative;cursor:crosshair;background-size:contain;background-position:center;background-repeat:no-repeat}
 .hero-f .sprite{width:88px;height:118px;background-image:none}
 .hero-f .sprite canvas{width:100%;height:100%;display:block}
-.boss-f .sprite{width:80px;height:80px}
+/* Boss sprite 尺寸由 battleLoop 依 zone1 高度動態設定；這裡只給佔位值 */
+.boss-f .sprite{width:280px;height:280px}
 .boss-f .sprite img{width:100%;height:100%;object-fit:contain;display:block}
+.boss-f .hpbar-wrap{width:min(50%,200px)}
 .hpbar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:60px;bottom:calc(100% + 4px)}
 .hpbar-wrap .bar{height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-bottom:2px;position:relative}
 .hpbar-wrap .bar .fill{height:100%;transition:width .15s}
@@ -153,14 +163,14 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .fire-btn{flex:0 0 auto;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#d94a4a,#6a1a1a);border:3px solid #8a2a2a;color:#fff;font-size:16px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;aspect-ratio:1/1}
 .fire-btn.disabled{background:#3a1a1a;border-color:#5a2a2a;color:#7a6f60}
 .ammo-info{font-size:10px;color:#e8a33d;text-align:center;padding:3px}
-.build-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:3px;padding:5px}
-.cell{background:#1e1813;border:1px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;color:#7a6f60;cursor:pointer;text-align:center;padding:2px;position:relative}
+.build-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:3px;padding:5px}
+.cell{background:#1e1813;border:1px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;color:#7a6f60;cursor:pointer;text-align:center;padding:0;position:relative;min-width:0;min-height:0;overflow:hidden}
 .cell.built{background:linear-gradient(180deg,#3a2a15,#241d16);border-color:#8a5f18;color:#e8a33d}
 .cell.core{background:linear-gradient(180deg,#5a3a1a,#3a2510);border-color:#e8a33d;color:#ffe0a0}
-.cell .cico{width:60%;height:52%;display:flex;align-items:center;justify-content:center}
-.cell .cico img{width:100%;height:100%;object-fit:contain;display:block}
-.cell .cnm{font-size:8px;margin-top:1px}
-.cell .clv{position:absolute;top:2px;right:3px;font-size:7px;color:#4caf50}
+.cell .cico{flex:1 1 auto;width:100%;min-height:0;position:relative;overflow:hidden}
+.cell .cico img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:cover;display:block}
+.cell .cnm{font-size:8px;flex:0 0 auto;line-height:1.15;max-width:100%;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,0,0,.78);color:#e8a33d;padding:1px 3px;border-radius:3px;text-align:center;position:relative;z-index:2}
+.cell .clv{position:absolute;top:2px;right:3px;font-size:7px;color:#4caf50;background:rgba(0,0,0,.82);border-radius:3px;padding:0 3px;line-height:1.4;z-index:3}
 .prof-area{flex:1;min-height:0;overflow-y:auto;padding:7px;font-size:10px}
 .prof-sec{margin-bottom:8px;border:1px solid #2a231c;border-radius:6px;overflow:hidden}
 .prof-sec h4{font-size:10px;color:#e8a33d;padding:6px 8px;background:#1a1510;display:flex;justify-content:space-between;cursor:pointer;border-bottom:1px solid #2a231c}
@@ -220,11 +230,20 @@ const REGION_KEYS = {'廢棄工廠':'factory','廢棄實驗室':'lab','郊區公
 const RARITY_ORDER=['破舊','一般','庫存','精品','傳奇','具名'];
 const RARITY_MULT={'破舊':0.8,'一般':1.0,'庫存':1.5,'精品':2.5,'傳奇':5.0,'具名':5.0};
 const RARITY_ICON={'破舊':'▪','一般':'▫','庫存':'◆','精品':'★','傳奇':'✦','具名':'✦'};
+const RARITY_BG={'破舊':'#4a2e1a','一般':'#3a3a3a','庫存':'#1e4a1e','精品':'#1e3a5a','傳奇':'#5a4410','具名':'#4a205a'};
 const MODE_ACCURACY={'點射':1.5,'短點射':1.2,'長點射':1.0,'掃射':0.8,'近戰':1.0,'投擲':1.0};
 const MAX_PROF_LEVEL=50;
 const MELEE_DURATION=2;
 const CHAR_HEIGHT_FACTOR = 0.58;
 const CHAR_HEIGHT_FACTOR_BATTLE = 0.667;
+const EXPLORE_HERO_X_RATIO = 0.25;
+/* ★ 戰鬥佈局常數：
+   BATTLE_GROUND_TOP_RATIO = 1.0 → 角色腳底貼齊 zone1 的下邊緣
+   BATTLE_BOSS_HEIGHT_RATIO = 0.75 → Boss sprite 佔 zone1 高度 3/4
+   BATTLE_HERO_SPRITE_H = 118 → 玩家 sprite 固定 88x118 px */
+const BATTLE_GROUND_TOP_RATIO = 1.0;
+const BATTLE_BOSS_HEIGHT_RATIO = 0.75;
+const BATTLE_HERO_SPRITE_H = 118;
 
 const TK_MAG={aks74u:30,aks74un:30,ak74:30,ak74n:30,ak74m:30,akm:30,akms:30,akMN:30,ak103:30,ak104:30,ak105:30,ak12:30,asval:20,'9a91':20,sr3m:30,vss:10,svd:10,sv98:10,rpk16:60,rpd:100,pkm:100,pkp:100,ash12:20,pp19:30,pm:8,pb:8,mp443:17,aps:20,mp133:6,mp153:7,mp155:6,saiga12:8,toz106:2,ks23:3};
 const TK_ARMOR={ssh68:20,ssh68m:22,kolpak:30,'6b47':40,'6b47m':45,altyn:50,kiver:40,maska:45,zsh12m:50,balaclava:5,shemagh:5,gp7:15,ballglasses:5,paca:45,'6b13':65,'6b13m':65,'6b23':70,'6b231':70,'6b232':70,'6b43':85,zhuk6a:85,zhuk3:75,defender2:75,cargopants:5,'6sh122':25,'6sh104':25,'6sh112':25,workboots:5,tactboots:15,lowaz:22,haix:25,belleville:20};
@@ -383,6 +402,7 @@ const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-
 const ALL_ITEMS={};Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS);
 function itemDef(id){return ALL_ITEMS[id]||null;}
 function resolveIconId(id){if(!id) return '';if(id.startsWith('named_')){const parts=id.split('_');if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];}return id;}
+function rarityBg(rarity){return RARITY_BG[rarity]||'#151210';}
 function itemIcon(id,size){
   const s=size||24;
   if(!id) return '';
@@ -439,6 +459,9 @@ const ROUTES={
   '廢土核心':[{name:'外環',nodes:['外圍防線','哨塔','斷裂高架','中央熔爐','核心']},{name:'內環',nodes:['通風井','管道區','反應爐','核心']}],
 };
 
+/* ============================================================
+   ★ BOSS 模組 — 資料區（BOSSES 常數）
+   ============================================================ */
 const BOSSES={
   factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:1000,armor:40,dmg:25,pen:2,seal:'seal_factory',unlock:'廢棄實驗室',skills:['衝撞','咆哮'],drops:['zhuk6a','sv98','6b23','rpk16','vss']},
   lab_queen:{name:'實驗室女王 · 白蝕',region:'廢棄實驗室',hp:2500,armor:120,dmg:45,pen:3,seal:'seal_lab',unlock:'郊區公路',skills:['衝撞','咆哮','毒霧'],drops:['altyn','saiga12','sv98','rpk16','asval']},
@@ -693,11 +716,6 @@ function getTopCfg(id){
   return HERO_VISIBLE_EQ.top;
 }
 
-/* ============================================================
-   ★ v17.5 修正：槍口 / 子彈發射位置計算
-   垂直基準：後側手方塊（back_arm）頂端
-   水平基準：螢幕 3/4 處（探索）；戰鬥則依英雄精靈實際位置
-   ============================================================ */
 function getHeroMuzzleLocal(spriteW, spriteH, factor){
   const B = { x: 30, y: 30, w: 340, h: 460 };
   const ORIG_CHAR_H = 386;
@@ -718,7 +736,48 @@ function getHeroMuzzleLocal(spriteW, spriteH, factor){
   };
 }
 
-function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor){
+function getExploreWeaponRightEdge(canvasW, canvasH){
+  const B = { x: 30, y: 30, w: 340, h: 460 };
+  const ORIG_CHAR_H = 386;
+  const ORIG_FOOT_X = 200;
+  const ORIG_FOOT_Y = 515;
+  const scale = (canvasH * CHAR_HEIGHT_FACTOR) / ORIG_CHAR_H;
+  const groundY = canvasH * 0.95;
+  const centerX = canvasW * EXPLORE_HERO_X_RATIO;
+
+  const eq = state.player.equipped;
+  let wpSlot = null, wpId = null;
+  if(heroAnim.eqSlot && eq[heroAnim.eqSlot]){ wpSlot = heroAnim.eqSlot; wpId = eq[heroAnim.eqSlot]; }
+  else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
+  else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
+  else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
+
+  if(!wpSlot || !wpId) return { x: centerX, y: groundY };
+  const cfg = getWeaponCfg(wpSlot, wpId);
+  if(!cfg) return { x: centerX, y: groundY };
+  const L = GAME_LAYERS.find(l => l.id === cfg.layer);
+  if(!L) return { x: centerX, y: groundY };
+
+  const cx = B.x + B.w * L.x;
+  const cy = B.y + B.h * L.y;
+  const w = B.w * L.w;
+  const h = B.h * L.h;
+  const px = w * L.pivot.x;
+  const py = h * L.pivot.y;
+  const localX = px + w * (cfg.ox || 0);
+  const localY = py + h * (cfg.oy || 0);
+  const weaponCenterCharX = cx - px + localX;
+  const weaponCenterCharY = cy - py + localY;
+  const weaponW = 400 * (cfg.scale || 0.3);
+  const rightCharX = weaponCenterCharX + weaponW / 2;
+
+  return {
+    x: centerX + scale * (rightCharX - ORIG_FOOT_X),
+    y: groundY + scale * (weaponCenterCharY - ORIG_FOOT_Y)
+  };
+}
+
+function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio){
   const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
   const factor = charHFactor || CHAR_HEIGHT_FACTOR;
@@ -731,7 +790,8 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
   const targetCharH = canvasH * factor;
   const scale = targetCharH / ORIG_CHAR_H;
   const groundY = canvasH * 0.95;
-  const centerX = canvasW / 2;
+  const ratio = (centerXRatio != null) ? centerXRatio : 0.5;
+  const centerX = canvasW * ratio;
 
   ctx.save();
   ctx.translate(centerX, groundY);
@@ -839,7 +899,6 @@ function drawEqLayer(ctx, u, B, anim, fi){
   ctx.restore();
 }
 
-/* 剪影：站立姿勢、實心方塊人形，頂部對齊頭部框上緣、底部對齊鞋子框下緣 */
 function drawSilhouette(ctx, canvasW, canvasH, topY, bottomY){
   const anim = GAME_ANIMS.idle;
   const fi = 0;
@@ -871,9 +930,6 @@ function drawSilhouette(ctx, canvasW, canvasH, topY, bottomY){
   ctx.restore();
 }
 
-/* ============================================================
-   探索頁面
-   ============================================================ */
 function renderExploreHeroCanvas(){
   if(currentTab !== 'explore') return;
   const canvas = document.getElementById('hero-canvas');
@@ -884,7 +940,7 @@ function renderExploreHeroCanvas(){
   if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
-  drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, heroAnim.eqSlot || null);
+  drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, heroAnim.eqSlot || null, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO);
 }
 
 function renderBattleHeroCanvas(){
@@ -918,24 +974,15 @@ function renderZone2Silhouette(){
   drawSilhouette(ctx, w, h, topY, bottomY);
 }
 
-/* 探索戰鬥演出：從槍口位置發射子彈
-   ★ v17.5：水平 = 螢幕 3/4 處；垂直 = 後側手方塊頂端 */
 function spawnExploreBullets(n){
   const fx = document.getElementById('explore-fx');
   if(!fx) return;
   const W = fx.clientWidth, H = fx.clientHeight;
-  const startX = W * 0.75;
-  const muzzleLocal = getHeroMuzzleLocal(W, H, CHAR_HEIGHT_FACTOR);
-  const startY = muzzleLocal.y;
+  const muzzle = getExploreWeaponRightEdge(W, H);
+  const startX = muzzle.x;
+  const startY = muzzle.y;
   for(let i=0;i<n;i++){
     setTimeout(()=>{
-      const muzzle = document.createElement('div');
-      muzzle.className = 'explore-muzzle';
-      muzzle.style.left = startX+'px';
-      muzzle.style.top = startY+'px';
-      fx.appendChild(muzzle);
-      setTimeout(()=>muzzle.remove(), 160);
-
       const bullet = document.createElement('div');
       bullet.className = 'explore-bullet';
       const endX = W*(0.88 + Math.random()*0.08);
@@ -970,9 +1017,6 @@ function playExploreCombatFx(slot, isMelee){
   spawnExploreBullets(1 + Math.floor(Math.random()*3));
 }
 
-/* ============================================================
-   遊戲核心邏輯
-   ============================================================ */
 const SAVE_KEY='wasteland_save_v17_5';
 const DEFAULT_WEAPON_PRIORITY=['primary','secondary','melee','throwable'];
 const DEFAULT_AMMO_RARITY=['傳奇','精品','庫存','一般','破舊'];
@@ -1054,7 +1098,6 @@ function buildingBonusText(bid,lv){
 function calcMaxHp(){const rl=getBuildingLv('rest');const rb=1+rl*0.02;return Math.round(100*Math.pow(1.01,state.player.level-1)*rb);}
 function equipArmorValue(id,rarity){const def=ARMOR[id];if(!def)return 0;if(def.slot==='backpack')return 0;let base=def.armor||0;if(base<5)base=5;return Math.round(base*(RARITY_MULT[rarity]||1));}
 
-/* 裝備變動時自動補滿護甲值，避免 0/N */
 function refreshPlayerStats(){
   const prevMaxArmor = state.player.maxArmor || 0;
   state.player.maxHp=calcMaxHp();
@@ -1102,7 +1145,16 @@ function applyDamage(target,rawDmg,penetration){
   return result;
 }
 
-function notify(msg,type){const n=el('div','toast'+(type?' '+type:''),msg);document.body.appendChild(n);setTimeout(()=>{n.classList.add('out');},1800);setTimeout(()=>{n.remove();},2300);}
+const toastSlotSet = new Set();
+function notify(msg,type){
+  const n=el('div','toast'+(type?' '+type:''),msg);
+  let slot=0;
+  while(toastSlotSet.has(slot) && slot<7) slot++;
+  toastSlotSet.add(slot);
+  n.style.top=`calc(22% + ${slot*50}px)`;
+  document.body.appendChild(n);
+  setTimeout(()=>{toastSlotSet.delete(slot);n.remove();},2300);
+}
 function pushLog(html,items,type){state.logs.push({t:Date.now(),html,items:items||[],type:type||'explore'});if(state.logs.length>500)state.logs.splice(0,state.logs.length-500);if(currentTab==='explore')renderZone3Log();}
 function renderZone3Log(){
   const box=$('#logbox');if(!box)return;box.innerHTML='';
@@ -1442,9 +1494,6 @@ function offlineSettle(){
   return events;
 }
 
-/* ============================================================
-   探索 UI / 裝備欄
-   ============================================================ */
 function renderExplore(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   const regions=getActiveRegions();
@@ -1498,21 +1547,20 @@ function renderEquipZone(z2){
     } else {
       inner=`<div class="nm">${s.label}</div>`;
     }
-    html+=`<div class="slot ${def?'filled':'empty'} ${isFixed?'fixed':''}" style="${style}" data-slot="${s.key}">${inner}</div>`;
+    const rar=def?(state.player.equippedRarity[s.key]||'一般'):'';
+    const bgStyle=def?`background:${rarityBg(rar)};`:'';
+    html+=`<div class="slot ${def?'filled':'empty'} ${isFixed?'fixed':''}" style="${style};${bgStyle}" data-slot="${s.key}">${inner}</div>`;
   }
-  html+=`<div class="player-stat-panel" style="left:3%;top:4%;width:34%">
-    <div class="row"><b>Lv.${state.player.level}</b></div>
-    <div class="row"><span>❤️</span><b>${state.player.maxHp}</b></div>
-    <div class="row"><span>🛡️</span><b>${state.player.maxArmor}</b></div>
+  html+=`<div class="player-stat-panel" style="left:3%;top:4%">
+    <div class="row lv-row"><b>Lv.${state.player.level}</b></div>
+    <div class="row"><span>❤️</span><b>${Math.round(state.player.maxHp)}</b></div>
+    <div class="row"><span>🛡️</span><b>${Math.round(state.player.maxArmor)}</b></div>
   </div>`;
   z2.innerHTML=html;
   $$('.slot',z2).forEach(e=>{e.onclick=()=>openSlotDetail(e.dataset.slot);});
   requestAnimationFrame(()=>renderZone2Silhouette());
 }
 
-/* ============================================================
-   Modal / 詳情 UI
-   ============================================================ */
 const modalLayer=$('#modal-layer');
 const modalEl=$('.modal',modalLayer);
 function openModal({title,body,footer,full}){
@@ -1589,7 +1637,7 @@ function openSlotPicker(slot){
   list.sort((a,b)=>RARITY_ORDER.indexOf(b.rarity)-RARITY_ORDER.indexOf(a.rarity));
   let body='';
   if(!list.length)body='<div class="empty-hint">倉庫中沒有可裝備於此槽位的物品</div>';
-  else{for(const it of list){body+=`<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${it.def.name}</div><div class="sub">${it.def.type||slot} · ${it.rarity}</div></div><div class="cnt">*${it.count}</div></div>`;}}
+  else{for(const it of list){body+=`<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon" style="background:${rarityBg(it.rarity)}">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${it.def.name}</div><div class="sub">${it.def.type||slot} · ${it.rarity}</div></div><div class="cnt">*${it.count}</div></div>`;}}
   const bd=openModal({title:`選擇 ${slot} 裝備`,body});
   $$('.item-row',bd).forEach(row=>{row.onclick=()=>{const iid=row.dataset.iid,irar=row.dataset.irar;closeModal();openEquipmentCompare(slot,iid,irar);};});
 }
@@ -1608,6 +1656,7 @@ function openEquipmentCompare(slot,newId,newRarity){
   const oldDef=oldId?itemDef(oldId):null;
   const labels={head:'頭部',face:'臉部',top:'上衣',pants:'褲子',shoes:'鞋子',backpack:'背包',primary:'主武器',secondary:'副武器',melee:'近戰武器',throwable:'投擲物'};
   const isArmorSlot=slot==='head'||slot==='face'||slot==='top'||slot==='pants'||slot==='shoes';
+  const iconBox=(rar,id)=>`<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:5px;background:${rarityBg(rar)};flex-shrink:0">${itemIcon(id,30)}</span>`;
   let body='';
   if(oldDef){
     body+=`<div class="cmp-header"><div class="cmp-name old">${oldDef.name}<br>（${oldRarity}）</div><div class="cmp-name new">${newDef.name}<br>（${newRarity}）</div></div>`;
@@ -1640,7 +1689,7 @@ function openEquipmentCompare(slot,newId,newRarity){
     const ac=(newDef.armor!=null&&newDef.armor>0)?armorClass(newDef.armor):'';
     const aVal=(newDef.armor!=null)?equipArmorValue(newId,newRarity):0;
     const dVal=(newDef.dmg!=null)?Math.round(newDef.dmg*(RARITY_MULT[newRarity]||1)):null;
-    body+=`<div class="detail-title ${rarityClass(newRarity)}">${itemIcon(newId,30)} ${newDef.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div>`;
+    body+=`<div class="detail-title ${rarityClass(newRarity)}">${iconBox(newRarity,newId)} ${newDef.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div>`;
     body+=`<div class="detail-sub">稀有度：${newRarity}</div>`;
     body+=`<div class="stat-line"><span class="k">裝備槽</span><span class="v">${labels[slot]}</span></div>`;
     if(newDef.armor!=null)body+=`<div class="stat-line"><span class="k">裝甲值</span><span class="v">${aVal}</span></div>`;
@@ -1690,7 +1739,7 @@ function openInventory(){
           const aVal=(it.def.armor!=null)?equipArmorValue(it.id,it.rarity):0;
           const dVal=(it.def.dmg!=null)?Math.round(it.def.dmg*(RARITY_MULT[it.rarity]||1)):null;
           const isArmorDef=it.def.slot==='head'||it.def.slot==='face'||it.def.slot==='top'||it.def.slot==='pants'||it.def.slot==='shoes';
-          body+=`<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${it.def.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div><div class="sub">${it.rarity}${it.def.type?' · '+it.def.type:''}${it.def.cal?' · '+it.def.cal:''}${!isArmorDef&&it.def.pen?' · 穿甲'+it.def.pen:''}${dVal!=null?' · 傷'+dVal:''}${aVal>0?' · 甲'+aVal:''}</div></div><div class="cnt">*${it.count}</div></div>`;
+          body+=`<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon" style="background:${rarityBg(it.rarity)}">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${it.def.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div><div class="sub">${it.rarity}${it.def.type?' · '+it.def.type:''}${it.def.cal?' · '+it.def.cal:''}${!isArmorDef&&it.def.pen?' · 穿甲'+it.def.pen:''}${dVal!=null?' · 傷'+dVal:''}${aVal>0?' · 甲'+aVal:''}</div></div><div class="cnt">*${it.count}</div></div>`;
         }
       }
     }
@@ -1706,7 +1755,8 @@ function openItemDetail(id,rarity){
   const dVal=(d.dmg!=null)?Math.round(d.dmg*(RARITY_MULT[rarity]||1)):null;
   const ammoId=d.cal?getDefaultAmmo(d.cal):null;
   const isArmorDef=d.slot==='head'||d.slot==='face'||d.slot==='top'||d.slot==='pants'||d.slot==='shoes';
-  let body=`<div class="detail-title ${rarityClass(rarity)}">${itemIcon(id,30)} ${d.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div>
+  const iconBox=`<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:5px;background:${rarityBg(rarity)};flex-shrink:0">${itemIcon(id,30)}</span>`;
+  let body=`<div class="detail-title ${rarityClass(rarity)}">${iconBox} ${d.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div>
     <div class="detail-sub">稀有度：${rarity}</div>
     <div class="stat-line"><span class="k">持有</span><span class="v">${invCount(id,rarity)}</span></div>
     <div class="stat-line"><span class="k">類別</span><span class="v">${itemCat(id)}</span></div>
@@ -1746,9 +1796,12 @@ function openLogHistory(){
 }
 
 /* ============================================================
-   戰鬥
+   ★★★ BOSS MODULE — 戰鬥邏輯區 ★★★
+   以下所有函式與狀態，皆屬於 Boss 戰鬥模組。若未來要拆分成
+   獨立檔案（例如 boss.js），整段可以原封不動搬移過去。
    ============================================================ */
 let battle=null;
+const BATTLE_ONESHOT_ANIMS=['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
 
 function renderCombat(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
@@ -1772,7 +1825,7 @@ function renderCombat(){
         · 只要在武器射程內即可對 Boss 開火造成傷害<br>
         · 傷害計算：穿透會降低 Boss 有效護甲；減傷上限 80%<br>
         · 護甲未破時傷害由護甲吸收；護甲歸零後 HP 承受 120% 傷害<br>
-        · 拖動搖桿可左右上下移動<br>
+        · 拖動搖桿可左右移動，移動時不能攻擊、攻擊時不能移動<br>
         · 點擊 Boss 身體部位設定瞄準點<br>
         · 彈藥用盡會自動裝填，並播放換彈動作<br>
         · 近戰武器不發射子彈，直接以刀鋒造成傷害
@@ -1806,7 +1859,11 @@ function renderBattleScene(z1){
       ${!b.engaged?`<div style="position:absolute;bottom:8px;left:8px;right:8px;text-align:center;font-size:11px;color:#e8a33d;background:rgba(0,0,0,.7);padding:6px;border-radius:8px;border:1px solid #8a5f18;z-index:20">準備中… 點擊 Boss 設定瞄準點，拖動搖桿前進至警戒範圍觸發戰鬥</div>`:''}
     </div>`;
   updateFighterPos();
-  requestAnimationFrame(()=>{ renderBattleHeroCanvas(); });
+  requestAnimationFrame(()=>{
+    /* 場景重建後，下一個 battleLoop 會依 lastH 變動重算佈局 */
+    if(battle) battle.lastH = 0;
+    renderBattleHeroCanvas();
+  });
   const bs=$('#boss-sprite');
   if(bs)bs.onclick=(e)=>{
     const scene=document.querySelector('.battle-scene');
@@ -1833,23 +1890,29 @@ function updateFighterPos(){
   if(dmgHd){dmgHd.querySelector('.num').textContent=Math.round(battle.damageDealt);}
 }
 function renderBattleJoystick(z2){
-  z2.innerHTML=`<div class="joystick" id="joystick"><div class="stick" id="stick"></div></div><div class="z2-hint">拖動搖桿移動</div>`;
+  z2.innerHTML=`<div class="joystick" id="joystick"><div class="stick" id="stick"></div></div><div class="z2-hint">拖動搖桿左右移動</div>`;
   const joy=$('#joystick'),stick=$('#stick');
   let touchId=null,cx,cy,radius;
   function start(e){const r=joy.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;radius=r.width/2;const t=e.changedTouches?e.changedTouches[0]:e;touchId=e.changedTouches?t.identifier:null;move(e);}
   function move(e){
     if(!battle||!battle.active)return;
+    /* 攻擊中 / 裝填中 / 使用中，不能移動 */
+    if(battle.firing || battle.reloading || battle.consuming){
+      stick.style.left='50%';stick.style.top='50%';
+      battle.moveDir=0;
+      return;
+    }
     let t=e;if(e.changedTouches)t=Array.from(e.changedTouches).find(x=>x.identifier===touchId)||e.changedTouches[0];
     let dx=t.clientX-cx;let dy=t.clientY-cy;
     const dist=Math.sqrt(dx*dx+dy*dy);
     if(dist>radius){dx=dx/dist*radius;dy=dy/dist*radius;}
     stick.style.left=(radius+dx)+'px';stick.style.top=(radius+dy)+'px';stick.style.transform='translate(-50%,-50%)';
+    /* 只取水平分量；垂直軸由佈局邏輯控制 */
     battle.moveDir=dx/radius;
-    battle.moveDirY=dy/radius;
   }
   function end(e){
     if(e.changedTouches&&touchId!==null){const found=Array.from(e.changedTouches).find(x=>x.identifier===touchId);if(!found)return;}
-    touchId=null;if(battle){battle.moveDir=0;battle.moveDirY=0;}
+    touchId=null;if(battle){battle.moveDir=0;}
     stick.style.left='50%';stick.style.top='50%';
   }
   joy.addEventListener('touchstart',e=>{e.preventDefault();start(e);},{passive:false});
@@ -1884,10 +1947,19 @@ function renderBattleControls(z3){
   $$('.fm-btn',z3).forEach(b=>{b.onclick=()=>{battle.fireMode=b.dataset.mode;renderBattleControls(z3);};});
   $$('.weapon-slot-btn',z3).forEach(b=>{b.onclick=()=>switchBattleWeapon(b.dataset.slot);});
   const fb=$('#fire-btn');
-  fb.addEventListener('touchstart',e=>{e.preventDefault();if(!battle.reloading&&!battle.consuming)battle.firing=true;},{passive:false});
+  fb.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    if(battle.reloading||battle.consuming)return;
+    if(battle.moveDir!==0)return;
+    battle.firing=true;
+  },{passive:false});
   fb.addEventListener('touchend',e=>{e.preventDefault();battle.firing=false;},{passive:false});
   fb.addEventListener('touchcancel',()=>{battle.firing=false;});
-  fb.addEventListener('mousedown',()=>{if(!battle.reloading&&!battle.consuming)battle.firing=true;});
+  fb.addEventListener('mousedown',()=>{
+    if(battle.reloading||battle.consuming)return;
+    if(battle.moveDir!==0)return;
+    battle.firing=true;
+  });
   fb.addEventListener('mouseup',()=>{battle.firing=false;});
   fb.addEventListener('mouseleave',()=>{battle.firing=false;});
 }
@@ -1934,7 +2006,7 @@ function startBossBattle(bid){
   refreshPlayerStats();
   const w=chooseCombatWeapon();
   const startSlot=w?w.slot:'melee';
-  battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossPen:b.pen||0,skills:b.skills||[],playerHp:state.player.hp,playerMaxHp:state.player.maxHp,playerArmor:state.player.armor,playerMaxArmor:Math.max(1,state.player.maxArmor),px:0.15,py:0.65,bx:0.75,by:0.65,moveDir:0,moveDirY:0,bullets:[],firing:false,reloading:false,consuming:false,lastShot:0,lastBossShot:0,damageDealt:0,weapon:null,weaponSlot:startSlot,playerWeaponRange:0.5,fireMode:'點射',ammoRef:null,ammoInMag:0,weaponStates:{},engaged:false,engagedRange:0.35,startTime:Date.now(),aimPoint:false,aimX:0.75,aimY:0.7,players:[{id:'local',isLocal:true}]};
+  battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossPen:b.pen||0,skills:b.skills||[],playerHp:state.player.hp,playerMaxHp:state.player.maxHp,playerArmor:state.player.armor,playerMaxArmor:Math.max(1,state.player.maxArmor),px:0.15,py:0.75,bx:0.75,by:0.25,moveDir:0,bullets:[],firing:false,reloading:false,consuming:false,lastShot:0,lastBossShot:0,damageDealt:0,weapon:null,weaponSlot:null,playerWeaponRange:0.5,fireMode:'點射',ammoRef:null,ammoInMag:0,weaponStates:{},engaged:false,engagedRange:0.35,startTime:Date.now(),aimPoint:false,aimX:0.75,aimY:0.7,players:[{id:'local',isLocal:true}],lastH:0};
   battleHeroAnim.name='idle';
   battleHeroAnim.frame=0;
   battleHeroAnim.lastUpdate=performance.now();
@@ -1948,15 +2020,66 @@ function battleLoop(now){
   if(!battle||!battle.active)return;
   const dt=Math.min(0.05,(now-battle.lastTime)/1000);battle.lastTime=now;
   const moveSpd=0.35*dt;
-  if(battle.moveDir)battle.px=clamp(battle.px+battle.moveDir*moveSpd,0.05,0.95);
-  if(battle.moveDirY)battle.py=clamp(battle.py+battle.moveDirY*moveSpd,0.40,0.85);
+
+  /* ★ 一次性佈局：玩家與 Boss 腳底都貼齊 zone1 下邊緣（1.0）
+     - 玩家 sprite 高 118px
+     - Boss sprite 尺寸 = zone1 高度 × 0.75
+     使用 #battle-fx 的 clientHeight（已設為 inset:0，覆蓋整個 battle-scene）。 */
+  const fxEl = document.getElementById('battle-fx');
+  if(fxEl){
+    const H = fxEl.clientHeight;
+    if(H > 0 && battle.lastH !== H){
+      battle.lastH = H;
+      const bossSprite = document.getElementById('boss-sprite');
+      const bossSize = Math.round(H * BATTLE_BOSS_HEIGHT_RATIO);
+      if(bossSprite){
+        bossSprite.style.width = bossSize + 'px';
+        bossSprite.style.height = bossSize + 'px';
+      }
+      const footY = BATTLE_GROUND_TOP_RATIO;
+      battle.py = clamp(footY - BATTLE_HERO_SPRITE_H / H, 0, 1);
+      battle.by = clamp(footY - bossSize / H, 0, 1);
+      updateFighterPos();
+    }
+  }
+
+  /* ★ 只有水平移動；攻擊 / 裝填 / 使用中不能移動 */
+  const canMove = !battle.firing && !battle.reloading && !battle.consuming;
+  const hasMoveInput = (battle.moveDir !== 0);
+
+  if(canMove && hasMoveInput){
+    battle.px = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
+  }
+
+  /* ★ 動畫狀態：不在一次性動畫中時，依移動與否切走/待機 */
+  if(BATTLE_ONESHOT_ANIMS.indexOf(battleHeroAnim.name) === -1){
+    if(canMove && hasMoveInput){
+      if(battleHeroAnim.name !== 'walk'){
+        battleHeroAnim.name='walk';
+        battleHeroAnim.frame=0;
+        battleHeroAnim.lastUpdate=performance.now();
+      }
+    } else {
+      if(battleHeroAnim.name !== 'idle'){
+        battleHeroAnim.name='idle';
+        battleHeroAnim.frame=0;
+        battleHeroAnim.lastUpdate=performance.now();
+      }
+    }
+  }
+
   const dx=battle.bx-battle.px;const dist=Math.abs(dx);
   if(!battle.engaged&&dist<battle.engagedRange){battle.engaged=true;notify('⚠️ 進入交戰狀態！','error');}
   if(battle.engaged){
     const bRange=0.4;
     if(dist>bRange+0.05){const bspd=0.03*dt;battle.bx+=Math.sign(dx)*Math.min(bspd,Math.abs(dist-bRange));}
     battle.bx=clamp(battle.bx,0.1,0.9);
-    if(now-battle.lastBossShot>1200&&dist<bRange){battle.lastBossShot=now;battle.bullets.push({sx:battle.bx,sy:battle.by,tx:battle.px,ty:battle.py,t:0,enemy:true,dmg:battle.bossDmg,pen:battle.bossPen||0});}
+    if(now-battle.lastBossShot>1200&&dist<bRange){
+      battle.lastBossShot=now;
+      /* ★ Boss 子彈從身體中心發射（by 為精靈頂端，向下偏移 sprite 高度一半） */
+      const bossCenterY = battle.by + BATTLE_BOSS_HEIGHT_RATIO / 2;
+      battle.bullets.push({sx:battle.bx, sy:bossCenterY, tx:battle.px, ty:battle.py, t:0, enemy:true, dmg:battle.bossDmg, pen:battle.bossPen||0});
+    }
   }
   if(battle.firing&&!battle.reloading&&!battle.consuming){
     const interval=fireInterval(battle.fireMode,battle.weapon);
@@ -2002,14 +2125,12 @@ function fireInterval(mode,weapon){
   if(mode==='短點射'||mode==='長點射'||mode==='掃射')base=Math.max(maxInterval,90);
   return Math.max(maxInterval,base);
 }
-/* ★ v17.5：槍口位置＝後側手方塊頂端（依英雄精靈實際位置換算） */
 function getPlayerMuzzlePos(){
   const fx = document.getElementById('battle-fx');
   const W = fx ? fx.clientWidth : 400;
   const H = fx ? fx.clientHeight : 500;
-  const spriteW = 88, spriteH = 118;
+  const spriteW = 88, spriteH = BATTLE_HERO_SPRITE_H;
   const local = getHeroMuzzleLocal(spriteW, spriteH, CHAR_HEIGHT_FACTOR_BATTLE);
-  // 英雄精靈 left=battle.px*W 且 translateX(-50%) → 精靈左緣 = battle.px*W - spriteW/2
   return {
     x: (battle.px * W - spriteW/2 + local.x) / W,
     y: (battle.py * H + local.y) / H
@@ -2017,6 +2138,7 @@ function getPlayerMuzzlePos(){
 }
 function playerShoot(){
   let w=battle.weapon;if(!w||battle.reloading||battle.consuming)return;
+  if(battle.moveDir !== 0) return;
   let def=w.def;
   const dist=Math.abs(battle.bx-battle.px);
   if(dist>battle.playerWeaponRange+0.05){if(Math.random()<0.05)notify('超出武器射程','error');return;}
@@ -2189,13 +2311,22 @@ function endBattle(victory){
     <div class="stat-line"><span class="k">剩餘 HP</span><span class="v">${Math.max(0,Math.round(b.playerHp))}</span></div>
     <div class="divider"></div>
     <div style="font-size:11px;color:#e8a33d;margin-bottom:6px">戰利品</div>
-    ${loot.length?loot.map(l=>`<div class="item-row" data-iid="${l.id}" data-irar="${l.rarity}"><div class="icon">${itemIcon(l.id,30)}</div><div class="info"><div class="nm ${rarityClass(l.rarity)}">${itemDef(l.id).name}</div><div class="sub">${l.rarity}</div></div><div class="cnt">*${l.count}</div></div>`).join(''):'<div class="empty-hint">無</div>'}`;
+    ${loot.length?loot.map(l=>`<div class="item-row" data-iid="${l.id}" data-irar="${l.rarity}"><div class="icon" style="background:${rarityBg(l.rarity)}">${itemIcon(l.id,30)}</div><div class="info"><div class="nm ${rarityClass(l.rarity)}">${itemDef(l.id).name}</div><div class="sub">${l.rarity}</div></div><div class="cnt">*${l.count}</div></div>`).join(''):'<div class="empty-hint">無</div>'}`;
   const ft=el('div','modal-ft');ft.innerHTML=`<button class="btn primary" id="m-ok">確認</button>`;
   const bd=openModal({title:'戰鬥結算',body,footer:ft});
   ft.querySelector('#m-ok').onclick=()=>{closeModal();battle=null;save();renderCombat();};
   $$('.item-row',bd).forEach(r=>{r.onclick=()=>openItemDetail(r.dataset.iid,r.dataset.irar);});
   save();
 }
+const BossModule = {
+  get battle(){ return battle; },
+  set battle(v){ battle = v; },
+  isActive(){ return !!(battle && battle.active); },
+  render(){ renderCombat(); },
+  start(bid){ startBossBattle(bid); },
+  heroAnim: battleHeroAnim
+};
+window.BossModule = BossModule;
 
 /* ============================================================
    基地
@@ -2237,10 +2368,6 @@ function renderBase(){
           <div class="prof-line"><span>物品拆解</span><span class="v">${profDisplay(p.salvage)}</span></div>
           <div class="prof-line"><span>物品掉落</span><span class="v">${profDisplay(p.drop)}</span></div>
         </div>
-      </div>
-      <div style="color:#7a6f60;font-size:9px;line-height:1.5;padding:5px 0">
-        熟練度上限 Lv.${MAX_PROF_LEVEL}，滿級後可改造對應武器<br>
-        命中率 =（基礎10% + 熟練度）× 模式加成 + 瞄具加成，上限95%
       </div>
       <div class="pref-btn" id="pref-btn">⚙️ 偏好設定</div>
     </div>`;
@@ -2533,9 +2660,6 @@ function getDragAfterElement(container,y){
   return els.reduce((closest,child)=>{const box=child.getBoundingClientRect();const offset=y-box.top-box.height/2;if(offset<0&&offset>closest.offset)return{offset,element:child};return closest;},{offset:Number.NEGATIVE_INFINITY}).element;
 }
 
-/* ============================================================
-   Tab / 主迴圈 / 初始化
-   ============================================================ */
 let currentTab='explore';
 function renderCurrentTab(){
   if(currentTab==='explore')renderExplore();
@@ -2544,7 +2668,7 @@ function renderCurrentTab(){
 }
 $$('.tab').forEach(t=>{
   t.onclick=()=>{
-    if(battle&&battle.active){if(!confirm('戰鬥尚未結束，確定要離開嗎？'))return;battle.active=false;battle=null;}
+    if(BossModule.isActive()){if(!confirm('戰鬥尚未結束，確定要離開嗎？'))return;BossModule.battle.active=false;BossModule.battle=null;}
     currentTab=t.dataset.tab;
     $$('.tab').forEach(x=>x.classList.toggle('active',x===t));
     renderCurrentTab();
@@ -2555,7 +2679,7 @@ let lastTickTime=Date.now();
 function onlineTick(){
   const now=Date.now();const dt=now-lastTickTime;lastTickTime=now;
   if(dt>EVENT_INTERVAL_MS*2){console.log('[tick] 偵測到離線中斷，時間差:',(dt/1000).toFixed(1),'秒');offlineSettle();return;}
-  if(battle&&battle.active)return;
+  if(BossModule.isActive())return;
   doExploreTick();
 }
 
@@ -2571,7 +2695,10 @@ requestAnimationFrame(heroLoop);
 
 window.addEventListener('resize', () => {
   if(currentTab === 'explore') renderExploreHeroCanvas();
-  if(currentTab === 'combat' && battle && battle.active) renderBattleHeroCanvas();
+  if(currentTab === 'combat' && BossModule.isActive()) {
+    if(BossModule.battle) BossModule.battle.lastH = 0;
+    renderBattleHeroCanvas();
+  }
   if(currentTab === 'explore' || currentTab === 'combat') renderZone2Silhouette();
 });
 
@@ -2610,7 +2737,7 @@ document.addEventListener('click',e=>{
   if(t&&t.dataset.iid)openItemDetail(t.dataset.iid,t.dataset.irar);
 });
 
-window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,addProf,notify,offlineSettle,getMeleeHits,getOrCreateNamedItem};
+window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,addProf,notify,offlineSettle,getMeleeHits,getOrCreateNamedItem,BossModule};
 </script>
 </body>
 </html>
