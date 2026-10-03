@@ -206,10 +206,33 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .mod-opt .bonus{color:#4caf50;font-weight:bold;font-size:11px;white-space:nowrap}
 /* ============================================================
    ★ BOSS MODULE STYLES
-   所有 Boss 專屬 CSS 一律加在此區塊，類別名稱以 boss- 開頭。
    ============================================================ */
 .boss-f .sprite canvas{width:100%;height:100%;display:block}
-/* 未來技能預警圈、震波、毒霧等特效類別加在這裡 */
+.boss-telegraph{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  border:3px solid #ff3030;
+  background:radial-gradient(circle, rgba(255,48,48,0.35) 0%, rgba(255,48,48,0.08) 70%, transparent 100%);
+  pointer-events:none;
+  z-index:6;
+  animation:telegraphPulse 0.35s ease-in-out infinite;
+  box-shadow:0 0 24px rgba(255,48,48,0.6), inset 0 0 24px rgba(255,48,48,0.4);
+}
+.boss-telegraph.aoe{
+  border-color:#ff8800;
+  background:radial-gradient(circle, rgba(255,136,0,0.42) 0%, rgba(255,136,0,0.1) 70%, transparent 100%);
+  animation:telegraphPulseAoe 0.4s ease-in-out infinite;
+  box-shadow:0 0 32px rgba(255,136,0,0.7), inset 0 0 32px rgba(255,136,0,0.5);
+}
+@keyframes telegraphPulse{
+  0%,100%{transform:translate(-50%,-50%) scale(0.85);opacity:.6}
+  50%    {transform:translate(-50%,-50%) scale(1.08);opacity:1}
+}
+@keyframes telegraphPulseAoe{
+  0%,100%{transform:translate(-50%,-50%) scale(0.9);opacity:.65}
+  50%    {transform:translate(-50%,-50%) scale(1.18);opacity:1}
+}
 </style>
 </head>
 <body>
@@ -231,7 +254,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 <script>
 "use strict";
 const VERSION='v17.5';
-/* ★ 資源版本（由 probeAssetVersion 探測 Last-Modified 後填入） */
 let ASSET_VERSION = localStorage.getItem('wasteland_asset_version') || '';
 const ASSET_PROBE_URL = 'icons/buildings/control.png';
 const ASSET_CACHE_KEY = 'wasteland_asset_version';
@@ -328,7 +350,7 @@ const WEAPONS={
   mp155:{name:'MP-155 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp155,modes:['點射'],rpm:70,range:0.4},
   saiga12:{name:'Saiga-12',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.saiga12,modes:['點射'],rpm:300,range:0.45},
   toz106:{name:'TOZ-106',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.toz106,modes:['點射'],rpm:40,range:0.35},
-  ks23:{name:'KS-23',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.ks23,modes:['點射'],rpm:40,range:0.45},
+  ks23:{name:'KS-23',slot:'secondary',type:'霰彈槍',cal:'23x75',mag:TK_MAG.ks23,modes:['點射'],rpm:40,range:0.45},
   '6kh2':{name:'6Kh2 刺刀',slot:'melee',type:'刺刀',dmg:25,modes:['近戰'],rpm:120,range:0.15},
   '6kh5':{name:'6Kh5 刺刀',slot:'melee',type:'刺刀',dmg:26,modes:['近戰'],rpm:120,range:0.15},
   kukri:{name:'Kukri 彎刀',slot:'melee',type:'刀',dmg:32,modes:['近戰'],rpm:100,range:0.18},
@@ -374,6 +396,11 @@ const AMMO={
   '12ga_flechette':{name:'12/70 箭形彈',cal:'12ga',dmg:25,pen:4,rarity:'精品',pellets:8},
   '12ga_ap20':{name:'12/70 AP-20',cal:'12ga',dmg:164,pen:5,rarity:'傳奇',pellets:1},
   '12.7_ps12':{name:'12.7×55mm PS12',cal:'12.7',dmg:120,pen:4,rarity:'一般',pellets:1},
+  '23x75_barricade':{name:'23×75mmR Barricade',cal:'23x75',dmg:40,pen:1,rarity:'破舊',pellets:1},
+  '23x75_volna':{name:'23×75mmR Volna',cal:'23x75',dmg:60,pen:2,rarity:'一般',pellets:1},
+  '23x75_zvezda':{name:'23×75mmR Zvezda',cal:'23x75',dmg:85,pen:3,rarity:'庫存',pellets:1},
+  '23x75_shrapnel10':{name:'23×75mmR Shrapnel-10',cal:'23x75',dmg:105,pen:4,rarity:'精品',pellets:1},
+  '23x75_shrapnel25':{name:'23×75mmR Shrapnel-25',cal:'23x75',dmg:130,pen:5,rarity:'傳奇',pellets:1},
 };
 
 const CONSUMABLES={bandage:{name:'繃帶',heal:15},water:{name:'瓶裝水',heal:5},ai2:{name:'AI-2 急救包',heal:30},painkiller:{name:'止痛藥',heal:10},tushonka:{name:'燉肉罐頭',heal:15},splint:{name:'夾板',heal:10},salewa:{name:'Salewa 急救包',heal:60},ifak:{name:'IFAK 急救包',heal:50},surv12:{name:'Surv12 野戰包',heal:70}};
@@ -388,6 +415,7 @@ const AMMO_ICON_BY_CAL = {
   '9x18':'918.png', '9x19':'919.png', '5.45':'545.png',
   '7.62':'76239.png', '7.62x54':'76254.png', '9x39':'939.png',
   '12ga':'12ga.png', '12.7':'12755.png',
+  '23x75':'2375.png'
 };
 
 const WEAPON_MOD_RULES={
@@ -430,9 +458,6 @@ function itemIcon(id,size){
 function bossIcon(id){return `<img src="icons/bosses/${id}.png${assetSuffix()}" alt="">`;}
 function buildingIcon(id){return `<img src="icons/buildings/${id}.png${assetSuffix()}" alt="">`;}
 
-/* ============================================================
-   ★ 資源版本探測：用 HEAD 請求讀 Last-Modified
-   ============================================================ */
 async function probeAssetVersion(){
   try{
     const url = ASSET_PROBE_URL + '?probe=' + Date.now();
@@ -539,11 +564,11 @@ function getMagOptionsForWeapon(weaponId){
 const ENEMIES={mutant_squirrel:{name:'變異松鼠',hp:10,dmg:3},mutant_rat:{name:'變異巨鼠',hp:20,dmg:5},ghoul:{name:'食屍鬼',hp:35,dmg:10},raider:{name:'掠奪者',hp:45,dmg:12},raider_vet:{name:'掠奪者老兵',hp:80,dmg:18},mutant_wolf:{name:'變異狼',hp:55,dmg:15},mutant_bear:{name:'變異熊',hp:150,dmg:30}};
 
 const REGIONS={
-  '廢棄工廠':{name:'廢棄工廠',desc:'生鏽的機械與堆積的貨櫃',enemies:['mutant_squirrel','mutant_rat','raider','ghoul'],loot:['wood','metal','screws','cloth','9x18_ps','9x19_ps','12ga_buck','5.45_us','pp19','aks74u','pm','mp133','6kh2','rgd5','ssh68','balaclava','paca','cargopants','workboots','ai2','bandage','water'],combat:{attack:0.55,stealth:0.22},seal:'seal_factory',sealRate:0.03},
+  '廢棄工廠':{name:'廢棄工廠',desc:'生鏽的機械與堆積的貨櫃',enemies:['mutant_squirrel','mutant_rat','raider','ghoul'],loot:['wood','metal','screws','cloth','9x18_ps','9x19_ps','12ga_buck','23x75_volna','5.45_us','pp19','aks74u','pm','mp133','6kh2','rgd5','ssh68','balaclava','paca','cargopants','workboots','ai2','bandage','water'],combat:{attack:0.55,stealth:0.22},seal:'seal_factory',sealRate:0.03},
   '廢棄實驗室':{name:'廢棄實驗室',desc:'冷白的燈管與腐蝕的培養槽',enemies:['ghoul','raider','raider_vet','mutant_rat'],loot:['electronics','metal','screws','cloth','9x19_pbp','5.45_bt','9x39_sp5','ak74m','9a91','pb','kukri','f1','kolpak','6b47','balaclava','gp7','6b23','6sh122','tactboots','salewa','painkiller','splint'],combat:{attack:0.6,stealth:0.28},seal:'seal_lab',sealRate:0.02},
-  '郊區公路':{name:'郊區公路',desc:'翻覆的車隊與荒廢的加油站',enemies:['raider','raider_vet','mutant_wolf','mutant_rat'],loot:['metal','gears','cloth','screws','7.62_ps','12ga_buck','12ga_slug','5.45_bt','akm','aks74u','ak74n','mp443','aps','rgd5','f1','kiver','kolpak','shemagh','6b23','6sh122','tactboots','painkiller','tushonka','water','ai2'],combat:{attack:0.62,stealth:0.3},seal:'seal_road',sealRate:0.02},
-  '輻射沼澤':{name:'輻射沼澤',desc:'發綠的水窪與扭曲的枯樹',enemies:['mutant_bear','mutant_wolf','ghoul','raider_vet'],loot:['electronics','gears','cloth','metal','5.45_bp','7.62_bp','7.62x54_bt','9x39_sp6','sv98','ak103','rpk16','vss','saiga12','f1','rgo','altyn','kiver','zhuk6a','6sh122','tactboots','salewa','splint','tushonka'],combat:{attack:0.7,stealth:0.35},seal:'seal_swamp',sealRate:0.015,needUnlock:true,unlockHint:'擊敗 實驗室女王 · 白蝕 解鎖'},
-  '廢土核心':{name:'廢土核心',desc:'鋼鐵巨構與永不熄滅的火光',enemies:['mutant_bear','raider_vet','raider_vet','mutant_wolf'],loot:['electronics','gears','metal','cloth','7.62_bp','5.45_bp','7.62x54_snb','9x39_sp6','pkp','svd','vss','asval','rpk16','rpd','saiga12','ash12','rgo','f1','altyn','zhuk6a','6b43','salewa','tushonka','splint'],combat:{attack:0.75,stealth:0.4},seal:'seal_core',sealRate:0.008,needUnlock:true,unlockHint:'擊敗 沼澤九頭 · 腐母 解鎖'},
+  '郊區公路':{name:'郊區公路',desc:'翻覆的車隊與荒廢的加油站',enemies:['raider','raider_vet','mutant_wolf','mutant_rat'],loot:['metal','gears','cloth','screws','7.62_ps','12ga_buck','12ga_slug','23x75_zvezda','5.45_bt','akm','aks74u','ak74n','mp443','aps','rgd5','f1','kiver','kolpak','shemagh','6b23','6sh122','tactboots','painkiller','tushonka','water','ai2'],combat:{attack:0.62,stealth:0.3},seal:'seal_road',sealRate:0.02},
+  '輻射沼澤':{name:'輻射沼澤',desc:'發綠的水窪與扭曲的枯樹',enemies:['mutant_bear','mutant_wolf','ghoul','raider_vet'],loot:['electronics','gears','cloth','metal','5.45_bp','7.62_bp','7.62x54_bt','9x39_sp6','23x75_shrapnel10','sv98','ak103','rpk16','vss','saiga12','f1','rgo','altyn','kiver','zhuk6a','6sh122','tactboots','salewa','splint','tushonka'],combat:{attack:0.7,stealth:0.35},seal:'seal_swamp',sealRate:0.015,needUnlock:true,unlockHint:'擊敗 實驗室女王 · 白蝕 解鎖'},
+  '廢土核心':{name:'廢土核心',desc:'鋼鐵巨構與永不熄滅的火光',enemies:['mutant_bear','raider_vet','raider_vet','mutant_wolf'],loot:['electronics','gears','metal','cloth','7.62_bp','5.45_bp','7.62x54_snb','9x39_sp6','23x75_shrapnel25','pkp','svd','vss','asval','rpk16','rpd','saiga12','ash12','rgo','f1','altyn','zhuk6a','6b43','salewa','tushonka','splint'],combat:{attack:0.75,stealth:0.4},seal:'seal_core',sealRate:0.008,needUnlock:true,unlockHint:'擊敗 沼澤九頭 · 腐母 解鎖'},
 };
 
 const ROUTES={
@@ -558,122 +583,152 @@ const ROUTES={
    ★ BOSS MODULE — 資料區
    ============================================================ */
 const BOSSES={
-  factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:10000,armor:400,dmg:25,pen:2,seal:'seal_factory',unlock:'廢棄實驗室',skills:['衝撞','咆哮'],drops:['zhuk6a','sv98','6b23','rpk16','vss']},
+  factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:10000,armor:400,dmg:25,pen:2,seal:'seal_factory',unlock:'廢棄實驗室',skills:['smash','sweep'],drops:['zhuk6a','sv98','6b23','rpk16','vss']},
   lab_queen:{name:'實驗室女王 · 白蝕',region:'廢棄實驗室',hp:25000,armor:1200,dmg:45,pen:3,seal:'seal_lab',unlock:'郊區公路',skills:['衝撞','咆哮','毒霧'],drops:['altyn','saiga12','sv98','rpk16','asval']},
   road_tyrant:{name:'公路暴君 · 鐵鎚',region:'郊區公路',hp:50000,armor:2500,dmg:70,pen:4,seal:'seal_road',unlock:'輻射沼澤',skills:['衝撞','咆哮'],drops:['zhuk6a','rpk16','svd','pkp','asval']},
   swamp_hydra:{name:'沼澤九頭 · 腐母',region:'輻射沼澤',hp:90000,armor:4000,dmg:100,pen:5,seal:'seal_swamp',unlock:'廢土核心',skills:['衝撞','咆哮','毒霧'],drops:['svd','pkp','altyn','zhuk6a','6b43']},
   core_omega:{name:'核心終焉 · OMEGA',region:'廢土核心',hp:160000,armor:6000,dmg:130,pen:6,seal:'seal_core',unlock:null,skills:['衝撞','咆哮','毒霧','EMP'],drops:['pkp','svd','altyn','6b43','zhuk6a']},
 };
 
-/* ---- BOSS_LAYERS：方塊骨架 ---- */
 const BOSS_LAYERS = {
   factory_king: {
-    canvas: { w: 400, h: 500 },
-    foot:   { x: 0.50, y: 0.98 },
+    canvas: { w:400, h:500 },
+    foot:   { x:0.5, y:0.98 },
     layers: [
-      { id:'leg_l',      z:20, color:'#3a2a1a', pivot:{x:0.5, y:0.05}, x:0.28, y:0.58, w:0.14, h:0.40 },
-      { id:'leg_r',      z:20, color:'#3a2a1a', pivot:{x:0.5, y:0.05}, x:0.58, y:0.58, w:0.14, h:0.40 },
-      { id:'torso',      z:30, color:'#5a4a35', pivot:{x:0.5, y:0.10}, x:0.25, y:0.22, w:0.50, h:0.42 },
-      { id:'shoulder_l', z:35, color:'#6a3a1a', pivot:{x:0.5, y:0.50}, x:0.15, y:0.18, w:0.16, h:0.16 },
-      { id:'shoulder_r', z:35, color:'#6a3a1a', pivot:{x:0.5, y:0.50}, x:0.69, y:0.18, w:0.16, h:0.16 },
-      { id:'arm_l',      z:40, color:'#4a3020', pivot:{x:0.5, y:0.10}, x:0.10, y:0.36, w:0.12, h:0.32 },
-      { id:'arm_r',      z:40, color:'#4a3020', pivot:{x:0.5, y:0.10}, x:0.78, y:0.36, w:0.12, h:0.32 },
-      { id:'head',       z:50, color:'#c89870', pivot:{x:0.5, y:0.90}, x:0.40, y:0.06, w:0.20, h:0.18 },
+      { id:'leg_r', z:10, color:'#3a2a1a', pivot:{x:0.5, y:0.05}, x:0.58, y:0.58, w:0.14, h:0.4 },
+      { id:'leg_l', z:20, color:'#3a2a1a', pivot:{x:0.5, y:0.05}, x:0.28, y:0.58, w:0.14, h:0.4 },
+      { id:'torso', z:30, color:'#5a4a35', pivot:{x:0.5, y:0.1}, x:0.25, y:0.22, w:0.5, h:0.42 },
+      { id:'arm_r', z:40, color:'#4a3020', pivot:{x:0.5, y:0.1}, x:0.769, y:0.351, w:0.12, h:0.32 },
+      { id:'shoulder_r', z:50, color:'#6a3a1a', pivot:{x:0.5, y:0.5}, x:0.69, y:0.18, w:0.16, h:0.16 },
+      { id:'arm_l', z:60, color:'#4a3020', pivot:{x:0.5, y:0.1}, x:0.106, y:0.346, w:0.12, h:0.32 },
+      { id:'shoulder_l', z:70, color:'#6a3a1a', pivot:{x:0.5, y:0.5}, x:0.15, y:0.18, w:0.16, h:0.16 },
+      { id:'head', z:80, color:'#c89870', pivot:{x:0.5, y:0.9}, x:0.421, y:0.099, w:0.2, h:0.18 },
+      { id:'helmet', z:90, color:'#888888', pivot:{x:0.5, y:0.5}, x:0.431, y:0.403, w:0.2, h:0.2 },
+      { id:'eyes', z:100, color:'#b3dfea', pivot:{x:0.5, y:0.5}, x:-0.006, y:0.298, w:0.2, h:0.2, anchor:{target:'helmet', rot:true} },
+      { id:'hammer-h', z:110, color:'#c1870b', pivot:{x:0.5, y:0.5}, x:0.668, y:0.489, w:0.2, h:0.2 },
+      { id:'hammer', z:120, color:'#888888', pivot:{x:0.5, y:0.5}, x:0.003, y:-0.19, w:0.2, h:0.2, anchor:{target:'hammer-h', rot:true} }
     ]
   }
 };
 
-/* ---- BOSS_ANIMS：動畫 ---- */
 const BOSS_ANIMS = {
   factory_king: {
     idle: {
       frameCount: 4, fps: 4, loop: true,
       keys: {
-        head:       [0,-2,-3,-2].map(v=>({rot:0, dx:0, dy:v})),
-        torso:      [0,-2,-3,-2].map(v=>({rot:0, dx:0, dy:v})),
-        shoulder_l: [0,-1,-2,-1].map(v=>({rot:0, dx:0, dy:v})),
-        shoulder_r: [0,-1,-2,-1].map(v=>({rot:0, dx:0, dy:v})),
-        arm_l:      [0,-2,-3,-2].map(v=>({rot:0, dx:0, dy:v})),
-        arm_r:      [0,-2,-3,-2].map(v=>({rot:0, dx:0, dy:v})),
-        leg_l:      [{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-        leg_r:      [{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+        leg_r: [{rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}],
+        leg_l: [{rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}],
+        torso: [{rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.35, dy:7.31, w:0.5, h:0.42}, {rot:0, dx:18.35, dy:7.02, w:0.5, h:0.42}, {rot:0, dx:18.35, dy:6.73, w:0.5, h:0.42}],
+        arm_r: [{rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:0, dx:-13.25, dy:-2.21, w:0.11, h:0.288}, {rot:0, dx:-13.25, dy:-2.21, w:0.11, h:0.288}],
+        'hammer-h': [{rot:-1.85, dx:-22.26, dy:12.39, w:0.736, h:0.023}, {rot:3.22, dx:-22.61, dy:10.38, w:0.736, h:0.023}, {rot:-6.48, dx:-21.99, dy:11.65, w:0.736, h:0.023}, {rot:3.09, dx:-23.5, dy:9.02, w:0.736, h:0.023}],
+        arm_l: [{rot:0, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:0, dx:11.28, dy:-2.15, w:0.126, h:0.291}, {rot:0, dx:11.28, dy:-2.15, w:0.126, h:0.328}, {rot:-4.8, dx:12, dy:-2.94, w:0.125, h:0.295}],
+        shoulder_r: [{rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}],
+        shoulder_l: [{rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}],
+        head: [{rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}],
+        helmet: [{rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.45, dy:-25.01, w:0.263, h:0.205}, {rot:0, dx:0.63, dy:-22.86, w:0.263, h:0.205}, {rot:0, dx:0.63, dy:-22.86, w:0.263, h:0.205}],
+        eyes: [{rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}],
+        hammer: [{rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}]
       }
     },
     walk: {
       frameCount: 8, fps: 10, loop: true,
       keys: {
-        head:       Array(8).fill(0).map((_,i)=>({rot:0, dx:0, dy:i%2?-1:0})),
-        torso:      Array(8).fill(0).map((_,i)=>({rot:0, dx:0, dy:i%2?-1:0})),
-        shoulder_l: Array(8).fill(0).map((_,i)=>({rot:0, dx:0, dy:i%2?-1:0})),
-        shoulder_r: Array(8).fill(0).map((_,i)=>({rot:0, dx:0, dy:i%2?-1:0})),
-        arm_l:      [-8,-4,0,4,8,4,0,-4].map(r=>({rot:r, dx:0, dy:0})),
-        arm_r:      [ 8, 4,0,-4,-8,-4,0, 4].map(r=>({rot:r, dx:0, dy:0})),
-        leg_l:      [-10,-5,0,5,10,5,0,-5].map(r=>({rot:r, dx:0, dy:0})),
-        leg_r:      [ 10, 5,0,-5,-10,-5,0, 5].map(r=>({rot:r, dx:0, dy:0})),
+        leg_r: [{rot:10, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:5, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:-5, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:-10, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:-5, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:5, dx:0.09, dy:-1.72, w:0.14, h:0.4}],
+        leg_l: [{rot:-10, dx:0, dy:0, w:0.14, h:0.4}, {rot:-5, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:5, dx:0, dy:0, w:0.14, h:0.4}, {rot:10, dx:0, dy:0, w:0.14, h:0.4}, {rot:5, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:-5, dx:0, dy:0, w:0.14, h:0.4}],
+        torso: [{rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}],
+        arm_r: [{rot:-6, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:-3, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:3, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:6, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:3, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:-3, dx:-13.07, dy:-2.43, w:0.12, h:0.32}],
+        'hammer-h': [{rot:6.1, dx:-20.92, dy:12.46, w:0.736, h:0.023}, {rot:-0.71, dx:-16.97, dy:10.086, w:0.736, h:0.023}, {rot:-7.26, dx:-13.529, dy:7.465, w:0.736, h:0.023}, {rot:-23.22, dx:-6.881, dy:-0.088, w:0.736, h:0.023}, {rot:-26.69, dx:-5.8, dy:-1.908, w:0.736, h:0.023}, {rot:-25.39, dx:-6.189, dy:-1.22, w:0.736, h:0.023}, {rot:-16.79, dx:-9.511, dy:3.201, w:0.736, h:0.023}, {rot:-3.44, dx:-15.76, dy:9.102, w:0.736, h:0.023}],
+        arm_l: [{rot:6, dx:12.62, dy:-2.08, w:0.12, h:0.32}, {rot:-0.81, dx:12.62, dy:-2.08, w:0.12, h:0.32}, {rot:-7.36, dx:12.62, dy:-2.08, w:0.12, h:0.32}, {rot:-23.32, dx:12.62, dy:-2.08, w:0.12, h:0.32}, {rot:-26.79, dx:12.62, dy:-2.08, w:0.12, h:0.32}, {rot:-25.49, dx:12.62, dy:-2.08, w:0.12, h:0.32}, {rot:-16.89, dx:12.35, dy:-2.01, w:0.12, h:0.32}, {rot:-3.54, dx:12.35, dy:-2.01, w:0.12, h:0.32}],
+        shoulder_r: [{rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}],
+        shoulder_l: [{rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}],
+        head: [{rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}],
+        helmet: [{rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}],
+        eyes: [{rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}],
+        hammer: [{rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.221, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}]
       }
     },
     attack_swipe: {
       frameCount: 6, fps: 14, loop: false,
       keys: {
-        head:       Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        torso:      [{rot:0,dx:0,dy:0},{rot:-3,dx:0,dy:0},{rot:5,dx:0,dy:0},{rot:3,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-        shoulder_l: Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        shoulder_r: Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        arm_l:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        arm_r:      [{rot:0,dx:0,dy:0},{rot:-30,dx:0,dy:0},{rot:40,dx:0,dy:0},{rot:60,dx:0,dy:0},{rot:20,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-        leg_l:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        leg_r:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        leg_r: [{rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}],
+        leg_l: [{rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}],
+        torso: [{rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:-3, dx:18.44, dy:4.8, w:0.5, h:0.42}, {rot:-5, dx:18.44, dy:3.8, w:0.5, h:0.42}, {rot:5, dx:18.44, dy:7.8, w:0.5, h:0.42}, {rot:3, dx:18.44, dy:6.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}],
+        arm_r: [{rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:-40, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:-70, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:60, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:20, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}],
+        'hammer-h': [{rot:-1.85, dx:-22.26, dy:12.39, w:0.736, h:0.023}, {rot:-35, dx:-22.259, dy:12.39, w:0.736, h:0.023}, {rot:-60, dx:-22.26, dy:12.39, w:0.736, h:0.023}, {rot:50, dx:-22.26, dy:12.39, w:0.736, h:0.023}, {rot:15, dx:-22.26, dy:12.39, w:0.736, h:0.023}, {rot:-1.85, dx:-22.26, dy:12.39, w:0.736, h:0.023}],
+        arm_l: [{rot:0, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:5, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:8, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:-5, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:-2, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:0, dx:11.28, dy:-2.15, w:0.12, h:0.32}],
+        shoulder_r: [{rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:-8, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:-12, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:10, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:5, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}],
+        shoulder_l: [{rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}],
+        head: [{rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:-2, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:-3, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:3, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:2, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}],
+        helmet: [{rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:-2, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:-3, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:3, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:2, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}],
+        eyes: [{rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}],
+        hammer: [{rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.222, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.222, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}]
       }
     },
     skill_charge: {
       frameCount: 8, fps: 10, loop: false,
       keys: {
-        head:       [{rot:0,dx:0,dy:0},{rot:-3,dx:0,dy:0},{rot:-6,dx:0,dy:0},{rot:-8,dx:0,dy:0},{rot:-6,dx:0,dy:0},{rot:4,dx:0,dy:0},{rot:6,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-        torso:      [{rot:0,dx:0,dy:0},{rot:-5,dx:0,dy:0},{rot:-10,dx:0,dy:0},{rot:-12,dx:0,dy:0},{rot:-10,dx:0,dy:0},{rot:8,dx:0,dy:0},{rot:12,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-        shoulder_l: Array(8).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        shoulder_r: Array(8).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        arm_l:      [{rot:0,dx:0,dy:0},{rot:20,dx:0,dy:0},{rot:30,dx:0,dy:0},{rot:35,dx:0,dy:0},{rot:25,dx:0,dy:0},{rot:-20,dx:0,dy:0},{rot:-30,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-        arm_r:      [{rot:0,dx:0,dy:0},{rot:-20,dx:0,dy:0},{rot:-30,dx:0,dy:0},{rot:-35,dx:0,dy:0},{rot:-25,dx:0,dy:0},{rot:20,dx:0,dy:0},{rot:30,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-        leg_l:      Array(8).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        leg_r:      Array(8).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        leg_r: [{rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:-20.9, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:-20.9, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:-12.9, dx:-0.18, dy:-1.72, w:0.14, h:0.4}, {rot:-10.1, dx:-0.18, dy:-1.79, w:0.14, h:0.4}, {rot:-36.7, dx:-0.45, dy:-1.79, w:0.14, h:0.4}],
+        leg_l: [{rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:7.9, dx:0, dy:0, w:0.14, h:0.4}, {rot:20.6, dx:0, dy:0, w:0.14, h:0.4}, {rot:10.9, dx:0, dy:-0.29, w:0.14, h:0.4}, {rot:-0.1, dx:0, dy:-0.29, w:0.14, h:0.4}, {rot:-10.2, dx:0, dy:-0.29, w:0.14, h:0.4}, {rot:-26.1, dx:-0.09, dy:-0.36, w:0.14, h:0.4}, {rot:-47.3, dx:0.09, dy:-0.43, w:0.14, h:0.4}],
+        torso: [{rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:-5, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:-1.1, dx:18.53, dy:6.66, w:0.5, h:0.42}, {rot:-1.1, dx:18.53, dy:6.66, w:0.5, h:0.42}, {rot:-1.1, dx:18.53, dy:6.66, w:0.5, h:0.42}, {rot:-1.1, dx:18.53, dy:6.66, w:0.5, h:0.42}, {rot:-1.1, dx:18.53, dy:6.66, w:0.5, h:0.42}, {rot:-1.1, dx:18.53, dy:6.66, w:0.5, h:0.42}],
+        arm_r: [{rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:-15, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:-37.07, dx:-16.03, dy:-5.08, w:0.12, h:0.32}, {rot:-29.04, dx:-12.25, dy:-8.14, w:0.12, h:0.32}, {rot:-29.04, dx:-12.25, dy:-8.14, w:0.12, h:0.32}, {rot:-40.3, dx:-12.34, dy:-8.14, w:0.12, h:0.32}, {rot:-40.3, dx:-12.34, dy:-8.14, w:0.12, h:0.32}, {rot:-17.5, dx:-12.43, dy:-8.14, w:0.115, h:0.249}],
+        'hammer-h': [{rot:-1.85, dx:-22.26, dy:12.39, w:0.736, h:0.023}, {rot:-15, dx:-11.88, dy:13.18, w:0.736, h:0.023}, {rot:-27.07, dx:-7.1, dy:11.484, w:0.736, h:0.023}, {rot:-38.55, dx:-0.07, dy:9.6, w:0.736, h:0.023}, {rot:-64.08, dx:11.1, dy:2.78, w:0.736, h:0.023}, {rot:-93.36, dx:18.04, dy:-13.17, w:0.736, h:0.023}, {rot:-139.81, dx:5.79, dy:-10.72, w:0.736, h:0.023}, {rot:-184.14, dx:-26.2, dy:-1.39, w:0.736, h:0.023}],
+        arm_l: [{rot:0, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:15, dx:11.55, dy:-2.08, w:0.12, h:0.32}, {rot:15, dx:11.55, dy:-2.08, w:0.12, h:0.32}, {rot:15, dx:11.55, dy:-2.08, w:0.12, h:0.32}, {rot:15, dx:11.55, dy:-2.08, w:0.12, h:0.32}, {rot:15, dx:11.55, dy:-2.08, w:0.12, h:0.32}, {rot:15, dx:11.55, dy:-2.08, w:0.12, h:0.32}, {rot:-28.2, dx:11.55, dy:-2.08, w:0.123, h:0.218}],
+        shoulder_r: [{rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}],
+        shoulder_l: [{rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}],
+        head: [{rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:-3, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:-6, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:-9, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:-6, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:3, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:6, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}],
+        helmet: [{rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:-3, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:-6, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:-9, dx:-2.86, dy:-23.65, w:0.263, h:0.205}, {rot:-9, dx:-0.53, dy:-25.16, w:0.263, h:0.205}, {rot:4.08, dx:1.43, dy:-27.45, w:0.263, h:0.205}, {rot:4.08, dx:1.43, dy:-27.45, w:0.263, h:0.205}, {rot:0.07, dx:0.39, dy:-24.94, w:0.263, h:0.205}],
+        eyes: [{rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}],
+        hammer: [{rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:-0.04, dx:37.241, dy:18.654, w:0.103, h:0.175}, {rot:1.35, dx:31.638, dy:19.305, w:0.103, h:0.175}, {rot:1.35, dx:31.638, dy:19.305, w:0.103, h:0.175}, {rot:1.35, dx:31.638, dy:19.305, w:0.103, h:0.175}, {rot:1.35, dx:31.638, dy:19.305, w:0.103, h:0.175}]
       }
     },
     hurt: {
       frameCount: 4, fps: 12, loop: false,
       keys: {
-        head:       [{dx:0},{dx:-4},{dx:4},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
-        torso:      [{dx:0},{dx:-3},{dx:3},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
-        shoulder_l: [{dx:0},{dx:-2},{dx:2},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
-        shoulder_r: [{dx:0},{dx:-2},{dx:2},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
-        arm_l:      [{dx:0},{dx:-2},{dx:2},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
-        arm_r:      [{dx:0},{dx:-2},{dx:2},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
-        leg_l:      [{dx:0},{dx:-1},{dx:1},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
-        leg_r:      [{dx:0},{dx:-1},{dx:1},{dx:0}].map(k=>({rot:0,dx:k.dx,dy:0})),
+        leg_r: [{rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:-0.91, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:1.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}],
+        leg_l: [{rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:-1, dy:0, w:0.14, h:0.4}, {rot:0, dx:1, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}],
+        torso: [{rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:16.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:20.44, dy:5.8, w:0.5, h:0.42}, {rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}],
+        arm_r: [{rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:0, dx:-15.07, dy:-2.43, w:0.12, h:0.32}, {rot:0, dx:-11.07, dy:-2.43, w:0.12, h:0.32}, {rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}],
+        'hammer-h': [{rot:-1.85, dx:-22.26, dy:12.39, w:0.736, h:0.023}, {rot:-1.85, dx:-24.26, dy:12.39, w:0.736, h:0.023}, {rot:-1.85, dx:-20.26, dy:12.39, w:0.736, h:0.023}, {rot:-1.85, dx:-22.26, dy:12.39, w:0.736, h:0.023}],
+        arm_l: [{rot:0, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:0, dx:9.28, dy:-2.15, w:0.12, h:0.32}, {rot:0, dx:13.28, dy:-2.15, w:0.12, h:0.32}, {rot:0, dx:11.28, dy:-2.15, w:0.12, h:0.32}],
+        shoulder_r: [{rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-6.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-2.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}],
+        shoulder_l: [{rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:5.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:9.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}],
+        head: [{rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:-0.39, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:3.61, dy:16.85, w:0.241, h:0.224}, {rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}],
+        helmet: [{rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:-1.73, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:2.27, dy:-25.23, w:0.263, h:0.205}, {rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}],
+        eyes: [{rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-2.71, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:1.29, dy:-30.1, w:0.193, h:0.067}, {rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}],
+        hammer: [{rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}]
       }
     },
     death: {
       frameCount: 6, fps: 8, loop: false,
       keys: {
-        head:       [{rot:0,dy:0},{rot:20,dy:0},{rot:40,dy:5},{rot:55,dy:10},{rot:70,dy:15},{rot:80,dy:20}],
-        torso:      [{rot:0,dy:0},{rot:15,dy:0},{rot:35,dy:5},{rot:55,dy:12},{rot:70,dy:20},{rot:80,dy:25}],
-        shoulder_l: Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        shoulder_r: Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        arm_l:      Array(6).fill(0).map((_,i)=>({rot: i*10, dx:0, dy:0})),
-        arm_r:      Array(6).fill(0).map((_,i)=>({rot:-i*10, dx:0, dy:0})),
-        leg_l:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
-        leg_r:      Array(6).fill(0).map(()=>({rot:0, dx:0, dy:0})),
+        leg_r: [{rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}, {rot:0, dx:0.09, dy:-1.72, w:0.14, h:0.4}],
+        leg_l: [{rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}, {rot:0, dx:0, dy:0, w:0.14, h:0.4}],
+        torso: [{rot:0, dx:18.44, dy:5.8, w:0.5, h:0.42}, {rot:8, dx:18.44, dy:7, w:0.5, h:0.42}, {rot:20, dx:18.44, dy:10, w:0.5, h:0.42}, {rot:35, dx:18.44, dy:15, w:0.5, h:0.42}, {rot:55, dx:18.44, dy:22, w:0.5, h:0.42}, {rot:75, dx:18.44, dy:30, w:0.5, h:0.42}],
+        arm_r: [{rot:0, dx:-13.07, dy:-2.43, w:0.12, h:0.32}, {rot:-8, dx:-13.07, dy:-1.43, w:0.12, h:0.32}, {rot:-20, dx:-13.07, dy:0.57, w:0.12, h:0.32}, {rot:-35, dx:-13.07, dy:3.57, w:0.12, h:0.32}, {rot:-50, dx:-13.07, dy:7.57, w:0.12, h:0.32}, {rot:-65, dx:-13.07, dy:12.57, w:0.12, h:0.32}],
+        'hammer-h': [{rot:-1.85, dx:-22.26, dy:12.39, w:0.736, h:0.023}, {rot:-10, dx:-22.26, dy:13.39, w:0.736, h:0.023}, {rot:-25, dx:-22.26, dy:15.39, w:0.736, h:0.023}, {rot:-45, dx:-22.261, dy:18.39, w:0.736, h:0.023}, {rot:-65, dx:-22.26, dy:22.39, w:0.736, h:0.023}, {rot:-85, dx:-22.259, dy:27.39, w:0.736, h:0.023}],
+        arm_l: [{rot:0, dx:11.28, dy:-2.15, w:0.12, h:0.32}, {rot:8, dx:11.28, dy:-1.15, w:0.12, h:0.32}, {rot:20, dx:11.28, dy:0.85, w:0.12, h:0.32}, {rot:35, dx:11.28, dy:3.85, w:0.12, h:0.32}, {rot:50, dx:11.28, dy:7.85, w:0.12, h:0.32}, {rot:65, dx:11.28, dy:12.85, w:0.12, h:0.32}],
+        shoulder_r: [{rot:0, dx:-4.57, dy:4.8, w:0.16, h:0.16}, {rot:0, dx:-5.57, dy:5.8, w:0.16, h:0.16}, {rot:0, dx:-7.57, dy:7.8, w:0.16, h:0.16}, {rot:0, dx:-10.57, dy:10.8, w:0.16, h:0.16}, {rot:0, dx:-14.57, dy:14.8, w:0.16, h:0.16}, {rot:0, dx:-19.57, dy:19.8, w:0.16, h:0.16}],
+        shoulder_l: [{rot:0, dx:7.16, dy:4.66, w:0.16, h:0.16}, {rot:0, dx:6.16, dy:5.66, w:0.16, h:0.16}, {rot:0, dx:4.16, dy:7.66, w:0.16, h:0.16}, {rot:0, dx:1.16, dy:10.66, w:0.16, h:0.16}, {rot:0, dx:-2.84, dy:14.66, w:0.16, h:0.16}, {rot:0, dx:-7.84, dy:19.66, w:0.16, h:0.16}],
+        head: [{rot:0, dx:1.61, dy:16.85, w:0.241, h:0.224}, {rot:10, dx:1.61, dy:18, w:0.241, h:0.224}, {rot:25, dx:1.61, dy:22, w:0.241, h:0.224}, {rot:40, dx:1.61, dy:28, w:0.241, h:0.224}, {rot:55, dx:1.61, dy:36, w:0.241, h:0.224}, {rot:70, dx:1.61, dy:44, w:0.241, h:0.224}],
+        helmet: [{rot:0, dx:0.27, dy:-25.23, w:0.263, h:0.205}, {rot:10, dx:0.27, dy:-24, w:0.263, h:0.205}, {rot:25, dx:0.27, dy:-20, w:0.263, h:0.205}, {rot:40, dx:0.27, dy:-14, w:0.263, h:0.205}, {rot:55, dx:0.27, dy:-6, w:0.263, h:0.205}, {rot:70, dx:0.27, dy:2, w:0.263, h:0.205}],
+        eyes: [{rot:0, dx:-0.71, dy:-30.1, w:0.193, h:0.067}, {rot:10, dx:-0.71, dy:-28.9, w:0.193, h:0.067}, {rot:25, dx:-0.71, dy:-24.9, w:0.193, h:0.067}, {rot:40, dx:-0.71, dy:-18.9, w:0.193, h:0.067}, {rot:55, dx:-0.71, dy:-10.9, w:0.193, h:0.067}, {rot:70, dx:-0.71, dy:-2.9, w:0.193, h:0.067}],
+        hammer: [{rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.22, dy:18.64, w:0.103, h:0.175}, {rot:0, dx:38.219, dy:18.64, w:0.103, h:0.175}]
       }
-    },
+    }
   }
 };
 
-/* ---- BOSS_SKILLS：技能 ---- */
+/* ---- BOSS_SKILLS：技能（以動畫為準重新命名） ---- */
 const BOSS_SKILLS = {
   factory_king: [
-    { id:'charge', name:'衝撞', cd:8,  range:0.60, dmg:35, pen:2,
-      anim:'skill_charge', telegraph:1200, hitFrame:5, aoe:false, knockback:0.15 },
-    { id:'roar',   name:'咆哮', cd:15, range:0.35, dmg:20, pen:1,
-      anim:'skill_charge', telegraph:800,  hitFrame:5, aoe:true,  knockback:0.10 },
+    { id:'smash', name:'碎地重錘', cd:10, range:0.20,
+      dmg:45, pen:2, anim:'skill_charge',
+      telegraph:1300, hitDelay:1300, totalTime:2000,
+      aoe:true, knockback:0.10, telegraphRatio:0.20, hitColor:'aoe' },
+    { id:'sweep', name:'揮錘掃擊', cd:16, range:0.30,
+      dmg:30, pen:2, anim:'attack_swipe',
+      telegraph:800, hitDelay:800, totalTime:1500,
+      aoe:true, knockback:0.12, telegraphRatio:0.30, hitColor:'aoe' }
   ]
 };
 
@@ -1189,6 +1244,49 @@ function renderZone2Silhouette(){
 const battleBossAnim = { name:'idle', frame:0, lastUpdate:0, forcedEnd:0 };
 const BATTLE_BOSS_ONESHOT = ['attack_swipe','skill_charge','hurt','death'];
 
+const BOSS_DEG2RAD = Math.PI / 180;
+function resolveBossWorld(def, anim, frame){
+  const result = {};
+  const visiting = new Set();
+  function resolve(L){
+    if(result[L.id]) return result[L.id];
+    if(visiting.has(L.id)){
+      const k = (anim && anim.keys[L.id] && anim.keys[L.id][frame]) || {rot:0,dx:0,dy:0};
+      result[L.id] = {
+        wx: def.canvas.w * L.x + def.canvas.w * (k.dx||0) * 0.01,
+        wy: def.canvas.h * L.y + def.canvas.h * (k.dy||0) * 0.01,
+        rot: k.rot || 0
+      };
+      return result[L.id];
+    }
+    visiting.add(L.id);
+    let bw = 0, by = 0, br = 0, ri = false;
+    if(L.anchor && L.anchor.target){
+      const tgt = def.layers.find(x => x.id === L.anchor.target);
+      if(tgt){
+        const t = resolve(tgt);
+        bw = t.wx; by = t.wy;
+        if(L.anchor.rot){ br = t.rot; ri = true; }
+      }
+    }
+    const k = (anim && anim.keys[L.id] && anim.keys[L.id][frame]) || {rot:0,dx:0,dy:0};
+    let ox = def.canvas.w * L.x + def.canvas.w * (k.dx||0) * 0.01;
+    let oy = def.canvas.h * L.y + def.canvas.h * (k.dy||0) * 0.01;
+    if(ri && br !== 0){
+      const r = br * BOSS_DEG2RAD;
+      const c = Math.cos(r), s = Math.sin(r);
+      const rx = ox * c - oy * s;
+      const ry = ox * s + oy * c;
+      ox = rx; oy = ry;
+    }
+    visiting.delete(L.id);
+    result[L.id] = { wx: bw + ox, wy: by + oy, rot: br + (k.rot || 0) };
+    return result[L.id];
+  }
+  for(const L of def.layers) resolve(L);
+  return result;
+}
+
 function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   const def = BOSS_LAYERS[bossId];
   if(!def) return;
@@ -1201,22 +1299,22 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   const sx = canvasW / def.canvas.w;
   const sy = canvasH / def.canvas.h;
 
+  const world = resolveBossWorld(def, anim, fi);
+
   ctx.save();
   ctx.scale(sx, sy);
 
   const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
   for(const L of sorted){
-    const keys = (anim.keys && anim.keys[L.id]) || [];
-    const key = keys[fi] || {rot:0, dx:0, dy:0};
-    const cx = def.canvas.w * (L.x + (key.dx||0) * 0.01);
-    const cy = def.canvas.h * (L.y + (key.dy||0) * 0.01);
-    const w  = def.canvas.w * L.w;
-    const h  = def.canvas.h * L.h;
+    const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0, dx:0, dy:0};
+    const wp = world[L.id] || { wx: def.canvas.w * L.x, wy: def.canvas.h * L.y, rot: 0 };
+    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+    const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
     const px = w * L.pivot.x;
     const py = h * L.pivot.y;
     ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate((key.rot || 0) * Math.PI / 180);
+    ctx.translate(wp.wx, wp.wy);
+    ctx.rotate(wp.rot * BOSS_DEG2RAD);
     ctx.translate(-px, -py);
     ctx.fillStyle = L.color;
     ctx.fillRect(0, 0, w, h);
@@ -2151,7 +2249,8 @@ function renderCombat(){
         · 前進至 Boss 警戒範圍才會觸發攻擊<br>
         · 點擊 Boss 設定瞄準點，射程內才能開火<br>
         · 拖動搖桿左右移動，移動時無法攻擊<br>
-        · 點擊攻擊鍵射擊一次；掃射模式可長按連射
+        · 點擊攻擊鍵射擊一次；掃射模式可長按連射<br>
+        · 主副武器彈藥耗盡後會自動切換到近戰裝備
       </div>
     </div>`;
   $$('.boss-card .btn',z1).forEach(btn=>{btn.onclick=()=>startBossBattle(btn.dataset.bid);});
@@ -2370,7 +2469,14 @@ function startBossBattle(bid){
   refreshPlayerStats();
   const w=chooseCombatWeapon();
   const startSlot=w?w.slot:'melee';
-  battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossPen:b.pen||0,skills:b.skills||[],playerHp:state.player.hp,playerMaxHp:state.player.maxHp,playerArmor:state.player.armor,playerMaxArmor:Math.max(1,state.player.maxArmor),px:0.15,py:0.75,bx:0.75,by:0.25,moveDir:0,bullets:[],firing:false,reloading:false,consuming:false,lastShot:0,lastBossShot:0,damageDealt:0,weapon:null,weaponSlot:null,playerWeaponRange:0.5,fireMode:'點射',fireHeld:false,burstLeft:0,ammoRef:null,ammoInMag:0,weaponStates:{},engaged:false,engagedRange:0.35,startTime:Date.now(),aimPoint:false,aimX:0.75,aimY:0.7,players:[{id:'local',isLocal:true}],lastH:0,healDisabledUntil:0,healTimer:null,autoHealing:false};
+  battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossPen:b.pen||0,
+    skills:b.skills||[],skillCds:null,bossCast:null,lastMeleeAt:0,
+    playerHp:state.player.hp,playerMaxHp:state.player.maxHp,playerArmor:state.player.armor,playerMaxArmor:Math.max(1,state.player.maxArmor),
+    px:0.15,py:0.75,bx:0.75,by:0.25,moveDir:0,bullets:[],firing:false,reloading:false,consuming:false,
+    lastShot:0,damageDealt:0,weapon:null,weaponSlot:null,playerWeaponRange:0.5,fireMode:'點射',fireHeld:false,burstLeft:0,
+    ammoRef:null,ammoInMag:0,weaponStates:{},engaged:false,engagedRange:0.35,startTime:Date.now(),
+    aimPoint:false,aimX:0.75,aimY:0.7,players:[{id:'local',isLocal:true}],lastH:0,
+    healDisabledUntil:0,healTimer:null,autoHealing:false};
   battleHeroAnim.name='idle';
   battleHeroAnim.frame=0;
   battleHeroAnim.lastUpdate=performance.now();
@@ -2386,36 +2492,72 @@ function startBossBattle(bid){
 }
 
 /* ============================================================
-   ★ BOSS MODULE — 行為 AI
+   ★ BOSS MODULE — 行為 AI（近戰版）
    ============================================================ */
 function updateBossAI(dt, now){
   const b = battle;
-  const dx   = b.bx - b.px;
+  if(!b) return;
+
+  if(!b.engaged){
+    const dx = b.bx - b.px;
+    if(Math.abs(dx) < b.engagedRange){
+      b.engaged = true;
+      notify('⚠️ 進入交戰狀態！','error');
+    }
+    return;
+  }
+
+  if(!b.skillCds){
+    b.skillCds = {};
+    const skills = BOSS_SKILLS[b.bossId] || [];
+    for(const sk of skills) b.skillCds[sk.id] = now + 1500;
+  }
+
+  if(b.bossCast){
+    const cast = b.bossCast;
+    const elapsed = now - cast.startTime;
+    if(!cast.applied && elapsed >= cast.skill.hitDelay){
+      cast.applied = true;
+      applyBossSkillDamage(cast.skill);
+    }
+    if(elapsed >= cast.skill.totalTime){
+      b.bossCast = null;
+    }
+    return;
+  }
+
+  const dx = b.bx - b.px;
   const dist = Math.abs(dx);
 
-  if(!b.engaged && dist < b.engagedRange){
-    b.engaged = true;
-    notify('⚠️ 進入交戰狀態！','error');
+  const skills = BOSS_SKILLS[b.bossId] || [];
+  for(const sk of skills){
+    if(now < (b.skillCds[sk.id] || 0)) continue;
+    if(dist > sk.range) continue;
+    b.bossCast = { skill: sk, startTime: now, applied: false };
+    b.skillCds[sk.id] = now + sk.cd * 1000;
+    playBossOneshot(sk.anim, sk.totalTime);
+    showBossTelegraph(sk);
+    notify(`⚡ ${b.bossName} 施展「${sk.name}」！`,'error');
+    return;
   }
-  if(!b.engaged) return;
 
-  const bRange = 0.4;
+  const bRange = 0.36;
   let bossMoving = false;
 
-  if(dist > bRange + 0.05){
-    const bspd = 0.03 * dt;
-    const step = Math.sign(dx) * Math.min(bspd, Math.abs(dist - bRange));
+  if(dist > bRange){
+    const bspd = 0.028 * dt;
+    const step = Math.sign(dx) * Math.min(bspd, dist - bRange);
     if(Math.abs(step) > 0.0001){
       b.bx += step;
       bossMoving = true;
     }
+  } else {
+    if(now - (b.lastMeleeAt || 0) > 1500){
+      b.lastMeleeAt = now;
+      doBossMeleeSwipe();
+    }
   }
   b.bx = clamp(b.bx, 0.1, 0.9);
-
-  if(now - b.lastBossShot > 1200 && dist < bRange){
-    b.lastBossShot = now;
-    b.bullets.push({sx:b.bx, sy:b.by, tx:b.px, ty:b.py, t:0, enemy:true, dmg:b.bossDmg, pen:b.bossPen||0});
-  }
 
   if(BATTLE_BOSS_ONESHOT.indexOf(battleBossAnim.name) === -1){
     const want = bossMoving ? 'walk' : 'idle';
@@ -2425,8 +2567,69 @@ function updateBossAI(dt, now){
       battleBossAnim.lastUpdate = performance.now();
     }
   }
+}
 
-  /* === 預留：技能觸發點 === */
+function showBossTelegraph(sk){
+  const layer = document.getElementById('battle-fx');
+  if(!layer) return;
+  const W = layer.clientWidth || 400;
+  const ratio = sk.telegraphRatio || sk.range;
+  const diameterPx = Math.round(W * ratio * 2);
+  const t = document.createElement('div');
+  t.className = 'boss-telegraph' + (sk.aoe ? ' aoe' : '');
+  t.style.left = (battle.bx * 100) + '%';
+  t.style.top  = (battle.by * 100) + '%';
+  t.style.width  = diameterPx + 'px';
+  t.style.height = diameterPx + 'px';
+  layer.appendChild(t);
+  setTimeout(()=>t.remove(), (sk.totalTime||1500) + 100);
+}
+
+function tryHitPlayer(dmg, pen){
+  if(!battle || !battle.active) return;
+  const dodge = clamp(0.15 + state.player.level * 0.005, 0, 0.5);
+  if(Math.random() < dodge){
+    spawnHitFx(battle.px, battle.py, '閃避', 'armor');
+    return;
+  }
+  const target = { hp: battle.playerHp, armor: battle.playerArmor };
+  const res = applyDamage(target, dmg, pen||0);
+  battle.playerHp = target.hp;
+  battle.playerArmor = target.armor;
+  spawnHitFx(battle.px, battle.py, `-${Math.round(dmg)}`, res.hpLost > 0 ? 'enemy' : 'armor');
+  if(battle.playerHp <= 0) endBattle(false);
+}
+
+function doBossMeleeSwipe(){
+  if(!battle || !battle.active) return;
+  const b = battle;
+  playBossOneshot('attack_swipe', 500);
+  setTimeout(()=>{
+    if(!battle || !battle.active) return;
+    const dist = Math.abs(battle.bx - battle.px);
+    if(dist > 0.42){
+      spawnHitFx(battle.bx, battle.by, 'MISS', 'armor');
+      return;
+    }
+    tryHitPlayer(b.bossDmg, b.bossPen);
+  }, 250);
+}
+
+function applyBossSkillDamage(sk){
+  if(!battle || !battle.active) return;
+  const dist = Math.abs(battle.bx - battle.px);
+  if(dist > sk.range){
+    spawnHitFx(battle.px, battle.py, 'MISS', 'armor');
+    notify(`躲過了「${sk.name}」`,'ok');
+    return;
+  }
+  tryHitPlayer(sk.dmg, sk.pen);
+  if(sk.knockback){
+    const dir = Math.sign(battle.px - battle.bx) || 1;
+    battle.px = clamp(battle.px + dir * sk.knockback, 0.05, 0.95);
+  }
+  if(!battle || !battle.active) return;
+  notify(`💥 受到「${sk.name}」！`,'error');
 }
 
 function battleLoop(now){
@@ -2569,7 +2772,7 @@ function manualHeal(){
         invRemove(id,r,1);
         battle.consuming=false;
         battle.healTimer=null;
-        pushLog(`<span class="pl">玩家</span> 使用 ${itemDef(id).name}，恢復 ${actualHeal} HP。`,[],'combat');
+        pushLog(`<span class="pl">玩家</span> 使用 ${itemDef(id).name}，恢復 ${actualHeal} 生命。`,[],'combat');
         refreshBattleControlsLive();
       },1200);
       refreshBattleControlsLive();
@@ -2613,16 +2816,101 @@ function stopPlayerFire(){
   if(!battle) return;
   battle.fireHeld = false;
 }
+
+/* ★ 修正：與探索模式同一套武器層／偏移邏輯計算槍口位置 */
 function getPlayerMuzzlePos(){
   const fx = document.getElementById('battle-fx');
   const W = fx ? fx.clientWidth : 400;
   const H = fx ? fx.clientHeight : 500;
   const spriteW = 88, spriteH = BATTLE_HERO_SPRITE_H;
-  const local = getHeroMuzzleLocal(spriteW, spriteH, CHAR_HEIGHT_FACTOR_BATTLE);
+
+  const B = { x:30, y:30, w:340, h:460 };
+  const ORIG_CHAR_H = 386;
+  const ORIG_FOOT_X = 200;
+  const ORIG_FOOT_Y = 515;
+  const scale = (spriteH * CHAR_HEIGHT_FACTOR_BATTLE) / ORIG_CHAR_H;
+  const groundY_local = spriteH * 0.95;
+  const centerX_local = spriteW / 2;
+
+  const eq = state.player.equipped;
+  let wpSlot = null, wpId = null;
+  if(battle.weaponSlot && eq[battle.weaponSlot]){
+    wpSlot = battle.weaponSlot; wpId = eq[battle.weaponSlot];
+  } else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
+  else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
+  else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
+
+  let localX = centerX_local;
+  let localY = groundY_local - spriteH * 0.4;
+
+  if(wpSlot && wpId){
+    const cfg = getWeaponCfg(wpSlot, wpId);
+    if(cfg){
+      const L = GAME_LAYERS.find(l => l.id === cfg.layer);
+      if(L){
+        const cx = B.x + B.w * L.x;
+        const cy = B.y + B.h * L.y;
+        const w  = B.w * L.w;
+        const h  = B.h * L.h;
+        const px = w * L.pivot.x;
+        const py = h * L.pivot.y;
+        const localXinChar = px + w * (cfg.ox || 0);
+        const localYinChar = py + h * (cfg.oy || 0);
+        const weaponCenterCharX = cx - px + localXinChar;
+        const weaponCenterCharY = cy - py + localYinChar;
+        const weaponW = 400 * (cfg.scale || 0.3);
+        const rightCharX = weaponCenterCharX + weaponW / 2;
+
+        localX = centerX_local + scale * (rightCharX - ORIG_FOOT_X);
+        localY = groundY_local + scale * (weaponCenterCharY - ORIG_FOOT_Y);
+      }
+    }
+  }
+
   return {
-    x: (battle.px * W - spriteW/2 + local.x) / W,
-    y: (battle.py * H + local.y) / H
+    x: (battle.px * W - spriteW / 2 + localX) / W,
+    y: (battle.py * H + localY) / H
   };
+}
+
+function slotCanFire(slot){
+  if(!battle) return false;
+  const w = equippedWeapon(slot);
+  if(!w) return false;
+  const def = w.def;
+  if(def.slot === 'melee') return true;
+  if(def.slot === 'throwable') return getThrowableCount() > 0;
+  if(!def.cal) return true;
+  const st = battle.weaponStates && battle.weaponStates[slot];
+  if(st){
+    if((st.ammoInMag||0) > 0) return true;
+    if(st.ammoRef && st.ammoRef.count > 0) return true;
+  }
+  const ammo = pickAmmoByPreference(def.cal);
+  return !!ammo;
+}
+function autoSwitchOnNoAmmo(){
+  if(!battle) return false;
+  const order = ['primary','secondary','melee'];
+  const curIdx = order.indexOf(battle.weaponSlot);
+  if(curIdx < 0) return false;
+  for(let i = curIdx + 1; i < order.length; i++){
+    const nextSlot = order[i];
+    if(nextSlot === 'melee'){
+      if(state.player.equipped.melee && equippedWeapon('melee')){
+        switchBattleWeapon('melee');
+        notify('彈藥耗盡，切換至近戰武器','error');
+        return true;
+      }
+    } else {
+      if(slotCanFire(nextSlot)){
+        switchBattleWeapon(nextSlot);
+        notify(`切換至${nextSlot==='primary'?'主武器':'副武器'}`,'error');
+        return true;
+      }
+    }
+  }
+  return false;
 }
 function playerShoot(){
   let w=battle.weapon;
@@ -2632,6 +2920,18 @@ function playerShoot(){
   const dist=Math.abs(battle.bx-battle.px);
   if(dist>battle.playerWeaponRange+0.05){if(Math.random()<0.05)notify('超出武器射程','error');return false;}
   const isMelee = def.slot === 'melee';
+
+  if(def.cal && battle.ammoInMag <= 0){
+    if(!(battle.ammoRef && battle.ammoRef.count > 0)){
+      const switched = autoSwitchOnNoAmmo();
+      if(!switched){
+        battle.firing = false;
+        battle.burstLeft = 0;
+      }
+      return false;
+    }
+  }
+
   if(battle.weaponSlot === 'secondary'){
     battleHeroAnim.name='fire_secondary';
     battleHeroAnim.frame=0;
@@ -2650,35 +2950,25 @@ function playerShoot(){
   }
   if(def.cal){
     if(battle.ammoInMag<=0){
-      if(battle.ammoRef&&battle.ammoRef.count>0){
-        battle.reloading=true;battle.firing=false;battle.burstLeft=0;
+      battle.reloading=true;battle.firing=false;battle.burstLeft=0;
+      refreshBattleControlsLive();
+      battleHeroAnim.name='reload';
+      battleHeroAnim.frame=0;
+      battleHeroAnim.lastUpdate=performance.now();
+      battleHeroAnim.forcedEnd=performance.now()+1700;
+      const currentSlot=battle.weaponSlot;
+      setTimeout(()=>{
+        if(!battle||!battle.active)return;
+        if(battle.weaponSlot!==currentSlot)return;
+        const need=def.mag||30;const take=Math.min(need,battle.ammoRef.count);
+        invRemove(battle.ammoRef.id,battle.ammoRef.rarity,take);
+        battle.ammoInMag=take;battle.ammoRef.count-=take;
+        battle.weaponStates[battle.weaponSlot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};
+        battle.reloading=false;
+        if(battleHeroAnim.name==='reload'){battleHeroAnim.name='idle';battleHeroAnim.frame=0;}
         refreshBattleControlsLive();
-        battleHeroAnim.name='reload';
-        battleHeroAnim.frame=0;
-        battleHeroAnim.lastUpdate=performance.now();
-        battleHeroAnim.forcedEnd=performance.now()+1700;
-        const currentSlot=battle.weaponSlot;
-        setTimeout(()=>{
-          if(!battle||!battle.active)return;
-          if(battle.weaponSlot!==currentSlot)return;
-          const need=def.mag||30;const take=Math.min(need,battle.ammoRef.count);
-          invRemove(battle.ammoRef.id,battle.ammoRef.rarity,take);
-          battle.ammoInMag=take;battle.ammoRef.count-=take;
-          battle.weaponStates[battle.weaponSlot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};
-          battle.reloading=false;
-          if(battleHeroAnim.name==='reload'){battleHeroAnim.name='idle';battleHeroAnim.frame=0;}
-          refreshBattleControlsLive();
-        },1700);
-        return false;
-      }
-      const sw=equippedWeapon('secondary');
-      if(sw&&itemDef(sw.id)&&battle.weaponSlot==='primary'){
-        battle.firing=false;battle.burstLeft=0;
-        switchBattleWeapon('secondary');
-        notify('主武器彈藥耗盡，切換至副武器','error');
-        return false;
-      }
-      battle.firing=false;battle.burstLeft=0;return false;
+      },1700);
+      return false;
     }
     battle.ammoInMag--;
     const mz = getPlayerMuzzlePos();
@@ -2814,7 +3104,6 @@ function endBattle(victory){
   $$('.item-row',bd).forEach(r=>{r.onclick=()=>openItemDetail(r.dataset.iid,r.dataset.irar);});
   save();
 }
-/* ★ BOSS 模組對外介面 */
 const BossModule = {
   get battle(){ return battle; },
   set battle(v){ battle = v; },
