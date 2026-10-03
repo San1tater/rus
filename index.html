@@ -41,7 +41,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .slot .nm{font-size:8px;font-weight:bold;text-align:center;line-height:1.1;padding:0 2px;word-break:break-all;overflow:hidden;max-height:22px}
 .slot.empty .nm{color:#4a4038;font-weight:normal}
 .player-stat-panel{position:absolute;background:rgba(14,12,10,.92);border:1px solid #3a2f25;border-radius:6px;padding:4px 6px;font-size:9px;z-index:4}
-.player-stat-panel .row{display:flex;justify-content:space-between;color:#a89a85;line-height:1.5}
+.player-stat-panel .row{display:flex;justify-content:space-between;color:#a89a85;line-height:1.5;flex-wrap:wrap;gap:2px}
 .player-stat-panel .row b{color:#e8a33d}
 .z3-head{flex:0 0 30px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border-bottom:1px solid #2a231c;background:#17140f}
 .z3-title{font-size:11px;color:#e8a33d;font-weight:bold}
@@ -1501,9 +1501,9 @@ function renderEquipZone(z2){
     html+=`<div class="slot ${def?'filled':'empty'} ${isFixed?'fixed':''}" style="${style}" data-slot="${s.key}">${inner}</div>`;
   }
   html+=`<div class="player-stat-panel" style="left:3%;top:4%;width:34%">
-    <div class="row"><span>等級</span><b>Lv.${state.player.level}</b></div>
-    <div class="row"><span>❤️ 生命</span><b>${Math.round(state.player.hp)}/${state.player.maxHp}</b></div>
-    <div class="row"><span>🛡️ 裝甲</span><b>${Math.round(state.player.armor)}/${state.player.maxArmor}</b></div>
+    <div class="row"><b>Lv.${state.player.level}</b></div>
+    <div class="row"><span>❤️</span><b>${state.player.maxHp}</b></div>
+    <div class="row"><span>🛡️</span><b>${state.player.maxArmor}</b></div>
   </div>`;
   z2.innerHTML=html;
   $$('.slot',z2).forEach(e=>{e.onclick=()=>openSlotDetail(e.dataset.slot);});
