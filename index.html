@@ -11,7 +11,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 #content{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
 #zone1{flex:1 1 0;min-height:0;position:relative;overflow:hidden;background:#1a1510}
 #lower{flex:1 1 0;min-height:0;display:flex}
-#zone2{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;background:#151210;border-right:1px solid #2a231c}
+#zone2{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;background:#151210;border-right:1px solid #2a231c;display:flex;flex-direction:column}
 #zone3{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;display:flex;flex-direction:column;background:#12100e}
 #tabbar{flex:0 0 54px;display:flex;background:#1a1510;border-top:1px solid #2a231c;padding-bottom:env(safe-area-inset-bottom)}
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#7a6f60;font-size:11px;gap:2px}
@@ -20,12 +20,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .toast{position:fixed;top:22%;left:50%;background:rgba(30,24,19,.96);border:1px solid #e8a33d;border-radius:8px;padding:10px 16px;color:#e8a33d;font-size:12px;z-index:10000;max-width:82%;text-align:center;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.7);animation:toastFloat 2.2s ease-out forwards}
 .toast.error{border-color:#e05252;color:#e05252}
 .toast.ok{border-color:#4caf50;color:#4caf50}
-@keyframes toastFloat{
-  0%{opacity:0;transform:translate(-50%,18px)}
-  12%{opacity:1;transform:translate(-50%,0)}
-  70%{opacity:1;transform:translate(-50%,-12px)}
-  100%{opacity:0;transform:translate(-50%,-56px)}
-}
+@keyframes toastFloat{0%{opacity:0;transform:translate(-50%,18px)}12%{opacity:1;transform:translate(-50%,0)}70%{opacity:1;transform:translate(-50%,-12px)}100%{opacity:0;transform:translate(-50%,-56px)}}
 .scene{position:absolute;inset:0}
 .bg-scroll{position:absolute;inset:0;display:flex;overflow:hidden}
 .bg-layer{flex:0 0 100%;height:100%;background-size:100% 100%;background-position:center;background-repeat:no-repeat;animation:bgscroll var(--spd,10s) linear infinite}
@@ -62,12 +57,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .logline .lose{color:#e05252;font-weight:bold}
 .logline .run{color:#e8741e;font-weight:bold}
 .logline .itm{cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
-.r-破舊{color:#b87333}
-.r-一般{color:#e0e0e0}
-.r-庫存{color:#4caf50}
-.r-精品{color:#2196f3}
-.r-傳奇{color:#ffb300}
-.r-具名{color:#a45ede}
+.r-破舊{color:#b87333}.r-一般{color:#e0e0e0}.r-庫存{color:#4caf50}.r-精品{color:#2196f3}.r-傳奇{color:#ffb300}.r-具名{color:#a45ede}
 #modal-layer{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center}
 #modal-layer.on{display:flex}
 .modal-bd{position:absolute;inset:0;background:rgba(0,0,0,.7)}
@@ -134,7 +124,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .hero-f .sprite canvas{width:100%;height:100%;display:block}
 .boss-f .sprite{width:280px;height:280px}
 .boss-f .sprite img{width:100%;height:100%;object-fit:contain;display:block}
-.boss-f .hpbar-wrap{width:min(50%,200px)}
+.boss-f .hpbar-wrap{width:min(50%,200px);z-index:2}
 .hpbar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:60px;bottom:calc(100% + 4px)}
 .hpbar-wrap .bar{height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-bottom:2px;position:relative}
 .hpbar-wrap .bar .fill{height:100%;transition:width .15s}
@@ -147,6 +137,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .hit-fx.crit{color:#ff3030;font-size:26px;-webkit-text-stroke:1.5px #000}
 .hit-fx.enemy{color:#ff5252}
 .hit-fx.armor{color:#5ab0ff}
+.hit-fx.weak{color:#a45ede}
 @keyframes hitup{0%{transform:translate(-50%,-50%) scale(0.5);opacity:0}15%{transform:translate(-50%,-70%) scale(1.3);opacity:1}100%{transform:translate(-50%,-260%) scale(1);opacity:0}}
 .aim-marker{position:absolute;width:14px;height:14px;border:2px solid #ffb300;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10;box-shadow:0 0 6px #ffb300}
 .joystick{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;height:120px;border-radius:50%;background:rgba(232,163,61,.08);border:2px solid rgba(232,163,61,.3);touch-action:none}
@@ -172,7 +163,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .cell .cnm{font-size:8px;flex:0 0 auto;line-height:1.15;max-width:100%;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,0,0,.78);color:#e8a33d;padding:1px 3px;border-radius:3px;text-align:center;position:relative;z-index:2}
 .cell .clv{position:absolute;top:2px;right:3px;font-size:7px;color:#4caf50;background:rgba(0,0,0,.82);border-radius:3px;padding:0 3px;line-height:1.4;z-index:3}
 .prof-area{flex:1;min-height:0;overflow-y:auto;padding:7px;font-size:10px}
-.prof-sec{margin-bottom:8px;border:1px solid #2a231c;border-radius:6px;overflow:hidden}
+.prof-sec{margin-bottom:8px;border:1px solid #2a231c;border-radius:6px}
 .prof-sec h4{font-size:10px;color:#e8a33d;padding:6px 8px;background:#1a1510;display:flex;justify-content:space-between;cursor:pointer;border-bottom:1px solid #2a231c}
 .prof-sec.collapsed h4{border-bottom:none}
 .prof-sec.collapsed .prof-body{display:none}
@@ -209,30 +200,26 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
    ============================================================ */
 .boss-f .sprite canvas{width:100%;height:100%;display:block}
 .boss-telegraph{
-  position:absolute;
-  transform:translate(-50%,-50%);
-  border-radius:50%;
+  position:absolute;transform:translate(-50%,-50%);border-radius:50%;
   border:3px solid #ff3030;
   background:radial-gradient(circle, rgba(255,48,48,0.35) 0%, rgba(255,48,48,0.08) 70%, transparent 100%);
-  pointer-events:none;
-  z-index:6;
+  pointer-events:none;z-index:6;
   animation:telegraphPulse 0.35s ease-in-out infinite;
   box-shadow:0 0 24px rgba(255,48,48,0.6), inset 0 0 24px rgba(255,48,48,0.4);
 }
-.boss-telegraph.aoe{
-  border-color:#ff8800;
-  background:radial-gradient(circle, rgba(255,136,0,0.42) 0%, rgba(255,136,0,0.1) 70%, transparent 100%);
-  animation:telegraphPulseAoe 0.4s ease-in-out infinite;
-  box-shadow:0 0 32px rgba(255,136,0,0.7), inset 0 0 32px rgba(255,136,0,0.5);
+.boss-telegraph.aoe{border-color:#ff8800;background:radial-gradient(circle, rgba(255,136,0,0.42) 0%, rgba(255,136,0,0.1) 70%, transparent 100%);animation:telegraphPulseAoe 0.4s ease-in-out infinite;box-shadow:0 0 32px rgba(255,136,0,0.7), inset 0 0 32px rgba(255,136,0,0.5);}
+@keyframes telegraphPulse{0%,100%{transform:translate(-50%,-50%) scale(0.85);opacity:.6}50%{transform:translate(-50%,-50%) scale(1.08);opacity:1}}
+@keyframes telegraphPulseAoe{0%,100%{transform:translate(-50%,-50%) scale(0.9);opacity:.65}50%{transform:translate(-50%,-50%) scale(1.18);opacity:1}}
+.boss-warning{
+  position:absolute;left:50%;
+  bottom:calc(100% + 28px);
+  transform:translateX(-50%);
+  font-size:26px;line-height:1;font-weight:900;
+  color:#ff3030;text-shadow:0 0 8px #ff3030,0 0 14px #ff6060,0 0 2px #000;
+  pointer-events:none;z-index:1;
+  animation:bossWarningPulse .42s ease-in-out infinite;
 }
-@keyframes telegraphPulse{
-  0%,100%{transform:translate(-50%,-50%) scale(0.85);opacity:.6}
-  50%    {transform:translate(-50%,-50%) scale(1.08);opacity:1}
-}
-@keyframes telegraphPulseAoe{
-  0%,100%{transform:translate(-50%,-50%) scale(0.9);opacity:.65}
-  50%    {transform:translate(-50%,-50%) scale(1.18);opacity:1}
-}
+@keyframes bossWarningPulse{0%,100%{transform:translateX(-50%) scale(.85);opacity:.7}50%{transform:translateX(-50%) scale(1.25);opacity:1}}
 </style>
 </head>
 <body>
@@ -274,8 +261,9 @@ const BATTLE_GROUND_TOP_RATIO = 1.0;
 const BATTLE_BOSS_HEIGHT_RATIO = 0.75;
 const BATTLE_HERO_SPRITE_H = 118;
 const BATTLE_HERO_FOOT_Y_RATIO = 0.95;
+const BOSS_MIN_GAP = 0.12;
 
-const TK_MAG={aks74u:30,aks74un:30,ak74:30,ak74n:30,ak74m:30,akm:30,akms:30,akMN:30,ak103:30,ak104:30,ak105:30,ak12:30,asval:20,'9a91':20,sr3m:30,vss:10,svd:10,sv98:10,rpk16:60,rpd:100,pkm:100,pkp:100,ash12:20,pp19:30,pm:8,pb:8,mp443:17,aps:20,mp133:6,mp153:7,mp155:6,saiga12:8,toz106:2,ks23:3};
+const TK_MAG={aks74u:30,aks74un:30,ak74:30,ak74n:30,ak74m:30,akm:30,akms:30,akMN:30,ak103:30,ak104:30,ak105:30,ak12:30,asval:20,'9a91':20,sr3m:30,vss:10,svd:10,sv98:10,rpk16:95,rpd:100,pkm:100,pkp:100,ash12:20,pp19:30,pm:8,pb:8,mp443:17,aps:20,mp133:6,mp153:7,mp155:6,saiga12:8,toz106:2,ks23:3};
 const TK_ARMOR={ssh68:20,ssh68m:22,kolpak:30,'6b47':40,'6b47m':45,altyn:50,kiver:40,maska:45,zsh12m:50,balaclava:5,shemagh:5,gp7:15,ballglasses:5,paca:45,'6b13':65,'6b13m':65,'6b23':70,'6b231':70,'6b232':70,'6b43':85,zhuk6a:85,zhuk3:75,defender2:75,cargopants:5,'6sh122':25,'6sh104':25,'6sh112':25,workboots:5,tactboots:15,lowaz:22,haix:25,belleville:20};
 
 function armorClass(armor){if(!armor||armor<=0)return '';if(armor<=25)return 'I';if(armor<=40)return 'II';if(armor<=55)return 'III';if(armor<=70)return 'IV';if(armor<=80)return 'V';return 'VI';}
@@ -583,11 +571,23 @@ const ROUTES={
    ★ BOSS MODULE — 資料區
    ============================================================ */
 const BOSSES={
-  factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:10000,armor:400,dmg:25,pen:2,seal:'seal_factory',unlock:'廢棄實驗室',skills:['smash','sweep'],drops:['zhuk6a','sv98','6b23','rpk16','vss']},
-  lab_queen:{name:'實驗室女王 · 白蝕',region:'廢棄實驗室',hp:25000,armor:1200,dmg:45,pen:3,seal:'seal_lab',unlock:'郊區公路',skills:['衝撞','咆哮','毒霧'],drops:['altyn','saiga12','sv98','rpk16','asval']},
-  road_tyrant:{name:'公路暴君 · 鐵鎚',region:'郊區公路',hp:50000,armor:2500,dmg:70,pen:4,seal:'seal_road',unlock:'輻射沼澤',skills:['衝撞','咆哮'],drops:['zhuk6a','rpk16','svd','pkp','asval']},
-  swamp_hydra:{name:'沼澤九頭 · 腐母',region:'輻射沼澤',hp:90000,armor:4000,dmg:100,pen:5,seal:'seal_swamp',unlock:'廢土核心',skills:['衝撞','咆哮','毒霧'],drops:['svd','pkp','altyn','zhuk6a','6b43']},
-  core_omega:{name:'核心終焉 · OMEGA',region:'廢土核心',hp:160000,armor:6000,dmg:130,pen:6,seal:'seal_core',unlock:null,skills:['衝撞','咆哮','毒霧','EMP'],drops:['pkp','svd','altyn','6b43','zhuk6a']},
+  factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:10000,armor:400,dmg:25,pen:2,seal:'seal_factory',unlock:'廢棄實驗室',drops:['zhuk6a','sv98','6b23','rpk16','vss']},
+  lab_queen:{name:'實驗室女王 · 白蝕',region:'廢棄實驗室',hp:25000,armor:1200,dmg:45,pen:3,seal:'seal_lab',unlock:'郊區公路',drops:['altyn','saiga12','sv98','rpk16','asval']},
+  road_tyrant:{name:'公路暴君 · 鐵鎚',region:'郊區公路',hp:50000,armor:2500,dmg:70,pen:4,seal:'seal_road',unlock:'輻射沼澤',drops:['zhuk6a','rpk16','svd','pkp','asval']},
+  swamp_hydra:{name:'沼澤九頭 · 腐母',region:'輻射沼澤',hp:90000,armor:4000,dmg:100,pen:5,seal:'seal_swamp',unlock:'廢土核心',drops:['svd','pkp','altyn','zhuk6a','6b43']},
+  core_omega:{name:'核心終焉 · OMEGA',region:'廢土核心',hp:160000,armor:6000,dmg:130,pen:6,seal:'seal_core',unlock:null,drops:['pkp','svd','altyn','6b43','zhuk6a']},
+};
+
+const BOSS_WEAKPOINTS = {
+  factory_king: ['leg_r', 'leg_l']
+};
+
+const BOSS_PHASES = {
+  factory_king: [
+    { hpPct:1.00, dmgMult:1.0, unlockSkills:[] },
+    { hpPct:0.66, dmgMult:1.2, unlockSkills:['dash'] },
+    { hpPct:0.33, dmgMult:1.5, unlockSkills:[] }
+  ]
 };
 
 const BOSS_LAYERS = {
@@ -718,17 +718,21 @@ const BOSS_ANIMS = {
   }
 };
 
-/* ---- BOSS_SKILLS：技能（以動畫為準重新命名） ---- */
 const BOSS_SKILLS = {
   factory_king: [
-    { id:'smash', name:'碎地重錘', cd:10, range:0.20,
+    { id:'smash', name:'碎地重錘', type:'aoe', cd:10, range:0.20,
       dmg:45, pen:2, anim:'skill_charge',
       telegraph:1300, hitDelay:1300, totalTime:2000,
-      aoe:true, knockback:0.10, telegraphRatio:0.20, hitColor:'aoe' },
-    { id:'sweep', name:'揮錘掃擊', cd:16, range:0.30,
+      aoe:true, knockback:0.10, telegraphRatio:0.20, unlockPhase:0 },
+    { id:'sweep', name:'揮錘掃擊', type:'aoe', cd:16, range:0.30,
       dmg:30, pen:2, anim:'attack_swipe',
       telegraph:800, hitDelay:800, totalTime:1500,
-      aoe:true, knockback:0.12, telegraphRatio:0.30, hitColor:'aoe' }
+      aoe:true, knockback:0.12, telegraphRatio:0.30, unlockPhase:0 },
+    { id:'dash', name:'突進', type:'dash', cd:14, range:0.65, minRange:0.20,
+      dmg:35, pen:2, contactDmg:20,
+      telegraph:800, dashSpeed:0.55, dashDistance:0.35,
+      exhaustMs:1500, hitTickMs:250,
+      unlockPhase: 1 }
   ]
 };
 
@@ -978,26 +982,6 @@ function getTopCfg(id){
   const def = itemDef(id);
   if(def && def.armored) return HERO_VISIBLE_EQ.top_armored;
   return HERO_VISIBLE_EQ.top;
-}
-
-function getHeroMuzzleLocal(spriteW, spriteH, factor){
-  const B = { x: 30, y: 30, w: 340, h: 460 };
-  const ORIG_CHAR_H = 386;
-  const ORIG_FOOT_X = 200;
-  const ORIG_FOOT_Y = 515;
-  const f = factor || CHAR_HEIGHT_FACTOR;
-  const scale = (spriteH * f) / ORIG_CHAR_H;
-  const groundY = spriteH * 0.95;
-  const centerX = spriteW / 2;
-  const L = GAME_LAYERS.find(l => l.id === 'back_arm');
-  const cx_world = B.x + B.w * L.x;
-  const cy_world = B.y + B.h * L.y;
-  const h_world = B.h * L.h;
-  const topY_world = cy_world - h_world * L.pivot.y;
-  return {
-    x: centerX + scale * (cx_world - ORIG_FOOT_X),
-    y: groundY + scale * (topY_world - ORIG_FOOT_Y)
-  };
 }
 
 function getExploreWeaponRightEdge(canvasW, canvasH){
@@ -2228,6 +2212,85 @@ function openLogHistory(){
 let battle=null;
 const BATTLE_ONESHOT_ANIMS=['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
 
+function pickAimPartFromClick(canvasX, canvasY){
+  if(!battle) return null;
+  const def = BOSS_LAYERS[battle.bossId];
+  if(!def) return null;
+  const anims = BOSS_ANIMS[battle.bossId];
+  const anim = anims ? (anims[battleBossAnim.name] || anims.idle) : null;
+  if(!anim) return null;
+  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  const world = resolveBossWorld(def, anim, fi);
+  const sorted = def.layers.slice().sort((a,b)=>b.z - a.z);
+  for(const L of sorted){
+    const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0,dx:0,dy:0};
+    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+    const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+    const px = w * L.pivot.x;
+    const py = h * L.pivot.y;
+    const wp = world[L.id];
+    if(!wp) continue;
+    const dx = canvasX - wp.wx;
+    const dy = canvasY - wp.wy;
+    const angle = -wp.rot * BOSS_DEG2RAD;
+    const cosA = Math.cos(angle), sinA = Math.sin(angle);
+    const localX = dx * cosA - dy * sinA + px;
+    const localY = dx * sinA + dy * cosA + py;
+    if(localX >= 0 && localX <= w && localY >= 0 && localY <= h){
+      return L.id;
+    }
+  }
+  return null;
+}
+
+function getAimTargetPos(){
+  if(!battle) return {x:0.75, y:0.3};
+  const part = battle.aimPart;
+  const def = BOSS_LAYERS[battle.bossId];
+  if(!def || !part) return {x:battle.bx, y:battle.by};
+  const L = def.layers.find(l => l.id === part);
+  if(!L) return {x:battle.bx, y:battle.by};
+  const anims = BOSS_ANIMS[battle.bossId];
+  const anim = anims ? (anims[battleBossAnim.name] || anims.idle) : null;
+  const fi = anim ? (((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount) : 0;
+  const k = (anim && anim.keys && anim.keys[part] && anim.keys[part][fi]) || {rot:0,dx:0,dy:0};
+  const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+  const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+  const px = w * L.pivot.x;
+  const py = h * L.pivot.y;
+  const world = anim ? resolveBossWorld(def, anim, fi) : null;
+  const wp = world ? world[part] : null;
+  if(!wp) return {x:battle.bx, y:battle.by};
+  const centerOffX = w/2 - px;
+  const centerOffY = h/2 - py;
+  const angle = wp.rot * BOSS_DEG2RAD;
+  const cosA = Math.cos(angle), sinA = Math.sin(angle);
+  const rotOffX = centerOffX * cosA - centerOffY * sinA;
+  const rotOffY = centerOffX * sinA + centerOffY * cosA;
+  const centerWX = wp.wx + rotOffX;
+  const centerWY = wp.wy + rotOffY;
+  const fxEl = document.getElementById('battle-fx');
+  const W = fxEl ? fxEl.clientWidth : 400;
+  const H = fxEl ? fxEl.clientHeight : 500;
+  const bossSprite = document.getElementById('boss-sprite');
+  const spriteW = bossSprite ? bossSprite.clientWidth : 280;
+  const spriteH = bossSprite ? bossSprite.clientHeight : 280;
+  const canvasPx = centerWX * (spriteW / def.canvas.w);
+  const canvasPy = centerWY * (spriteH / def.canvas.h);
+  const spriteLeft = battle.bx * W - spriteW / 2;
+  const spriteTop = battle.by * H;
+  return {
+    x: (spriteLeft + canvasPx) / W,
+    y: (spriteTop + canvasPy) / H
+  };
+}
+
+function isWeakPointHit(){
+  if(!battle) return false;
+  const weak = BOSS_WEAKPOINTS[battle.bossId] || [];
+  return weak.includes(battle.aimPart);
+}
+
 function renderCombat(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   if(battle&&battle.active){renderBattleScene(z1);renderBattleJoystick(z2);renderBattleControls(z3);return;}
@@ -2247,10 +2310,11 @@ function renderCombat(){
       <div style="color:#e8a33d;font-weight:bold;margin-bottom:6px">挑戰說明</div>
       <div style="line-height:1.7;font-size:10px;color:#bfb3a0">
         · 前進至 Boss 警戒範圍才會觸發攻擊<br>
-        · 點擊 Boss 設定瞄準點，射程內才能開火<br>
+        · 點擊 Boss 設定瞄準部位，預設為軀幹<br>
         · 拖動搖桿左右移動，移動時無法攻擊<br>
         · 點擊攻擊鍵射擊一次；掃射模式可長按連射<br>
-        · 主副武器彈藥耗盡後會自動切換到近戰裝備
+        · 主副武器彈藥耗盡後會自動切換到近戰裝備<br>
+        · Boss 會阻擋並推動玩家，玩家無法繞到其身後
       </div>
     </div>`;
   $$('.boss-card .btn',z1).forEach(btn=>{btn.onclick=()=>startBossBattle(btn.dataset.bid);});
@@ -2277,8 +2341,7 @@ function renderBattleScene(z1){
         <div class="sprite" id="hero-sprite"><canvas id="hero-battle-canvas"></canvas></div>
       </div>
       <div id="battle-fx"></div>
-      ${b.aimPoint?`<div class="aim-marker" id="aim-marker" style="left:${b.aimX*100}%;top:${b.aimY*100}%"></div>`:''}
-      ${!b.engaged?`<div style="position:absolute;bottom:8px;left:8px;right:8px;text-align:center;font-size:11px;color:#e8a33d;background:rgba(0,0,0,.7);padding:6px;border-radius:8px;border:1px solid #8a5f18;z-index:20">準備中… 點擊 Boss 設定瞄準點，拖動搖桿前進至警戒範圍觸發戰鬥</div>`:''}
+      ${!b.engaged?`<div style="position:absolute;bottom:8px;left:8px;right:8px;text-align:center;font-size:11px;color:#e8a33d;background:rgba(0,0,0,.7);padding:6px;border-radius:8px;border:1px solid #8a5f18;z-index:20">準備中… 點擊 Boss 設定瞄準部位，拖動搖桿前進至警戒範圍觸發戰鬥</div>`:''}
     </div>`;
   updateFighterPos();
   requestAnimationFrame(()=>{
@@ -2288,15 +2351,32 @@ function renderBattleScene(z1){
   });
   const bs=$('#boss-sprite');
   if(bs)bs.onclick=(e)=>{
-    const scene=document.querySelector('.battle-scene');
-    if(!scene)return;
-    const rect=scene.getBoundingClientRect();
-    const vx=clamp((e.clientX-rect.left)/rect.width,0,1);
-    const vy=clamp((e.clientY-rect.top)/rect.height,0,1);
-    battle.aimX=vx;battle.aimY=vy;battle.aimPoint=true;
-    const marker=$('#aim-marker');if(marker)marker.remove();
-    const fx=$('#battle-fx');
-    if(fx){const m=el('div','aim-marker');m.id='aim-marker';m.style.left=(vx*100)+'%';m.style.top=(vy*100)+'%';fx.appendChild(m);}
+    const bossSprite = document.getElementById('boss-sprite');
+    if(!bossSprite) return;
+    const def = BOSS_LAYERS[battle.bossId];
+    if(!def) return;
+    const scene = document.querySelector('.battle-scene');
+    if(!scene) return;
+    const sceneRect = scene.getBoundingClientRect();
+    const spriteRect = bossSprite.getBoundingClientRect();
+    const canvasX = (e.clientX - spriteRect.left) * (def.canvas.w / Math.max(1, spriteRect.width));
+    const canvasY = (e.clientY - spriteRect.top)  * (def.canvas.h / Math.max(1, spriteRect.height));
+    const part = pickAimPartFromClick(canvasX, canvasY);
+    if(part){
+      battle.aimPart = part;
+      const fx = document.getElementById('battle-fx');
+      if(fx){
+        const old = document.getElementById('aim-marker');
+        if(old) old.remove();
+        const m = document.createElement('div');
+        m.className = 'aim-marker';
+        m.id = 'aim-marker';
+        m.style.left = ((e.clientX - sceneRect.left) / sceneRect.width * 100) + '%';
+        m.style.top  = ((e.clientY - sceneRect.top)  / sceneRect.height * 100) + '%';
+        fx.appendChild(m);
+        setTimeout(()=>{ if(m.parentNode) m.remove(); }, 1000);
+      }
+    }
   };
 }
 function updateFighterPos(){
@@ -2315,10 +2395,19 @@ function renderBattleJoystick(z2){
   z2.innerHTML=`<div class="joystick" id="joystick"><div class="stick" id="stick"></div></div><div class="z2-hint">拖動搖桿左右移動</div>`;
   const joy=$('#joystick'),stick=$('#stick');
   let touchId=null,cx,cy,radius;
-  function start(e){const r=joy.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;radius=r.width/2;const t=e.changedTouches?e.changedTouches[0]:e;touchId=e.changedTouches?t.identifier:null;move(e);}
+  function start(e){
+    if(battle){
+      if(battle.firing){ battle.fireHeld=false; battle.burstLeft=0; }
+    }
+    const r=joy.getBoundingClientRect();
+    cx=r.left+r.width/2; cy=r.top+r.height/2; radius=r.width/2;
+    const t=e.changedTouches?e.changedTouches[0]:e;
+    touchId=e.changedTouches?t.identifier:null;
+    move(e);
+  }
   function move(e){
     if(!battle||!battle.active)return;
-    if(battle.firing || battle.reloading || battle.consuming){
+    if(battle.reloading || battle.consuming){
       stick.style.left='50%';stick.style.top='50%';
       battle.moveDir=0;
       return;
@@ -2459,6 +2548,20 @@ function switchBattleWeapon(slot){
   }
   renderBattleControls($('#zone3'));
 }
+
+function defaultAimPartForBoss(bossId){
+  const def = BOSS_LAYERS[bossId];
+  if(!def) return null;
+  const torso = def.layers.find(l => l.id === 'torso');
+  if(torso) return 'torso';
+  let best = null, bestArea = 0;
+  for(const L of def.layers){
+    const a = L.w * L.h;
+    if(a > bestArea){ bestArea = a; best = L.id; }
+  }
+  return best;
+}
+
 function startBossBattle(bid){
   const b=BOSSES[bid];if(!b)return;
   const seals=parseInt(state.seals[b.seal]||0,10);
@@ -2469,13 +2572,14 @@ function startBossBattle(bid){
   refreshPlayerStats();
   const w=chooseCombatWeapon();
   const startSlot=w?w.slot:'melee';
-  battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossPen:b.pen||0,
-    skills:b.skills||[],skillCds:null,bossCast:null,lastMeleeAt:0,
+  battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossDmgMult:1,bossPen:b.pen||0,
+    phaseIdx:0, healedPhases:[], skillCds:null, bossCast:null, bossDash:null, lastMeleeAt:0,
     playerHp:state.player.hp,playerMaxHp:state.player.maxHp,playerArmor:state.player.armor,playerMaxArmor:Math.max(1,state.player.maxArmor),
     px:0.15,py:0.75,bx:0.75,by:0.25,moveDir:0,bullets:[],firing:false,reloading:false,consuming:false,
     lastShot:0,damageDealt:0,weapon:null,weaponSlot:null,playerWeaponRange:0.5,fireMode:'點射',fireHeld:false,burstLeft:0,
     ammoRef:null,ammoInMag:0,weaponStates:{},engaged:false,engagedRange:0.35,startTime:Date.now(),
-    aimPoint:false,aimX:0.75,aimY:0.7,players:[{id:'local',isLocal:true}],lastH:0,
+    aimPart:defaultAimPartForBoss(bid),lastManualClick:0,
+    players:[{id:'local',isLocal:true}],lastH:0,
     healDisabledUntil:0,healTimer:null,autoHealing:false};
   battleHeroAnim.name='idle';
   battleHeroAnim.frame=0;
@@ -2492,8 +2596,68 @@ function startBossBattle(bid){
 }
 
 /* ============================================================
-   ★ BOSS MODULE — 行為 AI（近戰版）
+   ★ BOSS MODULE — 行為 AI（Boss 為障礙物，玩家永遠在其左側）
    ============================================================ */
+function getBossSkillList(bossId){
+  return BOSS_SKILLS[bossId] || [];
+}
+function phaseUnlocksSkill(phaseIdx, skill){
+  return (skill.unlockPhase === undefined) ? true : (phaseIdx >= skill.unlockPhase);
+}
+function updateBossPhase(){
+  const b = battle;
+  if(!b) return;
+  const phases = BOSS_PHASES[b.bossId];
+  if(!phases || phases.length === 0) return;
+  const hpPct = b.bossMaxHp > 0 ? (b.bossHp / b.bossMaxHp) : 0;
+  for(let i = phases.length - 1; i >= 0; i--){
+    if(hpPct <= phases[i].hpPct && i > b.phaseIdx){
+      b.phaseIdx = i;
+      const p = phases[i];
+      if(p.dmgMult !== undefined) b.bossDmgMult = p.dmgMult;
+      if(p.healFull){
+        const healed = b.healedPhases || [];
+        if(!(p.repeatable === false && healed.includes(i))){
+          b.bossHp = b.bossMaxHp;
+          if(!b.healedPhases) b.healedPhases = [];
+          b.healedPhases.push(i);
+        }
+      }
+      notify(`⚠️ ${b.bossName} 進入第 ${i+1} 階段！`, 'error');
+      break;
+    }
+  }
+}
+function showBossWarning(){
+  const fb = document.getElementById('fighter-boss');
+  if(!fb) return;
+  if(fb.querySelector('.boss-warning')) return;
+  const w = document.createElement('div');
+  w.className = 'boss-warning';
+  w.textContent = '❗';
+  fb.appendChild(w);
+}
+function hideBossWarning(){
+  const w = document.querySelector('.boss-warning');
+  if(w) w.remove();
+}
+
+/* Boss 向左移動時推動玩家；返回 Boss 允許的最小 x */
+function pushPlayerLeft(newBx){
+  const b = battle;
+  if(!b) return newBx;
+  const leftLimit = b.px + BOSS_MIN_GAP;
+  if(newBx < leftLimit){
+    const push = leftLimit - newBx;
+    const newPx = clamp(b.px - push, 0.05, 0.95);
+    b.px = newPx;
+    if(newBx < b.px + BOSS_MIN_GAP){
+      newBx = b.px + BOSS_MIN_GAP;
+    }
+  }
+  return newBx;
+}
+
 function updateBossAI(dt, now){
   const b = battle;
   if(!b) return;
@@ -2507,10 +2671,17 @@ function updateBossAI(dt, now){
     return;
   }
 
+  updateBossPhase();
+
   if(!b.skillCds){
     b.skillCds = {};
-    const skills = BOSS_SKILLS[b.bossId] || [];
+    const skills = getBossSkillList(b.bossId);
     for(const sk of skills) b.skillCds[sk.id] = now + 1500;
+  }
+
+  if(b.bossDash){
+    updateBossDash(dt, now);
+    return;
   }
 
   if(b.bossCast){
@@ -2529,16 +2700,25 @@ function updateBossAI(dt, now){
   const dx = b.bx - b.px;
   const dist = Math.abs(dx);
 
-  const skills = BOSS_SKILLS[b.bossId] || [];
+  const skills = getBossSkillList(b.bossId);
   for(const sk of skills){
+    if(!phaseUnlocksSkill(b.phaseIdx, sk)) continue;
     if(now < (b.skillCds[sk.id] || 0)) continue;
-    if(dist > sk.range) continue;
-    b.bossCast = { skill: sk, startTime: now, applied: false };
-    b.skillCds[sk.id] = now + sk.cd * 1000;
-    playBossOneshot(sk.anim, sk.totalTime);
-    showBossTelegraph(sk);
-    notify(`⚡ ${b.bossName} 施展「${sk.name}」！`,'error');
-    return;
+    if(sk.type === 'dash'){
+      const minR = sk.minRange || 0.15;
+      if(dist < minR || dist > sk.range) continue;
+      startBossDash(sk, now);
+      b.skillCds[sk.id] = now + sk.cd * 1000;
+      return;
+    } else {
+      if(dist > sk.range) continue;
+      b.bossCast = { skill: sk, startTime: now, applied: false };
+      b.skillCds[sk.id] = now + sk.cd * 1000;
+      playBossOneshot(sk.anim, sk.totalTime);
+      showBossTelegraph(sk);
+      notify(`⚡ ${b.bossName} 施展「${sk.name}」！`,'error');
+      return;
+    }
   }
 
   const bRange = 0.36;
@@ -2548,7 +2728,11 @@ function updateBossAI(dt, now){
     const bspd = 0.028 * dt;
     const step = Math.sign(dx) * Math.min(bspd, dist - bRange);
     if(Math.abs(step) > 0.0001){
-      b.bx += step;
+      let newBx = b.bx + step;
+      if(step < 0){
+        newBx = pushPlayerLeft(newBx);
+      }
+      b.bx = clamp(newBx, 0.05 + BOSS_MIN_GAP, 0.95);
       bossMoving = true;
     }
   } else {
@@ -2557,7 +2741,6 @@ function updateBossAI(dt, now){
       doBossMeleeSwipe();
     }
   }
-  b.bx = clamp(b.bx, 0.1, 0.9);
 
   if(BATTLE_BOSS_ONESHOT.indexOf(battleBossAnim.name) === -1){
     const want = bossMoving ? 'walk' : 'idle';
@@ -2566,6 +2749,105 @@ function updateBossAI(dt, now){
       battleBossAnim.frame = 0;
       battleBossAnim.lastUpdate = performance.now();
     }
+  }
+}
+
+function startBossDash(sk, now){
+  const b = battle;
+  if(!b) return;
+  const dir = Math.sign(b.px - b.bx) || 1;
+  const rawTarget = b.bx + dir * (sk.dashDistance || 0.35);
+  const targetX = clamp(rawTarget, 0.05 + BOSS_MIN_GAP, 0.95);
+  b.bossDash = {
+    skill: sk,
+    state: 'warn',
+    startTime: now,
+    warnMs: sk.telegraph || 800,
+    dir,
+    targetX,
+    speed: sk.dashSpeed || 0.55,
+    lastHit: 0,
+    contactDmg: sk.contactDmg || 15,
+    hitTickMs: sk.hitTickMs || 250,
+    exhaustMs: sk.exhaustMs || 1500
+  };
+  showBossWarning();
+  notify(`⚠️ ${b.bossName} 準備突進！`, 'error');
+}
+
+function updateBossDash(dt, now){
+  const b = battle;
+  const d = b.bossDash;
+  if(!d) return;
+  const elapsed = now - d.startTime;
+
+  if(d.state === 'warn'){
+    if(battleBossAnim.name !== 'idle' && BATTLE_BOSS_ONESHOT.indexOf(battleBossAnim.name) === -1){
+      battleBossAnim.name = 'idle';
+      battleBossAnim.frame = 0;
+      battleBossAnim.lastUpdate = now;
+    }
+    if(elapsed >= d.warnMs){
+      d.state = 'dash';
+      d.startTime = now;
+      hideBossWarning();
+      battleBossAnim.name = 'walk';
+      battleBossAnim.frame = 0;
+      battleBossAnim.lastUpdate = now;
+    }
+    return;
+  }
+
+  if(d.state === 'dash'){
+    const step = d.speed * dt * d.dir;
+    let newBx = b.bx + step;
+
+    if(d.dir < 0){
+      /* 向左衝：撞到玩家就推 */
+      const leftLimit = b.px + BOSS_MIN_GAP;
+      if(newBx < leftLimit){
+        const push = leftLimit - newBx;
+        const newPx = clamp(b.px - push, 0.05, 0.95);
+        b.px = newPx;
+        if(newBx < b.px + BOSS_MIN_GAP){
+          newBx = b.px + BOSS_MIN_GAP;
+        }
+        if((now - (d.lastHit||0)) > d.hitTickMs){
+          d.lastHit = now;
+          tryHitPlayer(d.contactDmg * (b.bossDmgMult||1), b.bossPen||0);
+        }
+      }
+    }
+
+    b.bx = clamp(newBx, 0.05 + BOSS_MIN_GAP, 0.95);
+
+    const reached =
+      (d.dir > 0 && b.bx >= d.targetX) ||
+      (d.dir < 0 && b.bx <= d.targetX) ||
+      Math.abs(b.bx - d.targetX) < 0.005;
+    if(reached){
+      b.bx = clamp(d.targetX, 0.05 + BOSS_MIN_GAP, 0.95);
+      d.state = 'exhaust';
+      d.startTime = now;
+      b.lastMeleeAt = now;
+      doBossMeleeSwipe();
+      battleBossAnim.name = 'idle';
+      battleBossAnim.frame = 0;
+      battleBossAnim.lastUpdate = now;
+    }
+    return;
+  }
+
+  if(d.state === 'exhaust'){
+    if(battleBossAnim.name !== 'idle' && BATTLE_BOSS_ONESHOT.indexOf(battleBossAnim.name) === -1){
+      battleBossAnim.name = 'idle';
+      battleBossAnim.frame = 0;
+      battleBossAnim.lastUpdate = now;
+    }
+    if(elapsed >= d.exhaustMs){
+      b.bossDash = null;
+    }
+    return;
   }
 }
 
@@ -2589,7 +2871,7 @@ function tryHitPlayer(dmg, pen){
   if(!battle || !battle.active) return;
   const dodge = clamp(0.15 + state.player.level * 0.005, 0, 0.5);
   if(Math.random() < dodge){
-    spawnHitFx(battle.px, battle.py, '閃避', 'armor');
+    spawnHitFx(battle.px, battle.py, 'MISS', 'armor');
     return;
   }
   const target = { hp: battle.playerHp, armor: battle.playerArmor };
@@ -2611,7 +2893,7 @@ function doBossMeleeSwipe(){
       spawnHitFx(battle.bx, battle.by, 'MISS', 'armor');
       return;
     }
-    tryHitPlayer(b.bossDmg, b.bossPen);
+    tryHitPlayer(b.bossDmg * (b.bossDmgMult||1), b.bossPen);
   }, 250);
 }
 
@@ -2623,10 +2905,11 @@ function applyBossSkillDamage(sk){
     notify(`躲過了「${sk.name}」`,'ok');
     return;
   }
-  tryHitPlayer(sk.dmg, sk.pen);
+  tryHitPlayer(sk.dmg * (battle.bossDmgMult||1), sk.pen);
   if(sk.knockback){
     const dir = Math.sign(battle.px - battle.bx) || 1;
-    battle.px = clamp(battle.px + dir * sk.knockback, 0.05, 0.95);
+    const newPx = clamp(battle.px + dir * sk.knockback, 0.05, 0.95);
+    battle.px = Math.min(newPx, battle.bx - BOSS_MIN_GAP);
   }
   if(!battle || !battle.active) return;
   notify(`💥 受到「${sk.name}」！`,'error');
@@ -2665,7 +2948,11 @@ function battleLoop(now){
   const hasMoveInput = (battle.moveDir !== 0);
 
   if(canMove && hasMoveInput){
-    battle.px = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
+    let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
+    /* 玩家永遠在 Boss 左側 */
+    const pxMax = Math.max(0.05, battle.bx - BOSS_MIN_GAP);
+    if(newPx > pxMax) newPx = pxMax;
+    battle.px = newPx;
   }
 
   if(BATTLE_ONESHOT_ANIMS.indexOf(battleHeroAnim.name) === -1){
@@ -2804,7 +3091,20 @@ function startPlayerFire(){
     }
     refreshBattleControlsLive();
   }
-  if(battle.moveDir !== 0) return;
+
+  const wdef = battle.weapon && battle.weapon.def;
+  const rpm = (wdef && wdef.rpm) ? wdef.rpm : 600;
+  const cdMs = 60000 / rpm;
+  const now = performance.now();
+  if(now - (battle.lastManualClick || 0) < cdMs) return;
+  battle.lastManualClick = now;
+
+  if(battle.moveDir !== 0){
+    battle.moveDir = 0;
+    const stick = document.getElementById('stick');
+    if(stick){ stick.style.left='50%'; stick.style.top='50%'; stick.style.transform='translate(-50%,-50%)'; }
+  }
+
   if(battle.fireMode === '掃射'){
     battle.fireHeld = true;
   } else {
@@ -2817,7 +3117,6 @@ function stopPlayerFire(){
   battle.fireHeld = false;
 }
 
-/* ★ 修正：與探索模式同一套武器層／偏移邏輯計算槍口位置 */
 function getPlayerMuzzlePos(){
   const fx = document.getElementById('battle-fx');
   const W = fx ? fx.clientWidth : 400;
@@ -2948,6 +3247,7 @@ function playerShoot(){
     battleHeroAnim.lastUpdate=performance.now();
     battleHeroAnim.forcedEnd=performance.now()+350;
   }
+  const isWeak = isWeakPointHit();
   if(def.cal){
     if(battle.ammoInMag<=0){
       battle.reloading=true;battle.firing=false;battle.burstLeft=0;
@@ -2972,13 +3272,12 @@ function playerShoot(){
     }
     battle.ammoInMag--;
     const mz = getPlayerMuzzlePos();
-    const tx=battle.aimPoint?battle.aimX:battle.bx;
-    const ty=battle.aimPoint?battle.aimY:battle.by;
+    const target = getAimTargetPos();
     const shotCount = 1 + Math.floor(Math.random()*3);
     for(let s=0;s<shotCount;s++){
       const jx = (Math.random()-0.5)*0.03;
       const jy = (Math.random()-0.5)*0.03;
-      battle.bullets.push({sx:mz.x,sy:mz.y,tx:clamp(tx+jx,0,1),ty:clamp(ty+jy,0,1),t:0,player:true});
+      battle.bullets.push({sx:mz.x,sy:mz.y,tx:clamp(target.x+jx,0,1),ty:clamp(target.y+jy,0,1),t:0,player:true});
     }
     const hitRate=getHitRate(def.type,battle.fireMode,def.scopeBonus||0);
     const baseDmg=Math.round(battle.ammoRef?AMMO[battle.ammoRef.id].dmg*(RARITY_MULT[battle.ammoRef.rarity]||1):20);
@@ -2990,7 +3289,15 @@ function playerShoot(){
       if(Math.random()*100<hitRate){
         let dmg=baseDmg;let isCrit=false;
         if(Math.random()<critRate){dmg=Math.round(dmg*critMult);isCrit=true;}
-        applyBossDamage(dmg,isCrit,ammoPen);
+        if(isWeak){
+          battle.bossHp = Math.max(0, battle.bossHp - dmg);
+          battle.damageDealt += dmg;
+          spawnHitFx(battle.bx, battle.by, `-${dmg}${isCrit?'!':''}`, isCrit?'crit':'weak');
+          if(battle.bossHp <= 0){ endBattle(true); return true; }
+        } else {
+          applyBossDamage(dmg,isCrit,ammoPen);
+          if(battle.bossHp <= 0) return true;
+        }
       }
     }
   } else {
@@ -3006,15 +3313,24 @@ function playerShoot(){
     const critRate=calcCritRate(w.rarity,'一般');
     const critMult=calcCritMult(w.rarity,'一般');
     const mz = getPlayerMuzzlePos();
+    const target = getAimTargetPos();
     if(!isMelee){
-      battle.bullets.push({sx:mz.x,sy:mz.y,tx:battle.bx,ty:battle.by,t:0,player:true,big:true});
+      battle.bullets.push({sx:mz.x,sy:mz.y,tx:target.x,ty:target.y,t:0,player:true,big:true});
     }
     const hits=isMelee?getMeleeHits(def.rpm):1;
     for(let i=0;i<hits;i++){
       if(Math.random()*100<hitRate){
         let dmg=baseDmg;let isCrit=false;
         if(Math.random()<critRate){dmg=Math.round(dmg*critMult);isCrit=true;}
-        applyBossDamage(dmg,isCrit,0);
+        if(isWeak){
+          battle.bossHp = Math.max(0, battle.bossHp - dmg);
+          battle.damageDealt += dmg;
+          spawnHitFx(battle.bx, battle.by, `-${dmg}${isCrit?'!':''}`, isCrit?'crit':'weak');
+          if(battle.bossHp <= 0){ endBattle(true); return true; }
+        } else {
+          applyBossDamage(dmg,isCrit,0);
+          if(battle.bossHp <= 0) return true;
+        }
       }
     }
   }
@@ -3120,7 +3436,7 @@ window.BossModule = BossModule;
 /* ============================================================
    基地
    ============================================================ */
-const collapsedSections={weapons:false,types:false,other:false};
+const collapsedSections={weapons:true,types:true,other:true};
 function profDisplay(v){v=v||0;const lv=Math.floor(v),pct=Math.round((v-lv)*100);return `Lv.${lv} (${pct}%)`;}
 function renderBase(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
