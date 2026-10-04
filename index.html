@@ -1,3 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
+<title>廢土求生 v17.5</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;font-size:12px;touch-action:manipulation;user-select:none;overscroll-behavior:none}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#content{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+#zone1{flex:1 1 0;min-height:0;position:relative;overflow:hidden;background:#1a1510}
+#lower{flex:1 1 0;min-height:0;display:flex}
+#zone2{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;background:#151210;border-right:1px solid #2a231c;display:flex;flex-direction:column}
+#zone3{flex:1 1 0;min-width:0;min-height:0;position:relative;overflow:hidden;display:flex;flex-direction:column;background:#12100e}
+#tabbar{flex:0 0 54px;display:flex;background:#1a1510;border-top:1px solid #2a231c;padding-bottom:env(safe-area-inset-bottom)}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#7a6f60;font-size:11px;gap:2px}
+.tab.active{color:#e8a33d}
+.tab .ico{font-size:18px}
+.toast{position:fixed;top:22%;left:50%;background:rgba(30,24,19,.96);border:1px solid #e8a33d;border-radius:8px;padding:10px 16px;color:#e8a33d;font-size:12px;z-index:10000;max-width:82%;text-align:center;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.7);animation:toastFloat 2.2s ease-out forwards}
+.toast.error{border-color:#e05252;color:#e05252}
+.toast.ok{border-color:#4caf50;color:#4caf50}
+@keyframes toastFloat{0%{opacity:0;transform:translate(-50%,18px)}12%{opacity:1;transform:translate(-50%,0)}70%{opacity:1;transform:translate(-50%,-12px)}100%{opacity:0;transform:translate(-50%,-56px)}}
+.scene{position:absolute;inset:0}
+.bg-scroll{position:absolute;inset:0;display:flex;overflow:hidden}
+.bg-layer{flex:0 0 100%;height:100%;background-size:100% 100%;background-position:center;background-repeat:no-repeat;animation:bgscroll var(--spd,10s) linear infinite}
+@keyframes bgscroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+.groundline{position:absolute;left:0;right:0;bottom:6%;height:2px;background:rgba(232,163,61,.15)}
+.hero-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.explore-fx{position:absolute;inset:0;pointer-events:none;z-index:7;overflow:hidden}
+.explore-bullet{position:absolute;width:7px;height:7px;border-radius:50%;background:#ffe08a;box-shadow:0 0 8px #ffb300,0 0 14px #ff8800;transform:translate(-50%,-50%);pointer-events:none}
+.zone-title{position:absolute;left:8px;top:8px;font-size:11px;color:#e8a33d;background:rgba(14,12,10,.7);padding:3px 8px;border-radius:10px;border:1px solid #3a2f25;z-index:6}
+.zone-badge{position:absolute;right:8px;top:8px;font-size:10px;color:#a89a85;background:rgba(14,12,10,.7);padding:3px 8px;border-radius:10px;border:1px solid #3a2f25;z-index:6}
+.zone2-silhouette{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.slot{position:absolute;width:21%;aspect-ratio:1;border-radius:5px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;display:flex;align-items:center;justify-content:center;font-size:9px;color:#7a6f60;cursor:pointer;overflow:hidden;z-index:3}
+.slot:active{transform:scale(.94)}
+.slot.filled{border-color:#e8a33d}
+.slot.fixed{border-color:#8a5f18}
+.slot .slot-img{width:72%;height:72%;object-fit:contain;display:block}
+.slot .lbl{position:absolute;bottom:1px;left:0;right:0;text-align:center;font-size:7px;background:rgba(0,0,0,.55);color:#a89a85;padding:1px 0}
+.slot .nm{font-size:8px;font-weight:bold;text-align:center;line-height:1.1;padding:0 2px;word-break:break-all;overflow:hidden;max-height:22px}
+.slot.empty .nm{color:#4a4038;font-weight:normal}
+.player-stat-panel{position:absolute;background:rgba(14,12,10,.92);border:1px solid #3a2f25;border-radius:6px;padding:4px 6px;font-size:9px;z-index:4;max-width:36%}
+.player-stat-panel .row{display:flex;justify-content:space-between;align-items:center;color:#a89a85;line-height:1.5;gap:4px;flex-wrap:wrap}
+.player-stat-panel .row.lv-row{justify-content:flex-end}
+.player-stat-panel .row b{color:#e8a33d}
+.z3-head{flex:0 0 30px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border-bottom:1px solid #2a231c;background:#17140f}
+.z3-title{font-size:11px;color:#e8a33d;font-weight:bold}
+.z3-btn{font-size:10px;color:#a89a85;background:#241d16;border:1px solid #3a2f25;padding:3px 8px;border-radius:8px}
+.logbox{flex:1;min-height:0;overflow-y:auto;padding:5px 7px;font-size:10px;line-height:1.45}
+.logbox::-webkit-scrollbar{width:3px}
+.logbox::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:2px}
+.logline{padding:2px 0;border-bottom:1px dashed #241d16;color:#bfb3a0;word-break:break-word}
+.logline .tm{color:#6a5f4d}
+.logline .pl{color:#e8a33d;font-weight:bold}
+.logline .win{color:#4caf50;font-weight:bold}
+.logline .lose{color:#e05252;font-weight:bold}
+.logline .run{color:#e8741e;font-weight:bold}
+.logline .itm{cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+.r-破舊{color:#b87333}.r-一般{color:#e0e0e0}.r-庫存{color:#4caf50}.r-精品{color:#2196f3}.r-傳奇{color:#ffb300}.r-具名{color:#a45ede}
+#modal-layer{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center}
+#modal-layer.on{display:flex}
+.modal-bd{position:absolute;inset:0;background:rgba(0,0,0,.7)}
+.modal{position:relative;background:#1e1813;border:1px solid #3a2f25;border-radius:10px;width:88%;max-width:420px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.7);overflow:hidden;z-index:1}
+.modal.full{width:100%;height:100%;max-width:none;max-height:none;border-radius:0}
+.modal-hd{flex:0 0 auto;padding:10px 12px;border-bottom:1px solid #2a231c;font-size:13px;color:#e8a33d;font-weight:bold;display:flex;justify-content:space-between;align-items:center}
+.modal-hd .x{font-size:18px;color:#7a6f60;padding:0 6px;cursor:pointer}
+.modal-bd-inner{flex:1;min-height:0;overflow-y:auto;padding:10px 12px}
+.modal-ft{flex:0 0 auto;padding:8px;border-top:1px solid #2a231c;display:flex;gap:6px}
+.btn{flex:1;padding:10px;border:none;border-radius:8px;background:#2c2419;color:#ddd;font-size:12px;font-weight:bold;cursor:pointer}
+.btn.primary{background:#8a5f18;color:#fff}
+.btn.danger{background:#6a2a2a}
+.btn.ghost{background:#1a1510;border:1px solid #3a2f25}
+.btn:disabled{opacity:.4}
+.item-row{display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;background:#241d16;margin-bottom:5px;cursor:pointer;border:1px solid #2a231c}
+.item-row .icon{flex:0 0 32px;height:32px;background:#151210;border-radius:5px;display:flex;align-items:center;justify-content:center;border:1px solid #3a2f25;overflow:hidden}
+.item-row .icon img{width:100%;height:100%;object-fit:contain;display:block}
+.item-row .info{flex:1;min-width:0}
+.item-row .nm{font-size:11px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-row .sub{font-size:9px;color:#7a6f60;margin-top:2px}
+.item-row .cnt{font-size:11px;color:#e8a33d;font-weight:bold}
+.cat-header{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin:6px 0 4px;cursor:pointer;color:#e8a33d;font-size:11px;font-weight:bold}
+.cost-ok{color:#4caf50;margin-right:6px;display:inline-block}
+.cost-no{color:#e05252;margin-right:6px;display:inline-block}
+.detail-title{font-size:15px;font-weight:bold;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.detail-title img{width:30px;height:30px;object-fit:contain}
+.detail-sub{font-size:10px;color:#7a6f60;margin-bottom:10px}
+.stat-line{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #2a231c;font-size:11px}
+.stat-line .k{color:#7a6f60}
+.stat-line .v{color:#e8a33d;font-weight:bold}
+.cmp-header{display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px solid #2a231c;margin-bottom:6px}
+.cmp-name{font-size:11px;font-weight:bold;flex:1;text-align:center}
+.cmp-name.old{color:#a89a85}
+.cmp-name.new{color:#e8a33d}
+.cmp-title{text-align:center;font-size:10px;color:#7a6f60;padding:4px 0;margin-bottom:4px}
+.cmp-row{display:flex;align-items:center;padding:7px 4px;border-bottom:1px dashed #2a231c}
+.cmp-val{flex:1;text-align:center;font-size:13px}
+.cmp-val.old{color:#a89a85}
+.cmp-val.new{font-weight:bold;color:#e8a33d}
+.cmp-val.new.up{color:#4caf50}
+.cmp-val.new.down{color:#e05252}
+.cmp-lbl{flex:0 0 70px;text-align:center;color:#7a6f60;font-size:10px}
+.boss-list{position:absolute;inset:0;overflow-y:auto;padding:8px}
+.boss-card{background:#1e1813;border:1px solid #3a2f25;border-radius:8px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center}
+.boss-card.locked{opacity:.5}
+.boss-avatar{flex:0 0 48px;height:48px;background:#2a1e15;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #5a3a1a;overflow:hidden}
+.boss-avatar img{width:100%;height:100%;object-fit:contain;display:block}
+.boss-info{flex:1;min-width:0}
+.boss-info .bn{font-size:13px;font-weight:bold;color:#e8a33d}
+.boss-info .bd{font-size:10px;color:#7a6f60;margin-top:2px;line-height:1.4}
+.seal-tag{font-size:9px;color:#4caf50;background:#1a2a1a;padding:2px 6px;border-radius:6px;display:inline-block;margin-top:4px}
+.seal-tag.none{color:#e05252;background:#2a1a1a}
+.battle-scene{position:absolute;inset:0;overflow:hidden;background:#241a10}
+.battle-bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 90%,#3a2818,#140e08)}
+#battle-fx{position:absolute;inset:0;pointer-events:none;z-index:8}
+.range-indicator{position:absolute;top:0;bottom:0;background:rgba(232,163,61,.08);border-left:1px dashed rgba(232,163,61,.45);border-right:1px dashed rgba(232,163,61,.45);pointer-events:none;z-index:1}
+.damage-header{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:rgba(14,12,10,.85);border:1px solid #8a5f18;border-radius:10px;padding:4px 12px;font-size:11px;color:#e8a33d;z-index:20;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.6);text-align:center;font-weight:bold}
+.damage-header .num{color:#ffb300}
+.damage-header .bar{width:180px;height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-top:4px}
+.damage-header .bar .fill{height:100%;background:linear-gradient(90deg,#e05252,#ffb300);transition:width .2s}
+.fighter{position:absolute;transform:translateX(-50%);z-index:3}
+.fighter .sprite{border-radius:6px;position:relative;cursor:crosshair;background-size:contain;background-position:center;background-repeat:no-repeat}
+.hero-f .sprite{width:88px;height:118px;background-image:none}
+.hero-f .sprite canvas{width:100%;height:100%;display:block}
+.boss-f .sprite{width:280px;height:280px}
+.boss-f .sprite img{width:100%;height:100%;object-fit:contain;display:block}
+.boss-f .hpbar-wrap{width:min(50%,200px);z-index:2}
+.hpbar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:60px;bottom:calc(100% + 4px)}
+.hpbar-wrap .bar{height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-bottom:2px;position:relative}
+.hpbar-wrap .bar .fill{height:100%;transition:width .15s}
+.hpbar-wrap .bar.hp .fill{background:#e05252}
+.hpbar-wrap .bar.ap .fill{background:#4a90d9}
+.hpbar-wrap .nm{font-size:8px;color:#e8a33d;text-align:center;white-space:nowrap;text-shadow:0 0 3px #000;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%)}
+.bullet{position:absolute;width:5px;height:5px;background:#ffe08a;border-radius:50%;box-shadow:0 0 6px #ffb300;transform:translate(-50%,-50%)}
+.bullet.enemy{background:#ff5252;box-shadow:0 0 6px #e05252}
+/* ============================================================
+   ★ lab_queen 投射物：白色蛛絲 / 綠色酸液（純視覺）
+   ============================================================ */
+.boss-proj-wrap{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  z-index:20;
+  will-change:left,top;
+}
+.boss-proj{display:block}
+.boss-proj.web{
+  width:38px;height:4px;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,0) 0%,
+    rgba(230,242,255,.7) 20%,
+    #ffffff 50%,
+    rgba(230,242,255,.7) 80%,
+    rgba(255,255,255,0) 100%);
+  border-radius:2px;
+  box-shadow:0 0 6px rgba(255,255,255,.95), 0 0 14px rgba(190,215,255,.7);
+  transform-origin:50% 50%;
+}
+.boss-proj.acid{
+  width:18px;height:18px;
+  border-radius:50%;
+  background:radial-gradient(circle,
+    #e8ffb8 0%,
+    #a8e84a 30%,
+    #6acb1a 55%,
+    #2e7a0e 80%,
+    rgba(40,100,15,0) 100%);
+  box-shadow:0 0 10px rgba(160,240,80,.95), 0 0 22px rgba(90,200,30,.65);
+}
+.hit-fx{position:absolute;font-size:20px;font-weight:bold;color:#ffb300;transform:translate(-50%,-50%);pointer-events:none;animation:hitup 1.1s ease-out forwards;text-shadow:0 0 4px #000,0 0 8px #000,0 0 12px #000;z-index:50;-webkit-text-stroke:1px #000}
+.hit-fx.crit{color:#ff3030;font-size:26px;-webkit-text-stroke:1.5px #000}
+.hit-fx.enemy{color:#ff5252}
+.hit-fx.armor{color:#5ab0ff}
+.hit-fx.weak{color:#a45ede}
+@keyframes hitup{0%{transform:translate(-50%,-50%) scale(0.5);opacity:0}15%{transform:translate(-50%,-70%) scale(1.3);opacity:1}100%{transform:translate(-50%,-260%) scale(1);opacity:0}}
+.aim-marker{position:absolute;width:14px;height:14px;border:2px solid #ffb300;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10;box-shadow:0 0 6px #ffb300}
+.joystick{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;height:120px;border-radius:50%;background:rgba(232,163,61,.08);border:2px solid rgba(232,163,61,.3);touch-action:none}
+.joystick .stick{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:52px;height:52px;border-radius:50%;background:rgba(232,163,61,.5);border:2px solid #e8a33d}
+.z2-hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:9px;color:#5a5040;z-index:4}
+.ctrl-wrap{position:absolute;inset:0;display:flex;flex-direction:column;padding:6px;gap:5px}
+.fire-modes{display:flex;gap:3px;flex-wrap:wrap}
+.fm-btn{flex:1;min-width:0;padding:6px 2px;font-size:9px;border-radius:6px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;text-align:center;cursor:pointer}
+.fm-btn.on{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.weapon-slot-btn{padding:7px;border-radius:6px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;font-size:10px;text-align:center;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.weapon-slot-btn.on{background:#3a2a15;border-color:#e8a33d;color:#e8a33d}
+.fire-btn{flex:0 0 auto;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#d94a4a,#6a1a1a);border:3px solid #8a2a2a;color:#fff;font-size:16px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;aspect-ratio:1/1}
+.fire-btn.disabled{background:#3a1a1a;border-color:#5a2a2a;color:#7a6f60}
+.heal-btn{width:60px;height:60px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#e05252,#8a1a1a);border:3px solid #a02a2a;color:#fff;font-size:28px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 10px rgba(224,82,82,0.5);}
+.heal-btn.disabled{background:#3a1a1a;border-color:#5a2a2a;color:#7a6f60;box-shadow:none;}
+.ammo-info{font-size:10px;color:#e8a33d;text-align:center;padding:3px}
+.build-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:3px;padding:5px}
+.cell{background:#1e1813;border:1px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;color:#7a6f60;cursor:pointer;text-align:center;padding:0;position:relative;min-width:0;min-height:0;overflow:hidden}
+.cell.built{background:linear-gradient(180deg,#3a2a15,#241d16);border-color:#8a5f18;color:#e8a33d}
+.cell.core{background:linear-gradient(180deg,#5a3a1a,#3a2510);border-color:#e8a33d;color:#ffe0a0}
+.cell .cico{flex:1 1 auto;width:100%;min-height:0;position:relative;overflow:hidden}
+.cell .cico img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:cover;display:block}
+.cell .cnm{font-size:8px;flex:0 0 auto;line-height:1.15;max-width:100%;width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,0,0,.78);color:#e8a33d;padding:1px 3px;border-radius:3px;text-align:center;position:relative;z-index:2}
+.cell .clv{position:absolute;top:2px;right:3px;font-size:7px;color:#4caf50;background:rgba(0,0,0,.82);border-radius:3px;padding:0 3px;line-height:1.4;z-index:3}
+.prof-area{flex:1;min-height:0;overflow-y:auto;padding:7px;font-size:10px}
+.prof-sec{margin-bottom:8px;border:1px solid #2a231c;border-radius:6px}
+.prof-sec h4{font-size:10px;color:#e8a33d;padding:6px 8px;background:#1a1510;display:flex;justify-content:space-between;cursor:pointer;border-bottom:1px solid #2a231c}
+.prof-sec.collapsed h4{border-bottom:none}
+.prof-sec.collapsed .prof-body{display:none}
+.prof-body{padding:4px 8px 6px}
+.prof-line{display:flex;justify-content:space-between;padding:3px 0;font-size:10px;color:#bfb3a0}
+.prof-line .v{color:#4caf50;font-weight:bold}
+.pref-btn{padding:7px;background:#2c2419;border:1px solid #3a2f25;border-radius:6px;color:#e8a33d;font-size:10px;font-weight:bold;text-align:center;margin:5px;cursor:pointer}
+.region-area{flex:1;min-height:0;overflow-y:auto;padding:7px;font-size:10px}
+.reg-item{display:flex;align-items:flex-start;gap:5px;padding:5px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin-bottom:4px;cursor:pointer}
+.reg-item.on{border-color:#e8a33d;background:#241d16}
+.reg-item.locked{opacity:.5;cursor:not-allowed}
+.reg-item .chk{flex:0 0 14px;height:14px;border:1px solid #3a2f25;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#e8a33d;margin-top:1px}
+.reg-item.on .chk{background:#8a5f18;border-color:#e8a33d;color:#fff}
+.reg-item .rn{font-size:10px;font-weight:bold;color:#e8a33d}
+.reg-item .rd{font-size:9px;color:#7a6f60;margin-top:1px;line-height:1.3}
+.reg-item .lock-hint{font-size:9px;color:#e05252;margin-top:2px}
+.mode-sel{display:flex;gap:4px;padding:5px 7px}
+.mode-btn{flex:1;padding:6px;font-size:10px;border-radius:6px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;text-align:center;cursor:pointer}
+.mode-btn.on{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.divider{height:1px;background:#2a231c;margin:6px 0}
+.empty-hint{color:#4a4038;font-size:10px;text-align:center;padding:14px 6px}
+.drag-handle{color:#7a6f60;padding:0 6px;cursor:grab;font-size:14px}
+.dragging{opacity:.4}
+.craft-slot{display:flex;gap:4px;align-items:center;padding:6px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin-bottom:4px;font-size:10px}
+.craft-slot .progress{flex:1;height:4px;background:#2a231c;border-radius:2px;overflow:hidden;margin-top:4px}
+.craft-slot .progress .fill{height:100%;background:#4caf50}
+.armor-class{font-size:8px;color:#4a90d9;font-weight:bold;margin-left:2px}
+.mod-opt{padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:11px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mod-opt.on{border-color:#a45ede;background:#241d30}
+.mod-opt .nm{color:#e8a33d;font-weight:bold;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mod-opt .bonus{color:#4caf50;font-weight:bold;font-size:11px;white-space:nowrap}
+/* ============================================================
+   ★ BOSS MODULE STYLES
+   ============================================================ */
+.boss-f .sprite canvas{width:100%;height:100%;display:block}
+.boss-telegraph{
+  position:absolute;transform:translate(-50%,-50%);border-radius:50%;
+  border:3px solid #ff3030;
+  background:radial-gradient(circle, rgba(255,48,48,0.35) 0%, rgba(255,48,48,0.08) 70%, transparent 100%);
+  pointer-events:none;z-index:6;
+  animation:telegraphPulse 0.35s ease-in-out infinite;
+  box-shadow:0 0 24px rgba(255,48,48,0.6), inset 0 0 24px rgba(255,48,48,0.4);
+}
+.boss-telegraph.aoe{border-color:#ff8800;background:radial-gradient(circle, rgba(255,136,0,0.42) 0%, rgba(255,136,0,0.1) 70%, transparent 100%);animation:telegraphPulseAoe 0.4s ease-in-out infinite;box-shadow:0 0 32px rgba(255,136,0,0.7), inset 0 0 32px rgba(255,136,0,0.5);}
+@keyframes telegraphPulse{0%,100%{transform:translate(-50%,-50%) scale(0.85);opacity:.6}50%{transform:translate(-50%,-50%) scale(1.08);opacity:1}}
+@keyframes telegraphPulseAoe{0%,100%{transform:translate(-50%,-50%) scale(0.9);opacity:.65}50%{transform:translate(-50%,-50%) scale(1.18);opacity:1}}
+.boss-warning{
+  position:absolute;left:50%;
+  bottom:calc(100% + 28px);
+  transform:translateX(-50%);
+  font-size:26px;line-height:1;font-weight:900;
+  color:#ff3030;text-shadow:0 0 8px #ff3030,0 0 14px #ff6060,0 0 2px #000;
+  pointer-events:none;z-index:1;
+  animation:bossWarningPulse .42s ease-in-out infinite;
+}
+@keyframes bossWarningPulse{0%,100%{transform:translateX(-50%) scale(.85);opacity:.7}50%{transform:translateX(-50%) scale(1.25);opacity:1}}
+.shield-bar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:min(50%,200px);bottom:calc(100% + 22px);z-index:3}
+.shield-bar-wrap .nm{font-size:8px;color:#7a7a7a;text-align:center;margin-bottom:2px;text-shadow:0 0 3px #000;letter-spacing:1px}
+.shield-bar-wrap .bar{height:3px;background:#1a1a1a;border-radius:2px;overflow:hidden}
+.shield-bar-wrap .bar .fill{height:100%;background:#666;transition:width .15s}
+.shield-shatter-fx{position:absolute;pointer-events:none;z-index:30;width:0;height:0;transform:translate(-50%,-50%)}
+.shield-shatter-fx .glow{position:absolute;left:-30px;top:-30px;width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,rgba(120,220,140,0.9) 0%,rgba(50,140,70,0.5) 40%,transparent 70%);animation:shieldGlow .45s ease-out forwards;pointer-events:none}
+@keyframes shieldGlow{0%{transform:scale(0.4);opacity:1}100%{transform:scale(1.6);opacity:0}}
+.shield-shatter-fx .frag{position:absolute;width:6px;height:6px;background:#0a5a20;border:1px solid #2aa850;border-radius:1px;pointer-events:none;left:-3px;top:-3px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="content">
+    <div id="zone1"></div>
+    <div id="lower">
+      <div id="zone2"></div>
+      <div id="zone3"></div>
+    </div>
+  </div>
+  <nav id="tabbar">
+    <div class="tab active" data-tab="explore"><div class="ico">🧭</div><div>探索</div></div>
+    <div class="tab" data-tab="combat"><div class="ico">⚔️</div><div>戰鬥</div></div>
+    <div class="tab" data-tab="base"><div class="ico">🏗️</div><div>基地</div></div>
+  </nav>
+</div>
+<div id="modal-layer"><div class="modal-bd"></div><div class="modal"></div></div>
+<script>
+"use strict";
+const VERSION='v17.5';
+let ASSET_VERSION = localStorage.getItem('wasteland_asset_version') || '';
+const ASSET_PROBE_URL = 'icons/buildings/control.png';
+const ASSET_CACHE_KEY = 'wasteland_asset_version';
+
+const EVENT_INTERVAL_MS = 10000;
+const REGION_KEYS = {'廢棄工廠':'factory','廢棄實驗室':'lab','郊區公路':'road','輻射沼澤':'swamp','廢土核心':'core'};
+const RARITY_ORDER=['破舊','一般','庫存','精品','傳奇','具名'];
+const UI_RARITY_LIST=['破舊','一般','庫存','精品','傳奇'];
+const RARITY_MULT={'破舊':0.8,'一般':1.0,'庫存':1.5,'精品':2.5,'傳奇':5.0,'具名':5.0};
+const RARITY_ICON={'破舊':'▪','一般':'▫','庫存':'◆','精品':'★','傳奇':'✦','具名':'✦'};
+const RARITY_BG={'破舊':'#4a2e1a','一般':'#3a3a3a','庫存':'#1e4a1e','精品':'#1e3a5a','傳奇':'#5a4410','具名':'#4a205a'};
+const MODE_ACCURACY={'點射':1.5,'短點射':1.2,'長點射':1.0,'掃射':0.8,'近戰':1.0,'投擲':1.0};
+const MAX_PROF_LEVEL=50;
+const MELEE_DURATION=2;
+const CHAR_HEIGHT_FACTOR = 0.58;
+const CHAR_HEIGHT_FACTOR_BATTLE = 0.667;
+const EXPLORE_HERO_X_RATIO = 0.25;
+const BATTLE_GROUND_TOP_RATIO = 1.0;
+const BATTLE_BOSS_HEIGHT_RATIO = 0.75;
+const BATTLE_HERO_SPRITE_H = 118;
+const BATTLE_HERO_FOOT_Y_RATIO = 0.95;
+const BOSS_MIN_GAP = 0.12;
+
+const TK_MAG={aks74u:30,aks74un:30,ak74:30,ak74n:30,ak74m:30,akm:30,akms:30,akMN:30,ak103:30,ak104:30,ak105:30,ak12:30,asval:20,'9a91':20,sr3m:30,vss:10,svd:10,sv98:10,rpk16:95,rpd:100,pkm:100,pkp:100,ash12:20,pp19:30,pm:8,pb:8,mp443:17,aps:20,mp133:6,mp153:7,mp155:6,saiga12:8,toz106:2,ks23:3};
+const TK_ARMOR={ssh68:20,ssh68m:22,kolpak:30,'6b47':40,'6b47m':45,altyn:50,kiver:40,maska:45,zsh12m:50,balaclava:5,shemagh:5,gp7:15,ballglasses:5,paca:45,'6b13':65,'6b13m':65,'6b23':70,'6b231':70,'6b232':70,'6b43':85,zhuk6a:85,zhuk3:75,defender2:75,cargopants:5,'6sh122':25,'6sh104':25,'6sh112':25,workboots:5,tactboots:15,lowaz:22,haix:25,belleville:20};
+
+function armorClass(armor){if(!armor||armor<=0)return '';const lv=Math.min(6,Math.max(1,Math.floor(armor/10)));return ['','I','II','III','IV','V','VI'][lv]||'';}
+
+const ARMOR={
+  ssh68:{name:'SSh-68 頭盔',slot:'head',armor:30},
+  ssh68m:{name:'SSh-68M 頭盔',slot:'head',armor:30},
+  kolpak:{name:'Kolpak-1S 頭盔',slot:'head',armor:20},
+  '6b47':{name:'6B47 頭盔',slot:'head',armor:30},
+  '6b47m':{name:'6B47M 頭盔',slot:'head',armor:30},
+  altyn:{name:'Altyn 頭盔',slot:'head',armor:100,subArmor:[{level:5,value:50},{level:5,value:50}]},
+  kiver:{name:'Kiver-M 頭盔',slot:'head',armor:60,subArmor:[{level:3,value:30},{level:3,value:30}]},
+  maska:{name:'Maska-1SCh 頭盔',slot:'head',armor:100,subArmor:[{level:4,value:40},{level:6,value:60}]},
+  zsh12m:{name:'ZSh-1-2M 頭盔',slot:'head',armor:70,subArmor:[{level:4,value:40},{level:3,value:30}]},
+  balaclava:{name:'巴拉克拉法面罩',slot:'face',armor:5},
+  shemagh:{name:'阿拉伯方巾',slot:'face',armor:5},
+  gp7:{name:'GP-7 防毒面具',slot:'face',armor:5},
+  ballglasses:{name:'彈道眼鏡',slot:'face',armor:10},
+  paca:{name:'PACA 軟甲',slot:'top',armor:30},
+  '6b13':{name:'6B13 防彈衣',slot:'top',armor:60},
+  '6b13m':{name:'6B13-M 防彈衣',slot:'top',armor:54,armored:true},
+  '6b23':{name:'6B23 防彈衣',slot:'top',armor:30},
+  '6b231':{name:'6B23-1 防彈衣',slot:'top',armor:45},
+  '6b232':{name:'6B23-2 防彈衣',slot:'top',armor:60,armored:true},
+  '6b43':{name:'6B43 防彈衣',slot:'top',armor:108,armored:true},
+  zhuk6a:{name:'Zhuk-6a 防彈衣',slot:'top',armor:90},
+  zhuk3:{name:'Zhuk-3 防彈衣',slot:'top',armor:45},
+  defender2:{name:'Defender 2 防彈衣',slot:'top',armor:90,armored:true},
+  cargopants:{name:'工裝褲',slot:'pants',armor:10},
+  workboots:{name:'工作靴',slot:'shoes',armor:5},
+  tactboots:{name:'戰術靴',slot:'shoes',armor:5},
+  lowaz:{name:'Lowa Zephyr',slot:'shoes',armor:5},
+  haix:{name:'Haix 軍靴',slot:'shoes',armor:5},
+  belleville:{name:'Belleville 軍靴',slot:'shoes',armor:5},
+  bplarge:{name:'探險背包',slot:'backpack',armor:0,fixed:true},
+};
+
+const WEAPONS={
+  aks74u:{name:'AKS-74U',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.aks74u,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
+  aks74un:{name:'AKS-74UN',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.aks74un,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
+  ak74:{name:'AK-74',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
+  ak74n:{name:'AK-74N',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74n,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
+  ak74m:{name:'AK-74M',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74m,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
+  akm:{name:'AKM',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akm,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
+  akms:{name:'AKMS',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akms,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.6},
+  akMN:{name:'AKMN',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akMN,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
+  ak103:{name:'AK-103',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak103,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
+  ak104:{name:'AK-104',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak104,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.6},
+  ak105:{name:'AK-105',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak105,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
+  ak12:{name:'AK-12',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak12,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.65},
+  asval:{name:'AS VAL',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.asval,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.5},
+  '9a91':{name:'9A-91',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG['9a91'],modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.5},
+  sr3m:{name:'SR-3M',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.sr3m,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.5},
+  vss:{name:'VSS Vintorez',slot:'primary',type:'狙擊槍',cal:'9x39',mag:TK_MAG.vss,modes:['點射'],rpm:700,range:0.55},
+  svd:{name:'SVD',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.svd,modes:['點射'],rpm:180,range:0.9},
+  sv98:{name:'SV-98',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.sv98,modes:['點射'],rpm:60,range:0.95},
+  rpk16:{name:'RPK-16',slot:'primary',type:'機槍',cal:'5.45',mag:TK_MAG.rpk16,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.65},
+  rpd:{name:'RPD',slot:'primary',type:'機槍',cal:'7.62',mag:TK_MAG.rpd,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
+  pkm:{name:'PKM',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkm,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
+  pkp:{name:'PKP Pecheneg',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkp,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
+  ash12:{name:'ASH-12',slot:'primary',type:'突擊步槍',cal:'12.7',mag:TK_MAG.ash12,modes:['點射','短點射'],rpm:600,range:0.6},
+  pp19:{name:'PP-19-01 Vityaz',slot:'primary',type:'衝鋒槍',cal:'9x19',mag:TK_MAG.pp19,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.45},
+  pm:{name:'PM 手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pm,modes:['點射'],rpm:400,range:0.35},
+  pb:{name:'PB 微聲手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pb,modes:['點射'],rpm:400,range:0.35},
+  mp443:{name:'MP-443 Grach',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.mp443,modes:['點射'],rpm:400,range:0.4},
+  aps:{name:'APS 斯捷奇金',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.aps,modes:['點射','短點射','長點射','掃射'],rpm:800,range:0.35},
+  mp133:{name:'MP-133 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp133,modes:['點射'],rpm:60,range:0.4},
+  mp153:{name:'MP-153 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp153,modes:['點射'],rpm:70,range:0.42},
+  mp155:{name:'MP-155 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp155,modes:['點射'],rpm:70,range:0.4},
+  saiga12:{name:'Saiga-12',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.saiga12,modes:['點射'],rpm:300,range:0.45},
+  toz106:{name:'TOZ-106',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.toz106,modes:['點射'],rpm:40,range:0.35},
+  ks23:{name:'KS-23',slot:'secondary',type:'霰彈槍',cal:'23x75',mag:TK_MAG.ks23,modes:['點射'],rpm:40,range:0.45},
+  '6kh2':{name:'6Kh2 刺刀',slot:'melee',type:'刺刀',dmg:25,modes:['近戰'],rpm:120,range:0.15},
+  '6kh5':{name:'6Kh5 刺刀',slot:'melee',type:'刺刀',dmg:26,modes:['近戰'],rpm:120,range:0.15},
+  kukri:{name:'Kukri 彎刀',slot:'melee',type:'刀',dmg:32,modes:['近戰'],rpm:100,range:0.18},
+  f1:{name:'F-1 手榴彈',slot:'throwable',type:'手榴彈',dmg:80,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  rgd5:{name:'RGD-5 手榴彈',slot:'throwable',type:'手榴彈',dmg:60,modes:['投擲'],rpm:60,range:0.5,explosive:true},
+  rgo:{name:'RGO 手榴彈',slot:'throwable',type:'手榴彈',dmg:100,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  rgn:{name:'RGN 手榴彈',slot:'throwable',type:'手榴彈',dmg:90,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  vog17:{name:'VOG-17 手榴彈',slot:'throwable',type:'手榴彈',dmg:75,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+  vog25:{name:'VOG-25 手榴彈',slot:'throwable',type:'手榴彈',dmg:78,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+};
+
+const AMMO={
+  '9x18_pst':{name:'9×18mm PSt',cal:'9x18',dmg:50,pen:2,rarity:'破舊'},
+  '9x18_ps':{name:'9×18mm PS',cal:'9x18',dmg:55,pen:2,rarity:'一般'},
+  '9x18_pmm':{name:'9×18mm PMM',cal:'9x18',dmg:58,pen:2,rarity:'庫存'},
+  '9x18_psv':{name:'9×18mm PSV',cal:'9x18',dmg:69,pen:2,rarity:'精品'},
+  '9x18_sp7':{name:'9×18mm SP7',cal:'9x18',dmg:77,pen:1,rarity:'傳奇'},
+  '9x19_pbp':{name:'9×19mm PBP',cal:'9x19',dmg:44,pen:4,rarity:'破舊'},
+  '9x19_ap63':{name:'9×19mm AP 6.3',cal:'9x19',dmg:52,pen:3,rarity:'一般'},
+  '9x19_pst':{name:'9×19mm PSt',cal:'9x19',dmg:54,pen:2,rarity:'庫存'},
+  '9x19_pso':{name:'9×19mm PSO',cal:'9x19',dmg:59,pen:2,rarity:'精品'},
+  '9x19_cci':{name:'9×19mm Luger CCI',cal:'9x19',dmg:70,pen:2,rarity:'傳奇'},
+  '5.45_hp':{name:'5.45×39mm HP',cal:'5.45',dmg:73,pen:2,rarity:'破舊'},
+  '5.45_ps':{name:'5.45×39mm PS',cal:'5.45',dmg:56,pen:3,rarity:'一般'},
+  '5.45_bt':{name:'5.45×39mm BT',cal:'5.45',dmg:44,pen:4,rarity:'庫存'},
+  '5.45_bp':{name:'5.45×39mm BP',cal:'5.45',dmg:48,pen:5,rarity:'精品'},
+  '5.45_7n39':{name:'5.45×39mm 7N39',cal:'5.45',dmg:37,pen:6,rarity:'傳奇'},
+  '7.62_hp':{name:'7.62×39mm HP',cal:'7.62',dmg:80,pen:2,rarity:'破舊'},
+  '7.62_fmj':{name:'7.62×39mm FMJ',cal:'7.62',dmg:63,pen:3,rarity:'一般'},
+  '7.62_ps':{name:'7.62×39mm PS',cal:'7.62',dmg:61,pen:4,rarity:'庫存'},
+  '7.62_bp':{name:'7.62×39mm BP',cal:'7.62',dmg:58,pen:5,rarity:'精品'},
+  '7.62_ma':{name:'7.62×39mm MAI AP',cal:'7.62',dmg:53,pen:6,rarity:'傳奇'},
+  '7.62x54_hp':{name:'7.62×54mmR HP BT',cal:'7.62x54',dmg:102,pen:3,rarity:'破舊'},
+  '7.62x54_fmj':{name:'7.62×54mmR FMJ',cal:'7.62x54',dmg:84,pen:4,rarity:'一般'},
+  '7.62x54_ps':{name:'7.62×54mmR PS',cal:'7.62x54',dmg:84,pen:5,rarity:'庫存'},
+  '7.62x54_bt':{name:'7.62×54mmR BT',cal:'7.62x54',dmg:78,pen:6,rarity:'精品'},
+  '7.62x54_bs':{name:'7.62×54mmR BS',cal:'7.62x54',dmg:72,pen:7,rarity:'傳奇'},
+  '9x39_fmj':{name:'9×39mm FMJ',cal:'9x39',dmg:75,pen:2,rarity:'破舊'},
+  '9x39_sp5':{name:'9×39mm SP-5',cal:'9x39',dmg:71,pen:3,rarity:'一般'},
+  '9x39_pab9':{name:'9×39mm PAB-9',cal:'9x39',dmg:62,pen:4,rarity:'庫存'},
+  '9x39_spp':{name:'9×39mm SPP',cal:'9x39',dmg:68,pen:4,rarity:'精品'},
+  '9x39_sp6':{name:'9×39mm SP-6',cal:'9x39',dmg:60,pen:5,rarity:'傳奇'},
+  '12ga_buck':{name:'12/70 5.25mm 鹿彈',cal:'12ga',dmg:37,pen:1,rarity:'破舊',pellets:8},
+  '12ga_7mm':{name:'12/70 7mm 鹿彈',cal:'12ga',dmg:39,pen:2,rarity:'一般',pellets:8},
+  '12ga_express':{name:'12/70 6.5mm Express',cal:'12ga',dmg:35,pen:2,rarity:'庫存',pellets:9},
+  '12ga_magnum':{name:'12/70 8.5mm Magnum',cal:'12ga',dmg:50,pen:2,rarity:'傳奇',pellets:8},
+  '12.7_ps12':{name:'12.7×55mm PS12',cal:'12.7',dmg:115,pen:3,rarity:'庫存',pellets:1},
+  '12.7_ps12b':{name:'12.7×55mm PS12B',cal:'12.7',dmg:102,pen:5,rarity:'傳奇',pellets:1},
+  '23x75_shrapnel25':{name:'23×75mmR Shrapnel-25',cal:'23x75',dmg:78,pen:1,rarity:'庫存',pellets:8},
+  '23x75_shrapnel10':{name:'23×75mmR Shrapnel-10',cal:'23x75',dmg:87,pen:1,rarity:'精品',pellets:8},
+  '23x75_barrikada':{name:'23×75mmR Barrikada',cal:'23x75',dmg:192,pen:4,rarity:'傳奇',pellets:1},
+};
+
+const CONSUMABLES={bandage:{name:'繃帶',heal:15},water:{name:'瓶裝水',heal:5},ai2:{name:'AI-2 急救包',heal:30},painkiller:{name:'止痛藥',heal:10},tushonka:{name:'燉肉罐頭',heal:15},splint:{name:'夾板',heal:10},salewa:{name:'Salewa 急救包',heal:60},ifak:{name:'IFAK 急救包',heal:50},surv12:{name:'Surv12 野戰包',heal:70}};
+const MATERIALS={wood:{name:'木材'},metal:{name:'金屬廢料'},screws:{name:'螺絲'},cloth:{name:'布料'},gears:{name:'齒輪'},electronics:{name:'電子零件'}};
+
+const MATERIAL_EMOJI = {wood:'🪵', metal:'🔩', screws:'🔧', cloth:'🧵', gears:'⚙️', electronics:'💡'};
+const PANTS_SHOES_EMOJI = {
+  cargopants:'👖', '6sh122':'👖', '6sh104':'👖', '6sh112':'👖',
+  workboots:'🥾', tactboots:'🥾', lowaz:'🥾', haix:'🥾', belleville:'🥾',
+};
+const AMMO_ICON_BY_CAL = {
+  '9x18':'918.png', '9x19':'919.png', '5.45':'545.png',
+  '7.62':'76239.png', '7.62x54':'76254.png', '9x39':'939.png',
+  '12ga':'12ga.png', '12.7':'12755.png',
+  '23x75':'2375.png'
+};
+
+const WEAPON_MOD_RULES={
+  aks74u:{mags:[45,60],scopes:[]},aks74un:{mags:[45,60],scopes:['1P87','EKP-8-02','PK-06']},
+  ak74:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},
+  ak74n:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},ak74m:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},
+  akm:{mags:[45,75],scopes:[]},akms:{mags:[45,75],scopes:[]},akMN:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},
+  ak103:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},ak104:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},
+  ak105:{mags:[45,60],scopes:['1P87','PSO-1']},ak12:{mags:[45,60,95],scopes:['1P87','PSO-1']},
+  asval:{mags:[30],scopes:['PSO-1','1P87']},'9a91':{mags:[],scopes:['PSO-1']},sr3m:{mags:[],scopes:['1P87']},
+  vss:{mags:[20,30],scopes:['PSO-1']},svd:{mags:[15,20],scopes:['PSO-1']},sv98:{mags:[],scopes:['PSO-1','1P87']},
+  rpk16:{mags:[95],scopes:['1P87','PSO-1']},rpd:{mags:[],scopes:['PSO-1']},
+  pkm:{mags:[200],scopes:[]},
+  pkp:{mags:[200],scopes:['1P87','PSO-1']},ash12:{mags:[],scopes:['1P87']},pp19:{mags:[],scopes:['1P87','PK-06']},
+  pm:{mags:[10],scopes:[]},pb:{mags:[10],scopes:[]},mp443:{mags:[20],scopes:[]},aps:{mags:[30],scopes:[]},
+};
+const SCOPE_BONUS={'1P87':5,'PSO-1':8,'EKP-8-02':4,'PK-06':6};
+const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-02 紅點','PK-06':'PK-06 紅點'};
+
+const ALL_ITEMS={};Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS);
+function itemDef(id){return ALL_ITEMS[id]||null;}
+function resolveIconId(id){if(!id) return '';if(id.startsWith('named_')){const parts=id.split('_');if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];}return id;}
+
+function assetSuffix(){ return ASSET_VERSION ? ('?v=' + ASSET_VERSION) : ''; }
+function rarityBg(rarity){return RARITY_BG[rarity]||'#151210';}
+function itemIcon(id,size){
+  const s=size||24;
+  if(!id) return '';
+  const v=assetSuffix();
+  if(MATERIAL_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${MATERIAL_EMOJI[id]}</span>`;
+  if(PANTS_SHOES_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${PANTS_SHOES_EMOJI[id]}</span>`;
+  const ammoDef=AMMO[id];
+  if(ammoDef && ammoDef.cal){
+    const f=AMMO_ICON_BY_CAL[ammoDef.cal];
+    if(f) return `<img src="icons/items/${f}${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+  }
+  const rid=resolveIconId(id);
+  return `<img src="icons/items/${rid}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+}
+function bossIcon(id){return `<img src="icons/bosses/${id}.png${assetSuffix()}" alt="">`;}
+function buildingIcon(id){return `<img src="icons/buildings/${id}.png${assetSuffix()}" alt="">`;}
+
+async function probeAssetVersion(){
+  try{
+    const url = ASSET_PROBE_URL + '?probe=' + Date.now();
+    const res = await fetch(url, { method:'HEAD', cache:'no-store' });
+    if(!res.ok) return false;
+    const lm = res.headers.get('Last-Modified') || '';
+    const etag = res.headers.get('ETag') || '';
+    const v = lm || etag;
+    if(!v) return false;
+    const encoded = encodeURIComponent(v);
+    const prev = localStorage.getItem(ASSET_CACHE_KEY) || '';
+    if(prev === encoded) return false;
+    ASSET_VERSION = encoded;
+    localStorage.setItem(ASSET_CACHE_KEY, encoded);
+    if(typeof heroImgCache !== 'undefined') heroImgCache.clear();
+    console.log('[assets] 資源版本更新:', prev || '(無)', '→', encoded);
+    return true;
+  }catch(e){
+    console.warn('[assets] 探測失敗:', e);
+    return false;
+  }
+}
+
+function itemCat(id){if(ARMOR[id])return 'armor';if(WEAPONS[id])return 'weapon';if(AMMO[id])return 'ammo';if(CONSUMABLES[id])return 'consume';if(MATERIALS[id])return 'material';const d=ALL_ITEMS[id];if(d&&d.named)return 'weapon';return 'misc';}
+function hasVariableRarity(id){const d=ALL_ITEMS[id];if(d&&d.named)return false;const c=itemCat(id);return c==='armor'||c==='weapon'||c==='consume'||c==='material';}
+function rollRarity(){const r=Math.random();if(r<0.35)return '破舊';if(r<0.65)return '一般';if(r<0.85)return '庫存';if(r<0.97)return '精品';return '傳奇';}
+function isFixedItem(id){const d=ARMOR[id];return d&&d.fixed===true;}
+function getDefaultAmmo(cal){for(const k in AMMO){if(AMMO[k].cal===cal&&AMMO[k].rarity==='一般')return k;}for(const k in AMMO){if(AMMO[k].cal===cal)return k;}return null;}
+function getMeleeHits(rpm){return Math.max(1,Math.round((rpm||60)*MELEE_DURATION/60));}
+
+function namedWeaponName(baseId,mag,scope){
+  const base=WEAPONS[baseId]||ALL_ITEMS[baseId];
+  if(!base)return '未知';
+  const parts=[base.name];
+  if(mag && mag!==base.mag) parts.push(mag);
+  if(scope) parts.push(scope.replace(/-/g,''));
+  return parts.join('_');
+}
+function getNamedId(baseId,mag,scope){
+  const base=WEAPONS[baseId];
+  const normMag = (mag && base && mag !== base.mag) ? mag : 'x';
+  const normScope = scope || 'x';
+  return `named_${baseId}_${normMag}_${normScope}`;
+}
+function getOrCreateNamedItem(baseId,mag,scope){
+  const id=getNamedId(baseId,mag,scope);
+  if(!ALL_ITEMS[id]){
+    const base=WEAPONS[baseId];
+    const name=namedWeaponName(baseId,mag,scope);
+    const effMag=(mag&&mag>base.mag)?mag:base.mag;
+    ALL_ITEMS[id]={name:name,slot:base.slot,type:base.type,cal:base.cal,mag:effMag,modes:base.modes,rpm:base.rpm,range:base.range,named:true,scope:scope||null,scopeBonus:scope?(SCOPE_BONUS[scope]||0):0,baseId:baseId};
+  }
+  return id;
+}
+function isProfMaxed(weaponType){return Math.floor(state.proficiency[weaponType]||0)>=MAX_PROF_LEVEL;}
+function calcModCost(baseId,mag,scope){
+  const cost={};
+  const baseMag=WEAPONS[baseId].mag;
+  if(mag && mag>baseMag){
+    cost.metal=(cost.metal||0)+50+Math.ceil((mag-baseMag)/2)*10;
+    cost.screws=(cost.screws||0)+30;
+    cost.gears=(cost.gears||0)+15;
+  }
+  if(scope){
+    cost.electronics=(cost.electronics||0)+80;
+    cost.metal=(cost.metal||0)+30;
+    cost.gears=(cost.gears||0)+25;
+    cost.screws=(cost.screws||0)+20;
+  }
+  return cost;
+}
+function calcModTime(baseId,mag,scope){
+  let t=0;
+  const bm=WEAPONS[baseId].mag;
+  if(mag && mag>bm) t+=60+(mag-bm)*2;
+  if(scope) t+=120;
+  return t;
+}
+function getMagOptionsForWeapon(weaponId){
+  const def = WEAPONS[weaponId];
+  if(!def) return [];
+  const cal = def.cal;
+  const type = def.type;
+  const defaultMag = def.mag;
+  let candidates = [];
+  if(cal === '5.45' && (type === '突擊步槍' || type === '機槍')){
+    candidates = [30, 60, 95];
+  } else if(cal === '7.62' && type === '突擊步槍'){
+    candidates = [30, 45, 75];
+  } else if(cal === '9x39'){
+    candidates = [20, 30];
+  } else if(cal === '7.62x54'){
+    if(weaponId === 'svd') candidates = [15, 20];
+    else if(weaponId === 'sv98') candidates = [];
+    else if(weaponId === 'pkm' || weaponId === 'pkp') candidates = [200];
+    else candidates = [];
+  } else {
+    const rules = WEAPON_MOD_RULES[weaponId];
+    if(rules && rules.mags) candidates = rules.mags.slice();
+  }
+  return candidates.filter(m => m >= defaultMag);
+}
+
+const ENEMIES={mutant_squirrel:{name:'變異松鼠',hp:10},mutant_rat:{name:'變異巨鼠',hp:20},ghoul:{name:'食屍鬼',hp:35},raider:{name:'掠奪者',hp:45},raider_vet:{name:'掠奪者老兵',hp:80},mutant_wolf:{name:'變異狼',hp:55},mutant_bear:{name:'變異熊',hp:150}};
+
+const REGIONS={
+  '廢棄工廠':{name:'廢棄工廠',desc:'生鏽的機械與堆積的貨櫃',enemies:['mutant_squirrel','mutant_rat','raider','ghoul'],loot:['wood','wood','wood','metal','metal','screws','cloth','9x18_pst','9x18_ps','9x19_pbp','9x19_pst','12ga_buck','12ga_7mm','5.45_hp','23x75_shrapnel25','pp19','aks74u','aks74un','mp133','toz106','mp153','pm','pb','6kh2','kukri','rgd5','ssh68','ssh68m','balaclava','shemagh','ballglasses','paca','cargopants','workboots','tactboots','ai2','bandage','water','painkiller'],combat:{attack:0.55,stealth:0.22},seal:'seal_factory',sealRate:0.03,enemyHpMult:1.0},
+  '廢棄實驗室':{name:'廢棄實驗室',desc:'冷白的燈管與腐蝕的培養槽',enemies:['ghoul','raider','raider_vet','mutant_rat'],loot:['electronics','electronics','metal','screws','cloth','gears','9x18_pmm','9x18_psv','9x19_ap63','9x19_pbp','9x39_fmj','9x39_sp5','9x39_pab9','9x39_spp','9a91','sr3m','vss','asval','pb','mp155','kukri','6kh5','f1','rgd5','vog17','kolpak','6b47','6b47m','balaclava','gp7','6b23','6b231','tactboots','salewa','ifak','painkiller','splint'],combat:{attack:0.6,stealth:0.28},seal:'seal_lab',sealRate:0.02,enemyHpMult:1.5},
+  '郊區公路':{name:'郊區公路',desc:'翻覆的車隊與荒廢的加油站',enemies:['raider','raider_vet','mutant_wolf','mutant_rat'],loot:['wood','wood','metal','gears','cloth','screws','5.45_ps','5.45_bt','7.62_hp','7.62_fmj','7.62_ps','9x19_pst','9x19_ap63','12ga_buck','12ga_express','23x75_shrapnel10','akm','akms','akMN','ak74','ak74n','ak74m','ak105','ak12','pp19','mp443','aps','mp133','mp153','rgd5','f1','rgo','kiver','kolpak','shemagh','6b13','6b13m','6b23','cargopants','tactboots','painkiller','tushonka','water','ai2','splint'],combat:{attack:0.62,stealth:0.3},seal:'seal_road',sealRate:0.02,enemyHpMult:2.5},
+  '輻射沼澤':{name:'輻射沼澤',desc:'發綠的水窪與扭曲的枯樹',enemies:['mutant_bear','mutant_wolf','ghoul','raider_vet'],loot:['wood','electronics','gears','cloth','metal','7.62x54_hp','7.62x54_fmj','7.62x54_ps','7.62x54_bt','7.62_bp','9x39_spp','9x39_sp6','12ga_express','12ga_magnum','23x75_shrapnel10','23x75_shrapnel25','sv98','svd','ak103','ak104','vss','saiga12','asval','mp155','ks23','f1','rgo','kiver','6b23','6b231','salewa','ifak','surv12','tushonka','splint'],combat:{attack:0.7,stealth:0.35},seal:'seal_swamp',sealRate:0.015,enemyHpMult:4.0,needUnlock:true,unlockHint:'擊敗 實驗室女王 · 白蝕 解鎖'},
+  '廢土核心':{name:'廢土核心',desc:'鋼鐵巨構與永不熄滅的火光',enemies:['mutant_bear','raider_vet','raider_vet','mutant_wolf'],loot:['electronics','gears','metal','cloth','7.62x54_bs','7.62_ma','5.45_bp','5.45_7n39','7.62_bp','12ga_magnum','12.7_ps12','9x18_sp7','9x19_cci','9x19_pso','9x39_sp6','9x39_spp','23x75_barrikada','rpd','rpk16','svd','sv98','vss','asval','saiga12','ks23','mp155','vog25','f1','rgo','maska','zhuk3','6b232','haix','salewa','ifak','surv12'],combat:{attack:0.75,stealth:0.4},seal:'seal_core',sealRate:0.008,enemyHpMult:6.0,needUnlock:true,unlockHint:'擊敗 沼澤九頭 · 腐母 解鎖'},
+};
+
+const ROUTES={
+  '廢棄工廠':[{name:'東線',nodes:['東門','休息室一樓','休息室二樓','回廊','檢修通道','儲油罐','車床','經理室']},{name:'西線',nodes:['西側卸貨區','倉庫','裝卸平台','車間','鍋爐房','經理室']},{name:'地下線',nodes:['地下入口','排水管道','維修隧道','動力室','經理室']}],
+  '廢棄實驗室':[{name:'主樓',nodes:['正門大廳','接待處','電梯井','B1 實驗區','樣本室','主控室']},{name:'側翼',nodes:['側門','更衣室','消毒通道','培養槽區','觀察室','主控室']},{name:'地下',nodes:['貨梯','儲藏間','冷凍庫','動物房','主控室']}],
+  '郊區公路':[{name:'主幹道',nodes:['收費站','翻覆車隊','加油站','休息區','隧道口','集結點']},{name:'繞行路',nodes:['小路','廢棄農舍','涵洞','山脊','集結點']},{name:'鐵軌',nodes:['鐵道口','信號塔','貨運列車','集結點']}],
+  '輻射沼澤':[{name:'淺灘',nodes:['灘頭','枯樹林','泥沼','廢船','祭壇','沼心']},{name:'深沼',nodes:['腐水區','孢子林','沉沒教堂','沼心']}],
+  '廢土核心':[{name:'外環',nodes:['外圍防線','哨塔','斷裂高架','中央熔爐','核心']},{name:'內環',nodes:['通風井','管道區','反應爐','核心']}],
+};
+
 /* ============================================================
    ★ BOSS MODULE — 資料區
    ============================================================ */
@@ -563,6 +1173,7 @@ const BUILDINGS={
   medbay:{name:'醫療站',desc:'加強消耗品恢復',cost:{wood:15,cloth:10,metal:5}},
   radio:{name:'無線電',desc:'定期資源補給',cost:{electronics:5,metal:10,gears:3}},
   armory:{name:'軍械庫',desc:'產出主副彈藥',cost:{metal:25,gears:8,screws:10}},
+  forge:{name:'護甲車間',desc:'護甲值加成',cost:{metal:250,gears:80,screws:100}},
 };
 
 const GAME_LAYERS = [
@@ -1370,7 +1981,7 @@ function buildingBonusText(bid,lv){
     return `產出主副彈藥（當前穿甲 ${tp}）`;
   }default:return '';}
 }
-function calcMaxHp(){const rl=getBuildingLv('rest');const rb=1+rl*0.02;return Math.round(100*Math.pow(1.01,state.player.level-1)*rb);}
+function calcMaxHp(){const rl=getBuildingLv('rest');const base=1+0.03*Math.pow(1.02,rl);return Math.round(100*Math.pow(base,state.player.level-1));}
 function equipArmorValue(id,rarity){const def=ARMOR[id];if(!def)return 0;if(def.slot==='backpack')return 0;let base=def.armor||0;if(base<5)base=5;return Math.round(base*(RARITY_MULT[rarity]||1));}
 const ROMAN_NUM=['','I','II','III','IV','V','VI'];
 function armorBreakdownText(id,rarity){
@@ -1394,6 +2005,8 @@ function refreshPlayerStats(){
   state.player.maxHp=calcMaxHp();
   let armor=0;
   for(const slot of ['head','face','top','pants','shoes']){const id=state.player.equipped[slot];if(id){const rarity=state.player.equippedRarity[slot]||'一般';armor+=equipArmorValue(id,rarity);}}
+  const forgeLv=getBuildingLv('forge');
+  if(forgeLv>0) armor = Math.round(armor * (1 + forgeLv * 0.03));
   state.player.maxArmor=armor;
   if(armor !== prevMaxArmor){ state.player.armor = armor; }
   if(state.player.hp>state.player.maxHp)state.player.hp=state.player.maxHp;
@@ -2513,7 +3126,7 @@ function startBossBattle(bid){
   const w=chooseCombatWeapon('combat');
   const startSlot=w?w.slot:'melee';
   const _hasShield=(bid==='road_tyrant');
-  const _shieldHp=_hasShield?2500:0;
+  const _shieldHp=_hasShield?12500:0;
   battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossDmgMult:1,bossPen:b.pen||0,bossCritRate:b.critRate||0,bossCritMult:b.critMult||1,
     phaseIdx:0, healedPhases:[], skillCds:null, bossCast:null, bossDash:null, lastMeleeAt:0,
     shieldMaxHp:_shieldHp, shieldHp:_shieldHp, shieldBroken:false, bossRetreat:null,
@@ -3383,12 +3996,12 @@ function playerShoot(){
 function applyBossDamage(dmg,isCrit,pen){
   battle.engaged = true;
   if(battle.shieldMaxHp>0 && !battle.shieldBroken && battle.shieldHp>0){
-    const sh={hp:0,armor:battle.shieldHp};
-    const r=applyDamage(sh,dmg,pen||0);
-    battle.shieldHp=sh.armor;
-    battle.damageDealt += (r.armorLost + r.hpLost);
-    const shown=r.armorLost>0?r.armorLost:r.hpLost;
-    spawnHitFx(battle.bx,battle.by,`-${Math.round(shown)}${isCrit?'!':''}`,isCrit?'crit':'armor');
+    const _pen=pen||0;
+    const _shieldScale=Math.min(1,Math.exp((_pen-7)*0.4));
+    const _shieldDmg=Math.max(1,Math.round(dmg*_shieldScale));
+    battle.shieldHp=Math.max(0,battle.shieldHp-_shieldDmg);
+    battle.damageDealt += _shieldDmg;
+    spawnHitFx(battle.bx,battle.by,`-${_shieldDmg}${isCrit?'!':''}`,isCrit?'crit':'armor');
     const shEl=document.getElementById('boss-shield');
     if(shEl)shEl.style.width=Math.max(0,battle.shieldHp/battle.shieldMaxHp*100)+'%';
     if(battle.shieldHp<=0)breakBossShield();
@@ -3668,7 +4281,7 @@ function onBuildCell(i){
   const slot=state.base.slots[i];
   if(slot){
     const b=BUILDINGS[slot.id];
-    const upCost={wood:15*slot.lv,metal:15*slot.lv,screws:5*slot.lv};
+    const upCost=(slot.id==='forge')?{metal:150*slot.lv,screws:50*slot.lv}:{wood:15*slot.lv,metal:15*slot.lv,screws:5*slot.lv};
     const curBonus=buildingBonusText(slot.id,slot.lv);
     const nextBonus=buildingBonusText(slot.id,slot.lv+1);
     let body=`<div class="detail-title">${buildingIcon(slot.id)} ${b.name} Lv.${slot.lv}</div>
