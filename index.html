@@ -634,7 +634,8 @@ const BOSS_WEAKPOINTS = {
   factory_king: ['leg_r', 'leg_l'],
   lab_queen:    ['abdomen'],
   road_tyrant:  [],
-  swamp_hydra:  []
+  swamp_hydra:  [],
+  core_omega:  ['arm_lu_tip']
 };
 
 const BOSS_PHASES = {
@@ -656,6 +657,12 @@ const BOSS_PHASES = {
     { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
     { hpPct:0.66, dmgMult:1.25, unlockSkills:['breath'] },
     { hpPct:0.33, dmgMult:1.6,  unlockSkills:[] }
+  ],
+  core_omega: [
+    { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
+    { hpPct:0.75, dmgMult:1.15, unlockSkills:['laser_spray'] },
+    { hpPct:0.50, dmgMult:1.35, unlockSkills:['laser_charge'] },
+    { hpPct:0.25, dmgMult:1.7,  unlockSkills:[] }
   ]
 };
 
@@ -776,6 +783,31 @@ const BOSS_LAYERS = {
       { id:'mouth_copy_2', z:380, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.339, y:0.302, w:0.2, h:0.2 },
       { id:'mouth_copy', z:390, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.343, y:0.317, w:0.2, h:0.2 },
       { id:'mouth', z:400, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.352, y:0.325, w:0.2, h:0.2 }
+    ]
+  },
+  core_omega: {
+    canvas: { w:500, h:500 },
+    foot:   { x:0.5, y:0.92 },
+    autoFit: true,
+    forceFit: true,
+    layers: [
+      { id:'ring_t', z:5, color:'#3a4a5a', pivot:{x:0.5, y:0.5}, x:-0.511, y:-0.167, w:0.6, h:0.04, anchor:{target:'arm_ru_mid', rot:true} },
+      { id:'ring_b', z:5, color:'#3a4a5a', pivot:{x:0.5, y:0.5}, x:-0.404, y:0.015, w:0.6, h:0.04, anchor:{target:'arm_ld_mid', rot:true} },
+      { id:'ring_l', z:5, color:'#3a4a5a', pivot:{x:0.5, y:0.5}, x:-0.063, y:-0.383, w:0.04, h:0.6, anchor:{target:'arm_lu_tip', rot:true} },
+      { id:'ring_r', z:5, color:'#3a4a5a', pivot:{x:0.5, y:0.5}, x:0.209, y:-0.242, w:0.04, h:0.6, anchor:{target:'arm_rd_mid', rot:true} },
+      { id:'arm_lu_base', z:10, color:'#4a5a6a', pivot:{x:0.5, y:1}, x:0.28, y:0.3, w:0.06, h:0.14 },
+      { id:'arm_lu_mid', z:11, color:'#5a6a7a', pivot:{x:0.5, y:1}, x:0.675, y:0.044, w:0.06, h:0.14, anchor:{target:'arm_lu_base', rot:true} },
+      { id:'arm_lu_tip', z:12, color:'#7a8a9a', pivot:{x:0.5, y:1}, x:0.79, y:0.021, w:0.1, h:0.08, anchor:{target:'arm_lu_mid', rot:true} },
+      { id:'arm_ru_base', z:13, color:'#4a5a6a', pivot:{x:0.5, y:1}, x:0.66, y:0.3, w:0.06, h:0.14 },
+      { id:'arm_ru_mid', z:14, color:'#5a6a7a', pivot:{x:0.5, y:1}, x:0.104, y:-0.291, w:0.06, h:0.14, anchor:{target:'arm_ru_base', rot:true} },
+      { id:'arm_ld_base', z:16, color:'#4a5a6a', pivot:{x:0.5, y:0}, x:0.28, y:0.7, w:0.06, h:0.14 },
+      { id:'arm_ld_mid', z:17, color:'#5a6a7a', pivot:{x:0.5, y:0}, x:0.358, y:0.175, w:0.06, h:0.14, anchor:{target:'arm_ld_base', rot:true} },
+      { id:'arm_rd_base', z:19, color:'#4a5a6a', pivot:{x:0.5, y:0}, x:0.66, y:0.7, w:0.06, h:0.14 },
+      { id:'arm_rd_mid', z:20, color:'#5a6a7a', pivot:{x:0.5, y:0}, x:0.08, y:-0.418, w:0.06, h:0.14, anchor:{target:'arm_rd_base', rot:true} },
+      { id:'core_ring_outer', z:30, color:'#5a7a9a', pivot:{x:0.5, y:0.5}, x:0.3, y:0.3, w:0.4, h:0.4 },
+      { id:'core_ring_mid', z:31, color:'#3a5a7a', pivot:{x:0.5, y:0.5}, x:0.35, y:0.35, w:0.3, h:0.3 },
+      { id:'core', z:32, color:'#2a3a4a', pivot:{x:0.5, y:0.5}, x:0.4, y:0.4, w:0.2, h:0.2 },
+      { id:'core_eye', z:33, color:'#00e0ff', pivot:{x:0.5, y:0.5}, x:0.47, y:0.47, w:0.06, h:0.06 }
     ]
   }
 };
@@ -1403,8 +1435,144 @@ const BOSS_ANIMS = {
         mouth: [{rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}]
       }
     }
-  }
-};
+  },
+  core_omega: {
+    idle: {
+      frameCount: 4, fps: 4, loop: true,
+      keys: {
+        ring_t: [{rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}],
+        ring_b: [{rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}],
+        ring_l: [{rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}],
+        ring_r: [{rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}],
+        arm_lu_base: [{rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:12.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:10.49, w:0.06, h:0.14}],
+        arm_lu_mid: [{rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}],
+        arm_lu_tip: [{rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}],
+        arm_ru_base: [{rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:3.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:1.37, w:0.06, h:0.14}],
+        arm_ru_mid: [{rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}],
+        arm_ld_base: [{rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-4.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-6.33, w:0.06, h:0.14}],
+        arm_ld_mid: [{rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}],
+        arm_rd_base: [{rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-6.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-8.47, w:0.06, h:0.14}],
+        arm_rd_mid: [{rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}],
+        core_ring_outer: [{rot:0, dx:16.56, dy:17.57, w:0.408, h:0.408}, {rot:0, dx:16.56, dy:17.57, w:0.416, h:0.416}, {rot:0, dx:16.56, dy:17.57, w:0.408, h:0.408}, {rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}],
+        core_ring_mid: [{rot:0, dx:11.98, dy:13.37, w:0.309, h:0.309}, {rot:0, dx:11.98, dy:13.37, w:0.318, h:0.318}, {rot:0, dx:11.98, dy:13.37, w:0.309, h:0.309}, {rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}],
+        core: [{rot:0, dx:6.38, dy:6.74, w:0.206, h:0.206}, {rot:0, dx:6.38, dy:6.74, w:0.212, h:0.212}, {rot:0, dx:6.38, dy:6.74, w:0.206, h:0.206}, {rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}],
+        core_eye: [{rot:0, dx:0, dy:0, w:0.066, h:0.066}, {rot:0, dx:0, dy:0, w:0.072, h:0.072}, {rot:0, dx:0, dy:0, w:0.066, h:0.066}, {rot:0, dx:0, dy:0, w:0.06, h:0.06}]
+      }
+    },
+    walk: {
+      frameCount: 4, fps: 4, loop: true,
+      keys: {
+        ring_t: [{rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}],
+        ring_b: [{rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}],
+        ring_l: [{rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}],
+        ring_r: [{rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}],
+        arm_lu_base: [{rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}],
+        arm_lu_mid: [{rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}],
+        arm_lu_tip: [{rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}],
+        arm_ru_base: [{rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}],
+        arm_ru_mid: [{rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}],
+        arm_ld_base: [{rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}],
+        arm_ld_mid: [{rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}],
+        arm_rd_base: [{rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}],
+        arm_rd_mid: [{rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}],
+        core_ring_outer: [{rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.41, h:0.41}, {rot:0, dx:16.56, dy:17.57, w:0.42, h:0.42}, {rot:0, dx:16.56, dy:17.57, w:0.41, h:0.41}],
+        core_ring_mid: [{rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.31, h:0.31}, {rot:0, dx:11.98, dy:13.37, w:0.321, h:0.321}, {rot:0, dx:11.98, dy:13.37, w:0.31, h:0.31}],
+        core: [{rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.21, h:0.21}, {rot:0, dx:6.38, dy:6.74, w:0.22, h:0.22}, {rot:0, dx:6.38, dy:6.74, w:0.21, h:0.21}],
+        core_eye: [{rot:0, dx:0, dy:0, w:0.06, h:0.06}, {rot:0, dx:0, dy:0, w:0.069, h:0.069}, {rot:0, dx:0, dy:0, w:0.078, h:0.078}, {rot:0, dx:0, dy:0, w:0.069, h:0.069}]
+      }
+    },
+    attack_swipe: {
+      frameCount: 6, fps: 14, loop: false,
+      keys: {
+        ring_t: [{rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}],
+        ring_b: [{rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}],
+        ring_l: [{rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}],
+        ring_r: [{rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}],
+        arm_lu_base: [{rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:34.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:24.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:69.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:54.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}],
+        arm_lu_mid: [{rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-31.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-36.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-11.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-21.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}],
+        arm_lu_tip: [{rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-20.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-23.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-7.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-14.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}],
+        arm_ru_base: [{rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}],
+        arm_ru_mid: [{rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}],
+        arm_ld_base: [{rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}],
+        arm_ld_mid: [{rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}],
+        arm_rd_base: [{rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}],
+        arm_rd_mid: [{rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}],
+        core_ring_outer: [{rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}],
+        core_ring_mid: [{rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}],
+        core: [{rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}],
+        core_eye: [{rot:0, dx:0, dy:0, w:0.06, h:0.06}, {rot:0, dx:0, dy:0, w:0.066, h:0.066}, {rot:0, dx:0, dy:0, w:0.075, h:0.075}, {rot:0, dx:0, dy:0, w:0.084, h:0.084}, {rot:0, dx:0, dy:0, w:0.069, h:0.069}, {rot:0, dx:0, dy:0, w:0.06, h:0.06}]
+      }
+    },
+    skill_charge: {
+      frameCount: 8, fps: 10, loop: false,
+      keys: {
+        ring_t: [{rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}],
+        ring_b: [{rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}],
+        ring_l: [{rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}],
+        ring_r: [{rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}],
+        arm_lu_base: [{rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:39.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:32.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:26.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:64.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:74.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:59.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}],
+        arm_lu_mid: [{rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-34.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-41.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-46.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-1.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:8.4, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-11.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}],
+        arm_lu_tip: [{rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-20.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-25.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-29.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-5.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:2.2, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-7.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}],
+        arm_ru_base: [{rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:44.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:37.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:31.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:69.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:79.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:64.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}],
+        arm_ru_mid: [{rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-51.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-58.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-63.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-18.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-8.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-28.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}],
+        arm_ld_base: [{rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:1.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:-5.12, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:-11.12, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:26.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:36.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:21.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}],
+        arm_ld_mid: [{rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:102.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:95.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:90.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:135.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:145.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:125.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}],
+        arm_rd_base: [{rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-94.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-101.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-107.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-69.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-59.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-74.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}],
+        arm_rd_mid: [{rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:14.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:7.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:2.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:47.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:57.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:37.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}],
+        core_ring_outer: [{rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.408, h:0.408}, {rot:0, dx:16.56, dy:17.57, w:0.42, h:0.42}, {rot:0, dx:16.56, dy:17.57, w:0.432, h:0.432}, {rot:0, dx:16.56, dy:17.57, w:0.448, h:0.448}, {rot:0, dx:16.56, dy:17.57, w:0.46, h:0.46}, {rot:0, dx:16.56, dy:17.57, w:0.432, h:0.432}, {rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}],
+        core_ring_mid: [{rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.309, h:0.309}, {rot:0, dx:11.98, dy:13.37, w:0.321, h:0.321}, {rot:0, dx:11.98, dy:13.37, w:0.336, h:0.336}, {rot:0, dx:11.98, dy:13.37, w:0.354, h:0.354}, {rot:0, dx:11.98, dy:13.37, w:0.366, h:0.366}, {rot:0, dx:11.98, dy:13.37, w:0.33, h:0.33}, {rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}],
+        core: [{rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.21, h:0.21}, {rot:0, dx:6.38, dy:6.74, w:0.224, h:0.224}, {rot:0, dx:6.38, dy:6.74, w:0.24, h:0.24}, {rot:0, dx:6.38, dy:6.74, w:0.26, h:0.26}, {rot:0, dx:6.38, dy:6.74, w:0.28, h:0.28}, {rot:0, dx:6.38, dy:6.74, w:0.23, h:0.23}, {rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}],
+        core_eye: [{rot:0, dx:0, dy:0, w:0.06, h:0.06}, {rot:0, dx:0, dy:0, w:0.072, h:0.072}, {rot:0, dx:0, dy:0, w:0.084, h:0.084}, {rot:0, dx:0, dy:0, w:0.096, h:0.096}, {rot:0, dx:0, dy:0, w:0.12, h:0.12}, {rot:0, dx:0, dy:0, w:0.132, h:0.132}, {rot:0, dx:0, dy:0, w:0.09, h:0.09}, {rot:0, dx:0, dy:0, w:0.06, h:0.06}]
+      }
+    },
+    hurt: {
+      frameCount: 4, fps: 12, loop: false,
+      keys: {
+        ring_t: [{rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}],
+        ring_b: [{rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}],
+        ring_l: [{rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}],
+        ring_r: [{rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}],
+        arm_lu_base: [{rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-4.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-10.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}],
+        arm_lu_mid: [{rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-58.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-64.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}],
+        arm_lu_tip: [{rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-76.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-82.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}],
+        arm_ru_base: [{rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-1.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-7.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}],
+        arm_ru_mid: [{rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-6.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-12.32, dy:19.43, w:0.06, h:0.14}, {rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}],
+        arm_ld_base: [{rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:5.84, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:-0.16, dy:-5.33, w:0.06, h:0.14}, {rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}],
+        arm_ld_mid: [{rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-32.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-38.27, dy:-5.23, w:0.06, h:0.14}, {rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}],
+        arm_rd_base: [{rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-2.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-8.37, dy:-7.47, w:0.06, h:0.14}, {rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}],
+        arm_rd_mid: [{rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-3.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-9.66, dy:52.97, w:0.06, h:0.14}, {rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}],
+        core_ring_outer: [{rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:19.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:13.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}],
+        core_ring_mid: [{rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:14.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:8.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}],
+        core: [{rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:9.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:3.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}],
+        core_eye: [{rot:0, dx:0, dy:0, w:0.06, h:0.06}, {rot:0, dx:0, dy:0, w:0.054, h:0.054}, {rot:0, dx:0, dy:0, w:0.069, h:0.069}, {rot:0, dx:0, dy:0, w:0.06, h:0.06}]
+      }
+    },
+    death: {
+      frameCount: 8, fps: 8, loop: false,
+      keys: {
+        ring_t: [{rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}, {rot:-5.58, dx:33.12, dy:6.24, w:0.6, h:0.04}],
+        ring_b: [{rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}],
+        ring_l: [{rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}],
+        ring_r: [{rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}],
+        arm_lu_base: [{rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:50.114, dx:-7.21, dy:14.347, w:0.06, h:0.14}, {rot:55.829, dx:-7.21, dy:17.204, w:0.06, h:0.14}, {rot:61.543, dx:-7.21, dy:20.061, w:0.06, h:0.14}, {rot:67.257, dx:-7.21, dy:22.919, w:0.06, h:0.14}, {rot:72.971, dx:-7.21, dy:25.776, w:0.06, h:0.14}, {rot:78.686, dx:-7.21, dy:28.633, w:0.06, h:0.14}, {rot:84.4, dx:-7.21, dy:31.49, w:0.06, h:0.14}],
+        arm_lu_mid: [{rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-22.314, dx:-61.79, dy:8.453, w:0.06, h:0.14}, {rot:-18.029, dx:-61.79, dy:10.596, w:0.06, h:0.14}, {rot:-13.743, dx:-61.79, dy:12.739, w:0.06, h:0.14}, {rot:-9.457, dx:-61.79, dy:14.881, w:0.06, h:0.14}, {rot:-5.171, dx:-61.79, dy:17.024, w:0.06, h:0.14}, {rot:-0.886, dx:-61.79, dy:19.167, w:0.06, h:0.14}, {rot:3.4, dx:-61.79, dy:21.31, w:0.06, h:0.14}],
+        arm_lu_tip: [{rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-14.943, dx:-79.57, dy:3.579, w:0.1, h:0.08}, {rot:-12.086, dx:-79.57, dy:5.007, w:0.1, h:0.08}, {rot:-9.229, dx:-79.57, dy:6.436, w:0.1, h:0.08}, {rot:-6.371, dx:-79.57, dy:7.864, w:0.1, h:0.08}, {rot:-3.514, dx:-79.57, dy:9.293, w:0.1, h:0.08}, {rot:-0.657, dx:-79.57, dy:10.721, w:0.1, h:0.08}, {rot:2.2, dx:-79.57, dy:12.15, w:0.1, h:0.08}],
+        arm_ru_base: [{rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:55.214, dx:-4.6, dy:5.227, w:0.06, h:0.14}, {rot:60.929, dx:-4.6, dy:8.084, w:0.06, h:0.14}, {rot:66.643, dx:-4.6, dy:10.941, w:0.06, h:0.14}, {rot:72.357, dx:-4.6, dy:13.799, w:0.06, h:0.14}, {rot:78.071, dx:-4.6, dy:16.656, w:0.06, h:0.14}, {rot:83.786, dx:-4.6, dy:19.513, w:0.06, h:0.14}, {rot:89.5, dx:-4.6, dy:22.37, w:0.06, h:0.14}],
+        arm_ru_mid: [{rot:-43.92, dx:-9.32, dy:19.43, w:0.06, h:0.14}, {rot:-39.634, dx:-9.32, dy:21.573, w:0.06, h:0.14}, {rot:-35.349, dx:-9.32, dy:23.716, w:0.06, h:0.14}, {rot:-31.063, dx:-9.32, dy:25.859, w:0.06, h:0.14}, {rot:-26.777, dx:-9.32, dy:28.001, w:0.06, h:0.14}, {rot:-22.491, dx:-9.32, dy:30.144, w:0.06, h:0.14}, {rot:-18.206, dx:-9.32, dy:32.287, w:0.06, h:0.14}, {rot:-13.92, dx:-9.32, dy:34.43, w:0.06, h:0.14}],
+        arm_ld_base: [{rot:6.88, dx:2.84, dy:-5.33, w:0.06, h:0.14}, {rot:12.594, dx:2.84, dy:-2.473, w:0.06, h:0.14}, {rot:18.309, dx:2.84, dy:0.384, w:0.06, h:0.14}, {rot:24.023, dx:2.84, dy:3.241, w:0.06, h:0.14}, {rot:29.737, dx:2.84, dy:6.099, w:0.06, h:0.14}, {rot:35.451, dx:2.84, dy:8.956, w:0.06, h:0.14}, {rot:41.166, dx:2.84, dy:11.813, w:0.06, h:0.14}, {rot:46.88, dx:2.84, dy:14.67, w:0.06, h:0.14}],
+        arm_ld_mid: [{rot:110.54, dx:-35.27, dy:-5.23, w:0.06, h:0.14}, {rot:114.826, dx:-35.27, dy:-3.087, w:0.06, h:0.14}, {rot:119.111, dx:-35.27, dy:-0.944, w:0.06, h:0.14}, {rot:123.397, dx:-35.27, dy:1.199, w:0.06, h:0.14}, {rot:127.683, dx:-35.27, dy:3.341, w:0.06, h:0.14}, {rot:131.969, dx:-35.27, dy:5.484, w:0.06, h:0.14}, {rot:136.254, dx:-35.27, dy:7.627, w:0.06, h:0.14}, {rot:140.54, dx:-35.27, dy:9.77, w:0.06, h:0.14}],
+        arm_rd_base: [{rot:-89.4, dx:-5.37, dy:-7.47, w:0.06, h:0.14}, {rot:-83.686, dx:-5.37, dy:-4.613, w:0.06, h:0.14}, {rot:-77.971, dx:-5.37, dy:-1.756, w:0.06, h:0.14}, {rot:-72.257, dx:-5.37, dy:1.101, w:0.06, h:0.14}, {rot:-66.543, dx:-5.37, dy:3.959, w:0.06, h:0.14}, {rot:-60.829, dx:-5.37, dy:6.816, w:0.06, h:0.14}, {rot:-55.114, dx:-5.37, dy:9.673, w:0.06, h:0.14}, {rot:-49.4, dx:-5.37, dy:12.53, w:0.06, h:0.14}],
+        arm_rd_mid: [{rot:22.23, dx:-6.66, dy:52.97, w:0.06, h:0.14}, {rot:26.516, dx:-6.66, dy:55.113, w:0.06, h:0.14}, {rot:30.801, dx:-6.66, dy:57.256, w:0.06, h:0.14}, {rot:35.087, dx:-6.66, dy:59.399, w:0.06, h:0.14}, {rot:39.373, dx:-6.66, dy:61.541, w:0.06, h:0.14}, {rot:43.659, dx:-6.66, dy:63.684, w:0.06, h:0.14}, {rot:47.944, dx:-6.66, dy:65.827, w:0.06, h:0.14}, {rot:52.23, dx:-6.66, dy:67.97, w:0.06, h:0.14}],
+        core_ring_outer: [{rot:0, dx:16.56, dy:17.57, w:0.4, h:0.4}, {rot:0, dx:16.56, dy:17.57, w:0.371, h:0.371}, {rot:0, dx:16.56, dy:17.57, w:0.343, h:0.343}, {rot:0, dx:16.56, dy:17.57, w:0.314, h:0.314}, {rot:0, dx:16.56, dy:17.57, w:0.286, h:0.286}, {rot:0, dx:16.56, dy:17.57, w:0.257, h:0.257}, {rot:0, dx:16.56, dy:17.57, w:0.229, h:0.229}, {rot:0, dx:16.56, dy:17.57, w:0.2, h:0.2}],
+        core_ring_mid: [{rot:0, dx:11.98, dy:13.37, w:0.3, h:0.3}, {rot:0, dx:11.98, dy:13.37, w:0.274, h:0.274}, {rot:0, dx:11.98, dy:13.37, w:0.249, h:0.249}, {rot:0, dx:11.98, dy:13.37, w:0.223, h:0.223}, {rot:0, dx:11.98, dy:13.37, w:0.197, h:0.197}, {rot:0, dx:11.98, dy:13.37, w:0.171, h:0.171}, {rot:0, dx:11.98, dy:13.37, w:0.146, h:0.146}, {rot:0, dx:11.98, dy:13.37, w:0.12, h:0.12}],
+        core: [{rot:0, dx:6.38, dy:6.74, w:0.2, h:0.2}, {rot:0, dx:6.38, dy:6.74, w:0.183, h:0.183}, {rot:0, dx:6.38, dy:6.74, w:0.166, h:0.166}, {rot:0, dx:6.38, dy:6.74, w:0.149, h:0.149}, {rot:0, dx:6.38, dy:6.74, w:0.131, h:0.131}, {rot:0, dx:6.38, dy:6.74, w:0.114, h:0.114}, {rot:0, dx:6.38, dy:6.74, w:0.097, h:0.097}, {rot:0, dx:6.38, dy:6.74, w:0.08, h:0.08}],
+        core_eye: [{rot:0, dx:0, dy:0, w:0.06, h:0.06}, {rot:0, dx:0, dy:0, w:0.054, h:0.054}, {rot:0, dx:0, dy:0, w:0.049, h:0.049}, {rot:0, dx:0, dy:0, w:0.043, h:0.043}, {rot:0, dx:0, dy:0, w:0.037, h:0.037}, {rot:0, dx:0, dy:0, w:0.031, h:0.031}, {rot:0, dx:0, dy:0, w:0.026, h:0.026}, {rot:0, dx:0, dy:0, w:0.02, h:0.02}]
+      }
+    }
+  }};
+
+/* ★ 交換 core_omega 的 idle 和 walk ★ */
+(function(){ var A = BOSS_ANIMS.core_omega; if(A){ var t = A.idle; A.idle = A.walk; A.walk = t; } })();
 
 const BOSS_SKILLS = {
   factory_king: [
@@ -1469,6 +1637,20 @@ const BOSS_SKILLS = {
       telegraph:1800, hitDelay:1800, totalTime:2800,
       aoe:true, knockback:0.08, telegraphRatio:0.30, unlockPhase:1,
       projectile:'acid' }
+  ],
+  core_omega: [
+    { id:'laser_single', name:'單發雷射', type:'aoe', cd:6, range:0.40,
+      dmg:50, pen:6, anim:'attack_swipe',
+      telegraph:900, hitDelay:900, totalTime:1400,
+      aoe:true, knockback:0.05, telegraphRatio:0.12, unlockPhase:0 },
+    { id:'laser_spray', name:'掃射雷射', type:'aoe', cd:12, range:0.35,
+      dmg:32, pen:5, anim:'attack_swipe',
+      telegraph:1200, hitDelay:1200, totalTime:1800,
+      aoe:true, knockback:0.06, telegraphRatio:0.15, unlockPhase:1 },
+    { id:'laser_charge', name:'蓄力雷射', type:'aoe', cd:20, range:0.50,
+      dmg:95, pen:7, anim:'skill_charge',
+      telegraph:2000, hitDelay:2000, totalTime:2800,
+      aoe:true, knockback:0.10, telegraphRatio:0.18, unlockPhase:2 }
   ]
 };
 
@@ -2058,8 +2240,11 @@ function computeBossFit(def, bossId, canvasW, canvasH){
   const scaleByIdle = canvasH / idleH;
   const scaleByAllH = canvasH / allH;
   const scaleByAllW = canvasW / allW;
-  const fitScale = Math.min(scaleByIdle, scaleByAllH, scaleByAllW);
-  if(fitScale >= 1 && aMinX >= 0 && aMinY >= 0 && aMaxX <= cw && aMaxY <= ch){
+  const idleW = iMaxX - iMinX;
+  const fitScale = def.forceFit
+    ? Math.min(canvasH / idleH, canvasW / idleW)
+    : Math.min(scaleByIdle, scaleByAllH, scaleByAllW);
+  if(!def.forceFit && fitScale >= 1 && aMinX >= 0 && aMinY >= 0 && aMaxX <= cw && aMaxY <= ch){
     def._fitCached = null;
     return null;
   }
@@ -2159,6 +2344,10 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
     if(_hideHydraHead && _hydraOwnerMap){
       const _owner = _hydraOwnerMap[L.id];
       if(_owner && !battle.heads[_owner].alive) continue;
+    }
+    if(bossId === 'core_omega' && battle && battle.arms){
+      const _arm = getOmegaArmIdOfLayer(L.id);
+      if(_arm && !battle.arms[_arm].alive) continue;
     }
     const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0, dx:0, dy:0};
     const wp = world[L.id] || { wx: def.canvas.w * L.x, wy: def.canvas.h * L.y, rot: 0 };
@@ -2366,9 +2555,9 @@ function buildingBonusText(bid,lv){
   case 'forge':return `護甲值 +${lv*3}%`;
   case 'radio':return `補給量 ×${lv}`;
   case 'armory':{
-    let tp=2;
-    if(lv<=5)tp=2;else if(lv<=10)tp=3;else if(lv<=15)tp=4;else if(lv<=20)tp=5;else tp=6;
-    return `產出主副彈藥（當前穿甲 ${tp}）`;
+    let targetRarity='一般';
+    if(lv<=5)targetRarity='破舊';else if(lv<=10)targetRarity='一般';else if(lv<=15)targetRarity='庫存';else if(lv<=20)targetRarity='精品';else targetRarity='傳奇';
+    return `產出主副彈藥（當前稀有度：${targetRarity}）`;
   }default:return '';}
 }
 function calcMaxHp(){const rl=getBuildingLv('rest');const base=1+0.03*Math.pow(1.02,rl);return Math.round(100*Math.pow(base,state.player.level-1));}
@@ -2742,14 +2931,15 @@ function buildingTick(){
     const last=state.armoryLastTick||0;const interval=3*60*1000/genMult;
     if(now-last>interval){
       state.armoryLastTick=now;
-      let targetPen=2;
-      if(armoryLv<=5)targetPen=2;else if(armoryLv<=10)targetPen=3;else if(armoryLv<=15)targetPen=4;else if(armoryLv<=20)targetPen=5;else targetPen=6;
+      let targetRarity='一般';
+      if(armoryLv<=5)targetRarity='破舊';else if(armoryLv<=10)targetRarity='一般';else if(armoryLv<=15)targetRarity='庫存';else if(armoryLv<=20)targetRarity='精品';else targetRarity='傳奇';
+      const _targetIdx=RARITY_ORDER.indexOf(targetRarity);
       const pw=equippedWeapon('primary'),sw=equippedWeapon('secondary');
       const cals=[];
       if(pw&&pw.def.cal)cals.push(pw.def.cal);
       if(sw&&sw.def.cal&&(!pw||sw.def.cal!==pw.def.cal))cals.push(sw.def.cal);
       if(!cals.length)cals.push('9x19');
-      for(const cal of cals){const ammos=Object.keys(AMMO).filter(k=>AMMO[k].cal===cal);if(!ammos.length)continue;let best=null,bestDiff=999;for(const a of ammos){const diff=Math.abs(AMMO[a].pen-targetPen);if(diff<bestDiff){bestDiff=diff;best=a;}}if(best){const cnt=rndInt(15,30)*Math.max(1,Math.ceil(armoryLv/3));invAdd(best,AMMO[best].rarity,cnt);notify(`🔫 軍械庫產出：${AMMO[best].name}*${cnt}`,'ok');}}
+      for(const cal of cals){const ammos=Object.keys(AMMO).filter(k=>AMMO[k].cal===cal);if(!ammos.length)continue;let best=null,bestDiff=999,bestIdx=999;for(const a of ammos){const aIdx=RARITY_ORDER.indexOf(AMMO[a].rarity);if(aIdx<0)continue;const diff=Math.abs(aIdx-_targetIdx);if(diff<bestDiff||(diff===bestDiff&&aIdx<bestIdx)){bestDiff=diff;bestIdx=aIdx;best=a;}}if(best){const cnt=rndInt(15,30)*Math.max(1,Math.ceil(armoryLv/3));invAdd(best,AMMO[best].rarity,cnt);notify(`🔫 軍械庫產出：${AMMO[best].name}*${cnt}`,'ok');}}
     }
   }
   processCrafting();
@@ -3300,14 +3490,13 @@ function isWeakPointHit(){
 function renderCombat(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   if(battle&&battle.active){renderBattleScene(z1);renderBattleJoystick(z2);renderBattleControls(z3);return;}
-  const FREE_BOSS_TEST_RENDER = (typeof FREE_BOSS_TEST !== 'undefined') ? FREE_BOSS_TEST : false;
   let listHtml='<div class="boss-list">';
   for(const bid in BOSSES){
     const b=BOSSES[bid];
     const seals=parseInt(state.seals[b.seal]||0,10);
     const defeated=state.defeatedBosses.includes(bid);
-    const can=FREE_BOSS_TEST_RENDER || (seals>0);
-    const sealTagText = FREE_BOSS_TEST_RENDER ? `信物 *${seals} （測試免信物）` : `信物 *${seals}`;
+    const can=seals>0;
+    const sealTagText = `信物 *${seals}`;
     listHtml+=`<div class="boss-card ${can?'':'locked'}"><div class="boss-avatar">${bossIcon(bid)}</div><div class="boss-info"><div class="bn">${b.name}${defeated?' ✅':''}</div><div class="bd">地區：${b.region} ｜ HP ${b.hp} ｜ 裝甲 ${b.armor} ｜ 傷害 ${b.dmg} ｜ 穿透 ${b.pen||0}</div><div class="seal-tag ${seals>0?'':'none'}">${sealTagText}</div></div><button class="btn ${can?'primary':''}" data-bid="${bid}" ${can?'':'disabled'} style="flex:0 0 auto;padding:8px 10px;font-size:11px">${can?'挑戰':'無信物'}</button></div>`;
   }
   listHtml+='</div>';
@@ -3351,7 +3540,6 @@ function renderBattleScene(z1){
       </div>
       <div class="head-bars" id="head-bars"></div>
       <div id="battle-fx"></div>
-      ${false?`<div style="position:absolute;bottom:8px;left:8px;right:8px;text-align:center;font-size:11px;color:#e8a33d;background:rgba(0,0,0,.7);padding:6px;border-radius:8px;border:1px solid #8a5f18;z-index:20">準備中… 點擊 Boss 設定瞄準部位，拖動搖桿前進至警戒範圍觸發戰鬥</div>`:''}
     </div>`;
   updateFighterPos();
   requestAnimationFrame(()=>{
@@ -3586,23 +3774,18 @@ function defaultAimPartForBoss(bossId){
   return best;
 }
 
-/* ★ 臨時測試用：true = Boss 戰免信物 */
-const FREE_BOSS_TEST = true;
-
 function startBossBattle(bid){
   const b=BOSSES[bid];if(!b)return;
   const seals=parseInt(state.seals[b.seal]||0,10);
-  if(!FREE_BOSS_TEST){
-    if(seals<=0){notify('沒有對應的 Boss 信物','error');return;}
-    state.seals[b.seal]=seals-1;
-  }
+  if(seals<=0){notify('沒有對應的 Boss 信物','error');return;}
+  state.seals[b.seal]=seals-1;
   state.player.hp=state.player.maxHp;
   state.player.armor=state.player.maxArmor;
   refreshPlayerStats();
   const w=chooseCombatWeapon('combat');
   const startSlot=w?w.slot:'melee';
-  const _hasShield=(bid==='road_tyrant');
-  const _shieldHp=_hasShield?12500:0;
+  const _hasShield=(bid==='road_tyrant'||bid==='core_omega');
+  const _shieldHp=bid==='road_tyrant'?12500:(bid==='core_omega'?30000:0);
   battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossDmgMult:1,bossPen:b.pen||0,bossCritRate:b.critRate||0,bossCritMult:b.critMult||1,
     phaseIdx:0, healedPhases:[], skillCds:null, bossCast:null, bossDash:null, lastMeleeAt:0,
     shieldMaxHp:_shieldHp, shieldHp:_shieldHp, shieldBroken:false, bossRetreat:null,
@@ -3614,6 +3797,7 @@ function startBossBattle(bid){
     players:[{id:'local',isLocal:true}],lastH:0,
     healDisabledUntil:0,healTimer:null,autoHealing:false};
   if(bid==='swamp_hydra') initHydraHeads();
+  if(bid==='core_omega') initOmegaArms();
   battleHeroAnim.name='idle';
   battleHeroAnim.frame=0;
   battleHeroAnim.lastUpdate=performance.now();
@@ -3753,6 +3937,7 @@ function updateBossAI(dt, now){
   const skills = getBossSkillList(b.bossId);
   for(const sk of skills){
     if(!phaseUnlocksSkill(b.phaseIdx, sk)) continue;
+    if(isOmegaSkillDisabled(sk)) continue;
     if(now < (b.skillCds[sk.id] || 0)) continue;
     if(sk.type === 'dash'){
       const minR = sk.minRange || 0.15;
@@ -3956,6 +4141,7 @@ function tryHitPlayer(dmg, pen){
 function doBossMeleeSwipe(){
   if(!battle || !battle.active) return;
   const b = battle;
+  if(b.bossId === 'core_omega' && isOmegaArmBroken('arm_lu_tip')) return;
   if(Math.abs(b.bx - b.px) > 0.30) return;
   playBossOneshot('attack_swipe', 500);
   setTimeout(()=>{
@@ -4090,9 +4276,7 @@ function battleLoop(now){
       const groundY = BATTLE_GROUND_TOP_RATIO;
       const playerFootPx = BATTLE_HERO_SPRITE_H * BATTLE_HERO_FOOT_Y_RATIO;
       battle.py = clamp(groundY - playerFootPx / H, 0, 1);
-      const bossDef = BOSS_LAYERS[battle.bossId];
-      const bossFootY = bossDef ? bossDef.foot.y : 1.0;
-      battle.by = clamp(groundY - (bossSize * bossFootY) / H, 0, 1);
+      battle.by = clamp(groundY - bossSize / H, 0, 1);
       updateFighterPos();
     }
   }
@@ -4433,6 +4617,7 @@ function playerShoot(){
           battle.bossHp = Math.max(0, battle.bossHp - dmg);
           battle.damageDealt += dmg;
           spawnHitFx(battle.bx, battle.by, `-${dmg}${isCrit?'!':''}`, isCrit?'crit':'weak');
+          if(battle.bossId === 'core_omega' && battle.arms) damageOmegaArm(battle.aimPart, dmg);
           if(battle.bossHp <= 0){ endBattle(true); return true; }
         } else {
           applyBossDamage(dmg,isCrit,ammoPen);
@@ -4468,6 +4653,7 @@ function playerShoot(){
           battle.bossHp = Math.max(0, battle.bossHp - dmg);
           battle.damageDealt += dmg;
           spawnHitFx(battle.bx, battle.by, `-${dmg}${isCrit?'!':''}`, isCrit?'crit':'weak');
+          if(battle.bossId === 'core_omega' && battle.arms) damageOmegaArm(battle.aimPart, dmg);
           if(battle.bossHp <= 0){ endBattle(true); return true; }
         } else {
           applyBossDamage(dmg,isCrit,0);
@@ -4481,6 +4667,43 @@ function playerShoot(){
   refreshBattleControlsLive();
   return true;
 }
+/* ★ core_omega 四臂系統 ★ */
+const OMEGA_ARM_TIP_IDS = ['arm_lu_tip'];
+const OMEGA_ARM_HP = 10000;
+const OMEGA_SKILL_TO_ARM = { melee:'arm_lu_tip' };
+function initOmegaArms(){
+  battle.arms = {};
+  for(const id of OMEGA_ARM_TIP_IDS){ battle.arms[id] = { hp: OMEGA_ARM_HP, max: OMEGA_ARM_HP, alive: true }; }
+}
+function getOmegaArmIdOfLayer(layerId){
+  const m = layerId.match(/^(arm_lu)_/);
+  if(!m) return null;
+  return 'arm_lu_tip';
+}
+function damageOmegaArm(armId, dmg){
+  if(!battle || !battle.arms) return;
+  const arm = battle.arms[armId];
+  if(!arm || !arm.alive) return;
+  arm.hp = Math.max(0, arm.hp - dmg);
+  if(arm.hp <= 0){
+    arm.alive = false;
+    playHeadBreakFx(armId);
+    if(battle.aimPart === armId){
+      battle.aimPart = 'core';
+    }
+  }
+}
+function isOmegaArmBroken(armId){
+  if(!battle || !battle.arms) return false;
+  const arm = battle.arms[armId];
+  return !!arm && !arm.alive;
+}
+function isOmegaSkillDisabled(sk){
+  if(!battle || battle.bossId !== 'core_omega') return false;
+  if(!sk.armRequired) return false;
+  return isOmegaArmBroken(sk.armRequired);
+}
+
 /* ★ swamp_hydra 獨立頭部 HP 系統 ★ */
 const HYDRA_HEAD_IDS = ['head_1','head_2','head_3','head_4','head_5','head_6','head_7'];
 const HYDRA_HEAD_HP = 12857;
@@ -4892,13 +5115,7 @@ function showBattleResult(bossDef, b, victory, loot){
 const BossModule = {
   get battle(){ return battle; },
   set battle(v){ battle = v; },
-  isActive(){ return !!(battle && battle.active); },
-  render(){ renderCombat(); },
-  start(bid){ startBossBattle(bid); },
-  heroAnim: battleHeroAnim,
-  bossAnim: battleBossAnim,
-  playBossOneshot: playBossOneshot,
-  hasSkeleton(bid){ return !!BOSS_LAYERS[bid]; }
+  isActive(){ return !!(battle && battle.active); }
 };
 window.BossModule = BossModule;
 
