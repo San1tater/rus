@@ -336,7 +336,7 @@ function defaultState(){
     player:{level:1,exp:0,hp:100,maxHp:100,armor:0,maxArmor:0,equipped:{head:null,face:null,top:null,pants:null,shoes:null,backpack:'bplarge',primary:null,secondary:null,melee:null,throwable:null},equippedRarity:{backpack:'傳奇'},throwableStock:0},
     inventory:{},logs:[],pendingSalvageEquipped:{},
     proficiency:{primary:0,secondary:0,melee:0,throwable:0,'突擊步槍':0,'機槍':0,'衝鋒槍':0,'狙擊槍':0,'手槍':0,'霰彈槍':0,'刺刀':0,'刀':0,'手榴彈':0,craft:0,salvage:0,drop:0},
-    preferences:{ammoExplore:{priority:'一般',fallback:'desc',exclude:[]},ammoCombat:{priority:'傳奇',fallback:'desc',exclude:[]},consume:{priority:'一般',fallback:'desc',exclude:[]},autoConsumeThreshold:0.3,actionMode:'attack',regions:['廢棄工廠']},
+    preferences:{ammoExplore:{priority:'一般',fallback:'desc',exclude:[]},ammoCombat:{priority:'傳奇',fallback:'desc',exclude:[]},consume:{priority:'一般',fallback:'desc',exclude:[]},throwableExplore:{priority:'破舊',fallback:'asc',exclude:['精品','傳奇']},throwableCombat:{priority:'傳奇',fallback:'desc',exclude:[]},autoConsumeThreshold:0.3,actionMode:'attack',regions:['廢棄工廠']},
     regionProgress:{},activeRegion:null,stashedWeapons:{},
     base:{slots:new Array(12).fill(null).map((_,i)=>i===0?{id:'control',lv:1}:null)},
     seals:{},defeatedBosses:[],unlockedRegions:['廢棄工廠','廢棄實驗室'],
@@ -365,15 +365,22 @@ function load(){
     delete state.preferences.weaponPriority;
     delete state.preferences.ammoRarity;
     delete state.preferences.consumeRarity;
-    for(const k of ['ammoExplore','ammoCombat','consume']){
+    const _prefDefaults = {
+      ammoExplore:{priority:'一般',fallback:'desc',exclude:[]},
+      ammoCombat:{priority:'傳奇',fallback:'desc',exclude:[]},
+      consume:{priority:'一般',fallback:'desc',exclude:[]},
+      throwableExplore:{priority:'破舊',fallback:'asc',exclude:['精品','傳奇']},
+      throwableCombat:{priority:'傳奇',fallback:'desc',exclude:[]},
+    };
+    for(const k of Object.keys(_prefDefaults)){
       if(!state.preferences[k] || typeof state.preferences[k] !== 'object'){
-        state.preferences[k] = {priority: k==='ammoCombat'?'傳奇':'一般', fallback:'desc', exclude:[]};
+        state.preferences[k] = Object.assign({}, _prefDefaults[k]);
       }
       const c = state.preferences[k];
       if(!Array.isArray(c.exclude)) c.exclude = [];
       c.exclude = c.exclude.filter(x=>RARITY_ORDER.includes(x));
-      if(!RARITY_ORDER.includes(c.priority)) c.priority = k==='ammoCombat'?'傳奇':'一般';
-      if(!['asc','desc'].includes(c.fallback)) c.fallback = 'desc';
+      if(!RARITY_ORDER.includes(c.priority)) c.priority = _prefDefaults[k].priority;
+      if(!['asc','desc'].includes(c.fallback)) c.fallback = _prefDefaults[k].fallback;
     }
     for(const k in state.seals){state.seals[k]=parseInt(state.seals[k]||0,10);}
     if(!state.player.equipped.backpack){state.player.equipped.backpack='bplarge';state.player.equippedRarity.backpack='傳奇';}
@@ -403,6 +410,38 @@ function invCount(id,r){return state.inventory[invKey(id,r)]||0;}
 function invList(){const l=[];for(const k in state.inventory){const [id,r]=k.split('@');l.push({id,rarity:r,count:state.inventory[k],def:itemDef(id)});}return l;}
 function getAmmoByCal(cal){const l=[];for(const k in state.inventory){const p=k.split('@');if(p.length!==2)continue;const id=p[0],r=p[1];const d=AMMO[id];if(!d||d.cal!==cal)continue;const cnt=state.inventory[k];if(!cnt||cnt<=0)continue;l.push({id,rarity:r,count:cnt,def:d});}return l;}
 function pickAmmoByPreference(cal,context){const l=getAmmoByCal(cal);if(!l.length)return null;const ctx=(context==='combat')?(state.preferences.ammoCombat||{priority:'傳奇',fallback:'desc',exclude:[]}):(state.preferences.ammoExplore||{priority:'一般',fallback:'desc',exclude:[]});const ex=ctx.exclude||[];const filtered=l.filter(a=>!ex.includes(a.rarity));if(!filtered.length)return null;const pri=ctx.priority||'一般';if(!ex.includes(pri)){const primary=filtered.filter(a=>a.rarity===pri);if(primary.length)return pick(primary);}const fb=ctx.fallback||'desc';const order=(fb==='asc')?['破舊','一般','庫存','精品','傳奇']:['傳奇','精品','庫存','一般','破舊'];for(const rar of order){const s=filtered.filter(a=>a.rarity===rar);if(s.length)return pick(s);}return pick(filtered);}
+/* ★ 投擲物偏好挑選：探索／戰鬥分開，探索預設排除高稀有度以免浪費 */
+function pickThrowableByPreference(context){
+  const ctx = (context === 'combat')
+    ? (state.preferences.throwableCombat || {priority:'傳奇',fallback:'desc',exclude:[]})
+    : (state.preferences.throwableExplore || {priority:'破舊',fallback:'asc',exclude:['精品','傳奇']});
+  const ex = ctx.exclude || [];
+  const items = [];
+  for(const k in state.inventory){
+    const [id, r] = k.split('@');
+    const d = WEAPONS[id];
+    if(!d || d.slot !== 'throwable') continue;
+    const cnt = state.inventory[k];
+    if(!cnt || cnt <= 0) continue;
+    if(ex.includes(r)) continue;
+    items.push({id, rarity:r, count:cnt, def:d});
+  }
+  if(!items.length) return null;
+  const pri = ctx.priority || '一般';
+  if(!ex.includes(pri)){
+    const primary = items.filter(a => a.rarity === pri);
+    if(primary.length) return pick(primary);
+  }
+  const fb = ctx.fallback || 'desc';
+  const order = (fb === 'asc')
+    ? ['破舊','一般','庫存','精品','傳奇']
+    : ['傳奇','精品','庫存','一般','破舊'];
+  for(const rar of order){
+    const s = items.filter(a => a.rarity === rar);
+    if(s.length) return pick(s);
+  }
+  return pick(items);
+}
 function findNextConsumable(){const ctx=state.preferences.consume||{priority:'一般',fallback:'desc',exclude:[]};const ex=ctx.exclude||[];const items=[];for(const k in state.inventory){const [id,r]=k.split('@');if(!CONSUMABLES[id])continue;if(ex.includes(r))continue;items.push({id,rarity:r,count:state.inventory[k]});}if(!items.length)return null;const pri=ctx.priority;if(!ex.includes(pri)){const p=items.filter(a=>a.rarity===pri);if(p.length)return p[0];}const fb=ctx.fallback||'desc';const order=(fb==='asc')?['破舊','一般','庫存','精品','傳奇']:['傳奇','精品','庫存','一般','破舊'];for(const r of order){const s=items.filter(a=>a.rarity===r);if(s.length)return s[0];}return items[0];}
 function equippedWeapon(slot){const id=state.player.equipped[slot];if(!id)return null;const rar=state.player.equippedRarity[slot]||'一般';const def=itemDef(id);if(!def)return null;return{id,rarity:rar,def,slot};}
 function getBuildingLv(id){for(const s of state.base.slots)if(s&&s.id===id)return s.lv||1;return 0;}
@@ -659,6 +698,24 @@ function chooseCombatWeaponVerbose(context){
   const order=['primary','secondary','melee','throwable'];
   const trace=[];
   for(const slot of order){
+    /* ★ 探索模式：投擲槽改為從背包按探索偏好挑選，不碰裝備槽；
+       這樣玩家留給 Boss 戰的高稀有度手雷永遠不會在探索中被消耗。 */
+    if(slot === 'throwable' && context === 'explore'){
+      const t = pickThrowableByPreference('explore');
+      if(t){
+        const tdef = WEAPONS[t.id];
+        trace.push(`throwable(背包):${tdef.name}×${t.count}✓`);
+        return {
+          slot:'throwable',
+          weapon:{id:t.id, rarity:t.rarity, def:tdef, slot:'throwable'},
+          ammo:null,
+          fromBag:true,
+          trace
+        };
+      }
+      trace.push('throwable:背包無可用手雷');
+      continue;
+    }
     const w=equippedWeapon(slot);if(!w){trace.push(`${slot}:未裝備`);continue;}
     const def=itemDef(w.id);if(!def){trace.push(`${slot}:非武器`);continue;}
     if(def.cal){const ammo=pickAmmoByPreference(def.cal,context);if(ammo){trace.push(`${slot}:${def.name}✓`);return{slot,weapon:w,ammo,trace};}else{trace.push(`${slot}:${def.name}無彈`);continue;}}
@@ -725,27 +782,45 @@ function autoCombat(region,node,enemies){
       let remaining=enemies.map(e=>({...e}));let bi=bulletsUsed;
       while(bi>0&&remaining.some(e=>e.hp>0)){const alive=remaining.filter(e=>e.hp>0);if(!alive.length)break;const target=pick(alive);bi--;for(let p=0;p<pellets;p++){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}if(remaining.every(e=>e.hp<=0))break;}
     } else if(def.explosive){
+      /* ★ 投擲物：探索模式一律從背包消耗，裝備槽保留給 Boss 戰 */
       mode=def.modes?def.modes[0]:'投擲';
-      if(getThrowableCount()<=0){if(!ensureThrowableFromBackpack()){pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');return{victory:false,loot:[]};}}
-      state.player.throwableStock--;bulletsUsed=1;setTimeout(checkThrowableUnequip,0);
+      if(choice.fromBag){
+        if(!invRemove(weapon.id, weapon.rarity, 1)){
+          pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');
+          return {victory:false,loot:[]};
+        }
+      } else {
+        /* 保險分支：理論上探索不會走到這裡（裝備槽投擲已被 chooseCombatWeaponVerbose 排除） */
+        if(getThrowableCount()<=0 && !ensureThrowableFromBackpack()){
+          pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');
+          return {victory:false,loot:[]};
+        }
+        state.player.throwableStock--;
+        setTimeout(checkThrowableUnequip,0);
+      }
+      bulletsUsed=1;
       const hitRate=getHitRate(def.type,mode)+10;
       const baseDmg=Math.round(def.dmg*(RARITY_MULT[weapon.rarity]||1));
       for(const target of enemies){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-5,5);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}
     } else {
+      /* 近戰（唯一非槍械非投擲的近戰路徑） */
       mode=def.modes?def.modes[0]:'近戰';
       const hitRate=getHitRate(def.type,mode)+10;
       const baseDmg=Math.round((def.dmg||0)*(RARITY_MULT[weapon.rarity]||1));
-      if(def.slot==='throwable'){
-        if(getThrowableCount()<=0){if(!ensureThrowableFromBackpack()){pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，投擲物不足。`,[],'explore');return{victory:false,loot:[]};}}
-        state.player.throwableStock--;bulletsUsed=1;setTimeout(checkThrowableUnequip,0);
-        const alive=enemies.map(e=>({...e}));const target=pick(alive);
-        const d=baseDmg+rndInt(-3,3);
-        if(Math.random()*100<hitRate){target.hp-=d;dmgDealt+=d;hits=1;}
-      } else {
-        const attackTimes=getMeleeHits(def.rpm);
-        bulletsUsed=attackTimes;
-        const alive=enemies.filter(e=>e.hp>0);
-        if(alive.length){const target=pick(alive);for(let i=0;i<attackTimes;i++){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);dmgDealt+=Math.max(1,d);hits++;}}}
+      const attackTimes=getMeleeHits(def.rpm);
+      bulletsUsed=attackTimes;
+      const alive=enemies.filter(e=>e.hp>0);
+      if(alive.length){
+        const target=pick(alive);
+        for(let i=0;i<attackTimes;i++){
+          if(Math.random()*100<hitRate){
+            let d=baseDmg+rndInt(-3,3);
+            if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}
+            target.hp-=Math.max(1,d);
+            dmgDealt+=Math.max(1,d);
+            hits++;
+          }
+        }
       }
     }
     const reallyVictory=dmgDealt>=totalEnemyHp&&hits>0;
