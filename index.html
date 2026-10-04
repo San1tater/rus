@@ -2520,7 +2520,8 @@ function load(){
     }
     for(const k in state.seals){state.seals[k]=parseInt(state.seals[k]||0,10);}
     if(!state.player.equipped.backpack){state.player.equipped.backpack='bplarge';state.player.equippedRarity.backpack='傳奇';}
-    for(const k in state.inventory){const [id]=k.split('@');if(!ALL_ITEMS[id] && !id.startsWith('named_')){delete state.inventory[k];}}
+    removeInvalidInventoryItems();
+    consolidateInventoryDuplicates();
     for(const slot in state.player.equipped){const id=state.player.equipped[slot];if(id && !ALL_ITEMS[id] && !id.startsWith('named_')){state.player.equipped[slot]=null;delete state.player.equippedRarity[slot];}}
     for(const k in state.inventory){const [id]=k.split('@');if(id.startsWith('named_')){const parts=id.split('_');if(parts.length>=4){const baseId=parts[1];const mag=parts[2]==='x'?null:parseInt(parts[2],10);const scope=parts[3]==='x'?null:parts[3];if(WEAPONS[baseId])getOrCreateNamedItem(baseId,mag,scope);}}}
     for(const slot in state.player.equipped){const id=state.player.equipped[slot];if(id && id.startsWith('named_')){const parts=id.split('_');if(parts.length>=4){const baseId=parts[1];const mag=parts[2]==='x'?null:parseInt(parts[2],10);const scope=parts[3]==='x'?null:parts[3];if(WEAPONS[baseId])getOrCreateNamedItem(baseId,mag,scope);}}}
@@ -2666,6 +2667,41 @@ function salvageToMaterials(id,rarity,count){
   for(const [m,c] of mats)invAddRaw(m,'一般',c*count);
   addProf('salvage',0.5*count);return true;
 }
+function removeInvalidInventoryItems(){
+  const removed=[];
+  for(const k in state.inventory){
+    const [id]=k.split('@');
+    if(!ALL_ITEMS[id] && !id.startsWith('named_')){
+      removed.push({id,cnt:state.inventory[k]});
+      delete state.inventory[k];
+    }
+  }
+  return removed;
+}
+function consolidateInventoryDuplicates(){
+  const _keep={};
+  for(const k in state.inventory){
+    const [id,rar]=k.split('@');
+    if(!id||id.startsWith('named_')) continue;
+    const cat=itemCat(id);
+    if(cat!=='weapon'&&cat!=='armor') continue;
+    const m=RARITY_MULT[rar]||1;
+    if(!_keep[id]||m>_keep[id].m){_keep[id]={m,k};}
+  }
+  const _toSalvage=[];
+  for(const k in state.inventory){
+    const [id,rar]=k.split('@');
+    if(!id||id.startsWith('named_')) continue;
+    if(!_keep[id]) continue;
+    if(k===_keep[id].k) continue;
+    _toSalvage.push({id,rar,cnt:state.inventory[k],k});
+  }
+  for(const s of _toSalvage){
+    delete state.inventory[s.k];
+    salvageToMaterials(s.id,s.rar,s.cnt);
+  }
+  return _toSalvage;
+}
 function invAdd(id,rarity,count){
   if(count<=0)return;
   const cat=itemCat(id);
@@ -2679,7 +2715,14 @@ function invAdd(id,rarity,count){
     if(maxExisting>0){
       if(newMult<=maxExisting){salvageToMaterials(id,rarity,count);return;}
       else{
-        if(maxInvKey){const [iid,irar]=maxInvKey.split('@');const cnt=state.inventory[maxInvKey];delete state.inventory[maxInvKey];salvageToMaterials(id,irar,cnt);}
+        const _toDel=[];
+        for(const k in state.inventory){
+          const [iid,irar]=k.split('@');
+          if(iid!==id) continue;
+          const m=RARITY_MULT[irar]||1;
+          if(m<newMult) _toDel.push({k,rar:irar,cnt:state.inventory[k]});
+        }
+        for(const r of _toDel){delete state.inventory[r.k];salvageToMaterials(id,r.rar,r.cnt);}
         if(maxEqSlot){state.pendingSalvageEquipped=state.pendingSalvageEquipped||{};state.pendingSalvageEquipped[maxEqSlot]=true;}
       }
     }
@@ -3151,7 +3194,7 @@ function openSlotDetail(slot){
   }
   const ft=el('div','modal-ft');
   if(slot==='backpack'||isFixedItem(id)){
-    ft.innerHTML=`<button class="btn primary" id="m-open">打開</button><button class="btn ghost" id="m-exit">退出</button>`;
+    ft.innerHTML=`<button class="btn primary" id="m-open">打開</button><button class="btn" id="m-tidy">整理</button><button class="btn ghost" id="m-exit">退出</button>`;
   } else if(def){
     ft.innerHTML=`<button class="btn" id="m-change">更換</button><button class="btn danger" id="m-unequip">卸下</button><button class="btn ghost" id="m-exit">退出</button>`;
   } else {
@@ -3160,6 +3203,30 @@ function openSlotDetail(slot){
   openModal({title:`${labels[slot]} 詳情`,body,footer:ft});
   ft.querySelector('#m-exit').onclick=closeModal;
   const op=ft.querySelector('#m-open');if(op)op.onclick=()=>{closeModal();openInventory();};
+  const tidy=ft.querySelector('#m-tidy');
+  if(tidy)tidy.onclick=()=>{
+    const invalid=removeInvalidInventoryItems();
+    const merged=consolidateInventoryDuplicates();
+    save();
+    let rpt='';
+    if(!invalid.length && !merged.length){
+      rpt='<div class="empty-hint">背包乾淨，無需整理</div>';
+    } else {
+      if(invalid.length){
+        rpt+='<div style="color:#e8a33d;font-weight:bold;font-size:12px;margin-bottom:6px">🗑️ 移除無效物品 '+invalid.length+' 項</div>';
+        for(const it of invalid){rpt+='<div style="font-size:10px;color:#a89a85;margin-bottom:2px">· '+it.id+' ×'+it.cnt+'</div>';}
+      }
+      if(merged.length){
+        rpt+='<div style="color:#e8a33d;font-weight:bold;font-size:12px;margin-top:10px;margin-bottom:6px">🔀 合併重複物品 '+merged.length+' 項</div>';
+        for(const it of merged){const d=itemDef(it.id);const name=d?d.name:it.id;rpt+='<div style="font-size:10px;color:#a89a85;margin-bottom:2px">· '+name+'（'+it.rar+' ×'+it.cnt+'）已分解為材料</div>';}
+      }
+    }
+    closeModal();
+    const _ft=el('div','modal-ft');
+    _ft.innerHTML='<button class="btn primary" id="m-ok">確定</button>';
+    const _bd=openModal({title:'整理結果',body:rpt,footer:_ft});
+    _ft.querySelector('#m-ok').onclick=()=>{closeModal();openSlotDetail(slot);};
+  };
   const ch=ft.querySelector('#m-change');if(ch)ch.onclick=()=>{closeModal();openSlotPicker(slot, ()=>openSlotDetail(slot));};
   const un=ft.querySelector('#m-unequip');
   if(un)un.onclick=()=>{
@@ -3167,9 +3234,9 @@ function openSlotDetail(slot){
     else {
       const curId=state.player.equipped[slot];
       const curRar=state.player.equippedRarity[slot]||'一般';
-      if(curId)invAddRaw(curId,curRar,1);
       state.player.equipped[slot]=null;
       delete state.player.equippedRarity[slot];
+      if(curId)invAdd(curId,curRar,1);
     }
     refreshPlayerStats();save();closeModal();renderCurrentTab();
     notify(`已卸下：${def.name}`,'ok');
@@ -3256,7 +3323,11 @@ function openEquipmentCompare(slot,newId,newRarity,onConfirm,onCancel){
       const o=state.player.equippedRarity[slot]||'一般';
       if(slot==='throwable'){unequipThrowable();}
       else if(state.pendingSalvageEquipped&&state.pendingSalvageEquipped[slot]){salvageToMaterials(oldId2,o,1);delete state.pendingSalvageEquipped[slot];}
-      else invAddRaw(oldId2,o,1);
+      else{
+        state.player.equipped[slot]=null;
+        delete state.player.equippedRarity[slot];
+        invAdd(oldId2,o,1);
+      }
     }
     if(slot==='throwable'){equipThrowable(newId,newRarity);}
     else{invRemove(newId,newRarity,1);state.player.equipped[slot]=newId;state.player.equippedRarity[slot]=newRarity;}
@@ -5206,7 +5277,7 @@ function setActionMode(mode){
     state.stashedWeapons=state.stashedWeapons||{};
     for(const slot of ['primary','secondary']){
       const id=state.player.equipped[slot];
-      if(id){state.stashedWeapons[slot]={id,rarity:state.player.equippedRarity[slot]||'一般'};invAddRaw(id,state.player.equippedRarity[slot]||'一般',1);state.player.equipped[slot]=null;delete state.player.equippedRarity[slot];}
+      if(id){const _r=state.player.equippedRarity[slot]||'一般';state.stashedWeapons[slot]={id,rarity:_r};state.player.equipped[slot]=null;delete state.player.equippedRarity[slot];invAdd(id,_r,1);}
     }
   } else {
     if(state.stashedWeapons){
