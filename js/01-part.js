@@ -70,7 +70,7 @@ const WEAPONS={
   ak74m:{name:'AK-74M',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74m,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
   akm:{name:'AKM',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akm,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
   akms:{name:'AKMS',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akms,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.6},
-  akmn:{name:'AKmn',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akmn,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
+  akmn:{name:'AKMN',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akmn,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
   ak103:{name:'AK-103',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak103,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
   ak104:{name:'AK-104',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak104,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.6},
   ak105:{name:'AK-105',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak105,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
