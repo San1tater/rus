@@ -889,6 +889,83 @@ function _offlineDiffInv(before){
   }
   return diff;
 }
+/* ★ 離線期間建築產出補算：無線電、軍械庫、改造隊列 ★
+   依照離線時長補發多次，避免玩家長時間離線損失產出。
+   回傳 { radioCount, armoryCount } 供摘要顯示。 */
+function _offlineBuildingSettle(now, baseTime){
+  const genLv = getBuildingLv('generator');
+  const genMult = 1 + genLv * 0.2;
+  let radioCount = 0;
+  let armoryCount = 0;
+
+  // ── 無線電：每 5 分鐘（受發電機加速）補一次材料 ──
+  const radioLv = getBuildingLv('radio');
+  if(radioLv > 0){
+    const interval = 5 * 60 * 1000 / genMult;
+    const last = Math.max(state.radioLastTick || 0, baseTime);
+    const diff = now - last;
+    if(diff >= interval){
+      const times = Math.floor(diff / interval);
+      const mats = ['wood','metal','screws','cloth','gears','electronics'];
+      for(let i = 0; i < times; i++){
+        const m = pick(mats);
+        const cnt = rndInt(3, 8) * radioLv;
+        invAdd(m, '一般', cnt);
+      }
+      radioCount = times;
+      state.radioLastTick = last + times * interval;
+    }
+  }
+
+  // ── 軍械庫：每 3 分鐘（受發電機加速）補一次彈藥 ──
+  const armoryLv = getBuildingLv('armory');
+  if(armoryLv > 0){
+    const interval = 3 * 60 * 1000 / genMult;
+    const last = Math.max(state.armoryLastTick || 0, baseTime);
+    const diff = now - last;
+    if(diff >= interval){
+      const times = Math.floor(diff / interval);
+      let targetRarity = '一般';
+      if(armoryLv <= 5) targetRarity = '破舊';
+      else if(armoryLv <= 10) targetRarity = '一般';
+      else if(armoryLv <= 15) targetRarity = '庫存';
+      else if(armoryLv <= 20) targetRarity = '精品';
+      else targetRarity = '傳奇';
+      const _targetIdx = RARITY_ORDER.indexOf(targetRarity);
+      const pw = equippedWeapon('primary'), sw = equippedWeapon('secondary');
+      const cals = [];
+      if(pw && pw.def.cal) cals.push(pw.def.cal);
+      if(sw && sw.def.cal && (!pw || sw.def.cal !== pw.def.cal)) cals.push(sw.def.cal);
+      if(!cals.length) cals.push('9x19');
+      for(let i = 0; i < times; i++){
+        for(const cal of cals){
+          const ammos = Object.keys(AMMO).filter(k => AMMO[k].cal === cal);
+          if(!ammos.length) continue;
+          let best = null, bestDiff = 999, bestIdx = 999;
+          for(const a of ammos){
+            const aIdx = RARITY_ORDER.indexOf(AMMO[a].rarity);
+            if(aIdx < 0) continue;
+            const d = Math.abs(aIdx - _targetIdx);
+            if(d < bestDiff || (d === bestDiff && aIdx < bestIdx)){
+              bestDiff = d; bestIdx = aIdx; best = a;
+            }
+          }
+          if(best){
+            const cnt = rndInt(15, 30) * Math.max(1, Math.ceil(armoryLv / 3));
+            invAdd(best, AMMO[best].rarity, cnt);
+          }
+        }
+      }
+      armoryCount = times;
+      state.armoryLastTick = last + times * interval;
+    }
+  }
+
+  // ── 改造隊列：直接用 Date.now() 結算（startTime 是真實時間） ──
+  processCrafting();
+
+  return { radioCount, armoryCount };
+}
 function offlineSettle(){
   const now=Date.now();
   const lastLogTime=state.logs.length?state.logs[state.logs.length-1].t:0;
@@ -912,6 +989,8 @@ function offlineSettle(){
     else searchEvent(region,cur.node);
     advanceNode(region);
   }
+  /* ★ 新增：離線期間建築產出補算（無線電、軍械庫、改造隊列）★ */
+  const buildingResults = _offlineBuildingSettle(now, baseTime);
   _offlineMode = false;
   const loot = _offlineDiffInv(beforeInv);
   const lootList = [];
@@ -930,6 +1009,12 @@ function offlineSettle(){
   });
   const overtime=elapsed>maxMs;
   let summary=`離線 ${(elapsed/3600000).toFixed(1)} 小時，共 ${events} 次事件（勝利 ${wins}／逃跑 ${runs}），獲得 ${totalKinds} 類 ${totalCount} 件物資。`;
+  if(buildingResults.radioCount>0 || buildingResults.armoryCount>0){
+    const parts=[];
+    if(buildingResults.radioCount>0) parts.push(`無線電×${buildingResults.radioCount}`);
+    if(buildingResults.armoryCount>0) parts.push(`軍械庫×${buildingResults.armoryCount}`);
+    summary+=` 建築產出：${parts.join('、')}。`;
+  }
   if(overtime)summary+=`（超過 8 小時，已進入休息模式）`;
   if(lootList.length)summary+=` 點擊查看 →`;
   state.logs.push({t:now,html:`<b style="color:#4a90d9">[離線摘要]</b> ${summary}`,items:lootList,type:'offline'});
