@@ -346,10 +346,20 @@ function openPreference(){
   body+=rarityPolicyBlockHTML('exp','🎯 探索模式彈藥',p.ammoExplore, true);
   body+=rarityPolicyBlockHTML('cmb','⚔️ 戰鬥模式彈藥',p.ammoCombat, false);
   body+=rarityPolicyBlockHTML('con','💊 消耗品使用',p.consume, false);
+  /* ★ 手雷偏好：探索預設排除高稀有度，避免打 Boss 用的手雷被浪費 */
+  body+=rarityPolicyBlockHTML('texp','💣 探索模式手雷',p.throwableExplore, true);
+  body+=rarityPolicyBlockHTML('tcmb','💣 戰鬥模式手雷',p.throwableCombat, false);
   body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:10px 0 6px">🩸 自動使用消耗品血量閾值：${Math.round(p.autoConsumeThreshold*100)}%</div><input type="range" min="5" max="90" value="${Math.round(p.autoConsumeThreshold*100)}" id="thr-slider" style="width:100%">`;
   const bd=openModal({title:'⚙️ 偏好設定',body});
-  const getCtx=(k)=>k==='exp'?state.preferences.ammoExplore:(k==='cmb'?state.preferences.ammoCombat:state.preferences.consume);
-  for(const prefix of ['exp','cmb','con']){
+  const getCtx=(k)=>{
+    if(k==='exp') return state.preferences.ammoExplore;
+    if(k==='cmb') return state.preferences.ammoCombat;
+    if(k==='con') return state.preferences.consume;
+    if(k==='texp') return state.preferences.throwableExplore;
+    if(k==='tcmb') return state.preferences.throwableCombat;
+    return null;
+  };
+  for(const prefix of ['exp','cmb','con','texp','tcmb']){
     const ctx=getCtx(prefix);
     const pri=bd.querySelector('#'+prefix+'-pri');
     if(pri)pri.onchange=()=>{ctx.priority=pri.value;save();};
@@ -360,6 +370,7 @@ function openPreference(){
     var t = e.target;
     if(!t || !t.classList || !t.classList.contains('excl-cb')) return;
     var ctx = getCtx(t.dataset.prefix);
+    if(!ctx) return;
     var r = t.dataset.r;
     if(!ctx.exclude) ctx.exclude = [];
     var idx = ctx.exclude.indexOf(r);
@@ -372,7 +383,8 @@ function openPreference(){
     }
     save();
     try{
-      var _key = t.dataset.prefix==='exp' ? 'ammoExplore' : (t.dataset.prefix==='cmb' ? 'ammoCombat' : 'consume');
+      var _keyMap = {exp:'ammoExplore', cmb:'ammoCombat', con:'consume', texp:'throwableExplore', tcmb:'throwableCombat'};
+      var _key = _keyMap[t.dataset.prefix];
       console.log('[偏好儲存]', t.dataset.prefix, r, t.checked, 'exclude=', state.preferences[_key].exclude);
     }catch(_){}
   });
@@ -395,6 +407,7 @@ function openPreference(){
       const cb = label.querySelector('.excl-cb');
       if(!cb) return;
       const ctx=getCtx(cb.dataset.prefix);
+      if(!ctx) return;
       const r=cb.dataset.r;
       if(!ctx.exclude)ctx.exclude=[];
       cb.checked = !cb.checked;
