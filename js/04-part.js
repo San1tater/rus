@@ -4,6 +4,13 @@
 let battle=null;
 const BATTLE_ONESHOT_ANIMS=['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
 
+/* ★ Boss 戰背景：獨立圖片，不復用探索圖（比例、地面線、視角皆不同）
+   檔名固定為 images/bg/boss_{bossId}.png */
+function getBossBgPath(bossId){
+  if(!BOSSES[bossId]) return '';
+  return `images/bg/boss_${bossId}.png${assetSuffix()}`;
+}
+
 function pickAimPartFromClick(canvasX, canvasY){
   if(!battle) return null;
   const def = BOSS_LAYERS[battle.bossId];
@@ -129,7 +136,7 @@ function renderBattleScene(z1){
   const dealtPct=Math.min(100,(b.damageDealt/totalHp)*100);
   z1.innerHTML=`
     <div class="battle-scene">
-      <div class="battle-bg"></div>
+      <div class="battle-bg" style="background-image:url('${getBossBgPath(b.bossId)}')"></div>
       <div class="range-indicator" id="range-indicator" style="left:${rLeft}%;width:${rWidth}%"></div>
       <div class="damage-header"><div>對 Boss 傷害 <span class="num">${Math.round(b.damageDealt)}</span> / ${totalHp}</div><div class="bar"><div class="fill" id="dmg-bar" style="width:${dealtPct}%"></div></div></div>
       <div class="fighter boss-f" id="fighter-boss" style="left:${b.bx*100}%;top:${b.by*100}%">
