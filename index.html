@@ -29,6 +29,8 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .hero-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
 .explore-fx{position:absolute;inset:0;pointer-events:none;z-index:7;overflow:hidden}
 .explore-bullet{position:absolute;width:7px;height:7px;border-radius:50%;background:#ffe08a;box-shadow:0 0 8px #ffb300,0 0 14px #ff8800;transform:translate(-50%,-50%);pointer-events:none}
+.explore-heal-fx{position:absolute;transform:translate(-50%,-50%);font-size:16px;font-weight:bold;color:#4caf50;text-shadow:0 0 4px #000,0 0 8px #1a4a1a;pointer-events:none;z-index:50;-webkit-text-stroke:0.5px #000;animation:healFloat 1.05s ease-out forwards}
+@keyframes healFloat{0%{transform:translate(-50%,-50%) scale(0.6);opacity:0}15%{transform:translate(-50%,-65%) scale(1.15);opacity:1}100%{transform:translate(-50%,-160%) scale(1);opacity:0}}
 .zone-title{position:absolute;left:8px;top:8px;font-size:11px;color:#e8a33d;background:rgba(14,12,10,.7);padding:3px 8px;border-radius:10px;border:1px solid #3a2f25;z-index:6}
 .zone-badge{position:absolute;right:8px;top:8px;font-size:10px;color:#a89a85;background:rgba(14,12,10,.7);padding:3px 8px;border-radius:10px;border:1px solid #3a2f25;z-index:6}
 .zone2-silhouette{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
@@ -127,10 +129,10 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .boss-f .hpbar-wrap{width:min(50%,200px);z-index:2}
 .hpbar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:60px;bottom:calc(100% + 4px)}
 .hpbar-wrap .bar{height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-bottom:2px;position:relative}
-.hpbar-wrap .bar .fill{height:100%;transition:width .15s}
+.hpbar-wrap .bar .fill{height:100%}
 .hpbar-wrap .bar.hp .fill{background:#e05252}
 .hpbar-wrap .bar.ap .fill{background:#4a90d9}
-.hpbar-wrap .nm{font-size:8px;color:#e8a33d;text-align:center;white-space:nowrap;text-shadow:0 0 3px #000;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%)}
+.hpbar-wrap .nm{font-size:8px;color:#e8a33d;text-align:center;white-space:nowrap;text-shadow:0 0 3px #000;position:absolute;bottom:calc(100% + 34px);left:50%;transform:translateX(-50%)}
 .bullet{position:absolute;width:5px;height:5px;background:#ffe08a;border-radius:50%;box-shadow:0 0 6px #ffb300;transform:translate(-50%,-50%)}
 .bullet.enemy{background:#ff5252;box-shadow:0 0 6px #e05252}
 /* ============================================================
@@ -185,7 +187,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .weapon-slot-btn.on{background:#3a2a15;border-color:#e8a33d;color:#e8a33d}
 .fire-btn{flex:0 0 auto;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#d94a4a,#6a1a1a);border:3px solid #8a2a2a;color:#fff;font-size:16px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;aspect-ratio:1/1}
 .fire-btn.disabled{background:#3a1a1a;border-color:#5a2a2a;color:#7a6f60}
-.heal-btn{width:60px;height:60px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#e05252,#8a1a1a);border:3px solid #a02a2a;color:#fff;font-size:28px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 10px rgba(224,82,82,0.5);}
+.heal-btn{flex:0 0 60px;width:60px;height:60px;aspect-ratio:1/1;border-radius:50%;background:radial-gradient(circle at 40% 35%,#e05252,#8a1a1a);border:3px solid #a02a2a;color:#fff;font-size:28px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 10px rgba(224,82,82,0.5);}
 .heal-btn.disabled{background:#3a1a1a;border-color:#5a2a2a;color:#7a6f60;box-shadow:none;}
 .ammo-info{font-size:10px;color:#e8a33d;text-align:center;padding:3px}
 .build-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:3px;padding:5px}
@@ -257,11 +259,20 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .shield-bar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:min(50%,200px);bottom:calc(100% + 22px);z-index:3}
 .shield-bar-wrap .nm{font-size:8px;color:#7a7a7a;text-align:center;margin-bottom:2px;text-shadow:0 0 3px #000;letter-spacing:1px}
 .shield-bar-wrap .bar{height:3px;background:#1a1a1a;border-radius:2px;overflow:hidden}
-.shield-bar-wrap .bar .fill{height:100%;background:#666;transition:width .15s}
+.shield-bar-wrap .bar .fill{height:100%;background:#666}
 .shield-shatter-fx{position:absolute;pointer-events:none;z-index:30;width:0;height:0;transform:translate(-50%,-50%)}
 .shield-shatter-fx .glow{position:absolute;left:-30px;top:-30px;width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,rgba(120,220,140,0.9) 0%,rgba(50,140,70,0.5) 40%,transparent 70%);animation:shieldGlow .45s ease-out forwards;pointer-events:none}
 @keyframes shieldGlow{0%{transform:scale(0.4);opacity:1}100%{transform:scale(1.6);opacity:0}}
 .shield-shatter-fx .frag{position:absolute;width:6px;height:6px;background:#0a5a20;border:1px solid #2aa850;border-radius:1px;pointer-events:none;left:-3px;top:-3px}
+.head-bars{position:absolute;inset:0;pointer-events:none;z-index:4}
+.head-bar{position:absolute;transform:translate(-50%,-100%);width:36px;text-align:center;pointer-events:none}
+.head-bar .bar{height:3px;background:#1a1a1a;border-radius:1px;overflow:hidden;border:1px solid #0a0a0a;box-shadow:0 0 3px rgba(0,0,0,0.8)}
+.head-bar .bar .fill{height:100%;background:linear-gradient(90deg,#5a8a2a,#8ac83a);transition:width .15s}
+.head-break-fx{position:absolute;pointer-events:none;z-index:30;width:0;height:0;transform:translate(-50%,-50%)}
+.head-break-fx .glow{position:absolute;left:-40px;top:-40px;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(180,80,60,0.9) 0%,rgba(100,40,20,0.5) 40%,transparent 70%);animation:headGlow .5s ease-out forwards;pointer-events:none}
+@keyframes headGlow{0%{transform:scale(0.4);opacity:1}100%{transform:scale(1.8);opacity:0}}
+.head-break-fx .frag{position:absolute;width:7px;height:7px;background:#3a1a10;border:1px solid #8a3a20;border-radius:1px;pointer-events:none;left:-3.5px;top:-3.5px}
+.head-break-fx .blood{position:absolute;width:5px;height:5px;background:#8a1010;border-radius:50%;pointer-events:none;left:-2.5px;top:-2.5px}
 </style>
 </head>
 <body>
@@ -622,7 +633,8 @@ const BOSSES={
 const BOSS_WEAKPOINTS = {
   factory_king: ['leg_r', 'leg_l'],
   lab_queen:    ['abdomen'],
-  road_tyrant:  []
+  road_tyrant:  [],
+  swamp_hydra:  []
 };
 
 const BOSS_PHASES = {
@@ -639,6 +651,11 @@ const BOSS_PHASES = {
   road_tyrant: [
     { hpPct:1.00, dmgMult:1.0, unlockSkills:[] },
     { hpPct:0.50, dmgMult:1.3, unlockSkills:['charge'] }
+  ],
+  swamp_hydra: [
+    { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
+    { hpPct:0.66, dmgMult:1.25, unlockSkills:['breath'] },
+    { hpPct:0.33, dmgMult:1.6,  unlockSkills:[] }
   ]
 };
 
@@ -646,6 +663,7 @@ const BOSS_LAYERS = {
   factory_king: {
     canvas: { w:400, h:500 },
     foot:   { x:0.5, y:0.98 },
+    autoFit: true,
     layers: [
       { id:'leg_r', z:10, color:'#3a2a1a', pivot:{x:0.5, y:0.05}, x:0.58, y:0.58, w:0.14, h:0.4 },
       { id:'leg_l', z:20, color:'#3a2a1a', pivot:{x:0.5, y:0.05}, x:0.28, y:0.58, w:0.14, h:0.4 },
@@ -711,6 +729,53 @@ const BOSS_LAYERS = {
       { id:'arm_r', z:140, color:'#311877', pivot:{x:0.5, y:0.1}, x:0.78, y:0.34, w:0.13, h:0.34 },
       { id:'shoulder_r', z:150, color:'#2d0101', pivot:{x:0.5, y:0.5}, x:0.72, y:0.16, w:0.2, h:0.2 },
       { id:'hammer', z:160, color:'#ff540a', pivot:{x:0.5, y:0.5}, x:-0.009, y:-0.229, w:0.22, h:0.2, anchor:{target:'hammer-h', rot:true} }
+    ]
+  },
+  swamp_hydra: {
+    canvas: { w:500, h:600 },
+    foot:   { x:0.5, y:0.98 },
+    autoFit: true,
+    layers: [
+      { id:'swamp', z:10, color:'#101a0a', pivot:{x:0.5, y:1}, x:0.126, y:0.964, w:0.8, h:0.17 },
+      { id:'body_copy_1', z:20, color:'#2b4413', pivot:{x:0.5, y:1}, x:-0.298, y:0.012, w:0.3, h:0.35, anchor:{target:'body', rot:true} },
+      { id:'body', z:30, color:'#3d5823', pivot:{x:0.5, y:1}, x:0.354, y:0.83, w:0.3, h:0.35 },
+      { id:'body_copy', z:40, color:'#3b482e', pivot:{x:0.5, y:1}, x:-0.213, y:0.012, w:0.3, h:0.35, anchor:{target:'body', rot:true} },
+      { id:'neck_7', z:50, color:'#6b7c5a', pivot:{x:0.5, y:1}, x:0.74, y:0.48, w:0.04, h:0.16 },
+      { id:'neck_6', z:60, color:'#293121', pivot:{x:0.5, y:1}, x:0.64, y:0.46, w:0.04, h:0.15 },
+      { id:'neck_5', z:70, color:'#1f3607', pivot:{x:0.5, y:1}, x:0.56, y:0.44, w:0.04, h:0.15 },
+      { id:'neck_4', z:80, color:'#47800f', pivot:{x:0.5, y:1}, x:0.46, y:0.42, w:0.04, h:0.14 },
+      { id:'neck_3_copy', z:90, color:'#2e510b', pivot:{x:0.5, y:1}, x:0.061, y:-0.148, w:0.04, h:0.15, anchor:{target:'head_3', rot:true} },
+      { id:'neck_3', z:100, color:'#29450d', pivot:{x:0.5, y:1}, x:0.366, y:0.42, w:0.04, h:0.15 },
+      { id:'neck_2', z:110, color:'#2b4a0d', pivot:{x:0.5, y:1}, x:0.277, y:0.525, w:0.04, h:0.15 },
+      { id:'neck_1', z:120, color:'#30431e', pivot:{x:0.5, y:1}, x:0.211, y:0.511, w:0.04, h:0.16 },
+      { id:'head_7', z:130, color:'#5a6a4a', pivot:{x:0.5, y:1}, x:0.126, y:-0.27, w:0.1, h:0.16, anchor:{target:'neck_7', rot:true} },
+      { id:'head_6', z:140, color:'#5a6a4a', pivot:{x:0.5, y:1}, x:0.124, y:-0.198, w:0.1, h:0.16, anchor:{target:'neck_6', rot:true} },
+      { id:'head_5', z:150, color:'#5a6a4a', pivot:{x:0.5, y:1}, x:0.116, y:-0.316, w:0.1, h:0.17, anchor:{target:'neck_5', rot:true} },
+      { id:'head_4', z:160, color:'#5a6a4a', pivot:{x:0.5, y:1}, x:0.023, y:-0.256, w:0.1, h:0.18, anchor:{target:'neck_4', rot:true} },
+      { id:'head_3', z:170, color:'#5a6a4a', pivot:{x:0.5, y:1}, x:0.355, y:0.247, w:0.1, h:0.17 },
+      { id:'head_2', z:180, color:'#5a6a4a', pivot:{x:0.5, y:1}, x:-0.016, y:-0.239, w:0.1, h:0.16, anchor:{target:'neck_2', rot:true} },
+      { id:'mouth_copy_1', z:190, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.341, y:0.324, w:0.2, h:0.2 },
+      { id:'head_1', z:200, color:'#5a6a4a', pivot:{x:0.5, y:1}, x:-0.027, y:-0.212, w:0.1, h:0.16, anchor:{target:'neck_1', rot:true} },
+      { id:'eyes_copy_5_copy', z:210, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:-0.188, y:-0.251, w:0.2, h:0.2, anchor:{target:'eyes_copy_5', rot:true} },
+      { id:'eyes_copy_copy', z:220, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.113, y:0.002, w:0.2, h:0.2, anchor:{target:'eyes_copy', rot:true} },
+      { id:'eyes_copy_1_copy', z:230, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.324, y:0.317, w:0.2, h:0.2 },
+      { id:'eyes_copy_2_copy', z:240, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.324, y:0.317, w:0.2, h:0.2 },
+      { id:'eyes_copy_6_copy_1', z:250, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:-0.33, y:-0.039, w:0.2, h:0.2, anchor:{target:'eyes_copy_6', rot:true} },
+      { id:'eyes_copy_6_copy', z:260, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:-0.277, y:0.06, w:0.2, h:0.2, anchor:{target:'eyes', rot:true} },
+      { id:'eyes_copy_6', z:270, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.324, y:0.317, w:0.2, h:0.2 },
+      { id:'eyes_copy_5', z:280, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.326, y:0.318, w:0.2, h:0.2 },
+      { id:'eyes_copy_4', z:290, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.324, y:0.317, w:0.2, h:0.2 },
+      { id:'eyes_copy_3', z:300, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.005, y:-0.217, w:0.2, h:0.2, anchor:{target:'eyes_copy_4', rot:true} },
+      { id:'eyes_copy_2', z:310, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:-0.095, y:-0.02, w:0.2, h:0.2, anchor:{target:'eyes_copy_2_copy', rot:true} },
+      { id:'eyes_copy_1', z:320, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.05, y:0.052, w:0.2, h:0.2, anchor:{target:'eyes_copy_1_copy', rot:true} },
+      { id:'eyes_copy', z:330, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.324, y:0.317, w:0.2, h:0.2 },
+      { id:'eyes', z:340, color:'#00ff40', pivot:{x:0.5, y:0.5}, x:0.324, y:0.317, w:0.2, h:0.2 },
+      { id:'mouth_copy_5', z:350, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.332, y:0.32, w:0.2, h:0.2 },
+      { id:'mouth_copy_4', z:360, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.338, y:0.318, w:0.2, h:0.2 },
+      { id:'mouth_copy_3', z:370, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.331, y:0.297, w:0.2, h:0.2 },
+      { id:'mouth_copy_2', z:380, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.339, y:0.302, w:0.2, h:0.2 },
+      { id:'mouth_copy', z:390, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.343, y:0.317, w:0.2, h:0.2 },
+      { id:'mouth', z:400, color:'#000000', pivot:{x:0.5, y:0.5}, x:0.352, y:0.325, w:0.2, h:0.2 }
     ]
   }
 };
@@ -1111,6 +1176,233 @@ const BOSS_ANIMS = {
         'shield-2_copy_1': [{rot:-57.5, dx:18.35, dy:-0.21, w:0.125, h:0.122}, {rot:-57.5, dx:18.35, dy:-0.21, w:0.125, h:0.122}, {rot:-57.5, dx:18.35, dy:-0.21, w:0.125, h:0.122}, {rot:-57.5, dx:18.35, dy:-0.21, w:0.125, h:0.122}, {rot:-57.5, dx:18.35, dy:-0.21, w:0.125, h:0.122}, {rot:-57.5, dx:18.35, dy:-0.21, w:0.125, h:0.122}]
       }
     }
+  },
+  swamp_hydra: {
+    idle: {
+      frameCount: 4, fps: 4, loop: true,
+      keys: {
+        swamp: [{rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}],
+        body_copy_1: [{rot:0, dx:44.61, dy:-1.22, w:0.244, h:0.143}, {rot:0, dx:44.61, dy:-1.72, w:0.244, h:0.143}, {rot:0, dx:44.61, dy:-2.22, w:0.244, h:0.143}, {rot:0, dx:44.61, dy:-1.72, w:0.244, h:0.143}],
+        body: [{rot:0, dx:26.58, dy:-1.29, w:0.309, h:0.19}, {rot:0, dx:26.58, dy:-1.79, w:0.309, h:0.19}, {rot:0, dx:26.58, dy:-2.29, w:0.309, h:0.19}, {rot:0, dx:26.58, dy:-1.79, w:0.309, h:0.19}],
+        body_copy: [{rot:0, dx:1.12, dy:-1.37, w:0.414, h:0.312}, {rot:0, dx:1.12, dy:-1.87, w:0.414, h:0.312}, {rot:0, dx:1.12, dy:-2.37, w:0.414, h:0.312}, {rot:0, dx:1.12, dy:-1.87, w:0.414, h:0.312}],
+        neck_7: [{rot:40.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}, {rot:40.4, dx:-16.5, dy:3.28, w:0.04, h:0.16}, {rot:40.4, dx:-16.5, dy:2.98, w:0.04, h:0.16}, {rot:40.4, dx:-16.5, dy:3.28, w:0.04, h:0.16}],
+        neck_6: [{rot:-12.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}, {rot:-12.5, dx:-4.98, dy:3.5, w:0.04, h:0.15}, {rot:-12.5, dx:-4.98, dy:3.2, w:0.04, h:0.15}, {rot:-12.5, dx:-4.98, dy:3.5, w:0.04, h:0.15}],
+        neck_5: [{rot:18, dx:-5.59, dy:13.04, w:0.04, h:0.15}, {rot:18, dx:-5.59, dy:12.74, w:0.04, h:0.15}, {rot:18, dx:-5.59, dy:12.44, w:0.04, h:0.15}, {rot:18, dx:-5.59, dy:12.74, w:0.04, h:0.15}],
+        neck_4: [{rot:0, dx:-1.03, dy:9.61, w:0.04, h:0.14}, {rot:0, dx:-1.03, dy:9.31, w:0.04, h:0.14}, {rot:0, dx:-1.03, dy:9.01, w:0.04, h:0.14}, {rot:0, dx:-1.03, dy:9.31, w:0.04, h:0.14}],
+        neck_3_copy: [{rot:17.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}, {rot:17.3, dx:-3.7, dy:7.59, w:0.04, h:0.15}, {rot:17.3, dx:-3.7, dy:7.29, w:0.04, h:0.15}, {rot:17.3, dx:-3.7, dy:7.59, w:0.04, h:0.15}],
+        neck_3: [{rot:-5.8, dx:3.52, dy:9.33, w:0.045, h:0.138}, {rot:-5.8, dx:3.52, dy:9.03, w:0.045, h:0.138}, {rot:-5.8, dx:3.52, dy:8.73, w:0.045, h:0.138}, {rot:-5.8, dx:3.52, dy:9.03, w:0.045, h:0.138}],
+        neck_2: [{rot:0, dx:0.77, dy:1.43, w:0.035, h:0.215}, {rot:0, dx:0.77, dy:1.13, w:0.035, h:0.215}, {rot:0, dx:0.77, dy:0.83, w:0.035, h:0.215}, {rot:0, dx:0.77, dy:1.13, w:0.035, h:0.215}],
+        neck_1: [{rot:-16.8, dx:3.35, dy:0.93, w:0.043, h:0.143}, {rot:-16.8, dx:3.35, dy:0.63, w:0.043, h:0.143}, {rot:-16.8, dx:3.35, dy:0.33, w:0.043, h:0.143}, {rot:-16.8, dx:3.35, dy:0.63, w:0.043, h:0.143}],
+        head_7: [{rot:-40.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}, {rot:-40.4, dx:-7.82, dy:13.82, w:0.119, h:0.138}, {rot:-40.4, dx:-7.82, dy:13.52, w:0.119, h:0.138}, {rot:-40.4, dx:-7.82, dy:13.82, w:0.119, h:0.138}],
+        head_6: [{rot:12.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}, {rot:12.5, dx:-10.83, dy:7.01, w:0.123, h:0.121}, {rot:12.5, dx:-10.83, dy:6.71, w:0.123, h:0.121}, {rot:12.5, dx:-10.83, dy:7.01, w:0.123, h:0.121}],
+        head_5: [{rot:-18, dx:-8.42, dy:44.23, w:0.083, h:0.147}, {rot:-18, dx:-8.42, dy:43.93, w:0.083, h:0.147}, {rot:-18, dx:-8.42, dy:43.63, w:0.083, h:0.147}, {rot:-18, dx:-8.42, dy:43.93, w:0.083, h:0.147}],
+        head_4: [{rot:0, dx:-1.89, dy:15.91, w:0.125, h:0.114}, {rot:0, dx:-1.89, dy:15.61, w:0.125, h:0.114}, {rot:0, dx:-1.89, dy:15.31, w:0.125, h:0.114}, {rot:0, dx:-1.89, dy:15.61, w:0.125, h:0.114}],
+        head_3: [{rot:0, dx:-5.59, dy:34.12, w:0.129, h:0.137}, {rot:0, dx:-5.59, dy:33.82, w:0.129, h:0.137}, {rot:0, dx:-5.59, dy:33.52, w:0.129, h:0.137}, {rot:0, dx:-5.59, dy:33.82, w:0.129, h:0.137}],
+        head_2: [{rot:0, dx:1.72, dy:7.74, w:0.138, h:0.157}, {rot:0, dx:1.72, dy:7.44, w:0.138, h:0.157}, {rot:0, dx:1.72, dy:7.14, w:0.138, h:0.157}, {rot:0, dx:1.72, dy:7.44, w:0.138, h:0.157}],
+        mouth_copy_1: [{rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}],
+        head_1: [{rot:16.8, dx:0.25, dy:7.6, w:0.123, h:0.108}, {rot:16.8, dx:0.25, dy:7.3, w:0.123, h:0.108}, {rot:16.8, dx:0.25, dy:7, w:0.123, h:0.108}, {rot:16.8, dx:0.25, dy:7.3, w:0.123, h:0.108}],
+        eyes_copy_5_copy: [{rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}],
+        eyes_copy_copy: [{rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}],
+        eyes_copy_1_copy: [{rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}],
+        eyes_copy_2_copy: [{rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}],
+        eyes_copy_6_copy_1: [{rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}],
+        eyes_copy_6_copy: [{rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}],
+        eyes_copy_6: [{rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}],
+        eyes_copy_5: [{rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}],
+        eyes_copy_4: [{rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}],
+        eyes_copy_3: [{rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}],
+        eyes_copy_2: [{rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}],
+        eyes_copy_1: [{rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}],
+        eyes_copy: [{rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}],
+        eyes: [{rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}],
+        mouth_copy_5: [{rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}],
+        mouth_copy_4: [{rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}],
+        mouth_copy_3: [{rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}],
+        mouth_copy_2: [{rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}],
+        mouth_copy: [{rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}],
+        mouth: [{rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}]
+      }
+    },
+    walk: {
+      frameCount: 4, fps: 4, loop: true,
+      keys: {
+        swamp: [{rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}],
+        body_copy_1: [{rot:0, dx:44.61, dy:-1.22, w:0.244, h:0.143}, {rot:0, dx:44.61, dy:-1.72, w:0.244, h:0.143}, {rot:0, dx:44.61, dy:-2.22, w:0.244, h:0.143}, {rot:0, dx:44.61, dy:-1.72, w:0.244, h:0.143}],
+        body: [{rot:0, dx:26.58, dy:-1.29, w:0.309, h:0.19}, {rot:0, dx:26.58, dy:-1.79, w:0.309, h:0.19}, {rot:0, dx:26.58, dy:-2.29, w:0.309, h:0.19}, {rot:0, dx:26.58, dy:-1.79, w:0.309, h:0.19}],
+        body_copy: [{rot:0, dx:1.12, dy:-1.37, w:0.414, h:0.312}, {rot:0, dx:1.12, dy:-1.87, w:0.414, h:0.312}, {rot:0, dx:1.12, dy:-2.37, w:0.414, h:0.312}, {rot:0, dx:1.12, dy:-1.87, w:0.414, h:0.312}],
+        neck_7: [{rot:40.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}, {rot:40.4, dx:-16.5, dy:3.28, w:0.04, h:0.16}, {rot:40.4, dx:-16.5, dy:2.98, w:0.04, h:0.16}, {rot:40.4, dx:-16.5, dy:3.28, w:0.04, h:0.16}],
+        neck_6: [{rot:-12.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}, {rot:-12.5, dx:-4.98, dy:3.5, w:0.04, h:0.15}, {rot:-12.5, dx:-4.98, dy:3.2, w:0.04, h:0.15}, {rot:-12.5, dx:-4.98, dy:3.5, w:0.04, h:0.15}],
+        neck_5: [{rot:18, dx:-5.59, dy:13.04, w:0.04, h:0.15}, {rot:18, dx:-5.59, dy:12.74, w:0.04, h:0.15}, {rot:18, dx:-5.59, dy:12.44, w:0.04, h:0.15}, {rot:18, dx:-5.59, dy:12.74, w:0.04, h:0.15}],
+        neck_4: [{rot:0, dx:-1.03, dy:9.61, w:0.04, h:0.14}, {rot:0, dx:-1.03, dy:9.31, w:0.04, h:0.14}, {rot:0, dx:-1.03, dy:9.01, w:0.04, h:0.14}, {rot:0, dx:-1.03, dy:9.31, w:0.04, h:0.14}],
+        neck_3_copy: [{rot:17.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}, {rot:17.3, dx:-3.7, dy:7.59, w:0.04, h:0.15}, {rot:17.3, dx:-3.7, dy:7.29, w:0.04, h:0.15}, {rot:17.3, dx:-3.7, dy:7.59, w:0.04, h:0.15}],
+        neck_3: [{rot:-5.8, dx:3.52, dy:9.33, w:0.045, h:0.138}, {rot:-5.8, dx:3.52, dy:9.03, w:0.045, h:0.138}, {rot:-5.8, dx:3.52, dy:8.73, w:0.045, h:0.138}, {rot:-5.8, dx:3.52, dy:9.03, w:0.045, h:0.138}],
+        neck_2: [{rot:0, dx:0.77, dy:1.43, w:0.035, h:0.215}, {rot:0, dx:0.77, dy:1.13, w:0.035, h:0.215}, {rot:0, dx:0.77, dy:0.83, w:0.035, h:0.215}, {rot:0, dx:0.77, dy:1.13, w:0.035, h:0.215}],
+        neck_1: [{rot:-16.8, dx:3.35, dy:0.93, w:0.043, h:0.143}, {rot:-16.8, dx:3.35, dy:0.63, w:0.043, h:0.143}, {rot:-16.8, dx:3.35, dy:0.33, w:0.043, h:0.143}, {rot:-16.8, dx:3.35, dy:0.63, w:0.043, h:0.143}],
+        head_7: [{rot:-40.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}, {rot:-40.4, dx:-7.82, dy:13.82, w:0.119, h:0.138}, {rot:-40.4, dx:-7.82, dy:13.52, w:0.119, h:0.138}, {rot:-40.4, dx:-7.82, dy:13.82, w:0.119, h:0.138}],
+        head_6: [{rot:12.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}, {rot:12.5, dx:-10.83, dy:7.01, w:0.123, h:0.121}, {rot:12.5, dx:-10.83, dy:6.71, w:0.123, h:0.121}, {rot:12.5, dx:-10.83, dy:7.01, w:0.123, h:0.121}],
+        head_5: [{rot:-18, dx:-8.42, dy:44.23, w:0.083, h:0.147}, {rot:-18, dx:-8.42, dy:43.93, w:0.083, h:0.147}, {rot:-18, dx:-8.42, dy:43.63, w:0.083, h:0.147}, {rot:-18, dx:-8.42, dy:43.93, w:0.083, h:0.147}],
+        head_4: [{rot:0, dx:-1.89, dy:15.91, w:0.125, h:0.114}, {rot:0, dx:-1.89, dy:15.61, w:0.125, h:0.114}, {rot:0, dx:-1.89, dy:15.31, w:0.125, h:0.114}, {rot:0, dx:-1.89, dy:15.61, w:0.125, h:0.114}],
+        head_3: [{rot:0, dx:-5.59, dy:34.12, w:0.129, h:0.137}, {rot:0, dx:-5.59, dy:33.82, w:0.129, h:0.137}, {rot:0, dx:-5.59, dy:33.52, w:0.129, h:0.137}, {rot:0, dx:-5.59, dy:33.82, w:0.129, h:0.137}],
+        head_2: [{rot:0, dx:1.72, dy:7.74, w:0.138, h:0.157}, {rot:0, dx:1.72, dy:7.44, w:0.138, h:0.157}, {rot:0, dx:1.72, dy:7.14, w:0.138, h:0.157}, {rot:0, dx:1.72, dy:7.44, w:0.138, h:0.157}],
+        mouth_copy_1: [{rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}],
+        head_1: [{rot:16.8, dx:0.25, dy:7.6, w:0.123, h:0.108}, {rot:16.8, dx:0.25, dy:7.3, w:0.123, h:0.108}, {rot:16.8, dx:0.25, dy:7, w:0.123, h:0.108}, {rot:16.8, dx:0.25, dy:7.3, w:0.123, h:0.108}],
+        eyes_copy_5_copy: [{rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}],
+        eyes_copy_copy: [{rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}],
+        eyes_copy_1_copy: [{rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}],
+        eyes_copy_2_copy: [{rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}],
+        eyes_copy_6_copy_1: [{rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}],
+        eyes_copy_6_copy: [{rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}],
+        eyes_copy_6: [{rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}],
+        eyes_copy_5: [{rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}],
+        eyes_copy_4: [{rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}],
+        eyes_copy_3: [{rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}],
+        eyes_copy_2: [{rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}],
+        eyes_copy_1: [{rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}],
+        eyes_copy: [{rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}],
+        eyes: [{rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}],
+        mouth_copy_5: [{rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}],
+        mouth_copy_4: [{rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}],
+        mouth_copy_3: [{rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}],
+        mouth_copy_2: [{rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}],
+        mouth_copy: [{rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}],
+        mouth: [{rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}]
+      }
+    },
+    hurt: {
+      frameCount: 4, fps: 12, loop: false,
+      keys: {
+        swamp: [{rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}],
+        body_copy_1: [{rot:0, dx:44.61, dy:-1.22, w:0.244, h:0.143}, {rot:0, dx:45.61, dy:-1.22, w:0.244, h:0.143}, {rot:0, dx:43.61, dy:-1.22, w:0.244, h:0.143}, {rot:0, dx:44.61, dy:-1.22, w:0.244, h:0.143}],
+        body: [{rot:0, dx:26.58, dy:-1.29, w:0.309, h:0.19}, {rot:0, dx:27.58, dy:-1.29, w:0.309, h:0.19}, {rot:0, dx:25.58, dy:-1.29, w:0.309, h:0.19}, {rot:0, dx:26.58, dy:-1.29, w:0.309, h:0.19}],
+        body_copy: [{rot:0, dx:1.12, dy:-1.37, w:0.414, h:0.312}, {rot:0, dx:2.12, dy:-1.37, w:0.414, h:0.312}, {rot:0, dx:0.12, dy:-1.37, w:0.414, h:0.312}, {rot:0, dx:1.12, dy:-1.37, w:0.414, h:0.312}],
+        neck_7: [{rot:40.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}, {rot:42.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}, {rot:38.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}, {rot:40.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}],
+        neck_6: [{rot:-12.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}, {rot:-10.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}, {rot:-14.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}, {rot:-12.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}],
+        neck_5: [{rot:18, dx:-5.59, dy:13.04, w:0.04, h:0.15}, {rot:20, dx:-5.59, dy:13.04, w:0.04, h:0.15}, {rot:16, dx:-5.59, dy:13.04, w:0.04, h:0.15}, {rot:18, dx:-5.59, dy:13.04, w:0.04, h:0.15}],
+        neck_4: [{rot:0, dx:-1.03, dy:9.61, w:0.04, h:0.14}, {rot:2, dx:-1.03, dy:9.61, w:0.04, h:0.14}, {rot:-2, dx:-1.03, dy:9.61, w:0.04, h:0.14}, {rot:0, dx:-1.03, dy:9.61, w:0.04, h:0.14}],
+        neck_3_copy: [{rot:17.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}, {rot:19.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}, {rot:15.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}, {rot:17.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}],
+        neck_3: [{rot:-5.8, dx:3.52, dy:9.33, w:0.045, h:0.138}, {rot:-3.8, dx:3.52, dy:9.33, w:0.045, h:0.138}, {rot:-7.8, dx:3.52, dy:9.33, w:0.045, h:0.138}, {rot:-5.8, dx:3.52, dy:9.33, w:0.045, h:0.138}],
+        neck_2: [{rot:0, dx:0.77, dy:1.43, w:0.035, h:0.215}, {rot:2, dx:0.77, dy:1.43, w:0.035, h:0.215}, {rot:-2, dx:0.77, dy:1.43, w:0.035, h:0.215}, {rot:0, dx:0.77, dy:1.43, w:0.035, h:0.215}],
+        neck_1: [{rot:-16.8, dx:3.35, dy:0.93, w:0.043, h:0.143}, {rot:-14.8, dx:3.35, dy:0.93, w:0.043, h:0.143}, {rot:-18.8, dx:3.35, dy:0.93, w:0.043, h:0.143}, {rot:-16.8, dx:3.35, dy:0.93, w:0.043, h:0.143}],
+        head_7: [{rot:-40.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}, {rot:-37.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}, {rot:-43.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}, {rot:-40.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}],
+        head_6: [{rot:12.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}, {rot:15.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}, {rot:9.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}, {rot:12.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}],
+        head_5: [{rot:-18, dx:-8.42, dy:44.23, w:0.083, h:0.147}, {rot:-15, dx:-8.42, dy:44.23, w:0.083, h:0.147}, {rot:-21, dx:-8.42, dy:44.23, w:0.083, h:0.147}, {rot:-18, dx:-8.42, dy:44.23, w:0.083, h:0.147}],
+        head_4: [{rot:0, dx:-1.89, dy:15.91, w:0.125, h:0.114}, {rot:3, dx:-1.89, dy:15.91, w:0.125, h:0.114}, {rot:-3, dx:-1.89, dy:15.91, w:0.125, h:0.114}, {rot:0, dx:-1.89, dy:15.91, w:0.125, h:0.114}],
+        head_3: [{rot:0, dx:-5.59, dy:34.12, w:0.129, h:0.137}, {rot:3, dx:-5.59, dy:34.12, w:0.129, h:0.137}, {rot:-3, dx:-5.59, dy:34.12, w:0.129, h:0.137}, {rot:0, dx:-5.59, dy:34.12, w:0.129, h:0.137}],
+        head_2: [{rot:0, dx:1.72, dy:7.74, w:0.138, h:0.157}, {rot:3, dx:1.72, dy:7.74, w:0.138, h:0.157}, {rot:-3, dx:1.72, dy:7.74, w:0.138, h:0.157}, {rot:0, dx:1.72, dy:7.74, w:0.138, h:0.157}],
+        mouth_copy_1: [{rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}],
+        head_1: [{rot:16.8, dx:0.25, dy:7.6, w:0.123, h:0.108}, {rot:19.8, dx:0.25, dy:7.6, w:0.123, h:0.108}, {rot:13.8, dx:0.25, dy:7.6, w:0.123, h:0.108}, {rot:16.8, dx:0.25, dy:7.6, w:0.123, h:0.108}],
+        eyes_copy_5_copy: [{rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}],
+        eyes_copy_copy: [{rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}],
+        eyes_copy_1_copy: [{rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}],
+        eyes_copy_2_copy: [{rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}],
+        eyes_copy_6_copy_1: [{rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}],
+        eyes_copy_6_copy: [{rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}],
+        eyes_copy_6: [{rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}],
+        eyes_copy_5: [{rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}],
+        eyes_copy_4: [{rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}],
+        eyes_copy_3: [{rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}],
+        eyes_copy_2: [{rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}],
+        eyes_copy_1: [{rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}],
+        eyes_copy: [{rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}],
+        eyes: [{rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}],
+        mouth_copy_5: [{rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}],
+        mouth_copy_4: [{rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}],
+        mouth_copy_3: [{rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}],
+        mouth_copy_2: [{rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}],
+        mouth_copy: [{rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}],
+        mouth: [{rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}]
+      }
+    },
+    skill_charge: {
+      frameCount: 8, fps: 10, loop: false,
+      keys: {
+        swamp: [{rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}],
+        body_copy_1: [{rot:0, dx:44.61, dy:-1.22, w:0.244, h:0.143}, {rot:-1, dx:44.61, dy:-1.52, w:0.244, h:0.143}, {rot:-1.5, dx:44.61, dy:-1.72, w:0.244, h:0.143}, {rot:-2, dx:44.61, dy:-1.82, w:0.244, h:0.143}, {rot:1, dx:44.61, dy:-0.92, w:0.244, h:0.143}, {rot:2, dx:44.61, dy:-0.62, w:0.244, h:0.143}, {rot:1, dx:44.61, dy:-0.92, w:0.244, h:0.143}, {rot:0, dx:44.61, dy:-1.22, w:0.244, h:0.143}],
+        body: [{rot:0, dx:26.58, dy:-1.29, w:0.309, h:0.19}, {rot:-1, dx:26.58, dy:-1.59, w:0.309, h:0.19}, {rot:-1.5, dx:26.58, dy:-1.79, w:0.309, h:0.19}, {rot:-2, dx:26.58, dy:-1.89, w:0.309, h:0.19}, {rot:1, dx:26.58, dy:-0.99, w:0.309, h:0.19}, {rot:2, dx:26.58, dy:-0.69, w:0.309, h:0.19}, {rot:1, dx:26.58, dy:-0.99, w:0.309, h:0.19}, {rot:0, dx:26.58, dy:-1.29, w:0.309, h:0.19}],
+        body_copy: [{rot:0, dx:1.12, dy:-1.37, w:0.414, h:0.312}, {rot:-1, dx:1.12, dy:-1.67, w:0.414, h:0.312}, {rot:-1.5, dx:1.12, dy:-1.87, w:0.414, h:0.312}, {rot:-2, dx:1.12, dy:-1.97, w:0.414, h:0.312}, {rot:1, dx:1.12, dy:-1.07, w:0.414, h:0.312}, {rot:2, dx:1.12, dy:-0.77, w:0.414, h:0.312}, {rot:1, dx:1.12, dy:-1.07, w:0.414, h:0.312}, {rot:0, dx:1.12, dy:-1.37, w:0.414, h:0.312}],
+        neck_7: [{rot:40.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}, {rot:37.4, dx:-16.5, dy:3.08, w:0.04, h:0.16}, {rot:34.4, dx:-16.5, dy:2.58, w:0.04, h:0.16}, {rot:32.4, dx:-16.5, dy:2.08, w:0.04, h:0.16}, {rot:46.4, dx:-16.5, dy:4.08, w:0.04, h:0.16}, {rot:54.4, dx:-16.5, dy:5.08, w:0.04, h:0.16}, {rot:46.4, dx:-16.5, dy:4.08, w:0.04, h:0.16}, {rot:40.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}],
+        neck_6: [{rot:-12.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}, {rot:-15.5, dx:-4.98, dy:3.3, w:0.04, h:0.15}, {rot:-18.5, dx:-4.98, dy:2.8, w:0.04, h:0.15}, {rot:-20.5, dx:-4.98, dy:2.3, w:0.04, h:0.15}, {rot:-6.5, dx:-4.98, dy:4.3, w:0.04, h:0.15}, {rot:1.5, dx:-4.98, dy:5.3, w:0.04, h:0.15}, {rot:-6.5, dx:-4.98, dy:4.3, w:0.04, h:0.15}, {rot:-12.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}],
+        neck_5: [{rot:18, dx:-5.59, dy:13.04, w:0.04, h:0.15}, {rot:15, dx:-5.59, dy:12.54, w:0.04, h:0.15}, {rot:12, dx:-5.59, dy:12.04, w:0.04, h:0.15}, {rot:10, dx:-5.59, dy:11.54, w:0.04, h:0.15}, {rot:24, dx:-5.59, dy:13.54, w:0.04, h:0.15}, {rot:32, dx:-5.59, dy:14.54, w:0.04, h:0.15}, {rot:24, dx:-5.59, dy:13.54, w:0.04, h:0.15}, {rot:18, dx:-5.59, dy:13.04, w:0.04, h:0.15}],
+        neck_4: [{rot:0, dx:-1.03, dy:9.61, w:0.04, h:0.14}, {rot:-3, dx:-1.03, dy:9.11, w:0.04, h:0.14}, {rot:-6, dx:-1.03, dy:8.61, w:0.04, h:0.14}, {rot:-8, dx:-1.03, dy:8.11, w:0.04, h:0.14}, {rot:6, dx:-1.03, dy:10.11, w:0.04, h:0.14}, {rot:14, dx:-1.03, dy:11.11, w:0.04, h:0.14}, {rot:6, dx:-1.03, dy:10.11, w:0.04, h:0.14}, {rot:0, dx:-1.03, dy:9.61, w:0.04, h:0.14}],
+        neck_3_copy: [{rot:17.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}, {rot:14.3, dx:-3.7, dy:7.39, w:0.04, h:0.15}, {rot:11.3, dx:-3.7, dy:6.89, w:0.04, h:0.15}, {rot:9.3, dx:-3.7, dy:6.39, w:0.04, h:0.15}, {rot:23.3, dx:-3.7, dy:8.39, w:0.04, h:0.15}, {rot:31.3, dx:-3.7, dy:9.39, w:0.04, h:0.15}, {rot:23.3, dx:-3.7, dy:8.39, w:0.04, h:0.15}, {rot:17.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}],
+        neck_3: [{rot:-5.8, dx:3.52, dy:9.33, w:0.045, h:0.138}, {rot:-8.8, dx:3.52, dy:8.83, w:0.045, h:0.138}, {rot:-11.8, dx:3.52, dy:8.33, w:0.045, h:0.138}, {rot:-13.8, dx:3.52, dy:7.83, w:0.045, h:0.138}, {rot:0.2, dx:3.52, dy:9.83, w:0.045, h:0.138}, {rot:8.2, dx:3.52, dy:10.83, w:0.045, h:0.138}, {rot:0.2, dx:3.52, dy:9.83, w:0.045, h:0.138}, {rot:-5.8, dx:3.52, dy:9.33, w:0.045, h:0.138}],
+        neck_2: [{rot:0, dx:0.77, dy:1.43, w:0.035, h:0.215}, {rot:-3, dx:0.77, dy:0.93, w:0.035, h:0.215}, {rot:-6, dx:0.77, dy:0.43, w:0.035, h:0.215}, {rot:-8, dx:0.77, dy:-0.07, w:0.035, h:0.215}, {rot:6, dx:0.77, dy:1.93, w:0.035, h:0.215}, {rot:14, dx:0.77, dy:2.93, w:0.035, h:0.215}, {rot:6, dx:0.77, dy:1.93, w:0.035, h:0.215}, {rot:0, dx:0.77, dy:1.43, w:0.035, h:0.215}],
+        neck_1: [{rot:-16.8, dx:3.35, dy:0.93, w:0.043, h:0.143}, {rot:-19.8, dx:3.35, dy:0.43, w:0.043, h:0.143}, {rot:-22.8, dx:3.35, dy:-0.07, w:0.043, h:0.143}, {rot:-24.8, dx:3.35, dy:-0.57, w:0.043, h:0.143}, {rot:-10.8, dx:3.35, dy:1.43, w:0.043, h:0.143}, {rot:-2.8, dx:3.35, dy:2.43, w:0.043, h:0.143}, {rot:-10.8, dx:3.35, dy:1.43, w:0.043, h:0.143}, {rot:-16.8, dx:3.35, dy:0.93, w:0.043, h:0.143}],
+        head_7: [{rot:-40.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}, {rot:-46.4, dx:-7.82, dy:13.32, w:0.119, h:0.138}, {rot:-50.4, dx:-7.82, dy:12.82, w:0.119, h:0.138}, {rot:-53.4, dx:-7.82, dy:12.52, w:0.119, h:0.138}, {rot:-30.4, dx:-7.82, dy:14.92, w:0.119, h:0.138}, {rot:-18.4, dx:-7.82, dy:15.92, w:0.119, h:0.138}, {rot:-30.4, dx:-7.82, dy:14.92, w:0.119, h:0.138}, {rot:-40.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}],
+        head_6: [{rot:12.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}, {rot:6.5, dx:-10.83, dy:6.51, w:0.123, h:0.121}, {rot:2.5, dx:-10.83, dy:6.01, w:0.123, h:0.121}, {rot:-0.5, dx:-10.83, dy:5.71, w:0.123, h:0.121}, {rot:22.5, dx:-10.83, dy:8.11, w:0.123, h:0.121}, {rot:34.5, dx:-10.83, dy:9.11, w:0.123, h:0.121}, {rot:22.5, dx:-10.83, dy:8.11, w:0.123, h:0.121}, {rot:12.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}],
+        head_5: [{rot:-18, dx:-8.42, dy:44.23, w:0.083, h:0.147}, {rot:-24, dx:-8.42, dy:43.43, w:0.083, h:0.147}, {rot:-28, dx:-8.42, dy:42.93, w:0.083, h:0.147}, {rot:-31, dx:-8.42, dy:42.63, w:0.083, h:0.147}, {rot:-8, dx:-8.42, dy:45.03, w:0.083, h:0.147}, {rot:4, dx:-8.42, dy:46.03, w:0.083, h:0.147}, {rot:-8, dx:-8.42, dy:45.03, w:0.083, h:0.147}, {rot:-18, dx:-8.42, dy:44.23, w:0.083, h:0.147}],
+        head_4: [{rot:0, dx:-1.89, dy:15.91, w:0.125, h:0.114}, {rot:-6, dx:-1.89, dy:15.11, w:0.125, h:0.114}, {rot:-10, dx:-1.89, dy:14.61, w:0.125, h:0.114}, {rot:-13, dx:-1.89, dy:14.31, w:0.125, h:0.114}, {rot:10, dx:-1.89, dy:16.71, w:0.125, h:0.114}, {rot:22, dx:-1.89, dy:17.71, w:0.125, h:0.114}, {rot:10, dx:-1.89, dy:16.71, w:0.125, h:0.114}, {rot:0, dx:-1.89, dy:15.91, w:0.125, h:0.114}],
+        head_3: [{rot:0, dx:-5.59, dy:34.12, w:0.129, h:0.137}, {rot:-6, dx:-5.59, dy:33.32, w:0.129, h:0.137}, {rot:-10, dx:-5.59, dy:32.82, w:0.129, h:0.137}, {rot:-13, dx:-5.59, dy:32.52, w:0.129, h:0.137}, {rot:10, dx:-5.59, dy:34.92, w:0.129, h:0.137}, {rot:22, dx:-5.59, dy:35.92, w:0.129, h:0.137}, {rot:10, dx:-5.59, dy:34.92, w:0.129, h:0.137}, {rot:0, dx:-5.59, dy:34.12, w:0.129, h:0.137}],
+        head_2: [{rot:0, dx:1.72, dy:7.74, w:0.138, h:0.157}, {rot:-6, dx:1.72, dy:6.94, w:0.138, h:0.157}, {rot:-10, dx:1.72, dy:6.44, w:0.138, h:0.157}, {rot:-13, dx:1.72, dy:6.14, w:0.138, h:0.157}, {rot:10, dx:1.72, dy:8.54, w:0.138, h:0.157}, {rot:22, dx:1.72, dy:9.54, w:0.138, h:0.157}, {rot:10, dx:1.72, dy:8.54, w:0.138, h:0.157}, {rot:0, dx:1.72, dy:7.74, w:0.138, h:0.157}],
+        mouth_copy_1: [{rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}],
+        head_1: [{rot:16.8, dx:0.25, dy:7.6, w:0.123, h:0.108}, {rot:10.8, dx:0.25, dy:6.8, w:0.123, h:0.108}, {rot:6.8, dx:0.25, dy:6.3, w:0.123, h:0.108}, {rot:3.8, dx:0.25, dy:6, w:0.123, h:0.108}, {rot:26.8, dx:0.25, dy:8.4, w:0.123, h:0.108}, {rot:38.8, dx:0.25, dy:9.4, w:0.123, h:0.108}, {rot:26.8, dx:0.25, dy:8.4, w:0.123, h:0.108}, {rot:16.8, dx:0.25, dy:7.6, w:0.123, h:0.108}],
+        eyes_copy_5_copy: [{rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}],
+        eyes_copy_copy: [{rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}],
+        eyes_copy_1_copy: [{rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}],
+        eyes_copy_2_copy: [{rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}],
+        eyes_copy_6_copy_1: [{rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}],
+        eyes_copy_6_copy: [{rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}],
+        eyes_copy_6: [{rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}],
+        eyes_copy_5: [{rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}],
+        eyes_copy_4: [{rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}],
+        eyes_copy_3: [{rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}],
+        eyes_copy_2: [{rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}],
+        eyes_copy_1: [{rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}],
+        eyes_copy: [{rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}],
+        eyes: [{rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}],
+        mouth_copy_5: [{rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}],
+        mouth_copy_4: [{rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}],
+        mouth_copy_3: [{rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}],
+        mouth_copy_2: [{rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}],
+        mouth_copy: [{rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}],
+        mouth: [{rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}]
+      }
+    },
+    death: {
+      frameCount: 8, fps: 8, loop: false,
+      keys: {
+        swamp: [{rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}, {rot:2.3, dx:39.62, dy:-6.45, w:0.852, h:0.246}],
+        body_copy_1: [{rot:0, dx:44.61, dy:-1.22, w:0.244, h:0.143}, {rot:0.571, dx:44.61, dy:-0.649, w:0.244, h:0.143}, {rot:1.143, dx:44.61, dy:-0.077, w:0.244, h:0.143}, {rot:1.714, dx:44.61, dy:0.494, w:0.244, h:0.143}, {rot:2.286, dx:44.61, dy:1.066, w:0.244, h:0.143}, {rot:2.857, dx:44.61, dy:1.637, w:0.244, h:0.143}, {rot:3.429, dx:44.61, dy:2.209, w:0.244, h:0.143}, {rot:4, dx:44.61, dy:2.78, w:0.244, h:0.143}],
+        body: [{rot:0, dx:26.58, dy:-1.29, w:0.309, h:0.19}, {rot:0.571, dx:26.58, dy:-0.719, w:0.309, h:0.19}, {rot:1.143, dx:26.58, dy:-0.147, w:0.309, h:0.19}, {rot:1.714, dx:26.58, dy:0.424, w:0.309, h:0.19}, {rot:2.286, dx:26.58, dy:0.996, w:0.309, h:0.19}, {rot:2.857, dx:26.58, dy:1.567, w:0.309, h:0.19}, {rot:3.429, dx:26.58, dy:2.139, w:0.309, h:0.19}, {rot:4, dx:26.58, dy:2.71, w:0.309, h:0.19}],
+        body_copy: [{rot:0, dx:1.12, dy:-1.37, w:0.414, h:0.312}, {rot:0.571, dx:1.12, dy:-0.799, w:0.414, h:0.312}, {rot:1.143, dx:1.12, dy:-0.227, w:0.414, h:0.312}, {rot:1.714, dx:1.12, dy:0.344, w:0.414, h:0.312}, {rot:2.286, dx:1.12, dy:0.916, w:0.414, h:0.312}, {rot:2.857, dx:1.12, dy:1.487, w:0.414, h:0.312}, {rot:3.429, dx:1.12, dy:2.059, w:0.414, h:0.312}, {rot:4, dx:1.12, dy:2.63, w:0.414, h:0.312}],
+        neck_7: [{rot:40.4, dx:-16.5, dy:3.58, w:0.04, h:0.16}, {rot:42.4, dx:-16.5, dy:4.437, w:0.04, h:0.16}, {rot:44.4, dx:-16.5, dy:5.294, w:0.04, h:0.16}, {rot:46.4, dx:-16.5, dy:6.151, w:0.04, h:0.16}, {rot:48.4, dx:-16.5, dy:7.009, w:0.04, h:0.16}, {rot:50.4, dx:-16.5, dy:7.866, w:0.04, h:0.16}, {rot:52.4, dx:-16.5, dy:8.723, w:0.04, h:0.16}, {rot:54.4, dx:-16.5, dy:9.58, w:0.04, h:0.16}],
+        neck_6: [{rot:-12.5, dx:-4.98, dy:3.8, w:0.04, h:0.15}, {rot:-10.5, dx:-4.98, dy:4.657, w:0.04, h:0.15}, {rot:-8.5, dx:-4.98, dy:5.514, w:0.04, h:0.15}, {rot:-6.5, dx:-4.98, dy:6.371, w:0.04, h:0.15}, {rot:-4.5, dx:-4.98, dy:7.229, w:0.04, h:0.15}, {rot:-2.5, dx:-4.98, dy:8.086, w:0.04, h:0.15}, {rot:-0.5, dx:-4.98, dy:8.943, w:0.04, h:0.15}, {rot:1.5, dx:-4.98, dy:9.8, w:0.04, h:0.15}],
+        neck_5: [{rot:18, dx:-5.59, dy:13.04, w:0.04, h:0.15}, {rot:20, dx:-5.59, dy:13.897, w:0.04, h:0.15}, {rot:22, dx:-5.59, dy:14.754, w:0.04, h:0.15}, {rot:24, dx:-5.59, dy:15.611, w:0.04, h:0.15}, {rot:26, dx:-5.59, dy:16.469, w:0.04, h:0.15}, {rot:28, dx:-5.59, dy:17.326, w:0.04, h:0.15}, {rot:30, dx:-5.59, dy:18.183, w:0.04, h:0.15}, {rot:32, dx:-5.59, dy:19.04, w:0.04, h:0.15}],
+        neck_4: [{rot:0, dx:-1.03, dy:9.61, w:0.04, h:0.14}, {rot:2, dx:-1.03, dy:10.467, w:0.04, h:0.14}, {rot:4, dx:-1.03, dy:11.324, w:0.04, h:0.14}, {rot:6, dx:-1.03, dy:12.181, w:0.04, h:0.14}, {rot:8, dx:-1.03, dy:13.039, w:0.04, h:0.14}, {rot:10, dx:-1.03, dy:13.896, w:0.04, h:0.14}, {rot:12, dx:-1.03, dy:14.753, w:0.04, h:0.14}, {rot:14, dx:-1.03, dy:15.61, w:0.04, h:0.14}],
+        neck_3_copy: [{rot:17.3, dx:-3.7, dy:7.89, w:0.04, h:0.15}, {rot:19.3, dx:-3.7, dy:8.747, w:0.04, h:0.15}, {rot:21.3, dx:-3.7, dy:9.604, w:0.04, h:0.15}, {rot:23.3, dx:-3.7, dy:10.461, w:0.04, h:0.15}, {rot:25.3, dx:-3.7, dy:11.319, w:0.04, h:0.15}, {rot:27.3, dx:-3.7, dy:12.176, w:0.04, h:0.15}, {rot:29.3, dx:-3.7, dy:13.033, w:0.04, h:0.15}, {rot:31.3, dx:-3.7, dy:13.89, w:0.04, h:0.15}],
+        neck_3: [{rot:-5.8, dx:3.52, dy:9.33, w:0.045, h:0.138}, {rot:-3.8, dx:3.52, dy:10.187, w:0.045, h:0.138}, {rot:-1.8, dx:3.52, dy:11.044, w:0.045, h:0.138}, {rot:0.2, dx:3.52, dy:11.901, w:0.045, h:0.138}, {rot:2.2, dx:3.52, dy:12.759, w:0.045, h:0.138}, {rot:4.2, dx:3.52, dy:13.616, w:0.045, h:0.138}, {rot:6.2, dx:3.52, dy:14.473, w:0.045, h:0.138}, {rot:8.2, dx:3.52, dy:15.33, w:0.045, h:0.138}],
+        neck_2: [{rot:0, dx:0.77, dy:1.43, w:0.035, h:0.215}, {rot:2, dx:0.77, dy:2.287, w:0.035, h:0.215}, {rot:4, dx:0.77, dy:3.144, w:0.035, h:0.215}, {rot:6, dx:0.77, dy:4.001, w:0.035, h:0.215}, {rot:8, dx:0.77, dy:4.859, w:0.035, h:0.215}, {rot:10, dx:0.77, dy:5.716, w:0.035, h:0.215}, {rot:12, dx:0.77, dy:6.573, w:0.035, h:0.215}, {rot:14, dx:0.77, dy:7.43, w:0.035, h:0.215}],
+        neck_1: [{rot:-16.8, dx:3.35, dy:0.93, w:0.043, h:0.143}, {rot:-14.8, dx:3.35, dy:1.787, w:0.043, h:0.143}, {rot:-12.8, dx:3.35, dy:2.644, w:0.043, h:0.143}, {rot:-10.8, dx:3.35, dy:3.501, w:0.043, h:0.143}, {rot:-8.8, dx:3.35, dy:4.359, w:0.043, h:0.143}, {rot:-6.8, dx:3.35, dy:5.216, w:0.043, h:0.143}, {rot:-4.8, dx:3.35, dy:6.073, w:0.043, h:0.143}, {rot:-2.8, dx:3.35, dy:6.93, w:0.043, h:0.143}],
+        head_7: [{rot:-40.4, dx:-7.82, dy:14.12, w:0.119, h:0.138}, {rot:-36.4, dx:-7.82, dy:15.549, w:0.119, h:0.138}, {rot:-32.4, dx:-7.82, dy:16.977, w:0.119, h:0.138}, {rot:-28.4, dx:-7.82, dy:18.406, w:0.119, h:0.138}, {rot:-24.4, dx:-7.82, dy:19.834, w:0.119, h:0.138}, {rot:-20.4, dx:-7.82, dy:21.263, w:0.119, h:0.138}, {rot:-16.4, dx:-7.82, dy:22.691, w:0.119, h:0.138}, {rot:-12.4, dx:-7.82, dy:24.12, w:0.119, h:0.138}],
+        head_6: [{rot:12.5, dx:-10.83, dy:7.31, w:0.123, h:0.121}, {rot:16.5, dx:-10.83, dy:8.739, w:0.123, h:0.121}, {rot:20.5, dx:-10.83, dy:10.167, w:0.123, h:0.121}, {rot:24.5, dx:-10.83, dy:11.596, w:0.123, h:0.121}, {rot:28.5, dx:-10.83, dy:13.024, w:0.123, h:0.121}, {rot:32.5, dx:-10.83, dy:14.453, w:0.123, h:0.121}, {rot:36.5, dx:-10.83, dy:15.881, w:0.123, h:0.121}, {rot:40.5, dx:-10.83, dy:17.31, w:0.123, h:0.121}],
+        head_5: [{rot:-18, dx:-8.42, dy:44.23, w:0.083, h:0.147}, {rot:-14, dx:-8.42, dy:45.659, w:0.083, h:0.147}, {rot:-10, dx:-8.42, dy:47.087, w:0.083, h:0.147}, {rot:-6, dx:-8.42, dy:48.516, w:0.083, h:0.147}, {rot:-2, dx:-8.42, dy:49.944, w:0.083, h:0.147}, {rot:2, dx:-8.42, dy:51.373, w:0.083, h:0.147}, {rot:6, dx:-8.42, dy:52.801, w:0.083, h:0.147}, {rot:10, dx:-8.42, dy:54.23, w:0.083, h:0.147}],
+        head_4: [{rot:0, dx:-1.89, dy:15.91, w:0.125, h:0.114}, {rot:4, dx:-1.89, dy:17.339, w:0.125, h:0.114}, {rot:8, dx:-1.89, dy:18.767, w:0.125, h:0.114}, {rot:12, dx:-1.89, dy:20.196, w:0.125, h:0.114}, {rot:16, dx:-1.89, dy:21.624, w:0.125, h:0.114}, {rot:20, dx:-1.89, dy:23.053, w:0.125, h:0.114}, {rot:24, dx:-1.89, dy:24.481, w:0.125, h:0.114}, {rot:28, dx:-1.89, dy:25.91, w:0.125, h:0.114}],
+        head_3: [{rot:0, dx:-5.59, dy:34.12, w:0.129, h:0.137}, {rot:4, dx:-5.59, dy:35.549, w:0.129, h:0.137}, {rot:8, dx:-5.59, dy:36.977, w:0.129, h:0.137}, {rot:12, dx:-5.59, dy:38.406, w:0.129, h:0.137}, {rot:16, dx:-5.59, dy:39.834, w:0.129, h:0.137}, {rot:20, dx:-5.59, dy:41.263, w:0.129, h:0.137}, {rot:24, dx:-5.59, dy:42.691, w:0.129, h:0.137}, {rot:28, dx:-5.59, dy:44.12, w:0.129, h:0.137}],
+        head_2: [{rot:0, dx:1.72, dy:7.74, w:0.138, h:0.157}, {rot:4, dx:1.72, dy:9.169, w:0.138, h:0.157}, {rot:8, dx:1.72, dy:10.597, w:0.138, h:0.157}, {rot:12, dx:1.72, dy:12.026, w:0.138, h:0.157}, {rot:16, dx:1.72, dy:13.454, w:0.138, h:0.157}, {rot:20, dx:1.72, dy:14.883, w:0.138, h:0.157}, {rot:24, dx:1.72, dy:16.311, w:0.138, h:0.157}, {rot:28, dx:1.72, dy:17.74, w:0.138, h:0.157}],
+        mouth_copy_1: [{rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}, {rot:0, dx:-6.45, dy:1.08, w:0.062, h:0.028}],
+        head_1: [{rot:16.8, dx:0.25, dy:7.6, w:0.123, h:0.108}, {rot:20.8, dx:0.25, dy:9.029, w:0.123, h:0.108}, {rot:24.8, dx:0.25, dy:10.457, w:0.123, h:0.108}, {rot:28.8, dx:0.25, dy:11.886, w:0.123, h:0.108}, {rot:32.8, dx:0.25, dy:13.314, w:0.123, h:0.108}, {rot:36.8, dx:0.25, dy:14.743, w:0.123, h:0.108}, {rot:40.8, dx:0.25, dy:16.171, w:0.123, h:0.108}, {rot:44.8, dx:0.25, dy:17.6, w:0.123, h:0.108}],
+        eyes_copy_5_copy: [{rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}, {rot:0, dx:13.57, dy:27.17, w:0.048, h:0.035}],
+        eyes_copy_copy: [{rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}, {rot:0, dx:-16.76, dy:0.14, w:0.048, h:0.035}],
+        eyes_copy_1_copy: [{rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}, {rot:0, dx:-4.99, dy:-5.24, w:0.048, h:0.035}],
+        eyes_copy_2_copy: [{rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}, {rot:0, dx:9.45, dy:2, w:0.048, h:0.035}],
+        eyes_copy_6_copy_1: [{rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}, {rot:0, dx:38.67, dy:3.38, w:0.048, h:0.035}],
+        eyes_copy_6_copy: [{rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}, {rot:0, dx:20.19, dy:-6.23, w:0.048, h:0.035}],
+        eyes_copy_6: [{rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}, {rot:0, dx:33, dy:3.88, w:0.048, h:0.035}],
+        eyes_copy_5: [{rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}, {rot:0, dx:18.56, dy:25.09, w:0.044, h:0.035}],
+        eyes_copy_4: [{rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}, {rot:0, dx:-0.52, dy:21.65, w:0.048, h:0.035}],
+        eyes_copy_3: [{rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}, {rot:0, dx:-6.54, dy:21.22, w:0.048, h:0.035}],
+        eyes_copy_2: [{rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}, {rot:0, dx:15.47, dy:1.57, w:0.048, h:0.035}],
+        eyes_copy_1: [{rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}, {rot:0, dx:0.85, dy:-6.03, w:0.048, h:0.035}],
+        eyes_copy: [{rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}, {rot:0, dx:-11.26, dy:-0.22, w:0.048, h:0.035}],
+        eyes: [{rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}, {rot:0, dx:27.66, dy:-6.01, w:0.048, h:0.035}],
+        mouth_copy_5: [{rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}, {rot:12.5, dx:22.09, dy:-0.43, w:0.051, h:0.042}],
+        mouth_copy_4: [{rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}, {rot:0, dx:13.75, dy:34.19, w:0.051, h:0.042}],
+        mouth_copy_3: [{rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}, {rot:0, dx:-5.42, dy:25.88, w:0.057, h:0.02}],
+        mouth_copy_2: [{rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}, {rot:0, dx:7.64, dy:7.67, w:0.062, h:0.028}],
+        mouth_copy: [{rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}, {rot:0, dx:-18.56, dy:5.09, w:0.062, h:0.028}],
+        mouth: [{rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}, {rot:0, dx:36.27, dy:8.1, w:0.051, h:0.042}]
+      }
+    }
   }
 };
 
@@ -1161,6 +1453,22 @@ const BOSS_SKILLS = {
       telegraph:800, dashSpeed:0.55, dashDistance:0.38,
       exhaustMs:1500, hitTickMs:250,
       unlockPhase:1 }
+  ],
+  swamp_hydra: [
+    { id:'spray',  name:'腐蝕噴灑', type:'aoe', cd:8,  range:0.28,
+      dmg:55, pen:5, anim:'skill_charge',
+      telegraph:1200, hitDelay:1200, totalTime:2000,
+      aoe:true, knockback:0.06, telegraphRatio:0.28, unlockPhase:0,
+      projectile:'acid' },
+    { id:'burst',  name:'毒沼爆發', type:'aoe', cd:14, range:0.35,
+      dmg:75, pen:5, anim:'skill_charge',
+      telegraph:1500, hitDelay:1500, totalTime:2400,
+      aoe:true, knockback:0.10, telegraphRatio:0.35, unlockPhase:0 },
+    { id:'breath', name:'毒霧吐息', type:'aoe', cd:20, range:0.45,
+      dmg:100, pen:5, anim:'skill_charge',
+      telegraph:1800, hitDelay:1800, totalTime:2800,
+      aoe:true, knockback:0.08, telegraphRatio:0.30, unlockPhase:1,
+      projectile:'acid' }
   ]
 };
 
@@ -1707,9 +2015,11 @@ function computeBossFit(def, bossId, canvasW, canvasH){
   const cw = def.canvas.w, ch = def.canvas.h;
   const anims = BOSS_ANIMS[bossId];
   if(!anims){ def._fitCached = null; return null; }
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let aMinX = Infinity, aMinY = Infinity, aMaxX = -Infinity, aMaxY = -Infinity;
+  let iMinX = Infinity, iMinY = Infinity, iMaxX = -Infinity, iMaxY = -Infinity;
   for(const animName in anims){
     const anim = anims[animName];
+    const isIdle = (animName === 'idle');
     for(let f = 0; f < anim.frameCount; f++){
       const world = resolveBossWorld(def, anim, f);
       for(const L of def.layers){
@@ -1727,25 +2037,35 @@ function computeBossFit(def, bossId, canvasW, canvasH){
           const dx = c[0] - px, dy = c[1] - py;
           const rx = dx*cos - dy*sin + wp.wx;
           const ry = dx*sin + dy*cos + wp.wy;
-          if(rx < minX) minX = rx;
-          if(ry < minY) minY = ry;
-          if(rx > maxX) maxX = rx;
-          if(ry > maxY) maxY = ry;
+          if(rx < aMinX) aMinX = rx;
+          if(ry < aMinY) aMinY = ry;
+          if(rx > aMaxX) aMaxX = rx;
+          if(ry > aMaxY) aMaxY = ry;
+          if(isIdle){
+            if(rx < iMinX) iMinX = rx;
+            if(ry < iMinY) iMinY = ry;
+            if(rx > iMaxX) iMaxX = rx;
+            if(ry > iMaxY) iMaxY = ry;
+          }
         }
       }
     }
   }
-  if(!isFinite(minX)){ def._fitCached = null; return null; }
-  if(minX >= 0 && minY >= 0 && maxX <= cw && maxY <= ch){
+  if(!isFinite(aMinX)){ def._fitCached = null; return null; }
+  if(!isFinite(iMinX)){ iMinX = aMinX; iMinY = aMinY; iMaxX = aMaxX; iMaxY = aMaxY; }
+  const allW = aMaxX - aMinX, allH = aMaxY - aMinY;
+  const idleH = iMaxY - iMinY;
+  const scaleByIdle = canvasH / idleH;
+  const scaleByAllH = canvasH / allH;
+  const scaleByAllW = canvasW / allW;
+  const fitScale = Math.min(scaleByIdle, scaleByAllH, scaleByAllW);
+  if(fitScale >= 1 && aMinX >= 0 && aMinY >= 0 && aMaxX <= cw && aMaxY <= ch){
     def._fitCached = null;
     return null;
   }
-  const bboxW = maxX - minX;
-  const bboxH = maxY - minY;
-  const fitScale = Math.min(canvasW / bboxW, canvasH / bboxH);
-  const scaledW = bboxW * fitScale;
-  const offsetX = (canvasW - scaledW) / 2 - minX * fitScale;
-  const offsetY = canvasH - maxY * fitScale;
+  const idleCX = (iMinX + iMaxX) / 2;
+  const offsetX = canvasW / 2 - idleCX * fitScale;
+  const offsetY = canvasH - iMaxY * fitScale;
   const fit = { fitScale, offsetX, offsetY, cw: canvasW, ch: canvasH };
   def._fitCached = fit;
   return fit;
@@ -1780,9 +2100,66 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
 
   const _SHIELD_LIDS = ['shield','shield-2','shield-2_copy','shield-2_copy_1'];
   const _hideShield = (bossId === 'road_tyrant' && battle && battle.shieldBroken);
+  const _hideHydraHead = (bossId === 'swamp_hydra' && battle && battle.heads);
+  let _hydraOwnerMap = null;
+  if(_hideHydraHead){
+    _hydraOwnerMap = {};
+    const _resolveAnchorOwner = (lid, seen) => {
+      seen = seen || new Set();
+      if(seen.has(lid)) return null;
+      seen.add(lid);
+      if(/^head_\d+$/.test(lid)) return lid;
+      const _L = def.layers.find(x => x.id === lid);
+      if(!_L || !_L.anchor) return null;
+      return _resolveAnchorOwner(_L.anchor.target, seen);
+    };
+    for(const L of def.layers){
+      const anchorOwner = _resolveAnchorOwner(L.id);
+      if(anchorOwner){ _hydraOwnerMap[L.id] = anchorOwner; }
+    }
+    const _emIds = def.layers.filter(L => /^(eyes|mouth)/.test(L.id)).map(L => L.id);
+    const _visited = new Set();
+    for(const _id of _emIds){
+      if(_visited.has(_id)) continue;
+      if(_hydraOwnerMap[_id]) continue;
+      const _group = [];
+      const _queue = [_id];
+      while(_queue.length){
+        const cur = _queue.shift();
+        if(_visited.has(cur)) continue;
+        _visited.add(cur);
+        _group.push(cur);
+        const cL = def.layers.find(x => x.id === cur);
+        if(!cL) continue;
+        for(const oid of _emIds){
+          if(_visited.has(oid)) continue;
+          const oL = def.layers.find(x => x.id === oid);
+          if(!oL) continue;
+          const linked = (oL.anchor && oL.anchor.target === cur) ||
+                         (cL.anchor && cL.anchor.target === oid);
+          if(linked) _queue.push(oid);
+        }
+      }
+      let sx = 0, sy = 0, cnt = 0;
+      for(const gid of _group){
+        const w2 = world[gid];
+        if(w2){ sx += w2.wx; sy += w2.wy; cnt++; }
+      }
+      if(cnt === 0) continue;
+      const cx2 = sx / cnt, cy2 = sy / cnt;
+      const bestId = pickHeadForPoint(cx2, cy2, def, world, anim, fi);
+      if(bestId){
+        for(const gid of _group) _hydraOwnerMap[gid] = bestId;
+      }
+    }
+  }
   const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
   for(const L of sorted){
     if(_hideShield && _SHIELD_LIDS.indexOf(L.id) >= 0) continue;
+    if(_hideHydraHead && _hydraOwnerMap){
+      const _owner = _hydraOwnerMap[L.id];
+      if(_owner && !battle.heads[_owner].alive) continue;
+    }
     const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0, dx:0, dy:0};
     const wp = world[L.id] || { wx: def.canvas.w * L.x, wy: def.canvas.h * L.y, rot: 0 };
     const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
@@ -1851,6 +2228,19 @@ function playBossOneshot(animName, durationMs){
   battleBossAnim.forcedEnd = performance.now() + (durationMs || 900);
 }
 
+function spawnExploreHealFx(amount){
+  if(currentTab !== 'explore') return;
+  const fx = document.getElementById('explore-fx');
+  if(!fx) return;
+  const W = fx.clientWidth, H = fx.clientHeight;
+  const el = document.createElement('div');
+  el.className = 'explore-heal-fx';
+  el.textContent = '+' + amount;
+  el.style.left = (W * EXPLORE_HERO_X_RATIO) + 'px';
+  el.style.top = (H * 0.37) + 'px';
+  fx.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
 function spawnExploreBullets(n){
   const fx = document.getElementById('explore-fx');
   if(!fx) return;
@@ -2064,7 +2454,16 @@ function pushLog(html,items,type){state.logs.push({t:Date.now(),html,items:items
 function renderZone3Log(){
   const box=$('#logbox');if(!box)return;box.innerHTML='';
   const logs=state.logs.filter(l=>l.type!=='combat').slice(-60);
-  for(const l of logs){const line=el('div','logline');line.innerHTML=`<span class="tm">${fmtTime(l.t)}</span> ${l.html}`;box.appendChild(line);}
+  for(const l of logs){
+    const line=el('div','logline');
+    line.innerHTML=`<span class="tm">${fmtTime(l.t)}</span> ${l.html}`;
+    if(l.type==='offline' && l.items && l.items.length){
+      line.style.cursor='pointer';
+      line.title='點擊檢視獲得物資';
+      line.onclick=()=>openOfflineDetail(l);
+    }
+    box.appendChild(line);
+  }
   box.scrollTop=box.scrollHeight;
 }
 
@@ -2315,7 +2714,7 @@ function doExploreTick(){
 function autoConsumeIfLow(){
   const thr=state.preferences.autoConsumeThreshold||0.3;
   if(state.player.hp/state.player.maxHp>=thr)return;
-  let used = false;
+  let healTotal = 0;
   while(state.player.hp < state.player.maxHp){
     const item = findNextConsumable();
     if(!item) break;
@@ -2323,10 +2722,12 @@ function autoConsumeIfLow(){
     const actualHeal=Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
     state.player.hp=Math.min(state.player.maxHp,state.player.hp+actualHeal);
     invRemove(item.id,item.rarity,1);
-    pushLog(`<span class="pl">玩家</span> 自動使用 ${itemDef(item.id).name}，恢復 ${actualHeal} HP。`,[],'explore');
-    used = true;
+    healTotal += actualHeal;
   }
-  if(used) refreshPlayerStats();
+  if(healTotal > 0){
+    spawnExploreHealFx(healTotal);
+    refreshPlayerStats();
+  }
 }
 function buildingTick(){
   const now=Date.now();
@@ -2381,6 +2782,23 @@ function processCrafting(){
   }
 }
 let _offlineMode = false;
+function _offlineSnapshotInv(){
+  const snap = {};
+  for(const k in state.inventory) snap[k] = state.inventory[k];
+  return snap;
+}
+function _offlineDiffInv(before){
+  const diff = {};
+  for(const k in state.inventory){
+    const prev = before[k] || 0;
+    const cur = state.inventory[k];
+    if(cur > prev){
+      const [id, rarity] = k.split('@');
+      diff[k] = { id, rarity, count: cur - prev };
+    }
+  }
+  return diff;
+}
 function offlineSettle(){
   const now=Date.now();
   const lastLogTime=state.logs.length?state.logs[state.logs.length-1].t:0;
@@ -2390,25 +2808,43 @@ function offlineSettle(){
   const maxMs=8*3600*1000;
   const effMs=Math.min(elapsed,maxMs);
   const hours=effMs/3600000;
-  const events=Math.floor(hours*rnd(1,2));
+  const events=Math.floor(hours*120);
   if(events<=0){state.lastSeen=now;return 0;}
-  let wins=0,runs=0,lootCount=0;
+  let wins=0,runs=0;
   const regionPool=getActiveRegions();
+  const beforeInv = _offlineSnapshotInv();
   _offlineMode = true;
   for(let i=0;i<events;i++){
     const region=pick(regionPool);const mode=state.preferences.actionMode;const r=REGIONS[region];
     const cc=mode==='attack'?r.combat.attack:r.combat.stealth;
     const cur=getCurrentNode(region);
-    if(Math.random()<cc){const n=spawnCount();const enemies=genEnemies(region,n);const res=autoCombat(region,cur.node,enemies);if(res.victory)wins++;else runs++;lootCount+=res.loot.length;}
+    if(Math.random()<cc){const n=spawnCount();const enemies=genEnemies(region,n);const res=autoCombat(region,cur.node,enemies);if(res.victory)wins++;else runs++;}
     else searchEvent(region,cur.node);
     advanceNode(region);
   }
   _offlineMode = false;
+  const loot = _offlineDiffInv(beforeInv);
+  const lootList = [];
+  let totalKinds = 0, totalCount = 0;
+  for(const k in loot){
+    const it = loot[k];
+    lootList.push({ id: it.id, rarity: it.rarity, count: it.count });
+    totalKinds++;
+    totalCount += it.count;
+  }
+  lootList.sort((a, b) => {
+    const rd = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    if(rd !== 0) return rd;
+    const ad = itemDef(a.id), bd = itemDef(b.id);
+    return ((ad && ad.name) || '').localeCompare((bd && bd.name) || '', 'zh-Hant');
+  });
   const overtime=elapsed>maxMs;
-  let summary=`離線 ${(elapsed/3600000).toFixed(1)} 小時，共 ${events} 次事件（勝利 ${wins}／逃跑 ${runs}），獲得 ${lootCount} 類物資。`;
+  let summary=`離線 ${(elapsed/3600000).toFixed(1)} 小時，共 ${events} 次事件（勝利 ${wins}／逃跑 ${runs}），獲得 ${totalKinds} 類 ${totalCount} 件物資。`;
   if(overtime)summary+=`（超過 8 小時，已進入休息模式）`;
-  state.logs.push({t:now,html:`<b style="color:#4a90d9">[離線摘要]</b> ${summary}`,items:[],type:'offline'});
+  if(lootList.length)summary+=` 點擊查看 →`;
+  state.logs.push({t:now,html:`<b style="color:#4a90d9">[離線摘要]</b> ${summary}`,items:lootList,type:'offline'});
   state.lastSeen=now;
+  try{ save(); }catch(e){}
   return events;
 }
 
@@ -2725,14 +3161,48 @@ function openItemDetail(id,rarity,returnFn){
   const eqb=ft.querySelector('#m-equip');
   if(eqb)eqb.onclick=()=>{const slot=d.slot;closeModal();openEquipmentCompare(slot,id,rarity, returnFn, () => openItemDetail(id,rarity,returnFn));};
 }
+function openOfflineDetail(log){
+  const items = (log && log.items) || [];
+  let body = `<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">${log.html}</div>`;
+  if(!items.length){
+    body += '<div class="empty-hint">無獲得物資</div>';
+  } else {
+    const groups = {weapon:[],armor:[],ammo:[],consume:[],material:[],misc:[]};
+    for(const it of items){
+      const cat = itemCat(it.id);
+      if(groups[cat]) groups[cat].push(it);
+      else groups.misc.push(it);
+    }
+    const names = {weapon:'⚔️ 武器',armor:'🛡️ 裝備',ammo:'🔫 彈藥',consume:'💊 消耗品',material:'🔧 材料',misc:'📦 其他'};
+    for(const g in groups){
+      if(!groups[g].length) continue;
+      body += `<div class="cat-header" style="cursor:default"><span>${names[g]} (${groups[g].length})</span><span></span></div>`;
+      for(const it of groups[g]){
+        const def = itemDef(it.id);
+        if(!def) continue;
+        body += `<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon" style="background:${rarityBg(it.rarity)}">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${def.name}</div><div class="sub">${it.rarity}${def.type?' · '+def.type:''}</div></div><div class="cnt">×${it.count}</div></div>`;
+      }
+    }
+  }
+  const bd = openModal({title:'📦 離線獲得物資', body});
+  $('.item-row', bd).forEach(r => {
+    r.onclick = () => { closeModal(); openItemDetail(r.dataset.iid, r.dataset.irar, () => openOfflineDetail(log)); };
+  });
+}
 function openLogHistory(){
   let body='<div style="font-size:10px">';
   const logs=state.logs.slice().reverse();
   if(!logs.length)body+='<div class="empty-hint">暫無記錄</div>';
-  for(const l of logs)body+=`<div class="logline" style="padding:5px 0">${l.html}</div>`;
+  for(const l of logs){
+    const clickAttr = (l.type==='offline' && l.items && l.items.length) ? 'data-offline-idx="'+logs.indexOf(l)+'" style="padding:5px 0;cursor:pointer;color:#4a90d9"' : 'style="padding:5px 0"';
+    body+=`<div class="logline" ${clickAttr}>${l.html}</div>`;
+  }
   body+='</div>';
   const bd=openModal({title:'📜 歷史記錄',body,full:true});
-  $$('.itm',bd).forEach(e=>{e.onclick=()=>openItemDetail(e.dataset.iid,e.dataset.irar);});
+  $('.itm',bd).forEach(e=>{e.onclick=()=>openItemDetail(e.dataset.iid,e.dataset.irar);});
+  $('[data-offline-idx]',bd).forEach(e=>{
+    e.onclick=()=>{ const l=logs[parseInt(e.dataset.offlineIdx,10)]; if(l) openOfflineDetail(l); };
+  });
 }
 
 /* ============================================================
@@ -2871,7 +3341,7 @@ function renderBattleScene(z1){
       <div class="range-indicator" id="range-indicator" style="left:${rLeft}%;width:${rWidth}%"></div>
       <div class="damage-header"><div>對 Boss 傷害 <span class="num">${Math.round(b.damageDealt)}</span> / ${totalHp}</div><div class="bar"><div class="fill" id="dmg-bar" style="width:${dealtPct}%"></div></div></div>
       <div class="fighter boss-f" id="fighter-boss" style="left:${b.bx*100}%;top:${b.by*100}%">
-        ${(b.shieldMaxHp>0 && !b.shieldBroken) ? `<div class="shield-bar-wrap" id="shield-bar-wrap"><div class="nm">盾</div><div class="bar"><div class="fill" id="boss-shield" style="width:${(b.shieldHp/b.shieldMaxHp*100)}%"></div></div></div>` : ''}
+        ${(b.shieldMaxHp>0 && !b.shieldBroken) ? `<div class="shield-bar-wrap" id="shield-bar-wrap"><div class="bar"><div class="fill" id="boss-shield" style="width:${(b.shieldHp/b.shieldMaxHp*100)}%"></div></div></div>` : ''}
         <div class="hpbar-wrap"><div class="nm">${b.bossName}</div><div class="bar ap"><div class="fill" id="boss-ap" style="width:${(b.bossArmor/b.bossMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:${(b.bossHp/b.bossMaxHp*100)}%"></div></div></div>
         <div class="sprite" id="boss-sprite">${BOSS_LAYERS[b.bossId] ? '<canvas id="boss-battle-canvas"></canvas>' : bossIcon(b.bossId)}</div>
       </div>
@@ -2879,6 +3349,7 @@ function renderBattleScene(z1){
         <div class="hpbar-wrap"><div class="nm">玩家</div><div class="bar ap"><div class="fill" id="hero-ap" style="width:${(b.playerArmor/b.playerMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="hero-hp" style="width:${(b.playerHp/b.playerMaxHp*100)}%"></div></div></div>
         <div class="sprite" id="hero-sprite"><canvas id="hero-battle-canvas"></canvas></div>
       </div>
+      <div class="head-bars" id="head-bars"></div>
       <div id="battle-fx"></div>
       ${false?`<div style="position:absolute;bottom:8px;left:8px;right:8px;text-align:center;font-size:11px;color:#e8a33d;background:rgba(0,0,0,.7);padding:6px;border-radius:8px;border:1px solid #8a5f18;z-index:20">準備中… 點擊 Boss 設定瞄準部位，拖動搖桿前進至警戒範圍觸發戰鬥</div>`:''}
     </div>`;
@@ -2985,12 +3456,17 @@ function buildBattleWeaponInfo(){
   if(wdef.slot==='melee') return `${wdef.name} ｜ 近戰`;
   if(wdef.slot==='throwable') return `${wdef.name} ｜ ×${getThrowableCount()}`;
   const ammoTotal=battle.ammoRef?battle.ammoRef.count:0;
-  return `${wdef.name} ｜ ${battle.ammoInMag}/${wdef.mag||0} ｜ 備彈 ${ammoTotal}${battle.reloading?'｜裝填中…':''}`;
+  let rarityIcon='';
+  if(battle.ammoRef){
+    const rr=battle.ammoRef.rarity;
+    rarityIcon=`<span class="${rarityClass(rr)}" style="font-size:13px;margin:0 5px;vertical-align:middle">${RARITY_ICON[rr]||'●'}</span>`;
+  }
+  return `${wdef.name} ｜ ${battle.ammoInMag}/${wdef.mag||0}${rarityIcon}備彈 ${ammoTotal}${battle.reloading?'｜裝填中…':''}`;
 }
 function refreshBattleControlsLive(){
   if(!battle) return;
   const info=document.getElementById('battle-ammo-info');
-  if(info) info.textContent=buildBattleWeaponInfo();
+  if(info) info.innerHTML=buildBattleWeaponInfo();
   const fb=document.getElementById('fire-btn');
   if(fb){
     const canFire=!battle.reloading&&!battle.consuming;
@@ -3137,6 +3613,7 @@ function startBossBattle(bid){
     aimPart:defaultAimPartForBoss(bid),lastManualClick:0,
     players:[{id:'local',isLocal:true}],lastH:0,
     healDisabledUntil:0,healTimer:null,autoHealing:false};
+  if(bid==='swamp_hydra') initHydraHeads();
   battleHeroAnim.name='idle';
   battleHeroAnim.frame=0;
   battleHeroAnim.lastUpdate=performance.now();
@@ -3296,7 +3773,15 @@ function updateBossAI(dt, now){
   const bRange = 0.14;
   let bossMoving = false;
 
-  if(dist > bRange){
+  if(b.bossId === 'swamp_hydra'){
+    /* ★ 沼澤九頭：完全不動，僅近戰範圍內咬擊 */
+    if(dist <= bRange){
+      if(now - (b.lastMeleeAt || 0) > 1500){
+        b.lastMeleeAt = now;
+        doBossMeleeSwipe();
+      }
+    }
+  } else if(dist > bRange){
     const bspd = 0.028 * dt;
     const step = -Math.sign(dx) * Math.min(bspd, dist - bRange);
     if(Math.abs(step) > 0.0001){
@@ -3595,8 +4080,11 @@ function battleLoop(now){
       battle.lastH = H;
       const bossSprite = document.getElementById('boss-sprite');
       const bossSize = Math.round(H * BATTLE_BOSS_HEIGHT_RATIO);
+      const fxElW = fxEl ? fxEl.clientWidth : H;
+      const maxHalfW = Math.floor(fxElW * Math.min(battle.bx, 1 - battle.bx) * 0.98);
+      const bossWide = Math.max(bossSize, Math.min(Math.round(bossSize * 1.5), maxHalfW * 2));
       if(bossSprite){
-        bossSprite.style.width = bossSize + 'px';
+        bossSprite.style.width = bossWide + 'px';
         bossSprite.style.height = bossSize + 'px';
       }
       const groundY = BATTLE_GROUND_TOP_RATIO;
@@ -3647,7 +4135,7 @@ function battleLoop(now){
       else battle.burstLeft=0;
     }
   }
-  updateBullets(dt);updateFighterPos();
+  updateBullets(dt);updateFighterPos();if(battle.bossId==='swamp_hydra')updateHeadBarsUI();
   updateBattleHeroAnim(now);
   updateBattleBossAnim(now);
   renderBattleHeroCanvas();
@@ -3993,8 +4481,255 @@ function playerShoot(){
   refreshBattleControlsLive();
   return true;
 }
+/* ★ swamp_hydra 獨立頭部 HP 系統 ★ */
+const HYDRA_HEAD_IDS = ['head_1','head_2','head_3','head_4','head_5','head_6','head_7'];
+const HYDRA_HEAD_HP = 12857;
+const HYDRA_NECK_MAP = { neck_1:'head_1', neck_2:'head_2', neck_3:'head_3', neck_4:'head_4', neck_5:'head_5', neck_6:'head_6', neck_7:'head_7' };
+function initHydraHeads(){
+  battle.heads = {};
+  for(const id of HYDRA_HEAD_IDS){ battle.heads[id] = { hp: HYDRA_HEAD_HP, max: HYDRA_HEAD_HP, alive: true }; }
+  battle.bossMaxHp = HYDRA_HEAD_HP * HYDRA_HEAD_IDS.length;
+  battle.bossHp = battle.bossMaxHp;
+}
+function getHeadOwnerOfLayer(layerId){
+  if(!battle) return null;
+  const def = BOSS_LAYERS[battle.bossId];
+  if(!def) return null;
+  let cur = def.layers.find(l => l.id === layerId);
+  const seen = new Set();
+  while(cur && !seen.has(cur.id)){
+    if(/^head_\d+$/.test(cur.id)) return cur.id;
+    seen.add(cur.id);
+    cur = cur.anchor ? def.layers.find(l => l.id === cur.anchor.target) : null;
+  }
+  return null;
+}
+function pickHeadForPoint(px, py, def, world, anim, fi){
+  for(let i = 1; i <= 7; i++){
+    const hid = 'head_' + i;
+    const L = def.layers.find(x => x.id === hid);
+    if(!L) continue;
+    const k = (anim.keys && anim.keys[hid] && anim.keys[hid][fi]) || {rot:0,dx:0,dy:0};
+    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+    const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+    const pivotX = w * L.pivot.x;
+    const pivotY = h * L.pivot.y;
+    const wp = world[hid]; if(!wp) continue;
+    const rot = wp.rot * Math.PI / 180;
+    const cos = Math.cos(-rot), sin = Math.sin(-rot);
+    const dx = px - wp.wx;
+    const dy = py - wp.wy;
+    const lx = dx * cos - dy * sin + pivotX;
+    const ly = dx * sin + dy * cos + pivotY;
+    if(lx >= 0 && lx <= w && ly >= 0 && ly <= h) return hid;
+  }
+  let bestId = null, bestD = Infinity;
+  for(let i = 1; i <= 7; i++){
+    const hid = 'head_' + i;
+    const hw = world[hid]; if(!hw) continue;
+    const dx = px - hw.wx, dy = py - hw.wy;
+    const d = dx*dx + dy*dy;
+    if(d < bestD){ bestD = d; bestId = hid; }
+  }
+  return bestId;
+}
+function findNearestHeadForLayer(layerId){
+  if(!battle) return null;
+  const def = BOSS_LAYERS[battle.bossId]; if(!def) return null;
+  const anims = BOSS_ANIMS[battle.bossId]; if(!anims) return null;
+  const anim = anims[battleBossAnim.name] || anims.idle; if(!anim) return null;
+  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  const world = resolveBossWorld(def, anim, fi);
+  const _isEM = /^(eyes|mouth)/.test(layerId);
+  if(!_isEM){
+    const self = world[layerId]; if(!self) return null;
+    return pickHeadForPoint(self.wx, self.wy, def, world, anim, fi);
+  }
+  const _emIds = def.layers.filter(L => /^(eyes|mouth)/.test(L.id)).map(L => L.id);
+  const _group = [];
+  const _visited = new Set();
+  const _queue = [layerId];
+  while(_queue.length){
+    const cur = _queue.shift();
+    if(_visited.has(cur)) continue;
+    _visited.add(cur);
+    _group.push(cur);
+    const cL = def.layers.find(x => x.id === cur);
+    if(!cL) continue;
+    for(const oid of _emIds){
+      if(_visited.has(oid)) continue;
+      const oL = def.layers.find(x => x.id === oid);
+      if(!oL) continue;
+      const linked = (oL.anchor && oL.anchor.target === cur) ||
+                     (cL.anchor && cL.anchor.target === oid);
+      if(linked) _queue.push(oid);
+    }
+  }
+  let sx = 0, sy = 0, cnt = 0;
+  for(const gid of _group){
+    const w = world[gid];
+    if(w){ sx += w.wx; sy += w.wy; cnt++; }
+  }
+  if(cnt === 0) return null;
+  return pickHeadForPoint(sx / cnt, sy / cnt, def, world, anim, fi);
+}
+function getHydraTargets(aimPart){
+  if(battle.heads[aimPart] && battle.heads[aimPart].alive) return [aimPart];
+  if(HYDRA_NECK_MAP[aimPart]){
+    const h = HYDRA_NECK_MAP[aimPart];
+    if(battle.heads[h] && battle.heads[h].alive) return [h];
+    return [];
+  }
+  if(/^(eyes|mouth)/.test(aimPart)){
+    const owner = findNearestHeadForLayer(aimPart);
+    if(owner && battle.heads[owner] && battle.heads[owner].alive) return [owner];
+    return [];
+  }
+  return HYDRA_HEAD_IDS.filter(h => battle.heads[h].alive);
+}
+function getHeadScreenPos(headId){
+  if(!battle) return null;
+  const def = BOSS_LAYERS[battle.bossId]; if(!def) return null;
+  const anims = BOSS_ANIMS[battle.bossId]; if(!anims) return null;
+  const anim = anims[battleBossAnim.name] || anims.idle; if(!anim) return null;
+  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  const world = resolveBossWorld(def, anim, fi);
+  const wp = world[headId]; if(!wp) return null;
+  const bossSprite = document.getElementById('boss-sprite');
+  const fxEl = document.getElementById('battle-fx');
+  if(!bossSprite || !fxEl) return null;
+  const W = fxEl.clientWidth, H = fxEl.clientHeight;
+  const spriteW = bossSprite.clientWidth || 280;
+  const spriteH = bossSprite.clientHeight || 280;
+  const spriteLeft = battle.bx * W - spriteW / 2;
+  const spriteTop = battle.by * H;
+  return {
+    x: (spriteLeft + (wp.wx / def.canvas.w) * spriteW) / W,
+    y: (spriteTop + (wp.wy / def.canvas.h) * spriteH) / H
+  };
+}
+function playHeadBreakFx(headId){
+  const layer = document.getElementById('battle-fx');
+  if(!layer || !battle) return;
+  const pos = getHeadScreenPos(headId); if(!pos) return;
+  const fx = document.createElement('div');
+  fx.className = 'head-break-fx';
+  fx.style.left = (pos.x * 100) + '%';
+  fx.style.top  = (pos.y * 100) + '%';
+  const glow = document.createElement('div');
+  glow.className = 'glow'; fx.appendChild(glow);
+  for(let i = 0; i < 16; i++){
+    const frag = document.createElement('div');
+    frag.className = (i % 2 === 0) ? 'frag' : 'blood';
+    const ang = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const dist = 35 + Math.random() * 60;
+    const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist;
+    frag.animate([
+      { transform: 'translate(0,0) scale(1) rotate(0deg)', opacity: 1 },
+      { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.4) rotate(' + (Math.random()*360-180) + 'deg)', opacity: 0 }
+    ], { duration: 550 + Math.random() * 250, easing: 'cubic-bezier(.2,.8,.4,1)', fill: 'forwards' });
+    fx.appendChild(frag);
+  }
+  layer.appendChild(fx);
+  setTimeout(() => fx.remove(), 900);
+  const bar = document.getElementById('head-bar-' + headId.replace('head_', ''));
+  if(bar) bar.remove();
+}
+function updateHeadBarsUI(){
+  if(!battle || battle.bossId !== 'swamp_hydra' || !battle.heads) return;
+  const container = document.getElementById('head-bars'); if(!container) return;
+  const def = BOSS_LAYERS[battle.bossId]; if(!def) return;
+  const anims = BOSS_ANIMS[battle.bossId];
+  const anim = anims ? (anims[battleBossAnim.name] || anims.idle) : null; if(!anim) return;
+  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  const world = resolveBossWorld(def, anim, fi);
+  const bossSprite = document.getElementById('boss-sprite');
+  const fxEl = document.getElementById('battle-fx');
+  if(!bossSprite || !fxEl) return;
+  const W = fxEl.clientWidth, H = fxEl.clientHeight;
+  const spriteW = bossSprite.clientWidth || 280;
+  const spriteH = bossSprite.clientHeight || 280;
+  const spriteLeft = battle.bx * W - spriteW / 2;
+  const spriteTop = battle.by * H;
+  const _fit = def.autoFit ? computeBossFit(def, battle.bossId, spriteW, spriteH) : null;
+  const _baseSx = spriteW / def.canvas.w;
+  const _baseSy = spriteH / def.canvas.h;
+  for(let i = 1; i <= 7; i++){
+    const headId = 'head_' + i;
+    const head = battle.heads[headId]; if(!head) continue;
+    let bar = document.getElementById('head-bar-' + i);
+    if(!head.alive){ if(bar) bar.remove(); continue; }
+    const L = def.layers.find(l => l.id === headId); if(!L) continue;
+    const k = (anim.keys && anim.keys[headId] && anim.keys[headId][fi]) || {rot:0,dx:0,dy:0};
+    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+    const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+    const px = w * L.pivot.x;
+    const py = h * L.pivot.y;
+    const wp = world[headId]; if(!wp) continue;
+    const topLocalX = w / 2;
+    const topLocalY = 0;
+    const dxx = topLocalX - px;
+    const dyy = topLocalY - py;
+    const rot = wp.rot * Math.PI / 180;
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    const rotX = dxx * cos - dyy * sin;
+    const rotY = dxx * sin + dyy * cos;
+    const topWX = wp.wx + rotX;
+    const topWY = wp.wy + rotY;
+    let canvasPx, canvasPy;
+    if(_fit){
+      canvasPx = _fit.offsetX + topWX * _fit.fitScale;
+      canvasPy = _fit.offsetY + topWY * _fit.fitScale;
+    } else {
+      canvasPx = topWX * _baseSx;
+      canvasPy = topWY * _baseSy;
+    }
+    const screenX = spriteLeft + canvasPx;
+    const screenY = spriteTop + canvasPy - 6;
+    if(!bar){
+      bar = document.createElement('div');
+      bar.id = 'head-bar-' + i;
+      bar.className = 'head-bar';
+      bar.innerHTML = '<div class="bar"><div class="fill"></div></div>';
+      container.appendChild(bar);
+    }
+    bar.style.left = screenX + 'px';
+    bar.style.top = screenY + 'px';
+    const fill = bar.querySelector('.fill');
+    if(fill) fill.style.width = Math.max(0, head.hp / head.max * 100) + '%';
+  }
+}
+function applyHydraDamage(dmg, isCrit, pen){
+  if(battle.bossArmor > 0){
+    const proxy = { hp: 0, armor: battle.bossArmor };
+    const r = applyDamage(proxy, dmg, pen || 0);
+    battle.bossArmor = proxy.armor;
+    battle.damageDealt += r.armorLost;
+    spawnHitFx(battle.bx, battle.by, '-' + r.armorLost + (isCrit ? '!' : ''), isCrit ? 'crit' : 'armor');
+    const apEl = document.getElementById('boss-ap');
+    if(apEl) apEl.style.width = Math.max(0, battle.bossArmor / battle.bossMaxArmor * 100) + '%';
+    return;
+  }
+  const isBodyPart = !/^(head_|neck_|eyes|mouth)/.test(battle.aimPart);
+  const adjustedDmg = isBodyPart ? Math.round(dmg * 0.7) : dmg;
+  const targets = getHydraTargets(battle.aimPart);
+  if(!targets.length) return;
+  const share = Math.max(1, Math.round(adjustedDmg / targets.length));
+  for(const headId of targets){
+    const head = battle.heads[headId]; if(!head || !head.alive) continue;
+    head.hp = Math.max(0, head.hp - share);
+    battle.damageDealt += share;
+    const pos = getHeadScreenPos(headId);
+    if(pos) spawnHitFx(pos.x, pos.y, '-' + share + (isCrit ? '!' : ''), isCrit ? 'crit' : 'weak');
+    if(head.hp <= 0){ head.alive = false; playHeadBreakFx(headId); }
+  }
+  battle.bossHp = HYDRA_HEAD_IDS.reduce((s, id) => s + (battle.heads[id].alive ? battle.heads[id].hp : 0), 0);
+  if(HYDRA_HEAD_IDS.every(id => !battle.heads[id].alive)){ battle.bossHp = 0; endBattle(true); return; }
+  updateHeadBarsUI();
+}
 function applyBossDamage(dmg,isCrit,pen){
   battle.engaged = true;
+  if(battle.bossId==='swamp_hydra' && battle.heads){ applyHydraDamage(dmg,isCrit,pen); return; }
   if(battle.shieldMaxHp>0 && !battle.shieldBroken && battle.shieldHp>0){
     const _pen=pen||0;
     const _shieldScale=Math.min(1,Math.exp((_pen-7)*0.4));
@@ -4483,7 +5218,8 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
     notify('已加入改造隊列','ok');
   };
 }
-function rarityPolicyBlockHTML(prefix, title, ctx){
+function rarityPolicyBlockHTML(prefix, title, ctx, showExclude){
+  if(showExclude === undefined) showExclude = true;
   const pri = ctx.priority || '一般';
   const fb = ctx.fallback || 'desc';
   const ex = ctx.exclude || [];
@@ -4491,15 +5227,17 @@ function rarityPolicyBlockHTML(prefix, title, ctx){
   h += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="flex:0 0 60px;color:#7a6f60;font-size:11px">優先使用</span><select id="${prefix}-pri" style="flex:1;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:4px 6px;font-size:11px">`;
   for(const r of RARITY_ORDER){h += `<option value="${r}" ${pri===r?'selected':''}>${r}</option>`;}
   h += `</select></div>`;
-  h += `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0"><span style="flex:0 0 60px;color:#7a6f60;font-size:11px;padding-top:4px">不使用</span><div style="flex:1;display:flex;flex-wrap:wrap;gap:4px">`;
-  for(const r of UI_RARITY_LIST){
-    const on = ex.includes(r);
-    const bc = on ? '#e05252' : '#3a2f25';
-    const bg = on ? '#3a1a1a' : '#241d16';
-    const tc = on ? '#e05252' : '#a89a85';
-    h += `<label class="excl-label" data-prefix="${prefix}" data-r="${r}" style="cursor:pointer;font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid ${bc};background:${bg};color:${tc};user-select:none;display:flex;align-items:center;gap:4px;line-height:1.2"><input type="checkbox" class="excl-cb" data-prefix="${prefix}" data-r="${r}" ${on?'checked':''} style="accent-color:#e05252;margin:0;width:auto;flex:0 0 auto">${r}</label>`;
+  if(showExclude){
+    h += `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0"><span style="flex:0 0 60px;color:#7a6f60;font-size:11px;padding-top:4px">不使用</span><div style="flex:1;display:flex;flex-wrap:wrap;gap:4px">`;
+    for(const r of UI_RARITY_LIST){
+      const on = ex.includes(r);
+      const bc = on ? '#e05252' : '#3a2f25';
+      const bg = on ? '#3a1a1a' : '#241d16';
+      const tc = on ? '#e05252' : '#a89a85';
+      h += `<label class="excl-label" data-prefix="${prefix}" data-r="${r}" style="cursor:pointer;font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid ${bc};background:${bg};color:${tc};user-select:none;display:flex;align-items:center;gap:4px;line-height:1.2"><input type="checkbox" class="excl-cb" data-prefix="${prefix}" data-r="${r}" ${on?'checked':''} style="accent-color:#e05252;margin:0;width:auto;flex:0 0 auto">${r}</label>`;
+    }
+    h += `</div></div>`;
   }
-  h += `</div></div>`;
   h += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="flex:0 0 60px;color:#7a6f60;font-size:11px">用罄後</span><select id="${prefix}-fb" style="flex:1;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:4px 6px;font-size:11px">`;
   h += `<option value="desc" ${fb==='desc'?'selected':''}>降序（傳奇→破舊）</option>`;
   h += `<option value="asc" ${fb==='asc'?'selected':''}>升序（破舊→傳奇）</option>`;
@@ -4509,9 +5247,9 @@ function rarityPolicyBlockHTML(prefix, title, ctx){
 function openPreference(){
   const p=state.preferences;
   let body='';
-  body+=rarityPolicyBlockHTML('exp','🎯 探索模式彈藥',p.ammoExplore);
-  body+=rarityPolicyBlockHTML('cmb','⚔️ 戰鬥模式彈藥',p.ammoCombat);
-  body+=rarityPolicyBlockHTML('con','💊 消耗品使用',p.consume);
+  body+=rarityPolicyBlockHTML('exp','🎯 探索模式彈藥',p.ammoExplore, true);
+  body+=rarityPolicyBlockHTML('cmb','⚔️ 戰鬥模式彈藥',p.ammoCombat, false);
+  body+=rarityPolicyBlockHTML('con','💊 消耗品使用',p.consume, false);
   body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:10px 0 6px">🩸 自動使用消耗品血量閾值：${Math.round(p.autoConsumeThreshold*100)}%</div><input type="range" min="5" max="90" value="${Math.round(p.autoConsumeThreshold*100)}" id="thr-slider" style="width:100%">`;
   const bd=openModal({title:'⚙️ 偏好設定',body});
   const getCtx=(k)=>k==='exp'?state.preferences.ammoExplore:(k==='cmb'?state.preferences.ammoCombat:state.preferences.consume);
