@@ -47,8 +47,77 @@ const HERO_SPRITE_W = 88;
 function getSceneW(){const fxEl=document.getElementById('battle-fx');return fxEl?fxEl.clientWidth:400;}
 function getBossSpriteWidthPx(){const sp=document.getElementById('boss-sprite');return sp?sp.clientWidth:280;}
 function getPlayerSpriteWidthPx(){return HERO_SPRITE_W;}
-function getBossLeftBoundaryN(){const W=getSceneW();if(!W)return 0;return battle.bx-(getBossSpriteWidthPx()/2)/W;}
-function getBossRightBoundaryN(){const W=getSceneW();if(!W)return 1;return battle.bx+(getBossSpriteWidthPx()/2)/W;}
+/* ★ 計算 BOSS 圖形在 sprite 內的實際像素邊界（依動畫 + sprite 尺寸快取） */
+function getBossGfxBounds(){
+  if(!battle) return null;
+  const def = BOSS_LAYERS[battle.bossId];
+  if(!def) return null;
+  const anims = BOSS_ANIMS[battle.bossId];
+  if(!anims) return null;
+  const anim = anims[battleBossAnim.name] || anims.idle;
+  if(!anim) return null;
+  const sp = document.getElementById('boss-sprite');
+  if(!sp) return null;
+  const spriteW = sp.clientWidth;
+  const spriteH = sp.clientHeight;
+  if(!spriteW || !spriteH) return null;
+  const cacheKey = battle.bossId + '|' + battleBossAnim.name + '|' + battleBossAnim.frame + '|' + spriteW + '|' + spriteH;
+  if(battle._bossGfxBoundsKey === cacheKey && battle._bossGfxBounds) return battle._bossGfxBounds;
+  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  const world = resolveBossWorld(def, anim, fi);
+  let minX = Infinity, maxX = -Infinity;
+  for(const L of def.layers){
+    const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0,dx:0,dy:0};
+    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+    const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+    const px = w * L.pivot.x;
+    const py = h * L.pivot.y;
+    const wp = world[L.id];
+    if(!wp) continue;
+    const rot = wp.rot * Math.PI / 180;
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    for(const c of [[0,0],[w,0],[0,h],[w,h]]){
+      const dx = c[0] - px, dy = c[1] - py;
+      const rx = dx*cos - dy*sin + wp.wx;
+      if(rx < minX) minX = rx;
+      if(rx > maxX) maxX = rx;
+    }
+  }
+  if(!isFinite(minX)){ battle._bossGfxBoundsKey = cacheKey; battle._bossGfxBounds = null; return null; }
+  const baseSx = spriteW / def.canvas.w;
+  const baseSy = spriteH / def.canvas.h;
+  let s, ox;
+  if(def.autoFit){
+    const fit = computeBossFit(def, battle.bossId, spriteW, spriteH);
+    if(fit){ s = fit.fitScale; ox = fit.offsetX; }
+    else { s = Math.min(baseSx, baseSy); ox = (spriteW - def.canvas.w * s) / 2; }
+  } else {
+    s = Math.min(baseSx, baseSy);
+    ox = (spriteW - def.canvas.w * s) / 2;
+  }
+  const bounds = { leftPx: ox + minX * s, rightPx: ox + maxX * s, spriteW: spriteW };
+  battle._bossGfxBoundsKey = cacheKey;
+  battle._bossGfxBounds = bounds;
+  return bounds;
+}
+function getBossLeftBoundaryN(){
+  const W = getSceneW(); if(!W || !battle) return 0;
+  const sp = document.getElementById('boss-sprite');
+  const spriteW = sp ? sp.clientWidth : 280;
+  const spriteLeft = battle.bx * W - spriteW / 2;
+  const bounds = getBossGfxBounds();
+  if(!bounds) return spriteLeft / W;
+  return (spriteLeft + bounds.leftPx) / W;
+}
+function getBossRightBoundaryN(){
+  const W = getSceneW(); if(!W || !battle) return 1;
+  const sp = document.getElementById('boss-sprite');
+  const spriteW = sp ? sp.clientWidth : 280;
+  const spriteLeft = battle.bx * W - spriteW / 2;
+  const bounds = getBossGfxBounds();
+  if(!bounds) return (spriteLeft + spriteW) / W;
+  return (spriteLeft + bounds.rightPx) / W;
+}
 function getPlayerRightBoundaryN(){const W=getSceneW();if(!W)return 1;return battle.px+(getPlayerSpriteWidthPx()/2)/W;}
 function getPlayerLeftBoundaryN(){const W=getSceneW();if(!W)return 0;return battle.px-(getPlayerSpriteWidthPx()/2)/W;}
 /* ★ 檢查瞄準部位的圖形是否與玩家攻擊範圍有重疊 */

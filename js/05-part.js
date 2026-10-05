@@ -51,9 +51,12 @@ function pushPlayerLeft(newBx){
   if(!b) return newBx;
   const W = getSceneW();
   if(!W) return newBx;
-  const bossHalf = getBossSpriteWidthPx() / 2;
   const playerHalf = getPlayerSpriteWidthPx() / 2;
-  const bossLeftPx = newBx * W - bossHalf;
+  const sp = document.getElementById('boss-sprite');
+  const spriteW = sp ? sp.clientWidth : 280;
+  const bounds = getBossGfxBounds();
+  const gfxLeftOffsetPx = bounds ? bounds.leftPx : (spriteW / 2);
+  const bossLeftPx = newBx * W - spriteW / 2 + gfxLeftOffsetPx;
   const playerRightPx = b.px * W + playerHalf;
   if(bossLeftPx < playerRightPx){
     const overlap = playerRightPx - bossLeftPx;
@@ -61,7 +64,7 @@ function pushPlayerLeft(newBx){
     b.px = newPx;
     const playerRightPx2 = b.px * W + playerHalf;
     if(bossLeftPx < playerRightPx2){
-      newBx = (playerRightPx2 + bossHalf) / W;
+      newBx = (playerRightPx2 + spriteW / 2 - gfxLeftOffsetPx) / W;
     }
   }
   return newBx;
@@ -488,11 +491,14 @@ function battleLoop(now){
 
   if(canMove && hasMoveInput){
     let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
-    /* 玩家永遠在 Boss 左側（像素邊界） */
+    /* 玩家永遠在 Boss 圖形左側（依實際圖形邊界） */
     const _W = getSceneW();
-    const _bossHalf = getBossSpriteWidthPx() / 2;
     const _playerHalf = getPlayerSpriteWidthPx() / 2;
-    const pxMax = (battle.bx * _W - _bossHalf - _playerHalf) / _W;
+    const _sp = document.getElementById('boss-sprite');
+    const _spriteW = _sp ? _sp.clientWidth : 280;
+    const _bounds = getBossGfxBounds();
+    const _gfxLeftOffsetPx = _bounds ? _bounds.leftPx : (_spriteW / 2);
+    const pxMax = (battle.bx * _W - _spriteW / 2 + _gfxLeftOffsetPx - _playerHalf) / _W;
     if(newPx > pxMax) newPx = Math.max(0.05, pxMax);
     battle.px = newPx;
   }
