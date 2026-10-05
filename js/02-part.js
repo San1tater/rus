@@ -2,11 +2,11 @@
    ★ BOSS MODULE — 資料區
    ============================================================ */
 const BOSSES={
-  factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:10000,armor:400,armorLevel:4,dmg:125,pen:2,critRate:0.10,critMult:1.5,seal:'seal_factory',unlock:'廢棄實驗室',drops:['zhuk6a','svd','altyn','rpk16','maska']},
-  lab_queen:{name:'實驗室女王 · 白蝕',region:'廢棄實驗室',hp:25000,armor:1200,armorLevel:5,dmg:225,pen:3,critRate:0.12,critMult:1.6,seal:'seal_lab',unlock:'郊區公路',drops:['altyn','zsh12m','rpk16','asval','maska','6b232']},
-  road_tyrant:{name:'公路暴君 · 鐵鎚',region:'郊區公路',hp:50000,armor:2500,armorLevel:6,dmg:350,pen:4,critRate:0.15,critMult:1.8,seal:'seal_road',unlock:'輻射沼澤',drops:['zhuk6a','svd','pkp','rpk16','belleville','zhuk3']},
-  swamp_hydra:{name:'沼澤九頭 · 腐母',region:'輻射沼澤',hp:90000,armor:4000,armorLevel:6,dmg:500,pen:5,critRate:0.18,critMult:2.0,seal:'seal_swamp',unlock:'廢土核心',drops:['altyn','zsh12m','svd','pkp','6b43','zhuk6a','maska']},
-  core_omega:{name:'核心終焉 · OMEGA',region:'廢土核心',hp:160000,armor:6000,armorLevel:7,dmg:650,pen:6,critRate:0.20,critMult:2.2,seal:'seal_core',unlock:null,drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','rgn']},
+  factory_king:{name:'工廠之王 · 鐵手',region:'廢棄工廠',hp:10000,armor:2000,armorLevel:4,dmg:125,pen:2,critRate:0.10,critMult:1.5,seal:'seal_factory',unlock:'廢棄實驗室',drops:['zhuk6a','svd','altyn','rpk16','maska']},
+  lab_queen:{name:'實驗室女王 · 白蝕',region:'廢棄實驗室',hp:25000,armor:6000,armorLevel:5,dmg:225,pen:3,critRate:0.12,critMult:1.6,seal:'seal_lab',unlock:'郊區公路',drops:['altyn','zsh12m','rpk16','asval','maska','6b232']},
+  road_tyrant:{name:'公路暴君 · 鐵鎚',region:'郊區公路',hp:50000,armor:12500,armorLevel:6,dmg:350,pen:4,critRate:0.15,critMult:1.8,seal:'seal_road',unlock:'輻射沼澤',drops:['zhuk6a','svd','pkp','rpk16','belleville','zhuk3']},
+  swamp_hydra:{name:'沼澤九頭 · 腐母',region:'輻射沼澤',hp:90000,armor:20000,armorLevel:6,dmg:500,pen:5,critRate:0.18,critMult:2.0,seal:'seal_swamp',unlock:'廢土核心',drops:['altyn','zsh12m','svd','pkp','6b43','zhuk6a','maska']},
+  core_omega:{name:'核心終焉 · OMEGA',region:'廢土核心',hp:160000,armor:30000,armorLevel:7,dmg:650,pen:6,critRate:0.20,critMult:2.2,seal:'seal_core',unlock:null,drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','rgn']},
 };
 
 const BOSS_WEAKPOINTS = {
