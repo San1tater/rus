@@ -137,7 +137,12 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
       ctx.scale(baseSx, baseSy);
     }
   } else {
-    ctx.scale(baseSx, baseSy);
+    /* ★ 等比縮放：取 min(sx, sy)，水平居中，底部對齊 */
+    const _s = Math.min(baseSx, baseSy);
+    const _ox = (canvasW - def.canvas.w * _s) / 2;
+    const _oy = (canvasH - def.canvas.h * _s);
+    ctx.translate(_ox, _oy);
+    ctx.scale(_s, _s);
   }
 
   const _SHIELD_LIDS = ['shield','shield-2','shield-2_copy','shield-2_copy_1'];
