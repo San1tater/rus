@@ -49,13 +49,19 @@ function hideBossWarning(){
 function pushPlayerLeft(newBx){
   const b = battle;
   if(!b) return newBx;
-  const leftLimit = b.px + BOSS_MIN_GAP;
-  if(newBx < leftLimit){
-    const push = leftLimit - newBx;
-    const newPx = clamp(b.px - push, 0.05, 0.95);
+  const W = getSceneW();
+  if(!W) return newBx;
+  const bossHalf = getBossSpriteWidthPx() / 2;
+  const playerHalf = getPlayerSpriteWidthPx() / 2;
+  const bossLeftPx = newBx * W - bossHalf;
+  const playerRightPx = b.px * W + playerHalf;
+  if(bossLeftPx < playerRightPx){
+    const overlap = playerRightPx - bossLeftPx;
+    const newPx = clamp(b.px - overlap / W, 0.05, 0.95);
     b.px = newPx;
-    if(newBx < b.px + BOSS_MIN_GAP){
-      newBx = b.px + BOSS_MIN_GAP;
+    const playerRightPx2 = b.px * W + playerHalf;
+    if(bossLeftPx < playerRightPx2){
+      newBx = (playerRightPx2 + bossHalf) / W;
     }
   }
   return newBx;
@@ -119,6 +125,8 @@ function updateBossAI(dt, now){
 
   const dx = b.bx - b.px;
   const dist = Math.abs(dx);
+  /* ★ 像素邊界判定：玩家圖形右邊界 vs BOSS 中心 - range */
+  const playerRightN = getPlayerRightBoundaryN();
 
   const skills = getBossSkillList(b.bossId);
   for(const sk of skills){
@@ -127,12 +135,13 @@ function updateBossAI(dt, now){
     if(now < (b.skillCds[sk.id] || 0)) continue;
     if(sk.type === 'dash'){
       const minR = sk.minRange || 0.15;
-      if(dist < minR || dist > sk.range) continue;
+      if(dist < minR) continue;
+      if(playerRightN < b.bx - sk.range) continue;
       startBossDash(sk, now);
       b.skillCds[sk.id] = now + sk.cd * 1000;
       return;
     } else {
-      if(dist > sk.range) continue;
+      if(playerRightN < b.bx - sk.range) continue;
       b.bossCast = { skill: sk, startTime: now, applied: false };
       b.skillCds[sk.id] = now + sk.cd * 1000;
       playBossOneshot(sk.anim, sk.totalTime);
@@ -146,15 +155,16 @@ function updateBossAI(dt, now){
 
   if(b.bossId === 'swamp_hydra'){
     /* ★ 沼澤九頭：完全不動，僅近戰範圍內咬擊 */
-    if(dist <= bRange){
+    if(playerRightN >= b.bx - bRange){
       if(now - (b.lastMeleeAt || 0) > 1500){
         b.lastMeleeAt = now;
         doBossMeleeSwipe();
       }
     }
-  } else if(dist > bRange){
+  } else if(playerRightN < b.bx - bRange){
     const bspd = 0.028 * dt;
-    const step = -Math.sign(dx) * Math.min(bspd, dist - bRange);
+    const gap = (b.bx - bRange) - playerRightN;
+    const step = -Math.min(bspd, gap);
     if(Math.abs(step) > 0.0001){
       let newBx = b.bx + step;
       if(step < 0){
@@ -184,8 +194,18 @@ function startBossDash(sk, now){
   const b = battle;
   if(!b) return;
   const dir = Math.sign(b.px - b.bx) || 1;
-  const rawTarget = b.bx + dir * (sk.dashDistance || 0.35);
-  const targetX = clamp(rawTarget, 0.05 + BOSS_MIN_GAP, 0.95);
+  let targetX;
+  if(dir < 0){
+    const W = getSceneW();
+    const bossHalf = getBossSpriteWidthPx() / 2;
+    const playerHalf = getPlayerSpriteWidthPx() / 2;
+    const centerTarget = b.bx - (sk.dashDistance || 0.35);
+    const boundaryTarget = (b.px * W + playerHalf + bossHalf) / W;
+    targetX = Math.max(centerTarget, boundaryTarget);
+  } else {
+    targetX = b.bx + dir * (sk.dashDistance || 0.35);
+  }
+  targetX = clamp(targetX, 0.05, 0.95);
   b.bossDash = {
     skill: sk,
     state: 'warn',
@@ -231,16 +251,14 @@ function updateBossDash(dt, now){
     let newBx = b.bx + step;
 
     if(d.dir < 0){
-      /* 向左衝：撞到玩家就推 */
-      const leftLimit = b.px + BOSS_MIN_GAP;
-      if(newBx < leftLimit){
-        const push = leftLimit - newBx;
-        const newPx = clamp(b.px - push, 0.05, 0.95);
-        b.px = newPx;
-        if(newBx < b.px + BOSS_MIN_GAP){
-          newBx = b.px + BOSS_MIN_GAP;
-        }
-        if((now - (d.lastHit||0)) > d.hitTickMs){
+      newBx = pushPlayerLeft(newBx);
+      const W = getSceneW();
+      if(W){
+        const bossHalf = getBossSpriteWidthPx() / 2;
+        const playerHalf = getPlayerSpriteWidthPx() / 2;
+        const bossLeftPx = newBx * W - bossHalf;
+        const playerRightPx = b.px * W + playerHalf;
+        if(bossLeftPx <= playerRightPx + 1 && (now - (d.lastHit||0)) > d.hitTickMs){
           d.lastHit = now;
           const _contactScale = (b.bossDmg || 25) / 25;
           tryHitPlayer(d.contactDmg * _contactScale * (b.bossDmgMult||1), b.bossPen||0);
@@ -310,7 +328,7 @@ function tryHitPlayer(dmg, pen){
     isCrit = true;
   }
   const target = { hp: battle.playerHp, armor: battle.playerArmor };
-  const res = applyDamage(target, finalDmg, pen||0);
+  const res = applyDamage(target, finalDmg, pen||0, state.player.armorLevel||0);
   battle.playerHp = target.hp;
   battle.playerArmor = target.armor;
   const _hh=document.getElementById('hero-hp'),_ha=document.getElementById('hero-ap');
@@ -327,13 +345,12 @@ function tryHitPlayer(dmg, pen){
 function doBossMeleeSwipe(){
   if(!battle || !battle.active) return;
   const b = battle;
-  if(b.bossId === 'core_omega' && isOmegaArmBroken('arm_lu_tip')) return;
-  if(Math.abs(b.bx - b.px) > 0.30) return;
+  if(b.bossId === 'core_omega' && isOmegaArmBroken('ring_l')) return;
+  if(getPlayerRightBoundaryN() < b.bx - 0.30) return;
   playBossOneshot('attack_swipe', 500);
   setTimeout(()=>{
     if(!battle || !battle.active) return;
-    const dist = Math.abs(battle.bx - battle.px);
-    if(dist > 0.30){
+    if(getPlayerRightBoundaryN() < battle.bx - 0.30){
       spawnHitFx(battle.bx, battle.by, 'MISS', 'armor');
       return;
     }
@@ -408,8 +425,7 @@ function spawnSingleProjectile(fx, type, sx, sy){
 function applyBossSkillDamage(sk){
   if(!battle || !battle.active) return;
   if(sk.projectile) spawnBossProjectile(sk);
-  const dist = Math.abs(battle.bx - battle.px);
-  if(dist > sk.range){
+  if(getPlayerRightBoundaryN() < battle.bx - sk.range){
     spawnHitFx(battle.px, battle.py, 'MISS', 'armor');
     return;
   }
@@ -472,9 +488,12 @@ function battleLoop(now){
 
   if(canMove && hasMoveInput){
     let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
-    /* 玩家永遠在 Boss 左側 */
-    const pxMax = Math.max(0.05, battle.bx - BOSS_MIN_GAP);
-    if(newPx > pxMax) newPx = pxMax;
+    /* 玩家永遠在 Boss 左側（像素邊界） */
+    const _W = getSceneW();
+    const _bossHalf = getBossSpriteWidthPx() / 2;
+    const _playerHalf = getPlayerSpriteWidthPx() / 2;
+    const pxMax = (battle.bx * _W - _bossHalf - _playerHalf) / _W;
+    if(newPx > pxMax) newPx = Math.max(0.05, pxMax);
     battle.px = newPx;
   }
 
@@ -725,8 +744,10 @@ function playerShoot(){
   if(!w||battle.reloading||battle.consuming)return false;
   if(battle.moveDir!==0)return false;
   let def=w.def;
-  const dist=Math.abs(battle.bx-battle.px);
-  if(dist>battle.playerWeaponRange+0.05){if(Math.random()<0.05)notify('超出武器射程','error');return false;}
+  const playerRightPx=battle.px+battle.playerWeaponRange;
+  const bossLeftPx=getBossLeftBoundaryN();
+  if(playerRightPx<bossLeftPx){if(Math.random()<0.05)notify('超出武器射程','error');return false;}
+  if(!isAimPartInRange()){if(Math.random()<0.05)notify('瞄準部位超出射程','error');return false;}
   const isMelee = def.slot === 'melee';
 
   if(def.cal && battle.ammoInMag <= 0){
@@ -842,7 +863,7 @@ function playerShoot(){
           if(battle.bossId === 'core_omega' && battle.arms) damageOmegaArm(battle.aimPart, dmg);
           if(battle.bossHp <= 0){ endBattle(true); return true; }
         } else {
-          applyBossDamage(dmg,isCrit,0);
+          applyBossDamage(dmg,isCrit,def.pen||0);
           if(battle.bossHp <= 0) return true;
         }
       }
@@ -854,17 +875,16 @@ function playerShoot(){
   return true;
 }
 /* ★ core_omega 四臂系統 ★ */
-const OMEGA_ARM_TIP_IDS = ['arm_lu_tip'];
+const OMEGA_ARM_IDS = ['ring_t','ring_b','ring_l','ring_r'];
 const OMEGA_ARM_HP = 10000;
-const OMEGA_SKILL_TO_ARM = { melee:'arm_lu_tip' };
+const OMEGA_SKILL_TO_ARM = { melee:'ring_l' };
 function initOmegaArms(){
   battle.arms = {};
-  for(const id of OMEGA_ARM_TIP_IDS){ battle.arms[id] = { hp: OMEGA_ARM_HP, max: OMEGA_ARM_HP, alive: true }; }
+  for(const id of OMEGA_ARM_IDS){ battle.arms[id] = { hp: OMEGA_ARM_HP, max: OMEGA_ARM_HP, alive: true }; }
 }
 function getOmegaArmIdOfLayer(layerId){
-  const m = layerId.match(/^(arm_lu)_/);
-  if(!m) return null;
-  return 'arm_lu_tip';
+  if(layerId && layerId.indexOf('ring_') === 0) return layerId;
+  return null;
 }
 function damageOmegaArm(armId, dmg){
   if(!battle || !battle.arms) return;
@@ -1110,8 +1130,9 @@ function updateHeadBarsUI(){
 }
 function applyHydraDamage(dmg, isCrit, pen){
   if(battle.bossArmor > 0){
+    const bl=BOSSES[battle.bossId]?(BOSSES[battle.bossId].armorLevel||0):0;
     const proxy = { hp: 0, armor: battle.bossArmor };
-    const r = applyDamage(proxy, dmg, pen || 0);
+    const r = applyDamage(proxy, dmg, pen || 0, bl);
     battle.bossArmor = proxy.armor;
     battle.damageDealt += r.armorLost;
     spawnHitFx(battle.bx, battle.by, '-' + r.armorLost + (isCrit ? '!' : ''), isCrit ? 'crit' : 'armor');
@@ -1151,8 +1172,9 @@ function applyBossDamage(dmg,isCrit,pen){
     if(battle.shieldHp<=0)breakBossShield();
     return;
   }
+  const bl=BOSSES[battle.bossId]?(BOSSES[battle.bossId].armorLevel||0):0;
   const target={hp:battle.bossHp,armor:battle.bossArmor};
-  const res=applyDamage(target,dmg,pen||0);
+  const res=applyDamage(target,dmg,pen||0,bl);
   battle.bossHp=target.hp;battle.bossArmor=target.armor;
   battle.damageDealt += (res.armorLost + res.hpLost);
   const shownDmg = res.hpLost > 0 ? res.hpLost : res.armorLost;
@@ -1209,7 +1231,7 @@ function updateBullets(dt){
         const dodge=clamp(0.15+state.player.level*0.005,0,0.5);
         if(Math.random()>dodge){
           const target={hp:battle.playerHp,armor:battle.playerArmor};
-          const res=applyDamage(target,b.dmg,b.pen||0);
+          const res=applyDamage(target,b.dmg,b.pen||0,state.player.armorLevel||0);
           battle.playerHp=target.hp;battle.playerArmor=target.armor;
           spawnHitFx(battle.px,battle.py,`-${Math.round(b.dmg)}`,res.hpLost>0?'enemy':'armor');
           if(battle.playerHp<=0){endBattle(false);return;}

@@ -333,7 +333,7 @@ function playExploreCombatFx(slot, isMelee){
 const SAVE_KEY='wasteland_save_v17_5';
 function defaultState(){
   return {
-    player:{level:1,exp:0,hp:100,maxHp:100,armor:0,maxArmor:0,equipped:{head:null,face:null,top:null,pants:null,shoes:null,backpack:'bplarge',primary:null,secondary:null,melee:null,throwable:null},equippedRarity:{backpack:'傳奇'},throwableStock:0},
+    player:{level:1,exp:0,hp:100,maxHp:100,armor:0,maxArmor:0,armorLevel:0,equipped:{head:null,face:null,top:null,pants:null,shoes:null,backpack:'bplarge',primary:null,secondary:null,melee:null,throwable:null},equippedRarity:{backpack:'傳奇'},throwableStock:0},
     inventory:{},logs:[],pendingSalvageEquipped:{},
     proficiency:{primary:0,secondary:0,melee:0,throwable:0,'突擊步槍':0,'機槍':0,'衝鋒槍':0,'狙擊槍':0,'手槍':0,'霰彈槍':0,'刺刀':0,'刀':0,'手榴彈':0,craft:0,salvage:0,drop:0},
     preferences:{ammoExplore:{priority:'一般',fallback:'desc',exclude:[]},ammoCombat:{priority:'傳奇',fallback:'desc',exclude:[]},consume:{priority:'一般',fallback:'desc',exclude:[]},throwableExplore:{priority:'破舊',fallback:'asc',exclude:['精品','傳奇']},throwableCombat:{priority:'傳奇',fallback:'desc',exclude:[]},autoConsumeThreshold:0.3,actionMode:'attack',regions:['廢棄工廠']},
@@ -458,22 +458,37 @@ function buildingBonusText(bid,lv){
   }default:return '';}
 }
 function calcMaxHp(){const rl=getBuildingLv('rest');const base=1+0.03*Math.pow(1.02,rl);return Math.round(100*Math.pow(base,state.player.level-1));}
-function equipArmorValue(id,rarity){const def=ARMOR[id];if(!def)return 0;if(def.slot==='backpack')return 0;let base=def.armor||0;if(base<5)base=5;return Math.round(base*(RARITY_MULT[rarity]||1));}
+function equipArmorValue(id,rarity){
+  const def=ARMOR[id];
+  if(!def)return 0;
+  if(def.slot==='backpack')return 0;
+  let base=0;
+  if(def.slot==='head'){
+    base=10*getHelmetTotalLevel(id);
+  } else if(def.slot==='top'){
+    base=10*(def.level||1)*1.5;
+    if(def.armored)base*=1.2;
+  } else {
+    base=10*(def.level||1);
+  }
+  return Math.round(base*(RARITY_MULT[rarity]||1));
+}
 const ROMAN_NUM=['','I','II','III','IV','V','VI'];
 function armorBreakdownText(id,rarity){
   const def=ARMOR[id];
   if(!def||def.armor==null)return '';
   const mult=RARITY_MULT[rarity]||1;
-  if(def.subArmor&&def.subArmor.length){
+  if(def.slot==='head'&&def.subArmor&&def.subArmor.length){
     return def.subArmor.map(s=>{
-      const v=Math.round(s.value*mult);
+      const v=Math.round(10*(s.level||0)*mult);
       const r=ROMAN_NUM[s.level]||'';
       return v+'（'+r+'級）';
     }).join('+');
   }
-  const v=Math.round(def.armor*mult);
-  const ac=armorClass(def.armor);
-  return v+(ac?'（'+ac+'級）':'');
+  const total=equipArmorValue(id,rarity);
+  const lv=def.level||1;
+  const ac=ROMAN_NUM[lv]||'';
+  return total+(ac?'（'+ac+'級）':'');
 }
 
 function refreshPlayerStats(){
@@ -484,6 +499,7 @@ function refreshPlayerStats(){
   const forgeLv=getBuildingLv('forge');
   if(forgeLv>0) armor = Math.round(armor * (1 + forgeLv * 0.03));
   state.player.maxArmor=armor;
+  state.player.armorLevel=getPlayerArmorLevel();
   if(armor !== prevMaxArmor){ state.player.armor = armor; }
   if(state.player.hp>state.player.maxHp)state.player.hp=state.player.maxHp;
   if(state.player.armor>state.player.maxArmor)state.player.armor=state.player.maxArmor;
@@ -507,21 +523,39 @@ function getHitRate(weaponType,mode,scopeBonus){
 function calcCritRate(wr,ar){return clamp(Math.round(10*(RARITY_MULT[wr]||1)*(RARITY_MULT[ar]||1))/100,0,0.85);}
 function calcCritMult(wr,ar){return 1.5*(RARITY_MULT[wr]||1)*(RARITY_MULT[ar]||1);}
 
-function applyDamage(target,rawDmg,penetration){
+/* ★ 新穿甲公式：
+   - 穿甲達標 (pen >= armorLevel)：同時傷裝甲與生命，
+     生命傷害減免 reduction(diff) = 0.5 * 0.01^(diff/7)，diff:0→50%, 7→0.5%
+   - 穿甲不足 (pen < armorLevel)：只傷裝甲，
+     傷害倍率 mult(diff) = 0.1 * (0.1)^((diff-1)/5)，diff:1→10%, 6→1%
+     （diff = armorLevel - pen）
+   - 護甲值清零後：沿用 ×1.2 機制 */
+function applyDamage(target,rawDmg,penetration,armorLevel){
   const A=Math.round(target.armor);const pen=penetration||0;
+  const al=armorLevel||0;
   const result={armorLost:0,hpLost:0,finalDmg:0,overkill:false};
   if(A<=0){const hpDmg=Math.round(rawDmg*1.2);target.hp=Math.max(0,Math.round(target.hp-hpDmg));result.hpLost=hpDmg;result.finalDmg=hpDmg;result.overkill=true;return result;}
-  const penFactor=clamp(1-pen/12,0.2,1);
-  const effA=A*penFactor;
-  let reduction=Math.round((2/3)*effA);
-  const maxReduction=Math.round(rawDmg*0.8);
-  if(reduction>maxReduction)reduction=maxReduction;
-  const finalDmg=Math.max(0,Math.round(rawDmg-reduction));
-  const armorDmg=Math.max(1,Math.round((1/3)*finalDmg+rawDmg*0.08));
-  const armorLost=Math.min(A,armorDmg);
-  target.armor=Math.max(0,A-armorLost);
-  result.armorLost=armorLost;result.finalDmg=finalDmg;
-  if(target.armor<=0){const hpDmg=Math.round(Math.max(1,finalDmg)*1.2);target.hp=Math.max(0,Math.round(target.hp-hpDmg));result.hpLost=hpDmg;result.overkill=true;}
+  const diff=pen-al;
+  if(diff>=0){
+    const reduction=0.5*Math.pow(0.01,diff/7);
+    const armorDmg=Math.round(rawDmg);
+    const hpDmg=Math.round(rawDmg*(1-reduction));
+    const armorLost=Math.min(A,armorDmg);
+    target.armor=Math.max(0,A-armorLost);
+    target.hp=Math.max(0,Math.round(target.hp-hpDmg));
+    result.armorLost=armorLost;
+    result.hpLost=hpDmg;
+    result.finalDmg=hpDmg;
+    if(target.armor<=0)result.overkill=true;
+  } else {
+    const d=-diff;
+    const mult=0.1*Math.pow(0.1,(d-1)/5);
+    const armorDmg=Math.round(rawDmg*mult);
+    const armorLost=Math.min(A,armorDmg);
+    target.armor=Math.max(0,A-armorLost);
+    result.armorLost=armorLost;
+    result.finalDmg=armorLost;
+  }
   return result;
 }
 
@@ -1187,7 +1221,7 @@ function openSlotDetail(slot){
   const rar=state.player.equippedRarity[slot]||'一般';
   let body='';
   if(def){
-    const ac=def.armor!=null?armorClass(def.armor):'';
+    const ac=armorClass(def.level||0);
     const aVal=def.armor!=null?equipArmorValue(id,rar):0;
     const dVal=def.dmg!=null?Math.round(def.dmg*(RARITY_MULT[rar]||1)):null;
     const isArmor=slot==='head'||slot==='face'||slot==='top'||slot==='pants'||slot==='shoes';
@@ -1314,7 +1348,7 @@ function openEquipmentCompare(slot,newId,newRarity,onConfirm,onCancel){
       if(oldHits!=null||newHits!=null){let dClass='',arrow3='';if(oldHits!=null&&newHits!=null){if(newHits>oldHits){dClass='up';arrow3=' ▲';}else if(newHits<oldHits){dClass='down';arrow3=' ▼';}}body+=`<div class="cmp-row"><div class="cmp-val old">${oldHits!=null?oldHits+' 次':'—'}</div><div class="cmp-lbl">每輪攻擊</div><div class="cmp-val new ${dClass}">${newHits!=null?newHits+' 次':'—'}${arrow3}</div></div>`;}
     }
   } else {
-    const ac=(newDef.armor!=null&&newDef.armor>0)?armorClass(newDef.armor):'';
+    const ac=armorClass(newDef.level||0);
     const aVal=(newDef.armor!=null)?equipArmorValue(newId,newRarity):0;
     const dVal=(newDef.dmg!=null)?Math.round(newDef.dmg*(RARITY_MULT[newRarity]||1)):null;
     body+=`<div class="detail-title ${rarityClass(newRarity)}">${iconBox(newRarity,newId)} ${newDef.name}${ac?` <span class="armor-class">${ac}</span>`:''}</div>`;
@@ -1387,7 +1421,7 @@ function openInventory(){
       body+=`<div class="cat-header" data-cat="${g}"><span>${names[g]} (${groups[g].length})</span><span>${collapsed?'▶':'▼'}</span></div>`;
       if(!collapsed){
         for(const it of groups[g]){
-          const ac=(it.def.armor!=null&&it.def.armor>0)?armorClass(it.def.armor):'';
+          const ac=armorClass(it.def.level||0);
           const aVal=(it.def.armor!=null)?equipArmorValue(it.id,it.rarity):0;
           const dVal=(it.def.dmg!=null)?Math.round(it.def.dmg*(RARITY_MULT[it.rarity]||1)):null;
           const isArmorDef=it.def.slot==='head'||it.def.slot==='face'||it.def.slot==='top'||it.def.slot==='pants'||it.def.slot==='shoes';
@@ -1404,7 +1438,7 @@ function openInventory(){
 }
 function openItemDetail(id,rarity,returnFn){
   const d=itemDef(id);if(!d)return;
-  const ac=(d.armor!=null&&d.armor>0)?armorClass(d.armor):'';
+  const ac=armorClass(d.level||0);
   const aVal=(d.armor!=null)?equipArmorValue(id,rarity):0;
   const dVal=(d.dmg!=null)?Math.round(d.dmg*(RARITY_MULT[rarity]||1)):null;
   const ammoId=d.cal?getDefaultAmmo(d.cal):null;

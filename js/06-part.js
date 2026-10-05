@@ -124,7 +124,7 @@ function onBuildCell(i){
     for(const [k,v] of Object.entries(upCost)){const have=materialEquivalent(k);const ok=have>=v;body+=`<div class="stat-line"><span class="k">${MATERIALS[k].name}</span><span class="v" style="color:${ok?'#4caf50':'#e05252'}">${have}/${v}</span></div>`;}
     const ft=el('div','modal-ft');
     const isWorkbench=slot.id==='workbench';
-    ft.innerHTML=`<button class="btn primary" id="m-up">升級</button>${isWorkbench?'<button class="btn" id="m-craft">🔧 改造</button>':''}<button class="btn ghost" id="m-close">關閉</button>`;
+    ft.innerHTML=`<button class="btn primary" id="m-up">升級</button>${isWorkbench?'<button class="btn" id="m-craft">改造</button>':''}<button class="btn ghost" id="m-close">關閉</button>`;
     openModal({title:b.name,body,footer:ft});
     ft.querySelector('#m-close').onclick=closeModal;
     ft.querySelector('#m-up').onclick=()=>{

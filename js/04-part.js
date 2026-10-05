@@ -42,6 +42,58 @@ function pickAimPartFromClick(canvasX, canvasY){
   return null;
 }
 
+/* ★ 像素級圖形邊界 helper（用於射程判定、碰撞、推動） */
+const HERO_SPRITE_W = 88;
+function getSceneW(){const fxEl=document.getElementById('battle-fx');return fxEl?fxEl.clientWidth:400;}
+function getBossSpriteWidthPx(){const sp=document.getElementById('boss-sprite');return sp?sp.clientWidth:280;}
+function getPlayerSpriteWidthPx(){return HERO_SPRITE_W;}
+function getBossLeftBoundaryN(){const W=getSceneW();if(!W)return 0;return battle.bx-(getBossSpriteWidthPx()/2)/W;}
+function getBossRightBoundaryN(){const W=getSceneW();if(!W)return 1;return battle.bx+(getBossSpriteWidthPx()/2)/W;}
+function getPlayerRightBoundaryN(){const W=getSceneW();if(!W)return 1;return battle.px+(getPlayerSpriteWidthPx()/2)/W;}
+function getPlayerLeftBoundaryN(){const W=getSceneW();if(!W)return 0;return battle.px-(getPlayerSpriteWidthPx()/2)/W;}
+/* ★ 檢查瞄準部位的圖形是否與玩家攻擊範圍有重疊 */
+function isAimPartInRange(){
+  if(!battle) return false;
+  const def=BOSS_LAYERS[battle.bossId];
+  if(!def) return true;
+  const part=battle.aimPart;
+  if(!part) return true;
+  const L=def.layers.find(l=>l.id===part);
+  if(!L) return true;
+  const anims=BOSS_ANIMS[battle.bossId];
+  const anim=anims?(anims[battleBossAnim.name]||anims.idle):null;
+  if(!anim) return true;
+  const fi=((battleBossAnim.frame%anim.frameCount)+anim.frameCount)%anim.frameCount;
+  const k=(anim.keys&&anim.keys[part]&&anim.keys[part][fi])||{rot:0,dx:0,dy:0};
+  const w=def.canvas.w*(k.w!==undefined?k.w:L.w);
+  const h=def.canvas.h*(k.h!==undefined?k.h:L.h);
+  const px=w*L.pivot.x;
+  const py=h*L.pivot.y;
+  const world=resolveBossWorld(def,anim,fi);
+  const wp=world[part];
+  if(!wp) return true;
+  const rot=wp.rot*(Math.PI/180);
+  const cos=Math.cos(rot),sin=Math.sin(rot);
+  const corners=[[0,0],[w,0],[0,h],[w,h]];
+  let minX=Infinity;
+  for(const c of corners){
+    const dx=c[0]-px,dy=c[1]-py;
+    const rx=dx*cos-dy*sin+wp.wx;
+    if(rx<minX)minX=rx;
+  }
+  const W=getSceneW();
+  const bossSprite=document.getElementById('boss-sprite');
+  const spriteW=bossSprite?bossSprite.clientWidth:280;
+  const spriteH=bossSprite?bossSprite.clientHeight:280;
+  const _fit=def.autoFit?computeBossFit(def,battle.bossId,spriteW,spriteH):null;
+  let canvasMinX;
+  if(_fit){canvasMinX=_fit.offsetX+minX*_fit.fitScale;}
+  else{canvasMinX=minX*(spriteW/def.canvas.w);}
+  const spriteLeft=battle.bx*W-spriteW/2;
+  const worldMinX=(spriteLeft+canvasMinX)/W;
+  const playerRight=battle.px+battle.playerWeaponRange;
+  return playerRight>=worldMinX;
+}
 function getAimTargetPos(){
   if(!battle) return {x:0.75, y:0.3};
   const part = battle.aimPart;
@@ -129,7 +181,7 @@ function renderCombat(){
 
 function renderBattleScene(z1){
   const b=battle;
-  const rLeft=Math.max(0,(b.px-(b.playerWeaponRange||0.5)))*100;
+  const rLeft=b.px*100;
   const rRight=Math.min(1,(b.px+(b.playerWeaponRange||0.5)))*100;
   const rWidth=rRight-rLeft;
   const totalHp=b.bossMaxHp+b.bossMaxArmor;
@@ -202,7 +254,7 @@ function updateFighterPos(){
   if(h){h.style.left=(battle.px*100)+'%';h.style.top=(battle.py*100)+'%';}
   if(b){b.style.left=(battle.bx*100)+'%';b.style.top=(battle.by*100)+'%';}
   const ri=$('#range-indicator');
-  if(ri){const r=battle.playerWeaponRange||0.5;const rLeft=Math.max(0,(battle.px-r))*100;const rRight=Math.min(1,(battle.px+r))*100;ri.style.left=rLeft+'%';ri.style.width=(rRight-rLeft)+'%';}
+  if(ri){const r=battle.playerWeaponRange||0.5;const rLeft=battle.px*100;const rRight=Math.min(1,(battle.px+r))*100;ri.style.left=rLeft+'%';ri.style.width=(rRight-rLeft)+'%';}
   const dmgBar=$('#dmg-bar');
   if(dmgBar){const totalHp=battle.bossMaxHp+battle.bossMaxArmor;dmgBar.style.width=Math.min(100,(battle.damageDealt/totalHp)*100)+'%';}
   const dmgHd=$('.damage-header');
