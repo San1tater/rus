@@ -49,23 +49,10 @@ function hideBossWarning(){
 function pushPlayerLeft(newBx){
   const b = battle;
   if(!b) return newBx;
-  const W = getSceneW();
-  if(!W) return newBx;
-  const playerHalf = getPlayerSpriteWidthPx() / 2;
-  const sp = document.getElementById('boss-sprite');
-  const spriteW = sp ? sp.clientWidth : 280;
-  const bounds = getBossGfxBounds();
-  const gfxLeftOffsetPx = bounds ? bounds.leftPx : (spriteW / 2);
-  const bossLeftPx = newBx * W - spriteW / 2 + gfxLeftOffsetPx;
-  const playerRightPx = b.px * W + playerHalf;
-  if(bossLeftPx < playerRightPx){
-    const overlap = playerRightPx - bossLeftPx;
-    const newPx = clamp(b.px - overlap / W, 0.05, 0.95);
-    b.px = newPx;
-    const playerRightPx2 = b.px * W + playerHalf;
-    if(bossLeftPx < playerRightPx2){
-      newBx = (playerRightPx2 + spriteW / 2 - gfxLeftOffsetPx) / W;
-    }
+  /* ★ 中心點對中心點：BOSS 中心不能越過玩家中心 */
+  if(newBx < b.px){
+    b.px = Math.max(0.05, newBx);
+    if(newBx < b.px) newBx = b.px;
   }
   return newBx;
 }
@@ -199,12 +186,9 @@ function startBossDash(sk, now){
   const dir = Math.sign(b.px - b.bx) || 1;
   let targetX;
   if(dir < 0){
-    const W = getSceneW();
-    const bossHalf = getBossSpriteWidthPx() / 2;
-    const playerHalf = getPlayerSpriteWidthPx() / 2;
+    /* ★ 中心點對中心點：目標最多到玩家中心 */
     const centerTarget = b.bx - (sk.dashDistance || 0.35);
-    const boundaryTarget = (b.px * W + playerHalf + bossHalf) / W;
-    targetX = Math.max(centerTarget, boundaryTarget);
+    targetX = Math.max(centerTarget, b.px);
   } else {
     targetX = b.bx + dir * (sk.dashDistance || 0.35);
   }
@@ -254,18 +238,12 @@ function updateBossDash(dt, now){
     let newBx = b.bx + step;
 
     if(d.dir < 0){
+      const _willContact = (newBx <= b.px);
       newBx = pushPlayerLeft(newBx);
-      const W = getSceneW();
-      if(W){
-        const bossHalf = getBossSpriteWidthPx() / 2;
-        const playerHalf = getPlayerSpriteWidthPx() / 2;
-        const bossLeftPx = newBx * W - bossHalf;
-        const playerRightPx = b.px * W + playerHalf;
-        if(bossLeftPx <= playerRightPx + 1 && (now - (d.lastHit||0)) > d.hitTickMs){
-          d.lastHit = now;
-          const _contactScale = (b.bossDmg || 25) / 25;
-          tryHitPlayer(d.contactDmg * _contactScale * (b.bossDmgMult||1), b.bossPen||0);
-        }
+      if(_willContact && (now - (d.lastHit||0)) > d.hitTickMs){
+        d.lastHit = now;
+        const _contactScale = (b.bossDmg || 25) / 25;
+        tryHitPlayer(d.contactDmg * _contactScale * (b.bossDmgMult||1), b.bossPen||0);
       }
     }
 
@@ -491,15 +469,8 @@ function battleLoop(now){
 
   if(canMove && hasMoveInput){
     let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
-    /* 玩家永遠在 Boss 圖形左側（依實際圖形邊界） */
-    const _W = getSceneW();
-    const _playerHalf = getPlayerSpriteWidthPx() / 2;
-    const _sp = document.getElementById('boss-sprite');
-    const _spriteW = _sp ? _sp.clientWidth : 280;
-    const _bounds = getBossGfxBounds();
-    const _gfxLeftOffsetPx = _bounds ? _bounds.leftPx : (_spriteW / 2);
-    const pxMax = (battle.bx * _W - _spriteW / 2 + _gfxLeftOffsetPx - _playerHalf) / _W;
-    if(newPx > pxMax) newPx = Math.max(0.05, pxMax);
+    /* ★ 中心點對中心點：玩家中心不能超過 BOSS 中心 */
+    if(newPx > battle.bx) newPx = Math.max(0.05, battle.bx);
     battle.px = newPx;
   }
 
