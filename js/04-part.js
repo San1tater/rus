@@ -8,7 +8,8 @@ const BATTLE_ONESHOT_ANIMS=['fire_primary','fire_secondary','attack_melee','relo
    檔名固定為 images/bg/boss_{bossId}.png */
 function getBossBgPath(bossId){
   if(!BOSSES[bossId]) return '';
-  return `images/bg/boss_${bossId}.png${assetSuffix()}`;
+  const _base=bossId.replace(/_ii$/,'');
+  return `images/bg/boss_${_base}.png${assetSuffix()}`;
 }
 
 function pickAimPartFromClick(canvasX, canvasY){
@@ -154,10 +155,8 @@ function isAimPartInRange(){
   const bossSprite=document.getElementById('boss-sprite');
   const spriteW=bossSprite?bossSprite.clientWidth:280;
   const spriteH=bossSprite?bossSprite.clientHeight:280;
-  const _fit=def.autoFit?computeBossFit(def,battle.bossId,spriteW,spriteH):null;
-  let canvasMinX;
-  if(_fit){canvasMinX=_fit.offsetX+minX*_fit.fitScale;}
-  else{canvasMinX=minX*(spriteW/def.canvas.w);}
+  const _tf=getBossCanvasTransform(def,battle.bossId,spriteW,spriteH);
+  const canvasMinX=_tf.ox+minX*_tf.sx;
   const spriteLeft=battle.bx*W-spriteW/2;
   const worldMinX=(spriteLeft+canvasMinX)/W;
   const playerRight=battle.px+battle.playerWeaponRange;
@@ -195,15 +194,9 @@ function getAimTargetPos(){
   const bossSprite = document.getElementById('boss-sprite');
   const spriteW = bossSprite ? bossSprite.clientWidth : 280;
   const spriteH = bossSprite ? bossSprite.clientHeight : 280;
-  const _fit = def.autoFit ? computeBossFit(def, battle.bossId, spriteW, spriteH) : null;
-  let canvasPx, canvasPy;
-  if(_fit){
-    canvasPx = _fit.offsetX + centerWX * _fit.fitScale;
-    canvasPy = _fit.offsetY + centerWY * _fit.fitScale;
-  } else {
-    canvasPx = centerWX * (spriteW / def.canvas.w);
-    canvasPy = centerWY * (spriteH / def.canvas.h);
-  }
+  const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
+  const canvasPx = _tf.ox + centerWX * _tf.sx;
+  const canvasPy = _tf.oy + centerWY * _tf.sy;
   const spriteLeft = battle.bx * W - spriteW / 2;
   const spriteTop = battle.by * H;
   return {
@@ -218,33 +211,37 @@ function isWeakPointHit(){
   return weak.includes(battle.aimPart);
 }
 
+let _bossSelectedTier={};
 function renderCombat(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   if(battle&&battle.active){renderBattleScene(z1);renderBattleJoystick(z2);renderBattleControls(z3);return;}
+  const _BOSS_GROUPS=[{baseKey:'factory_king',regionName:'廢棄工廠'},{baseKey:'lab_queen',regionName:'廢棄實驗室'},{baseKey:'road_tyrant',regionName:'郊區公路'},{baseKey:'swamp_hydra',regionName:'輻射沼澤'},{baseKey:'core_omega',regionName:'廢土核心'}];
   let listHtml='<div class="boss-list">';
-  for(const bid in BOSSES){
-    const b=BOSSES[bid];
-    const seals=parseInt(state.seals[b.seal]||0,10);
-    const defeated=state.defeatedBosses.includes(bid);
-    const can=seals>0;
-    const sealTagText = `信物 *${seals}`;
-    listHtml+=`<div class="boss-card ${can?'':'locked'}"><div class="boss-avatar">${bossIcon(bid)}</div><div class="boss-info"><div class="bn">${b.name}${defeated?' ✅':''}</div><div class="bd">地區：${b.region} ｜ HP ${b.hp} ｜ 裝甲 ${b.armor} ｜ 傷害 ${b.dmg} ｜ 穿透 ${b.pen||0}</div><div class="seal-tag ${seals>0?'':'none'}">${sealTagText}</div></div><button class="btn ${can?'primary':''}" data-bid="${bid}" ${can?'':'disabled'} style="flex:0 0 auto;padding:8px 10px;font-size:11px">${can?'挑戰':'無信物'}</button></div>`;
+  for(const _g of _BOSS_GROUPS){
+    const _b1=BOSSES[_g.baseKey];if(!_b1)continue;
+    const _b2=BOSSES[_g.baseKey+'_ii'];
+    const _t2Exists=!!_b2;
+    const _t2Unlocked=_t2Exists&&state.unlockedRegions.includes(_g.regionName+'II');
+    let _curTier=_bossSelectedTier[_g.baseKey]||1;
+    if(_curTier===2&&!_t2Unlocked)_curTier=1;
+    const _b=_curTier===2?_b2:_b1;
+    const _bid=_curTier===2?(_g.baseKey+'_ii'):_g.baseKey;
+    const _seals1=parseInt(state.seals[_b1.seal]||0,10);
+    const _seals2=_b2?parseInt(state.seals[_b2.seal]||0,10):0;
+    const _defeated=state.defeatedBosses.includes(_bid);
+    const _can=_curTier===2?_seals2>0:_seals1>0;
+    listHtml+=`<div class="boss-card ${_can?'':'locked'}"><div class="boss-avatar">${bossIcon(_bid)}</div><div class="boss-info"><div class="bn">${_b.name}${_defeated?' ✅':''}</div><div class="bd">甲 ${_b.armor} ｜ 生命 ${_b.hp}</div></div><div class="boss-tier-selector"><div class="boss-tier-btn ${_curTier===1?'on':''}" data-boss-key="${_g.baseKey}" data-tier="1"><div class="bt-label">I</div><div class="bt-seal">×${_seals1}</div></div>${_t2Exists?`<div class="boss-tier-btn ${_curTier===2?'on':''} ${_t2Unlocked?'':'locked'}" data-boss-key="${_g.baseKey}" data-tier="2"><div class="bt-label">${_t2Unlocked?'II':'🔒'}</div><div class="bt-seal">${_t2Unlocked?'×'+_seals2:'-'}</div></div>`:''}</div><button class="btn ${_can?'primary':''}" data-bid="${_bid}" ${_can?'':'disabled'} style="padding:8px 10px;font-size:11px;flex:0 0 auto">${_can?'挑戰':'無信物'}</button></div>`;
   }
   listHtml+='</div>';
   z1.innerHTML=listHtml;
   renderEquipZone(z2);
   z3.innerHTML=`<div class="z3-head"><div class="z3-title">⚔️ Boss 挑戰</div></div>
-    <div class="logbox" style="padding:10px">
-      <div style="color:#e8a33d;font-weight:bold;margin-bottom:6px">挑戰說明</div>
-      <div style="line-height:1.7;font-size:10px;color:#bfb3a0">
-        · 前進至 Boss 警戒範圍才會觸發攻擊<br>
-        · 點擊 Boss 設定瞄準部位，預設為軀幹<br>
-        · 拖動搖桿左右移動，移動時無法攻擊<br>
-        · 點擊攻擊鍵射擊一次；掃射模式可長按連射<br>
-        · 主副武器彈藥耗盡後會自動切換到近戰裝備<br>
-        · Boss 會阻擋並推動玩家，玩家無法繞到其身後
-      </div>
+    <div style="padding:10px;font-size:10px;color:#7a6f60;line-height:1.6">
+      · 點擊 Boss 設定瞄準部位<br>
+      · 連續射擊會降低命中率，點放可維持精準<br>
+      · 主副武器耗盡自動切換近戰
     </div>`;
+  $$('.boss-tier-btn[data-boss-key]',z1).forEach(btn=>{btn.onclick=(e)=>{e.stopPropagation();if(btn.classList.contains('locked'))return;_bossSelectedTier[btn.dataset.bossKey]=parseInt(btn.dataset.tier,10);renderCombat();};});
   $$('.boss-card .btn',z1).forEach(btn=>{btn.onclick=()=>startBossBattle(btn.dataset.bid);});
 }
 
@@ -262,7 +259,7 @@ function renderBattleScene(z1){
       <div class="damage-header"><div>對 Boss 傷害 <span class="num">${Math.round(b.damageDealt)}</span> / ${totalHp}</div><div class="bar"><div class="fill" id="dmg-bar" style="width:${dealtPct}%"></div></div></div>
       <div class="fighter boss-f" id="fighter-boss" style="left:${b.bx*100}%;top:${b.by*100}%">
         ${(b.shieldMaxHp>0 && !b.shieldBroken) ? `<div class="shield-bar-wrap" id="shield-bar-wrap"><div class="bar"><div class="fill" id="boss-shield" style="width:${(b.shieldHp/b.shieldMaxHp*100)}%"></div></div></div>` : ''}
-        <div class="hpbar-wrap"><div class="nm">${b.bossName}</div><div class="bar ap"><div class="fill" id="boss-ap" style="width:${(b.bossArmor/b.bossMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:${(b.bossHp/b.bossMaxHp*100)}%"></div></div></div>
+        <div class="hpbar-wrap"><div class="nm">${b.bossName}${(b.bossId.indexOf("_ii")>=0)?" II":""}</div><div class="bar ap"><div class="fill" id="boss-ap" style="width:${(b.bossArmor/b.bossMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:${(b.bossHp/b.bossMaxHp*100)}%"></div></div></div>
         <div class="sprite" id="boss-sprite">${BOSS_LAYERS[b.bossId] ? '<canvas id="boss-battle-canvas"></canvas>' : bossIcon(b.bossId)}</div>
       </div>
       <div class="fighter hero-f" id="fighter-hero" style="left:${b.px*100}%;top:${b.py*100}%">
@@ -290,15 +287,9 @@ function renderBattleScene(z1){
     const spriteRect = bossSprite.getBoundingClientRect();
     const spriteX = e.clientX - spriteRect.left;
     const spriteY = e.clientY - spriteRect.top;
-    const _fit = def.autoFit ? computeBossFit(def, battle.bossId, spriteRect.width, spriteRect.height) : null;
-    let canvasX, canvasY;
-    if(_fit){
-      canvasX = (spriteX - _fit.offsetX) / _fit.fitScale;
-      canvasY = (spriteY - _fit.offsetY) / _fit.fitScale;
-    } else {
-      canvasX = spriteX * (def.canvas.w / Math.max(1, spriteRect.width));
-      canvasY = spriteY * (def.canvas.h / Math.max(1, spriteRect.height));
-    }
+    const _tf = getBossCanvasTransform(def, battle.bossId, spriteRect.width, spriteRect.height);
+    const canvasX = (spriteX - _tf.ox) / _tf.sx;
+    const canvasY = (spriteY - _tf.oy) / _tf.sy;
     const part = pickAimPartFromClick(canvasX, canvasY);
     if(part){
       battle.aimPart = part;
@@ -450,11 +441,12 @@ function switchBattleWeapon(slot){
   const w=equippedWeapon(slot);if(!w||!itemDef(w.id))return;
   const def=itemDef(w.id);
   battle.weaponStates=battle.weaponStates||{};
-  if(battle.weaponSlot&&battle.weaponStates[battle.weaponSlot]){battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;battle.weaponStates[battle.weaponSlot].ammoRef=battle.ammoRef;}
-  else if(battle.weaponSlot){battle.weaponStates[battle.weaponSlot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};}
+  if(battle.weaponSlot){battle.weaponStates[battle.weaponSlot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef,fireMode:battle.fireMode};}
   if(battle.reloading){battle.reloading=false;}
   battle.weapon=w;battle.weaponSlot=slot;
-  battle.fireMode=def.modes?def.modes[0]:'點射';
+  const _prevSt=battle.weaponStates[slot];
+  if(_prevSt&&_prevSt.fireMode&&def.modes&&def.modes.includes(_prevSt.fireMode)){battle.fireMode=_prevSt.fireMode;}
+  else{battle.fireMode=def.modes?def.modes[0]:'點射';}
   battle.fireHeld=false;
   battle.burstLeft=0;
   battle.playerWeaponRange=def.range||0.5;
@@ -515,8 +507,10 @@ function startBossBattle(bid){
   refreshPlayerStats();
   const w=chooseCombatWeapon('combat');
   const startSlot=w?w.slot:'melee';
-  const _hasShield=(bid==='road_tyrant'||bid==='core_omega');
-  const _shieldHp=bid==='road_tyrant'?12500:(bid==='core_omega'?30000:0);
+  const _isRT=(bid==='road_tyrant'||bid==='road_tyrant_ii');
+  const _isCO=(bid==='core_omega'||bid==='core_omega_ii');
+  const _hasShield=(_isRT||_isCO);
+  const _shieldHp=_isRT?12500:(_isCO?30000:0);
   battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossDmgMult:1,bossPen:b.pen||0,bossCritRate:b.critRate||0,bossCritMult:b.critMult||1,
     phaseIdx:0, healedPhases:[], skillCds:null, bossCast:null, bossDash:null, lastMeleeAt:0,
     shieldMaxHp:_shieldHp, shieldHp:_shieldHp, shieldBroken:false, bossRetreat:null,
@@ -526,9 +520,9 @@ function startBossBattle(bid){
     ammoRef:null,ammoInMag:0,weaponStates:{},engaged:false,engagedRange:0.35,startTime:Date.now(),
     aimPart:defaultAimPartForBoss(bid),lastManualClick:0,
     players:[{id:'local',isLocal:true}],lastH:0,
-    healDisabledUntil:0,healTimer:null,autoHealing:false};
-  if(bid==='swamp_hydra') initHydraHeads();
-  if(bid==='core_omega') initOmegaArms();
+    healDisabledUntil:0,healTimer:null,autoHealing:false,chainShots:0,lastShotTime:0,chainResetMs:600};
+  if(bid==='swamp_hydra'||bid==='swamp_hydra_ii') initHydraHeads();
+  if(bid==='core_omega'||bid==='core_omega_ii') initOmegaArms();
   battleHeroAnim.name='idle';
   battleHeroAnim.frame=0;
   battleHeroAnim.lastUpdate=performance.now();

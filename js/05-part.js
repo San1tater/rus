@@ -143,7 +143,7 @@ function updateBossAI(dt, now){
   const bRange = 0.14;
   let bossMoving = false;
 
-  if(b.bossId === 'swamp_hydra'){
+  if(b.bossId === 'swamp_hydra' || b.bossId === 'swamp_hydra_ii'){
     /* ★ 沼澤九頭：完全不動，僅近戰範圍內咬擊 */
     if(playerRightN >= b.bx - bRange){
       if(now - (b.lastMeleeAt || 0) > 1500){
@@ -326,7 +326,7 @@ function tryHitPlayer(dmg, pen){
 function doBossMeleeSwipe(){
   if(!battle || !battle.active) return;
   const b = battle;
-  if(b.bossId === 'core_omega' && isOmegaArmBroken('ring_l')) return;
+  if((b.bossId === 'core_omega' || b.bossId === 'core_omega_ii') && isOmegaArmBroken('ring_l')) return;
   if(getPlayerRightBoundaryN() < b.bx - 0.30) return;
   playBossOneshot('attack_swipe', 500);
   setTimeout(()=>{
@@ -501,7 +501,7 @@ function battleLoop(now){
       else battle.burstLeft=0;
     }
   }
-  updateBullets(dt);updateFighterPos();if(battle.bossId==='swamp_hydra')updateHeadBarsUI();
+  updateBullets(dt);updateFighterPos();if(battle.bossId==='swamp_hydra'||battle.bossId==='swamp_hydra_ii')updateHeadBarsUI();
   updateBattleHeroAnim(now);
   updateBattleBossAnim(now);
   renderBattleHeroCanvas();
@@ -754,6 +754,17 @@ function playerShoot(){
     battleHeroAnim.lastUpdate=performance.now();
     battleHeroAnim.forcedEnd=performance.now()+350;
   }
+  const _now = performance.now();
+  if(_now - (battle.lastShotTime || 0) > (battle.chainResetMs||600)){ battle.chainShots = 0; }
+  battle.chainShots = (battle.chainShots || 0) + 1;
+  battle.lastShotTime = _now;
+  const _n = battle.chainShots;
+  let _effectiveMode;
+  if(_n === 1) _effectiveMode = '點射';
+  else if(_n <= 3) _effectiveMode = '短點射';
+  else if(_n <= 7) _effectiveMode = '長點射';
+  else _effectiveMode = '掃射';
+  
   const isWeak = isWeakPointHit();
   if(def.cal){
     if(battle.ammoInMag<=0){
@@ -786,8 +797,9 @@ function playerShoot(){
       const jy = (Math.random()-0.5)*0.03;
       battle.bullets.push({sx:mz.x,sy:mz.y,tx:clamp(target.x+jx,0,1),ty:clamp(target.y+jy,0,1),t:0,player:true});
     }
-    const hitRate=getHitRate(def.type,battle.fireMode,def.scopeBonus||0);
-    const baseDmg=Math.round(battle.ammoRef?AMMO[battle.ammoRef.id].dmg*(RARITY_MULT[battle.ammoRef.rarity]||1):20);
+    const hitRate=getHitRate(def.type,_effectiveMode,def.scopeBonus||0);
+    const _pdB=0.6+clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL,0,1)*0.9;
+    const baseDmg=Math.round((battle.ammoRef?AMMO[battle.ammoRef.id].dmg*(RARITY_MULT[battle.ammoRef.rarity]||1):20)*_pdB);
     const ammoPen=battle.ammoRef?(AMMO[battle.ammoRef.id].pen||0):0;
     const critRate=calcCritRate(w.rarity,battle.ammoRef?battle.ammoRef.rarity:'一般');
     const critMult=calcCritMult(w.rarity,battle.ammoRef?battle.ammoRef.rarity:'一般');
@@ -801,7 +813,7 @@ function playerShoot(){
           battle.bossHp = Math.max(0, battle.bossHp - dmg);
           battle.damageDealt += dmg;
           spawnHitFx(battle.bx, battle.by, `-${dmg}${isCrit?'!':''}`, isCrit?'crit':'weak');
-          if(battle.bossId === 'core_omega' && battle.arms) damageOmegaArm(battle.aimPart, dmg);
+          if((battle.bossId === 'core_omega' || battle.bossId === 'core_omega_ii') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
           if(battle.bossHp <= 0){ endBattle(true); return true; }
         } else {
           applyBossDamage(dmg,isCrit,ammoPen);
@@ -837,7 +849,7 @@ function playerShoot(){
           battle.bossHp = Math.max(0, battle.bossHp - dmg);
           battle.damageDealt += dmg;
           spawnHitFx(battle.bx, battle.by, `-${dmg}${isCrit?'!':''}`, isCrit?'crit':'weak');
-          if(battle.bossId === 'core_omega' && battle.arms) damageOmegaArm(battle.aimPart, dmg);
+          if((battle.bossId === 'core_omega' || battle.bossId === 'core_omega_ii') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
           if(battle.bossHp <= 0){ endBattle(true); return true; }
         } else {
           applyBossDamage(dmg,isCrit,def.pen||0);
@@ -882,7 +894,7 @@ function isOmegaArmBroken(armId){
   return !!arm && !arm.alive;
 }
 function isOmegaSkillDisabled(sk){
-  if(!battle || battle.bossId !== 'core_omega') return false;
+  if(!battle || (battle.bossId !== 'core_omega' && battle.bossId !== 'core_omega_ii')) return false;
   if(!sk.armRequired) return false;
   return isOmegaArmBroken(sk.armRequired);
 }
@@ -1009,9 +1021,12 @@ function getHeadScreenPos(headId){
   const spriteH = bossSprite.clientHeight || 280;
   const spriteLeft = battle.bx * W - spriteW / 2;
   const spriteTop = battle.by * H;
+  const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
+  const canvasX = _tf.ox + wp.wx * _tf.sx;
+  const canvasY = _tf.oy + wp.wy * _tf.sy;
   return {
-    x: (spriteLeft + (wp.wx / def.canvas.w) * spriteW) / W,
-    y: (spriteTop + (wp.wy / def.canvas.h) * spriteH) / H
+    x: (spriteLeft + canvasX) / W,
+    y: (spriteTop + canvasY) / H
   };
 }
 function playHeadBreakFx(headId){
@@ -1042,7 +1057,7 @@ function playHeadBreakFx(headId){
   if(bar) bar.remove();
 }
 function updateHeadBarsUI(){
-  if(!battle || battle.bossId !== 'swamp_hydra' || !battle.heads) return;
+  if(!battle || (battle.bossId !== 'swamp_hydra' && battle.bossId !== 'swamp_hydra_ii') || !battle.heads) return;
   const container = document.getElementById('head-bars'); if(!container) return;
   const def = BOSS_LAYERS[battle.bossId]; if(!def) return;
   const anims = BOSS_ANIMS[battle.bossId];
@@ -1057,9 +1072,7 @@ function updateHeadBarsUI(){
   const spriteH = bossSprite.clientHeight || 280;
   const spriteLeft = battle.bx * W - spriteW / 2;
   const spriteTop = battle.by * H;
-  const _fit = def.autoFit ? computeBossFit(def, battle.bossId, spriteW, spriteH) : null;
-  const _baseSx = spriteW / def.canvas.w;
-  const _baseSy = spriteH / def.canvas.h;
+  const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
   for(let i = 1; i <= 7; i++){
     const headId = 'head_' + i;
     const head = battle.heads[headId]; if(!head) continue;
@@ -1082,14 +1095,8 @@ function updateHeadBarsUI(){
     const rotY = dxx * sin + dyy * cos;
     const topWX = wp.wx + rotX;
     const topWY = wp.wy + rotY;
-    let canvasPx, canvasPy;
-    if(_fit){
-      canvasPx = _fit.offsetX + topWX * _fit.fitScale;
-      canvasPy = _fit.offsetY + topWY * _fit.fitScale;
-    } else {
-      canvasPx = topWX * _baseSx;
-      canvasPy = topWY * _baseSy;
-    }
+    const canvasPx = _tf.ox + topWX * _tf.sx;
+    const canvasPy = _tf.oy + topWY * _tf.sy;
     const screenX = spriteLeft + canvasPx;
     const screenY = spriteTop + canvasPy - 6;
     if(!bar){
@@ -1136,7 +1143,7 @@ function applyHydraDamage(dmg, isCrit, pen){
 }
 function applyBossDamage(dmg,isCrit,pen){
   battle.engaged = true;
-  if(battle.bossId==='swamp_hydra' && battle.heads){ applyHydraDamage(dmg,isCrit,pen); return; }
+  if((battle.bossId==='swamp_hydra'||battle.bossId==='swamp_hydra_ii') && battle.heads){ applyHydraDamage(dmg,isCrit,pen); return; }
   if(battle.shieldMaxHp>0 && !battle.shieldBroken && battle.shieldHp>0){
     const _pen=pen||0;
     const _shieldScale=Math.min(1,Math.exp((_pen-7)*0.4));
@@ -1245,7 +1252,8 @@ function endBattle(victory){
   if(victory){
     state.stats.bossKills++;
     if(!state.defeatedBosses.includes(b.bossId))state.defeatedBosses.push(b.bossId);
-    if(bossDef.unlock&&!state.unlockedRegions.includes(bossDef.unlock)){state.unlockedRegions.push(bossDef.unlock);pushLog(`<span class="win">解鎖新地區：${bossDef.unlock}</span>`,[],'combat');}
+    if(bossDef.unlock){const nextName=bossDef.tier===2?bossDef.unlock+'II':bossDef.unlock;if(!state.unlockedRegions.includes(nextName)){state.unlockedRegions.push(nextName);pushLog(`<span class="win">解鎖新地區：${nextName}</span>`,[],'combat');}}
+    if(bossDef.unlockTier2){const nextName=bossDef.unlockTier2+'II';if(!state.unlockedRegions.includes(nextName)){state.unlockedRegions.push(nextName);pushLog(`<span class="win">解鎖二級入口：${nextName}</span>`,[],'combat');}}
     const drops=pickN(bossDef.drops,Math.min(2,bossDef.drops.length));
     for(const did of drops){const dd=itemDef(did);if(!dd)continue;const rar=rollRarity();invAdd(did,rar,1);loot.push({id:did,rarity:rar,count:1});}
     addExp(50);
@@ -1295,7 +1303,7 @@ function showBattleResult(bossDef, b, victory, loot){
   const ft=el('div','modal-ft');ft.innerHTML=`<button class="btn primary" id="m-ok">確認</button>`;
   const bd=openModal({title:'戰鬥結算',body,footer:ft});
   ft.querySelector('#m-ok').onclick=()=>{closeModal();battle=null;save();renderCombat();};
-  $('.item-row',bd).forEach(r=>{r.onclick=()=>openItemDetail(r.dataset.iid,r.dataset.irar);});
+  $$('.item-row',bd).forEach(r=>{r.onclick=()=>openItemDetail(r.dataset.iid,r.dataset.irar);});
 }
 const BossModule = {
   get battle(){ return battle; },

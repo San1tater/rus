@@ -113,6 +113,23 @@ function computeBossFit(def, bossId, canvasW, canvasH){
   return fit;
 }
 
+/* ★ 統一座標變換 helper：drawBlockBoss / getAimTargetPos / pickAimPart / isAimPartInRange / 血條
+   全部使用同一組 (sx, sy, ox, oy)，確保視覺與判定一致。
+   - autoFit + fit：等比縮放，水平居中、底部對齊
+   - autoFit 無 fit：直接按 sprite/canvas 比例縮放（通常不發生）
+   - 非 autoFit：等比縮放取 min(sx, sy)，水平居中、底部對齊 */
+function getBossCanvasTransform(def, bossId, canvasW, canvasH){
+  const baseSx = canvasW / def.canvas.w;
+  const baseSy = canvasH / def.canvas.h;
+  if(def.autoFit){
+    const fit = computeBossFit(def, bossId, canvasW, canvasH);
+    if(fit) return { sx: fit.fitScale, sy: fit.fitScale, ox: fit.offsetX, oy: fit.offsetY };
+    return { sx: baseSx, sy: baseSy, ox: 0, oy: 0 };
+  }
+  const s = Math.min(baseSx, baseSy);
+  return { sx: s, sy: s, ox: (canvasW - def.canvas.w * s) / 2, oy: canvasH - def.canvas.h * s };
+}
+
 function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   const def = BOSS_LAYERS[bossId];
   if(!def) return;
@@ -128,26 +145,13 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   const world = resolveBossWorld(def, anim, fi);
 
   ctx.save();
-  if(def.autoFit){
-    const fit = computeBossFit(def, bossId, canvasW, canvasH);
-    if(fit){
-      ctx.translate(fit.offsetX, fit.offsetY);
-      ctx.scale(fit.fitScale, fit.fitScale);
-    } else {
-      ctx.scale(baseSx, baseSy);
-    }
-  } else {
-    /* ★ 等比縮放：取 min(sx, sy)，水平居中，底部對齊 */
-    const _s = Math.min(baseSx, baseSy);
-    const _ox = (canvasW - def.canvas.w * _s) / 2;
-    const _oy = (canvasH - def.canvas.h * _s);
-    ctx.translate(_ox, _oy);
-    ctx.scale(_s, _s);
-  }
+  const _tf = getBossCanvasTransform(def, bossId, canvasW, canvasH);
+  ctx.translate(_tf.ox, _tf.oy);
+  ctx.scale(_tf.sx, _tf.sy);
 
   const _SHIELD_LIDS = ['shield','shield-2','shield-2_copy','shield-2_copy_1'];
-  const _hideShield = (bossId === 'road_tyrant' && battle && battle.shieldBroken);
-  const _hideHydraHead = (bossId === 'swamp_hydra' && battle && battle.heads);
+  const _hideShield = ((bossId === 'road_tyrant' || bossId === 'road_tyrant_ii') && battle && battle.shieldBroken);
+  const _hideHydraHead = ((bossId === 'swamp_hydra' || bossId === 'swamp_hydra_ii') && battle && battle.heads);
   let _hydraOwnerMap = null;
   if(_hideHydraHead){
     _hydraOwnerMap = {};
@@ -207,7 +211,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
       const _owner = _hydraOwnerMap[L.id];
       if(_owner && !battle.heads[_owner].alive) continue;
     }
-    if(bossId === 'core_omega' && battle && battle.arms){
+    if((bossId === 'core_omega' || bossId === 'core_omega_ii') && battle && battle.arms){
       const _arm = getOmegaArmIdOfLayer(L.id);
       if(_arm && !battle.arms[_arm].alive) continue;
     }
@@ -362,6 +366,10 @@ function load(){
     state.player.throwableStock=parseInt(state.player.throwableStock||0,10);
     state.proficiency=Object.assign(d.proficiency,s.proficiency||{});
     state.preferences=Object.assign(d.preferences,s.preferences||{});
+    state.preferences.regions=(state.preferences.regions||[]).filter(r=>!!REGIONS[r]);
+    state.unlockedRegions=(state.unlockedRegions||[]).filter(r=>!!REGIONS[r]);
+    {const _seen={};for(const id of state.preferences.regions){const _b=id.replace(/II$/,'');_seen[_b]=id;}state.preferences.regions=Object.values(_seen);}
+    if(!state.unlockedRegions.includes('廢棄工廠'))state.unlockedRegions.push('廢棄工廠');
     delete state.preferences.autoSalvage;
     state.base=Object.assign(d.base,s.base||{});
     state.regionProgress=Object.assign({},s.regionProgress||{});
@@ -462,7 +470,7 @@ function buildingBonusText(bid,lv){
     return `產出主副彈藥（當前稀有度：${targetRarity}）`;
   }default:return '';}
 }
-function calcMaxHp(){const rl=getBuildingLv('rest');const base=1+0.03*Math.pow(1.02,rl);return Math.round(100*Math.pow(base,state.player.level-1));}
+function calcMaxHp(){const rl=getBuildingLv('rest');const base=1+0.10883*Math.pow(1.02,rl);return Math.round(100*Math.pow(base,state.player.level-1));}
 function equipArmorValue(id,rarity){
   const def=ARMOR[id];
   if(!def)return 0;
@@ -514,7 +522,7 @@ function addExp(n){
   state.player.exp+=n;let need=Math.round(50*Math.pow(1.15,state.player.level-1));
   while(state.player.exp>=need){state.player.exp-=need;state.player.level++;refreshPlayerStats();state.player.hp=state.player.maxHp;notify(`🎉 升級至 Lv.${state.player.level}（HP ${state.player.maxHp}）`,'ok');pushLog(`<span class="pl">玩家</span> 升級至 <b>Lv.${state.player.level}</b>，最大生命 ${state.player.maxHp}。`,[],'explore');need=Math.round(50*Math.pow(1.15,state.player.level-1));}
 }
-function addProf(cat,n){const tl=getBuildingLv('toilet');const m=1+tl*0.1;state.proficiency[cat]=(state.proficiency[cat]||0)+n*m;}
+function addProf(cat,n){const tl=getBuildingLv('toilet');const m=1+tl*0.1;state.proficiency[cat]=Math.min(MAX_PROF_RAW,(state.proficiency[cat]||0)+n*m);}
 function getHitRate(weaponType,mode,scopeBonus){
   let base=10,p=0;
   const w=state.player.equipped.primary,s=state.player.equipped.secondary,m=state.player.equipped.melee,t=state.player.equipped.throwable;
@@ -695,7 +703,7 @@ function ensureThrowableFromBackpack(){
   return true;
 }
 
-function getActiveRegions(){const l=state.preferences.regions.filter(r=>REGIONS[r]&&(!REGIONS[r].needUnlock||state.unlockedRegions.includes(r)));return l.length?l:['廢棄工廠'];}
+function getActiveRegions(){const l=state.preferences.regions.filter(r=>REGIONS[r]&&(!REGIONS[r].needUnlock||state.unlockedRegions.includes(r)));if(l.length)return l;for(const k in REGIONS){if(!REGIONS[k].needUnlock||state.unlockedRegions.includes(k))return[k];}return['廢棄工廠'];}
 function getCurrentNode(region){
   const routes=ROUTES[region];if(!routes||!routes.length)return{path:'',node:'未知',pathIdx:0,nodeIdx:0};
   let prog=state.regionProgress[region];
@@ -715,7 +723,7 @@ function advanceNode(region){
 function getCurrentBg(){
   const region=state.activeRegion;if(!region)return '';
   const prog=state.regionProgress[region];if(!prog)return '';
-  const key=REGION_KEYS[region];if(!key)return '';
+  const key=REGION_KEYS[region.replace(/II$/,'')];if(!key)return '';
   const routes=ROUTES[region];
   const pathIdx=clamp(prog.pathIdx||0,0,(routes?routes.length:1)-1);
   const nodeIdx=clamp(prog.nodeIdx||0,0,(routes&&routes[pathIdx]?routes[pathIdx].nodes.length:1)-1);
@@ -727,15 +735,24 @@ function updateExploreBg(){
   const bg=getCurrentBg();
   if(bg)layers.forEach(l=>{l.style.backgroundImage=`url('${bg}')`;});
   const t=$('#zone1 .zone-title');
-  if(t){const region=state.activeRegion||'';const cur=region?getCurrentNode(region):null;if(cur)t.innerHTML=`🧭 ${region} · ${cur.node}`;}
+  if(t){const region=state.activeRegion||'';const cur=region?getCurrentNode(region):null;if(cur){const _dr=region.replace(/II$/,' II');t.innerHTML=`🧭 ${_dr} · ${cur.node}`;}}
 }
 
 function genEnemies(region,count){const r=REGIONS[region];const arr=[];const mult=r.enemyHpMult||1;for(let i=0;i<count;i++){const eid=pick(r.enemies);const e=ENEMIES[eid];const hp=Math.round(e.hp*mult);arr.push({id:eid,name:e.name,hp:hp,maxHp:hp,armor:0,maxArmor:0});}return arr;}
-function spawnCount(){const r=Math.random();if(r<0.4)return 1;if(r<0.75)return 2;if(r<0.92)return 3;return 5;}
+function spawnCount(region){const R=region?REGIONS[region]:null;if(!R||!R.spawnWeights){const r=Math.random();if(r<0.4)return 1;if(r<0.75)return 2;if(r<0.92)return 3;return 5;}const w=R.spawnWeights;const total=Object.values(w).reduce((a,b)=>a+b,0);let x=Math.random()*total;for(const n in w){x-=w[n];if(x<=0)return parseInt(n,10);}return 1;}
 
-function chooseCombatWeaponVerbose(context){
-  const order=['primary','secondary','melee','throwable'];
+function chooseCombatWeaponVerbose(context,enemyCount){
   const trace=[];
+  if(context==='explore'&&enemyCount>=2){
+    const _t=pickThrowableByPreference('explore');
+    if(_t){
+      const _td=WEAPONS[_t.id];
+      trace.push('throwable(多敵優先):'+_td.name+'×'+_t.count+'✓');
+      return {slot:'throwable',weapon:{id:_t.id,rarity:_t.rarity,def:_td,slot:'throwable'},ammo:null,fromBag:true,trace};
+    }
+    trace.push('throwable:多敵但無手雷');
+  }
+  const order=['primary','secondary','melee','throwable'];
   for(const slot of order){
     /* ★ 探索模式：投擲槽改為從背包按探索偏好挑選，不碰裝備槽；
        這樣玩家留給 Boss 戰的高稀有度手雷永遠不會在探索中被消耗。 */
@@ -783,7 +800,7 @@ function applyDropBonus(count){const sl=getBuildingLv('storage');return Math.max
 
 function autoCombat(region,node,enemies){
   try{
-    const choice=chooseCombatWeaponVerbose('explore');
+    const choice=chooseCombatWeaponVerbose('explore',enemies.length);
     const totalEnemyHp=enemies.reduce((s,e)=>s+e.hp,0);
     if(!choice.slot){pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 遭遇了 ${fmtEnemies(enemies)}，<span class="lose">手無寸鐵，只能逃跑。</span>`,[],'explore');return{victory:false,loot:[]};}
     const {slot,weapon,ammo}=choice;const def=weapon.def;
@@ -792,6 +809,7 @@ function autoCombat(region,node,enemies){
     addProf(slot,0.1);if(def.type)addProf(def.type,0.1);
     const ec=enemies.length;let bulletsUsed=0,hits=0,dmgDealt=0,crits=0;
     let mode='點射',rounds=1;
+    let remaining=enemies.map(e=>({...e}));
     const critRate=calcCritRate(weapon.rarity,ammo?ammo.rarity:'一般');
     const critMult=calcCritMult(weapon.rarity,ammo?ammo.rarity:'一般');
     const scopeBonus=def.scopeBonus||0;
@@ -799,14 +817,21 @@ function autoCombat(region,node,enemies){
     if(def.cal&&isSemiAutoOnly(def)){
       mode='點射';
       const hitRate=getHitRate(def.type,'點射',scopeBonus);
-      const baseDmg=Math.round(ammo.def.dmg*(RARITY_MULT[ammo.rarity]||1));
+      const _pl=Math.floor(state.proficiency[def.type]||0);
+      const _pe=clamp(_pl/MAX_PROF_LEVEL,0,1);
+      const _pd=0.6+_pe*0.9;
+      const baseDmg=Math.round(ammo.def.dmg*(RARITY_MULT[ammo.rarity]||1)*_pd);
       const magCap=def.mag||1;const maxBullets=Math.min(magCap,ammo.count);
-      const maxRounds=Math.max(1,Math.floor(maxBullets/Math.max(1,ec)));
-      const profLevel=Math.floor(state.proficiency[def.type]||0);
-      const extraChance=Math.min(1,profLevel*0.02);
-      rounds=1;while(rounds<maxRounds&&Math.random()<extraChance)rounds++;
-      const remaining=enemies.map(e=>({...e}));
-      for(let r=0;r<rounds;r++){const alive=remaining.filter(e=>e.hp>0);if(!alive.length)break;for(const target of alive){if(bulletsUsed>=maxBullets)break;bulletsUsed++;if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}if(remaining.every(e=>e.hp<=0))break;}
+      const hitP=Math.max(0.01,hitRate/100);
+      const avgHp=totalEnemyHp/Math.max(1,ec);
+      const expHits=Math.ceil(avgHp/Math.max(1,baseDmg));
+      const expBullets=Math.ceil(expHits/hitP);
+      const profErr=(1-_pe)*0.8;
+      const jitter=1+(Math.random()*2-1)*profErr;
+      const planned=Math.max(1,Math.ceil(expBullets*jitter));
+      const bulletsToFire=Math.min(planned,maxBullets);
+      for(let i=0;i<bulletsToFire;i++){const alive=remaining.filter(e=>e.hp>0);if(!alive.length)break;const target=pick(alive);bulletsUsed++;if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp=Math.max(0,target.hp-Math.max(1,d));hits++;dmgDealt+=Math.max(1,d);}}
+      rounds=1;
       if(bulletsUsed>0)invRemove(ammo.id,ammo.rarity,bulletsUsed);
     } else if(def.cal){
       mode=chooseFireMode(weapon,ec,ammo.count);
@@ -816,9 +841,10 @@ function autoCombat(region,node,enemies){
       if(mode==='掃射')needBullets=Math.min(def.mag||30,ammo.count);else needBullets=perTarget*ec;
       needBullets=Math.min(needBullets,ammo.count);bulletsUsed=needBullets;
       if(bulletsUsed>0)invRemove(ammo.id,ammo.rarity,bulletsUsed);
-      const baseDmg=Math.round(ammo.def.dmg*(RARITY_MULT[ammo.rarity]||1));
+      const _pd2=0.6+clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL,0,1)*0.9;
+      const baseDmg=Math.round(ammo.def.dmg*(RARITY_MULT[ammo.rarity]||1)*_pd2);
       const pellets=ammo.def.pellets||1;
-      let remaining=enemies.map(e=>({...e}));let bi=bulletsUsed;
+      let bi=bulletsUsed;
       while(bi>0&&remaining.some(e=>e.hp>0)){const alive=remaining.filter(e=>e.hp>0);if(!alive.length)break;const target=pick(alive);bi--;for(let p=0;p<pellets;p++){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}if(remaining.every(e=>e.hp<=0))break;}
     } else if(def.explosive){
       /* ★ 投擲物：探索模式一律從背包消耗，裝備槽保留給 Boss 戰 */
@@ -839,16 +865,18 @@ function autoCombat(region,node,enemies){
       }
       bulletsUsed=1;
       const hitRate=getHitRate(def.type,mode)+10;
-      const baseDmg=Math.round(def.dmg*(RARITY_MULT[weapon.rarity]||1));
-      for(const target of enemies){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-5,5);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}
+      const _pdT=0.6+clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL,0,1)*0.9;
+      const baseDmg=Math.round(def.dmg*(RARITY_MULT[weapon.rarity]||1)*_pdT);
+      for(const target of remaining){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-5,5);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}
     } else {
       /* 近戰（唯一非槍械非投擲的近戰路徑） */
       mode=def.modes?def.modes[0]:'近戰';
       const hitRate=getHitRate(def.type,mode)+10;
-      const baseDmg=Math.round((def.dmg||0)*(RARITY_MULT[weapon.rarity]||1));
+      const _pdM=0.6+clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL,0,1)*0.9;
+      const baseDmg=Math.round((def.dmg||0)*(RARITY_MULT[weapon.rarity]||1)*_pdM);
       const attackTimes=getMeleeHits(def.rpm);
       bulletsUsed=attackTimes;
-      const alive=enemies.filter(e=>e.hp>0);
+      const alive=remaining.filter(e=>e.hp>0);
       if(alive.length){
         const target=pick(alive);
         for(let i=0;i<attackTimes;i++){
@@ -862,17 +890,17 @@ function autoCombat(region,node,enemies){
         }
       }
     }
-    const reallyVictory=dmgDealt>=totalEnemyHp&&hits>0;
+    const reallyVictory=remaining.every(e=>e.hp<=0)&&hits>0;
     const ammoTxt=def.cal?`消耗 ${ammo.def.name}子彈${bulletsUsed}發`:(def.explosive?`投出 ${def.name}×1`:'');
     const isMelee=def.slot==='melee';
     const meleeHits=isMelee?getMeleeHits(def.rpm):0;
-    const hitTxt=def.cal?`(命中:${hits}/${bulletsUsed}，暴擊:${crits}，傷害:${dmgDealt}/${totalEnemyHp})`:(isMelee?`(近戰 ${meleeHits} 次，命中:${hits}，暴擊:${crits}，傷害:${dmgDealt}/${totalEnemyHp})`:`(命中:${hits}，暴擊:${crits}，傷害:${dmgDealt}/${totalEnemyHp})`);
+    const _remHp=remaining.reduce((s,e)=>s+Math.max(0,e.hp),0);const _effDmg=Math.max(0,totalEnemyHp-_remHp);const hitTxt=def.cal?`(命中:${hits}/${bulletsUsed}，暴擊:${crits}，傷害:${_effDmg}/${totalEnemyHp})`:(isMelee?`(近戰 ${meleeHits} 次，命中:${hits}，暴擊:${crits}，傷害:${_effDmg}/${totalEnemyHp})`:`(命中:${hits}，暴擊:${crits}，傷害:${_effDmg}/${totalEnemyHp})`);
     const modeDisplay=(def.cal&&isSemiAutoOnly(def)&&rounds>1)?`${rounds}輪點射`:mode;
     let resultTxt='',loot=[];
     if(reallyVictory){
       resultTxt=`<span class="win">勝利</span>`;state.stats.kills+=enemies.length;
       const dropN=rndInt(1,2);
-      for(let i=0;i<dropN;i++){const lid=pick(REGIONS[region].loot);const ldef=itemDef(lid);if(!ldef)continue;const rar=hasVariableRarity(lid)?rollRarity():ldef.rarity;let cnt=(itemCat(lid)==='ammo')?rndInt(10,30):(itemCat(lid)==='material'?rndInt(2,6):1);cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);loot.push({id:lid,rarity:rar,count:cnt});}
+      for(let i=0;i<dropN;i++){const drop=rollRegionDrop(region);if(!drop)continue;const lid=drop.id,rar=drop.rarity;let cnt=(itemCat(lid)==='ammo')?rndInt(3,8):(itemCat(lid)==='material'?rndInt(1,4):1);cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);loot.push({id:lid,rarity:rar,count:cnt});}
       addExp(enemies.length*3);
       if(REGIONS[region].seal&&Math.random()<REGIONS[region].sealRate){state.seals[REGIONS[region].seal]=parseInt(state.seals[REGIONS[region].seal]||0,10)+1;pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 撿到了 <b>Boss 信物</b>！`,[],'explore');}
     } else {
@@ -893,8 +921,12 @@ function searchEvent(region,node){
     if(lid){const ldef=itemDef(lid);const rar=rollRarity();invAdd(lid,rar,1);pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 開啓了 武器櫃，獲得 ${fmtItemSpan(lid,rar,1)}。`,[{id:lid,rarity:rar,count:1}],'explore');addProf('drop',1);addExp(2);return;}
   }
   if(roll<0.75){
-    const lid=pick(r.loot.filter(id=>AMMO[id]||MATERIALS[id]||CONSUMABLES[id]));
-    if(lid){const ldef=itemDef(lid);const rar=hasVariableRarity(lid)?rollRarity():ldef.rarity;let cnt=AMMO[lid]?rndInt(15,45):(MATERIALS[lid]?rndInt(2,7):1);cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 發現了 補給箱，獲得 ${fmtItemSpan(lid,rar,cnt)}。`,[{id:lid,rarity:rar,count:cnt}],'explore');addProf('drop',1);addExp(1);return;}
+    const pool=r.loot.filter(id=>AMMO[id]||MATERIALS[id]||CONSUMABLES[id]);
+    let lid=pick(pool);
+    let rar=null;
+    if(lid&&AMMO[lid]){const ammoPool=r.loot.filter(id=>AMMO[id]);const selRar=rollAmmoRarity(region);if(selRar){const filtered=ammoPool.filter(id=>AMMO[id].rarity===selRar);if(filtered.length)lid=pick(filtered);}rar=AMMO[lid].rarity;}
+    else if(lid){const ldef=itemDef(lid);rar=hasVariableRarity(lid)?rollRarity():ldef.rarity;}
+    if(lid){let cnt=AMMO[lid]?rndInt(5,15):(MATERIALS[lid]?rndInt(1,5):1);cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 發現了 補給箱，獲得 ${fmtItemSpan(lid,rar,cnt)}。`,[{id:lid,rarity:rar,count:cnt}],'explore');addProf('drop',1);addExp(1);return;}
   }
   pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 沒有發現任何東西。`,[],'explore');
 }
@@ -907,7 +939,7 @@ function doExploreTick(){
   const cc0=mode==='attack'?r.combat.attack:r.combat.stealth;
   const sb=(state.proficiency.drop||0)*0.001;
   const cc=clamp(cc0-(mode==='stealth'?sb:0),0.05,0.9);
-  if(Math.random()<cc){const n=spawnCount();const enemies=genEnemies(region,n);autoCombat(region,node,enemies);}
+  if(Math.random()<cc){const n=spawnCount(region);const enemies=genEnemies(region,n);autoCombat(region,node,enemies);}
   else searchEvent(region,node);
   const finished=advanceNode(region);
   if(finished){state.activeRegion=pick(regions);}
@@ -1099,7 +1131,7 @@ function offlineSettle(){
     const region=pick(regionPool);const mode=state.preferences.actionMode;const r=REGIONS[region];
     const cc=mode==='attack'?r.combat.attack:r.combat.stealth;
     const cur=getCurrentNode(region);
-    if(Math.random()<cc){const n=spawnCount();const enemies=genEnemies(region,n);const res=autoCombat(region,cur.node,enemies);if(res.victory)wins++;else runs++;}
+    if(Math.random()<cc){const n=spawnCount(region);const enemies=genEnemies(region,n);const res=autoCombat(region,cur.node,enemies);if(res.victory)wins++;else runs++;}
     else searchEvent(region,cur.node);
     advanceNode(region);
   }
@@ -1145,13 +1177,14 @@ function renderExplore(){
   const cur=getCurrentNode(region);
   const bg=getCurrentBg();
   const spd=Math.round(EVENT_INTERVAL_MS/1000);
+  const _displayRegion=region.replace(/II$/,' II');
   z1.innerHTML=`
     <div class="scene">
       <div class="bg-scroll" style="--spd:${spd}s"><div class="bg-layer" style="background-image:url('${bg}')"></div><div class="bg-layer" style="background-image:url('${bg}')"></div></div>
       <div class="groundline"></div>
       <div class="explore-fx" id="explore-fx"></div>
       <canvas id="hero-canvas" class="hero-canvas"></canvas>
-      <div class="zone-title">🧭 ${region} · ${cur.node}</div>
+      <div class="zone-title">🧭 ${_displayRegion} · ${cur.node}</div>
       <div class="zone-badge">${state.preferences.actionMode==='attack'?'⚔ 攻擊前進':'🥷 潛行蒐集'}</div>
     </div>`;
   requestAnimationFrame(()=>{ renderExploreHeroCanvas(); });
@@ -1502,7 +1535,7 @@ function openOfflineDetail(log){
     }
   }
   const bd = openModal({title:'📦 離線獲得物資', body});
-  $('.item-row', bd).forEach(r => {
+  $$('.item-row', bd).forEach(r => {
     r.onclick = () => { closeModal(); openItemDetail(r.dataset.iid, r.dataset.irar, () => openOfflineDetail(log)); };
   });
 }
@@ -1516,8 +1549,8 @@ function openLogHistory(){
   }
   body+='</div>';
   const bd=openModal({title:'📜 歷史記錄',body,full:true});
-  $('.itm',bd).forEach(e=>{e.onclick=()=>openItemDetail(e.dataset.iid,e.dataset.irar);});
-  $('[data-offline-idx]',bd).forEach(e=>{
+  $$('.itm',bd).forEach(e=>{e.onclick=()=>openItemDetail(e.dataset.iid,e.dataset.irar);});
+  $$('[data-offline-idx]',bd).forEach(e=>{
     e.onclick=()=>{ const l=logs[parseInt(e.dataset.offlineIdx,10)]; if(l) openOfflineDetail(l); };
   });
 }

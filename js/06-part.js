@@ -2,7 +2,7 @@
    基地
    ============================================================ */
 const collapsedSections={weapons:true,types:true,other:true};
-function profDisplay(v){v=v||0;const lv=Math.floor(v),pct=Math.round((v-lv)*100);return `Lv.${lv} (${pct}%)`;}
+function profDisplay(v){v=v||0;if(v>=MAX_PROF_LEVEL)return `Lv.${MAX_PROF_LEVEL} (MAX)`;const capped=Math.min(MAX_PROF_LEVEL,v);const lv=Math.floor(capped),pct=Math.round((capped-lv)*100);return `Lv.${lv} (${pct}%)`;}
 function renderBase(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   let html='<div class="build-grid">';
@@ -19,7 +19,7 @@ function renderBase(){
   z2.innerHTML=`
     <div class="prof-area">
       <div class="prof-sec ${collapsedSections.weapons?'collapsed':''}" data-sec="weapons">
-        <h4 data-toggle="weapons"><span>🔫 武器使用（大類）</span><span>▼</span></h4>
+        <h4 data-toggle="weapons"><span>🔫 熟練度（欄位）</span><span>▼</span></h4>
         <div class="prof-body">
           <div class="prof-line"><span>主武器</span><span class="v">${profDisplay(p.primary)}</span></div>
           <div class="prof-line"><span>副武器</span><span class="v">${profDisplay(p.secondary)}</span></div>
@@ -28,7 +28,7 @@ function renderBase(){
         </div>
       </div>
       <div class="prof-sec ${collapsedSections.types?'collapsed':''}" data-sec="types">
-        <h4 data-toggle="types"><span>🎯 具體武器類型</span><span>▼</span></h4>
+        <h4 data-toggle="types"><span>🎯 熟練度（武器）</span><span>▼</span></h4>
         <div class="prof-body">${types.map(t=>`<div class="prof-line"><span>${t}</span><span class="v">${profDisplay(p[t])}</span></div>`).join('')}</div>
       </div>
       <div class="prof-sec ${collapsedSections.other?'collapsed':''}" data-sec="other">
@@ -45,37 +45,68 @@ function renderBase(){
   $('#pref-btn').onclick=openPreference;
   renderRegionArea(z3);
 }
+let _regionScrollPos=0;
+function getSelectedRegionTier(baseName){
+  for(const id of state.preferences.regions){
+    if(id===baseName)return 1;
+    if(id===baseName+'II')return 2;
+  }
+  return 0;
+}
+function setRegionTier(baseName,tier){
+  state.preferences.regions=state.preferences.regions.filter(id=>id!==baseName&&id!==baseName+'II');
+  if(tier===1)state.preferences.regions.push(baseName);
+  else if(tier===2)state.preferences.regions.push(baseName+'II');
+}
+function ensureAtLeastOneRegion(){
+  if(state.preferences.regions.length>0)return;
+  for(const k in REGIONS){
+    if(!REGIONS[k].needUnlock||state.unlockedRegions.includes(k)){state.preferences.regions.push(k);return;}
+  }
+  state.preferences.regions.push('廢棄工廠');
+}
 function renderRegionArea(z3){
-  if(!state.preferences.regions.length)state.preferences.regions=['廢棄工廠'];
+  const _ra=z3.querySelector('.region-area');
+  if(_ra) _regionScrollPos=_ra.scrollTop;
+  ensureAtLeastOneRegion();
   let html=`<div class="z3-head"><div class="z3-title">🗺️ 探索區域</div></div>
     <div class="mode-sel">
-      <div class="mode-btn ${state.preferences.actionMode==='attack'?'on':''}" data-mode="attack">⚔ 攻擊前進</div>
-      <div class="mode-btn ${state.preferences.actionMode==='stealth'?'on':''}" data-mode="stealth">🥷 潛行蒐集</div>
+      <div class="mode-btn ${state.preferences.actionMode==='attack'?'on':''}" data-mode="attack">⚔ 攻擊</div>
+      <div class="mode-btn ${state.preferences.actionMode==='stealth'?'on':''}" data-mode="stealth">🥷 潛行</div>
     </div>
     <div class="region-area">`;
-  for(const rid in REGIONS){
-    const r=REGIONS[rid];
-    const unlocked=!r.needUnlock||state.unlockedRegions.includes(rid);
-    const on=state.preferences.regions.includes(rid);
-    html+=`<div class="reg-item ${on?'on':''} ${unlocked?'':'locked'}" data-rid="${rid}" data-locked="${unlocked?0:1}">
-      <div class="chk">${on?'✓':''}</div>
-      <div class="ri"><div class="rn">${r.name}${unlocked?'':' 🔒'}</div>
-      <div class="rd">${r.desc}<br>戰鬥率 ${(r.combat.attack*100).toFixed(0)}% / ${(r.combat.stealth*100).toFixed(0)}% ｜ 信物 ${(r.sealRate*100).toFixed(1)}%</div>
-      ${!unlocked&&r.unlockHint?`<div class="lock-hint">🔒 ${r.unlockHint}</div>`:''}
+  const _baseKeys=['廢棄工廠','廢棄實驗室','郊區公路','輻射沼澤','廢土核心'];
+  for(const baseName of _baseKeys){
+    const r1=REGIONS[baseName];
+    if(!r1)continue;
+    const iiName=baseName+'II';
+    const r2=REGIONS[iiName];
+    const t2Exists=!!r2;
+    const t2Unlocked=t2Exists&&(!r2.needUnlock||state.unlockedRegions.includes(iiName));
+    const selTier=getSelectedRegionTier(baseName);
+    html+=`<div class="reg-item" data-sel-tier="${selTier}">
+      <div class="ri"><div class="rn">${r1.name}</div></div>
+      <div class="tier-selector">
+        <div class="tier-btn ${selTier===1?'on':''}" data-key="${baseName}" data-tier="1">I</div>
+        ${t2Exists?`<div class="tier-btn ${selTier===2?'on':''} ${t2Unlocked?'':'locked'}" data-key="${baseName}" data-tier="2">${t2Unlocked?'II':'🔒'}</div>`:''}
       </div>
     </div>`;
   }
-  html+=`</div><div style="padding:6px;font-size:9px;color:#5a5040;border-top:1px solid #2a231c">可多選。鎖定區域需擊敗對應 Boss 解鎖。</div>`;
+  html+=`</div>`;
   z3.innerHTML=html;
+  const _ra2=z3.querySelector('.region-area');
+  if(_ra2) _ra2.scrollTop=_regionScrollPos;
   $$('.mode-btn',z3).forEach(b=>{b.onclick=()=>setActionMode(b.dataset.mode);});
-  $$('.reg-item',z3).forEach(item=>{
-    item.onclick=()=>{
-      if(item.dataset.locked==='1'){notify('區域尚未解鎖','error');return;}
-      const rid=item.dataset.rid;
-      const idx=state.preferences.regions.indexOf(rid);
-      if(idx>=0){if(state.preferences.regions.length>1)state.preferences.regions.splice(idx,1);}
-      else state.preferences.regions.push(rid);
-      save();renderRegionArea(z3);notify('探索區域已更新','ok');
+  $$('.tier-btn',z3).forEach(btn=>{
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      const key=btn.dataset.key;
+      const tier=parseInt(btn.dataset.tier,10);
+      if(tier===2&&!state.unlockedRegions.includes(key+'II')){notify('二級區域尚未解鎖','error');return;}
+      const cur=getSelectedRegionTier(key);
+      setRegionTier(key,cur===tier?0:tier);
+      ensureAtLeastOneRegion();
+      save();renderRegionArea(z3);
     };
   });
 }
@@ -400,7 +431,7 @@ function openPreference(){
     cb.checked = !cb.checked;
     cb.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  $('.excl-label',bd).forEach(label=>{
+  $$('.excl-label',bd).forEach(label=>{
     label.onclick=(e)=>{
       if(e.target && (e.target.classList.contains('excl-cb') || e.target.tagName === 'INPUT')) return;
       e.preventDefault();
@@ -439,6 +470,7 @@ $$('.tab').forEach(t=>{
   t.onclick=()=>{
     if(BossModule.isActive()){if(!confirm('戰鬥尚未結束，確定要離開嗎？'))return;BossModule.battle.active=false;BossModule.battle=null;}
     currentTab=t.dataset.tab;
+    if(currentTab==='base') _regionScrollPos=0;
     $$('.tab').forEach(x=>x.classList.toggle('active',x===t));
     renderCurrentTab();
   };
