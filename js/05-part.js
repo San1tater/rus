@@ -640,7 +640,6 @@ function getPlayerMuzzlePos(){
   const H = fx ? fx.clientHeight : 500;
   const spriteW = 88, spriteH = BATTLE_HERO_SPRITE_H;
 
-  const B = { x:30, y:30, w:340, h:460 };
   const ORIG_CHAR_H = 386;
   const ORIG_FOOT_X = 200;
   const ORIG_FOOT_Y = 515;
@@ -650,9 +649,8 @@ function getPlayerMuzzlePos(){
 
   const eq = state.player.equipped;
   let wpSlot = null, wpId = null;
-  if(battle.weaponSlot && eq[battle.weaponSlot]){
-    wpSlot = battle.weaponSlot; wpId = eq[battle.weaponSlot];
-  } else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
+  if(battle.weaponSlot && eq[battle.weaponSlot]){ wpSlot = battle.weaponSlot; wpId = eq[battle.weaponSlot]; }
+  else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
   else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
   else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
 
@@ -662,33 +660,18 @@ function getPlayerMuzzlePos(){
   if(wpSlot && wpId){
     const cfg = getWeaponCfg(wpSlot, wpId);
     if(cfg){
-      const L = GAME_LAYERS.find(l => l.id === cfg.layer);
-      if(L){
-        const cx = B.x + B.w * L.x;
-        const cy = B.y + B.h * L.y;
-        const w  = B.w * L.w;
-        const h  = B.h * L.h;
-        const px = w * L.pivot.x;
-        const py = h * L.pivot.y;
-        const localXinChar = px + w * (cfg.ox || 0);
-        const localYinChar = py + h * (cfg.oy || 0);
-        const weaponCenterCharX = cx - px + localXinChar;
-        const weaponCenterCharY = cy - py + localYinChar;
-        const weaponW = 400 * (cfg.scale || 0.3);
-        const rightCharX = weaponCenterCharX + weaponW / 2;
-
-        localX = centerX_local + scale * (rightCharX - ORIG_FOOT_X);
-        localY = groundY_local + scale * (weaponCenterCharY - ORIG_FOOT_Y);
+      const layout = computeWeaponCharLayout(cfg);
+      if(layout){
+        localX = centerX_local + scale * (layout.rightX - ORIG_FOOT_X);
+        localY = groundY_local + scale * (layout.anchorY - ORIG_FOOT_Y);
       }
     }
   }
-
   return {
     x: (battle.px * W - spriteW / 2 + localX) / W,
     y: (battle.py * H + localY) / H
   };
 }
-
 function slotCanFire(slot){
   if(!battle) return false;
   const w = equippedWeapon(slot);

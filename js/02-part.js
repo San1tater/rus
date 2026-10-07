@@ -1209,6 +1209,43 @@ const GAME_ANIMS = {
   },
 };
 
+const WEAPON_LAYOUT = {
+  ak74:    { scale:1.0, ox: 0.115847, oy:-0.090232, rotation:0,  trim:{x:15,y:17,w:288,h:93} },
+  aks74u:  { scale:1.0, ox: 0.274369, oy:-0.198512, rotation:0,  trim:{x:19,y:28,w:194,h:85} },
+  pkm:     { scale:1.0, ox:-0.052429, oy:-0.297768, rotation:0,  trim:{x: 0,y:42,w:376,h:112} },
+  ash12:   { scale:1.0, ox:-0.028041, oy:-0.595536, rotation:0,  trim:{x:15,y:17,w:229,h:93} },
+  svd:     { scale:1.0, ox: 0.054877, oy:-0.460187, rotation:0,  trim:{x:19,y:33,w:345,h:61} },
+  sv98:    { scale:1.0, ox: 0.091459, oy:-0.442139, rotation:0,  trim:{x:18,y:33,w:345,h:61} },
+  vss:     { scale:1.0, ox:-0.003653, oy:-0.730885, rotation:0,  trim:{x:16,y: 1,w:294,h:99} },
+  aps:     { scale:1.0, ox: 0.621998, oy:-0.197900, rotation:0,  trim:{x:19,y: 0,w: 89,h:64} },
+  pb:      { scale:1.0, ox: 0.572905, oy:-0.215498, rotation:0,  trim:{x:30,y: 0,w:130,h:64} },
+  ks23:    { scale:1.0, ox: 0.154468, oy:-0.038305, rotation:-6, trim:{x:57,y: 0,w:266,h:64} },
+  mp155:   { scale:1.0, ox: 0.154468, oy:-0.038305, rotation:-6, trim:{x:18,y: 1,w:344,h:60} },
+  toz106:  { scale:1.0, ox: 0.285599, oy:-0.090809, rotation:-6, trim:{x: 8,y:10,w:182,h:54} },
+  '6kh5':  { scale:1.0, ox: 0.75,     oy: 0.71,     rotation:-79, trim:{x: 5,y:19,w:117,h:28} },
+};
+
+/* 統一的錨點/邊界計算：drawEqLayer、getExploreWeaponRightEdge、getPlayerMuzzlePos 共用
+   回傳人物原始座標系下的 { anchorX, anchorY, rightX, baseW } */
+function computeWeaponCharLayout(cfg){
+  if(!cfg || !cfg.layer) return null;
+  const L = GAME_LAYERS.find(l => l.id === cfg.layer);
+  if(!L) return null;
+  const B = { x:30, y:30, w:340, h:460 };
+  const w = B.w * L.w;
+  const h = B.h * L.h;
+  const cx = B.x + B.w * L.x;
+  const cy = B.y + B.h * L.y;
+  const anchorX = cx + w * (cfg.ox || 0);
+  const anchorY = cy + h * (cfg.oy || 0);
+  const isTrimMode = !!(cfg.trim && cfg.trim.w > 0);
+  const baseW = isTrimMode
+    ? cfg.trim.w * (cfg.scale || 1.0)
+    : 400 * (cfg.scale || 0.3);
+  const rightX = isTrimMode ? (anchorX + baseW) : (anchorX + baseW / 2);
+  return { anchorX, anchorY, rightX, baseW, isTrimMode };
+}
+
 const HERO_VISIBLE_EQ = {
   head:              { layer:'head',      behind:false, scale:0.34, ox:-0.14926568895119788, oy:-0.5893343612503056, rotation:4 },
   top:               { layer:'torso',     behind:false, scale:0.42, ox: 0.06118610784887918, oy: 0.37261399041264553, rotation:0 },
@@ -1274,6 +1311,11 @@ function updateBattleHeroAnim(now){
 }
 
 function getWeaponCfg(slot, id){
+  const baseId = resolveIconId(id);
+  const layout = WEAPON_LAYOUT[baseId];
+  if(layout){
+    return { layer:'front_arm', behind:true, scale:layout.scale, ox:layout.ox, oy:layout.oy, rotation:layout.rotation, trim:layout.trim };
+  }
   if(slot === 'primary') return HERO_VISIBLE_EQ.primary;
   if(slot === 'melee') return HERO_VISIBLE_EQ.melee;
   if(slot === 'secondary'){
@@ -1290,7 +1332,6 @@ function getTopCfg(id){
 }
 
 function getExploreWeaponRightEdge(canvasW, canvasH){
-  const B = { x: 30, y: 30, w: 340, h: 460 };
   const ORIG_CHAR_H = 386;
   const ORIG_FOOT_X = 200;
   const ORIG_FOOT_Y = 515;
@@ -1308,28 +1349,14 @@ function getExploreWeaponRightEdge(canvasW, canvasH){
   if(!wpSlot || !wpId) return { x: centerX, y: groundY };
   const cfg = getWeaponCfg(wpSlot, wpId);
   if(!cfg) return { x: centerX, y: groundY };
-  const L = GAME_LAYERS.find(l => l.id === cfg.layer);
-  if(!L) return { x: centerX, y: groundY };
-
-  const cx = B.x + B.w * L.x;
-  const cy = B.y + B.h * L.y;
-  const w = B.w * L.w;
-  const h = B.h * L.h;
-  const px = w * L.pivot.x;
-  const py = h * L.pivot.y;
-  const localX = px + w * (cfg.ox || 0);
-  const localY = py + h * (cfg.oy || 0);
-  const weaponCenterCharX = cx - px + localX;
-  const weaponCenterCharY = cy - py + localY;
-  const weaponW = 400 * (cfg.scale || 0.3);
-  const rightCharX = weaponCenterCharX + weaponW / 2;
+  const layout = computeWeaponCharLayout(cfg);
+  if(!layout) return { x: centerX, y: groundY };
 
   return {
-    x: centerX + scale * (rightCharX - ORIG_FOOT_X),
-    y: groundY + scale * (weaponCenterCharY - ORIG_FOOT_Y)
+    x: centerX + scale * (layout.rightX - ORIG_FOOT_X),
+    y: groundY + scale * (layout.anchorY - ORIG_FOOT_Y)
   };
 }
-
 function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio){
   const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
@@ -1390,7 +1417,7 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
       const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
       if(layerDef){
         const img = getHeroImg(`icons/items/${resolveIconId(wpId)}.png`);
-        units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
+        units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
       }
     }
   }
@@ -1439,19 +1466,34 @@ function drawEqLayer(ctx, u, B, anim, fi){
   const py = h * L.pivot.y;
   const localX = px + w * (u.ox || 0);
   const localY = py + h * (u.oy || 0);
-  const baseW = 400 * (u.scale || 0.3);
-  const ar = img.naturalWidth / img.naturalHeight;
-  const baseH = baseW / ar;
+
+  const hasTrim = u.trim && u.trim.w > 0;
+  let baseW, baseH, drawX;
+  if(hasTrim){
+    baseW = u.trim.w * (u.scale || 1.0);
+    baseH = u.trim.h * (u.scale || 1.0);
+    drawX = 0;
+  } else {
+    baseW = 400 * (u.scale || 0.3);
+    const ar = img.naturalWidth / img.naturalHeight;
+    baseH = baseW / ar;
+    drawX = -baseW / 2;
+  }
+
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate((key.rot || 0) * Math.PI / 180);
   ctx.translate(-px, -py);
   ctx.translate(localX, localY);
   if(u.rotation) ctx.rotate(u.rotation * Math.PI / 180);
-  ctx.drawImage(img, -baseW/2, -baseH/2, baseW, baseH);
+  if(hasTrim){
+    ctx.drawImage(img, u.trim.x, u.trim.y, u.trim.w, u.trim.h,
+                  drawX, -baseH/2, baseW, baseH);
+  } else {
+    ctx.drawImage(img, drawX, -baseH/2, baseW, baseH);
+  }
   ctx.restore();
 }
-
 function renderExploreHeroCanvas(){
   if(currentTab !== 'explore') return;
   const canvas = document.getElementById('hero-canvas');
