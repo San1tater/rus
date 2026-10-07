@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>分層人偶編輯器 v8.3</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;font-size:12px}
+#app{display:flex;flex-direction:column;height:100vh}
+header{flex:0 0 auto;padding:8px 12px;background:#1a1510;border-bottom:1px solid #2a231c;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+header h1{font-size:14px;color:#e8a33d;font-weight:bold}
+header .hint{font-size:10px;color:#7a6f60}
+header .spacer{flex:1}
+header button{background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer}
+header button:hover{border-color:#e8a33d;color:#e8a33d}
+header button.import{border-color:#4a90d9;color:#6ab8e8}
+header button.import:hover{border-color:#7ac8ff;color:#a8d8ff}
+header button.save{border-color:#4caf50;color:#6ad870;background:#1a2a1a}
+header button.save:hover{border-color:#7ae880;color:#a0ffa8;background:#1e3a1e}
+header button.save.dirty{border-color:#ffb300;color:#ffd060;background:#2a2210;box-shadow:0 0 8px rgba(255,179,0,.4)}
+header input[type=file]{display:none}
+main{flex:1;min-height:0;display:flex}
+aside{background:#151210;overflow-y:auto}
+aside::-webkit-scrollbar{width:6px}
+aside::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:3px}
+#left{flex:0 0 300px;border-right:1px solid #2a231c}
+#center{flex:1;min-width:0;display:flex;flex-direction:column;background:#0a0806}
+#right{flex:0 0 300px;border-left:1px solid #2a231c}
+.sec{padding:10px;border-bottom:1px solid #2a231c}
+.sec h3{font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.sec h3 .fold{color:#7a6f60;cursor:pointer;font-size:14px;user-select:none;padding:0 4px}
+.sec.folded .secBody{display:none}
+.secBody{display:flex;flex-direction:column;gap:5px}
+.row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.row label{flex:0 0 76px;color:#7a6f60;font-size:10px}
+.row input[type=text],.row select,.row input[type=number]{flex:1;min-width:0;background:#1a1510;border:1px solid #3a2f25;border-radius:4px;padding:5px 8px;color:#e0e0e0;font-size:11px}
+.row input:focus,.row select:focus{outline:none;border-color:#e8a33d}
+.row input[type=range]{flex:1;min-width:0}
+.row .val{flex:0 0 46px;text-align:right;color:#e8a33d;font-family:monospace;font-size:10px}
+.row .btn{flex:1;background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:5px;padding:6px;font-size:10px;cursor:pointer;text-align:center}
+.row .btn:hover{border-color:#e8a33d;color:#e8a33d}
+.row .btn.primary{background:#8a5f18;border-color:#e8a33d;color:#fff}
+.row .btn.danger{background:#3a1a1a;border-color:#6a2a2a;color:#e05252}
+.layerCard{background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:8px;margin-bottom:6px;cursor:pointer}
+.layerCard.selected{border-color:#e8a33d;background:#241d16}
+.layerCard.hidden{opacity:.45}
+.layerCard.core{border-left:3px solid #e8a33d}
+.layerCard.extra{border-left:3px solid #5a5040;opacity:.8}
+.layerCard.extra.hidden{opacity:.3}
+.layerCard .lc-head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.layerCard .lc-head .eye{width:20px;height:20px;flex:0 0 20px;display:flex;align-items:center;justify-content:center;border-radius:4px;background:#241d16;border:1px solid #3a2f25;cursor:pointer;font-size:11px;user-select:none}
+.layerCard .lc-head .eye:hover{border-color:#e8a33d}
+.layerCard .lc-head .eye.off{color:#5a5040;background:#0a0806}
+.layerCard .lc-head .eye.on{color:#4ad8e8}
+.layerCard .lc-head .ico{width:26px;height:26px;border-radius:4px;background:#0a0806;border:1px solid #2a231c;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 26px}
+.layerCard .lc-head .ico img{width:100%;height:100%;object-fit:contain}
+.layerCard .lc-head .nm{flex:1;font-size:11px;color:#ddd}
+.layerCard .lc-head .ztag{font-size:9px;color:#5a5040;font-family:monospace}
+.layerCard .lc-head .btns button{background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;margin-left:3px}
+.layerCard .uploadRow{display:flex;gap:4px;margin-bottom:6px}
+.layerCard .uploadRow input[type=file]{display:none}
+.layerCard .uploadRow label,.layerCard .uploadRow button{flex:1;background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:4px;padding:5px;font-size:10px;cursor:pointer;text-align:center}
+.layerCard .uploadRow label:hover{border-color:#e8a33d}
+.layerCard .info{font-size:9px;color:#7a6f60;font-family:monospace}
+.eqCard{background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:8px;margin-bottom:6px;cursor:pointer}
+.eqCard.selected{border-color:#e8a33d;background:#241d16}
+.eqCard.hidden{opacity:.42}
+.eqCard .ec-head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.eqCard .ec-head .eye{width:22px;height:22px;flex:0 0 22px;display:flex;align-items:center;justify-content:center;border-radius:4px;background:#241d16;border:1px solid #3a2f25;cursor:pointer;font-size:12px;user-select:none}
+.eqCard .ec-head .eye:hover{border-color:#e8a33d}
+.eqCard .ec-head .eye.off{color:#5a5040;background:#0a0806}
+.eqCard .ec-head .eye.on{color:#4ad8e8}
+.eqCard .ec-head .ico{width:28px;height:28px;border-radius:4px;background:#0a0806;border:1px solid #2a231c;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 28px}
+.eqCard .ec-head .ico img{width:100%;height:100%;object-fit:contain}
+.eqCard .ec-head .nm{flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eqCard .ec-head .del{color:#7a6f60;font-size:14px;padding:0 4px;cursor:pointer}
+.eqCard .ec-head .del:hover{color:#e05252}
+.eqCard .ec-body{font-size:9px;color:#7a6f60;line-height:1.4}
+.eqCard .ec-body .trimTag{color:#4ad8e8}
+#canvasWrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px;position:relative}
+#canvas{background:#14110c;border:1px solid #2a231c;border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,.6);cursor:default;touch-action:none}
+#animBar{flex:0 0 auto;background:#17140f;border-top:1px solid #2a231c;padding:8px 12px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+#animBar button{background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:5px;padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap}
+#animBar button.on{background:#8a5f18;color:#fff;border-color:#e8a33d}
+#animBar button.pose{color:#d0b070}
+#animBar button.pose.on{background:#a0701e;color:#fff}
+#animBar button.sec{color:#6ab8e8;border-color:#2a4258}
+#animBar button.sec.on{background:#1e5f8a;color:#fff;border-color:#4a9ed9}
+#animBar button.top{color:#c890d8;border-color:#4a2a58}
+#animBar button.top.on{background:#7a3e9a;color:#fff;border-color:#c890d8}
+#animBar label{font-size:10px;color:#7a6f60;margin-left:4px}
+#animBar input[type=range]{width:70px}
+#animBar .val{font-size:10px;color:#e8a33d;font-family:monospace;min-width:26px}
+#animBar .sep{width:1px;height:20px;background:#2a231c;margin:0 4px;flex:0 0 auto}
+#animBar .groupLabel{font-size:10px;color:#5a5040;padding:0 4px}
+#animBar .ctxTag{font-size:10px;color:#4caf50;background:#1a2a1a;border:1px solid #2a4a2a;border-radius:4px;padding:2px 6px;cursor:pointer;user-select:none}
+#animBar .ctxTag:hover{border-color:#4caf50}
+#toast{position:fixed;top:18%;left:50%;transform:translateX(-50%);background:rgba(30,24,19,.96);border:1px solid #e8a33d;border-radius:8px;padding:8px 14px;color:#e8a33d;font-size:12px;z-index:10000;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+#toast.err{border-color:#e05252;color:#e05252}
+#toast.ok{border-color:#4caf50;color:#4caf50}
+.hint{font-size:10px;color:#5a5040;line-height:1.6;padding:4px 0}
+.modeBadge{display:inline-block;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:bold}
+.modeBadge.base{background:#3a2a15;color:#e8a33d}
+.modeBadge.override{background:#1e3a2a;color:#4caf50}
+.trimInfo{background:#0a1818;border:1px solid #2a4040;border-radius:4px;padding:6px 8px;font-family:monospace;font-size:9px;color:#4ad8e8;line-height:1.5;margin-bottom:6px}
+.trimInfo b{color:#7ae8f0;font-weight:normal}
+.trimInfo .orig{color:#5a5040}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🧩 分層人偶編輯器 v8.3</h1>
+    <span class="hint">武器依實際內容左緣對齊 · 支援導入 / 導出遊戲 js</span>
+    <span class="spacer"></span>
+    <button id="btnSaveToJs" class="save">💾 保存至遊戲 js</button>
+    <button id="btnPickDir">🔗 選擇遊戲目錄</button>
+    <button id="btnImportJson" class="import">📥 導入編輯器 JSON</button>
+    <button id="btnImportGame" class="import">📥 導入遊戲 02-part.js</button>
+    <button id="btnShowAll">全部顯示</button>
+    <button id="btnHideAllEq">隱藏全部裝備</button>
+    <button id="btnRescanAll">重新掃描全部武器</button>
+    <button id="btnReset">重置</button>
+    <button id="btnExport">匯出設定</button>
+    <input type="file" id="importJsonInput" accept=".json">
+    <input type="file" id="importGameInput" accept=".js,.txt">
+  </header>
+  <main>
+    <aside id="left">
+      <div class="sec">
+        <h3><span>🎯 核心層</span></h3>
+        <div id="coreLayerList"></div>
+      </div>
+      <div class="sec folded" id="secExtra">
+        <h3><span>🧱 其他層（可折叠）</span><span class="fold" data-fold="secExtra">+</span></h3>
+        <div class="secBody" id="extraLayerList"></div>
+      </div>
+    </aside>
+    <section id="center">
+      <div id="canvasWrap">
+        <canvas id="canvas" width="400" height="520"></canvas>
+      </div>
+      <div id="animBar">
+        <button id="btnPlay">⏸</button>
+        <span class="groupLabel">基礎</span>
+        <button data-anim="idle" class="on">站立</button>
+        <button data-anim="walk">走路</button>
+        <button data-anim="run">跑步</button>
+        <button data-anim="hurt" class="pose">受擊</button>
+        <div class="sep"></div>
+        <span class="groupLabel">主武器</span>
+        <button data-anim="reload" class="pose">換彈</button>
+        <button data-anim="fire_primary" class="pose">射擊</button>
+        <div class="sep"></div>
+        <span class="groupLabel">副武器</span>
+        <button data-anim="switch_secondary" class="pose">切換</button>
+        <button data-anim="fire_secondary" class="pose">射擊</button>
+        <button id="secPistolBtn" class="sec on">手槍</button>
+        <button id="secShotgunBtn" class="sec">霰彈槍</button>
+        <div class="sep"></div>
+        <span class="groupLabel">近戰</span>
+        <button data-anim="switch_melee" class="pose">切換</button>
+        <button data-anim="attack_melee" class="pose">攻擊</button>
+        <div class="sep"></div>
+        <span class="groupLabel">上衣顯示</span>
+        <button id="topNormalBtn" class="top on">一般</button>
+        <button id="topArmoredBtn" class="top">帶護臂</button>
+        <div class="sep"></div>
+        <span class="ctxTag" id="ctxTag">受擊顯示：主武器</span>
+        <div class="sep"></div>
+        <label>速度</label>
+        <input type="range" id="speed" min="3" max="24" value="10">
+        <span class="val" id="speedVal">10</span>
+      </div>
+    </section>
+    <aside id="right">
+      <div class="sec" id="layerDetail">
+        <h3><span>選中層微調</span></h3>
+        <div id="layerDetailBody"><div class="hint">点左侧卡片或画布色块选中一层。</div></div>
+      </div>
+      <div class="sec">
+        <h3><span>裝備</span><button id="btnAddEq">+ 新增</button></h3>
+        <div id="eqList"></div>
+      </div>
+      <div class="sec" id="eqDetail" style="display:none">
+        <h3><span>裝備微調</span></h3>
+        <div id="eqDetailBody"></div>
+      </div>
+    </aside>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const STORAGE_KEY = 'layered_doll_v81';
+const CW = 400, CH = 520;
+
+/* ★ v8.3 目錄句柄持久化 */
+const IDB_NAME = 'layered_doll_db';
+const IDB_STORE = 'handles';
+const IDB_KEY = 'gameDir';
+
+const WEAPON_TYPES = ['primary','secondary_pistol','secondary_shotgun','melee','throwable'];
+
+const GAME_WEAPON_TYPE = {
+  ak74:'primary', aks74u:'primary', pkm:'primary', ash12:'primary',
+  svd:'primary', sv98:'primary', vss:'primary',
+  aps:'secondary_pistol', pb:'secondary_pistol',
+  ks23:'secondary_shotgun', mp155:'secondary_shotgun', toz106:'secondary_shotgun',
+  '6kh5':'melee',
+  ak74n:'primary', ak74m:'primary', akm:'primary', akms:'primary', akmn:'primary',
+  ak103:'primary', ak104:'primary', ak105:'primary', ak12:'primary',
+  asval:'primary', '9a91':'primary', sr3m:'primary',
+  rpk16:'primary', rpd:'primary', pkp:'primary',
+  pp19:'primary', mp443:'secondary_pistol',
+  mp133:'secondary_shotgun', mp153:'secondary_shotgun', saiga12:'secondary_shotgun',
+  '6kh2':'melee', kukri:'melee',
+};
+
+const LAYERS = [
+  { id:'backpack',   name:'背包',              group:'extra', z:6,  color:'#2e6a30', pivot:{x:0.5, y:0.4},  def:{x:0.286, y:0.42, w:0.22, h:0.30} },
+  { id:'right_leg',  name:'右腿（螢幕左·下）',  group:'extra', z:18, color:'#2a2a2a', pivot:{x:0.5, y:0.05}, def:{x:0.60, y:0.60, w:0.13, h:0.42} },
+  { id:'torso',      name:'軀幹',              group:'core',  z:30, color:'#4a6741', pivot:{x:0.5, y:0.10}, def:{x:0.50, y:0.27, w:0.30, h:0.42} },
+  { id:'head',       name:'頭（含頭盔）',       group:'core',  z:45, color:'#c89870', pivot:{x:0.5, y:0.92}, def:{x:0.53, y:0.22, w:0.20, h:0.17} },
+  { id:'face',       name:'面部',              group:'extra', z:48, color:'#b88860', pivot:{x:0.5, y:0.92}, def:{x:0.57, y:0.23, w:0.14, h:0.13} },
+  { id:'left_leg',   name:'左腿（螢幕右·上）',  group:'extra', z:52, color:'#3a3a3a', pivot:{x:0.5, y:0.05}, def:{x:0.44, y:0.62, w:0.14, h:0.44} },
+  { id:'back_arm',   name:'後臂（遠側手）',     group:'core',  z:55, color:'#3d3020', pivot:{x:0.5, y:0.5},  def:{x:0.80, y:0.36, w:0.11, h:0.10} },
+  { id:'front_arm',  name:'前臂（近側手）',     group:'core',  z:62, color:'#5a4a35', pivot:{x:0.05, y:0.5}, def:{x:0.27, y:0.38, w:0.40, h:0.08} },
+];
+
+const ANIMS = {
+  idle: {
+    frameCount: 4, fps: 4, loop: true, showEq: 'primary',
+    keys: {
+      head:      Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
+      torso:     Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
+      back_arm:  Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
+      front_arm: Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
+    }
+  },
+  walk: {
+    frameCount: 8, fps: 10, loop: true, showEq: 'primary',
+    keys: {
+      head:      Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+      torso:     Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+      back_arm:  Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+      front_arm: Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+      right_leg: [-18,-9,0,9,18,9,0,-9].map(r=>({rot:r,dx:0,dy:0})),
+      left_leg:  [18,9,0,-9,-18,-9,0,9].map(r=>({rot:r,dx:0,dy:0})),
+    }
+  },
+  run: {
+    frameCount: 8, fps: 16, loop: true, showEq: 'primary',
+    keys: {
+      head:      Array(8).fill(0).map((_,i)=>({rot:-3,dx:0,dy:i%2?-1.5:-0.5})),
+      torso:     Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:i%2?-1.5:-0.5})),
+      back_arm:  Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:i%2?-1.5:-0.5})),
+      front_arm: Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:i%2?-1.5:-0.5})),
+      right_leg: [-42,-22,0,22,42,22,0,-22].map(r=>({rot:r,dx:0,dy:0})),
+      left_leg:  [42,22,0,-22,-42,-22,0,22].map(r=>({rot:r,dx:0,dy:0})),
+    }
+  },
+  hurt: {
+    frameCount: 4, fps: 8, loop: false, showEq: 'context',
+    keys: {
+      head:      [{rot:0,dx:0,dy:0},{rot:6,dx:0,dy:-1},{rot:6,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
+      torso:     [{rot:0,dx:0,dy:0},{rot:4,dx:0,dy:-1},{rot:4,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
+      back_arm:  [{rot:0,dx:0,dy:0},{rot:4,dx:0,dy:-1},{rot:4,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
+      front_arm: [{rot:0,dx:0,dy:0},{rot:5,dx:0,dy:-1},{rot:5,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
+    }
+  },
+  fire_primary: {
+    frameCount: 4, fps: 16, loop: false, showEq: 'primary',
+    keys: {
+      head:      [{rot:0,dx:0,dy:0},{rot:1,dx:0,dy:-1},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+      torso:     [{rot:0,dx:0,dy:0},{rot:2,dx:0,dy:-1},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+      back_arm:  [{rot:0,dx:0,dy:0},{rot:4,dx:0,dy:-1},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+      front_arm: [
+        {rot:0,  dx:0,  dy:0},
+        {rot:-8, dx:-3, dy:-1},
+        {rot:-3, dx:-1, dy:0},
+        {rot:0,  dx:0,  dy:0},
+      ],
+    }
+  },
+  reload: {
+    frameCount: 10, fps: 10, loop: false, showEq: 'primary',
+    keys: {
+      head:      Array(10).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,-1,0,0][i];return {rot:0,dx:0,dy:p*0.3};}),
+      torso:     Array(10).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,-1,0,0][i];return {rot:0,dx:0,dy:p*0.5};}),
+      back_arm:  [0,-15,-30,-35,-25,-10,5,15,5,0].map(r=>({rot:r,dx:0,dy:0})),
+      front_arm: [
+        {rot:0,  dx:0,  dy:0},
+        {rot:-20,dx:-5, dy:1},
+        {rot:-40,dx:-8, dy:2},
+        {rot:-45,dx:-8, dy:2.5},
+        {rot:-30,dx:-5, dy:1.5},
+        {rot:-10,dx:-2, dy:0.5},
+        {rot:15, dx:5,  dy:-0.5},
+        {rot:30, dx:10, dy:-1.5},
+        {rot:10, dx:5,  dy:-0.5},
+        {rot:0,  dx:0,  dy:0},
+      ],
+    }
+  },
+  switch_secondary: {
+    frameCount: 8, fps: 10, loop: false, showEq: 'secondary',
+    keys: {
+      head:      Array(8).fill(0).map((_,i)=>{const p=[0,1,2,2,1,0,-1,-1][i];return {rot:0,dx:0,dy:p*0.3};}),
+      torso:     Array(8).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,0][i];return {rot:0,dx:0,dy:p*0.4};}),
+      back_arm:  [
+        {rot:0,  dx:0,  dy:0},{rot:-8, dx:-2, dy:0},{rot:-15,dx:-4, dy:0},{rot:-12,dx:-3, dy:0},
+        {rot:-8, dx:-2, dy:0},{rot:-4, dx:-1, dy:0},{rot:0,  dx:0,  dy:0},{rot:0,  dx:0,  dy:0},
+      ],
+      front_arm: [
+        {rot:0,  dx:0,   dy:0},{rot:-15,dx:-3,  dy:1},{rot:-25,dx:-5,  dy:2},{rot:-15,dx:-3,  dy:1.5},
+        {rot:-5, dx:-1,  dy:0.5},{rot:0,  dx:0,   dy:-0.5},{rot:3,  dx:0,   dy:-1},{rot:3,  dx:0,   dy:-1},
+      ],
+    }
+  },
+  fire_secondary: {
+    frameCount: 4, fps: 14, loop: false, showEq: 'secondary',
+    keys: {
+      head:      Array(4).fill({rot:0,dx:0,dy:0}),
+      torso:     Array(4).fill({rot:0,dx:0,dy:0}),
+      back_arm:  Array(4).fill({rot:0,dx:0,dy:0}),
+      front_arm: [
+        {rot:3,   dx:0,   dy:-1},
+        {rot:-12, dx:-1,  dy:-3},
+        {rot:-4,  dx:0,   dy:-1.8},
+        {rot:3,   dx:0,   dy:-1},
+      ],
+    }
+  },
+  switch_melee: {
+    frameCount: 8, fps: 10, loop: false, showEq: 'melee',
+    keys: {
+      head:      Array(8).fill(0).map((_,i)=>{const p=[0,1,2,2,1,0,-1,-1][i];return {rot:0,dx:0,dy:p*0.3};}),
+      torso:     Array(8).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,0][i];return {rot:0,dx:0,dy:p*0.4};}),
+      back_arm:  [0,-8,-15,-15,-10,-5,5,10].map(r=>({rot:r,dx:0,dy:0})),
+      front_arm: [
+        {rot:0,  dx:0,  dy:0},{rot:-15,dx:-3, dy:1},{rot:-25,dx:-5, dy:2},{rot:-10,dx:-2, dy:1.5},
+        {rot:10, dx:0,  dy:0.5},{rot:20, dx:2,  dy:0},{rot:15, dx:2,  dy:-1},{rot:10, dx:1,  dy:-1},
+      ],
+    }
+  },
+  attack_melee: {
+    frameCount: 8, fps: 14, loop: false, showEq: 'melee',
+    keys: {
+      head:      [{rot:0,dx:0,dy:0},{rot:-2,dx:0,dy:0},{rot:-3,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:3,dx:0,dy:0},{rot:2,dx:0,dy:0},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+      torso:     [{rot:0,dx:0,dy:0},{rot:-3,dx:-1,dy:0},{rot:-6,dx:-2,dy:0},{rot:0,dx:0,dy:0},{rot:6,dx:2,dy:0},{rot:3,dx:1,dy:0},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
+      back_arm:  [10,-10,-25,-10,15,5,5,10].map(r=>({rot:r,dx:0,dy:0})),
+      front_arm: [
+        {rot:10, dx:1,  dy:-1},{rot:-15,dx:-2, dy:-1},{rot:-40,dx:-5, dy:-2},{rot:0,  dx:0,  dy:-1},
+        {rot:60, dx:10, dy:0},{rot:100,dx:15, dy:1},{rot:60, dx:8,  dy:0},{rot:10, dx:1,  dy:-1},
+      ],
+    }
+  },
+};
+
+const EQ_TYPE_TO_LAYER = {
+  head:              { layer:'head',      behind:false, scale:0.26, ox:0,    oy:-0.06, rotation:0 },
+  face:              { layer:'face',      behind:false, scale:0.20, ox:0,    oy: 0.02, rotation:0 },
+  top:               { layer:'torso',     behind:false, scale:0.32, ox:0,    oy: 0,    rotation:0 },
+  top_armored:       { layer:'torso',     behind:false, scale:0.42, ox:0,    oy: 0,    rotation:0 },
+  backpack:          { layer:'backpack',  behind:false, scale:0.30, ox:0,    oy: 0,    rotation:0 },
+  pants:             { layer:'left_leg',  behind:false, scale:0.16, ox:0,    oy: 0,    rotation:0 },
+  shoes:             { layer:'left_leg',  behind:false, scale:0.14, ox:0,    oy: 0.35, rotation:0 },
+  primary:           { layer:'front_arm', behind:true,  scale:1.00, ox:0.05, oy:0,    rotation:0 },
+  secondary_pistol:  { layer:'front_arm', behind:true,  scale:1.00, ox:0.30, oy:0,    rotation:0 },
+  secondary_shotgun: { layer:'front_arm', behind:true,  scale:1.00, ox:0.05, oy:0,    rotation:-6 },
+  melee:             { layer:'front_arm', behind:false, scale:1.00, ox:0.30, oy:0,    rotation:-34 },
+  throwable:         { layer:'torso',     behind:false, scale:1.00, ox:0.00, oy:0.20, rotation:0 },
+};
+const EQ_TYPES = [
+  {id:'head',      name:'頭盔 / 帽子（頭層）'},
+  {id:'face',      name:'面罩 / 護目鏡'},
+  {id:'top',       name:'上衣 / 裝甲（軀幹）'},
+  {id:'top_armored', name:'上衣 · 帶護臂甲'},
+  {id:'backpack',  name:'背包'},
+  {id:'pants',     name:'褲子'},
+  {id:'shoes',     name:'鞋子'},
+  {id:'primary',   name:'主武器'},
+  {id:'secondary_pistol',  name:'副武器 · 手槍'},
+  {id:'secondary_shotgun', name:'副武器 · 霰彈槍'},
+  {id:'melee',     name:'近戰武器'},
+  {id:'throwable', name:'投擲物'},
+];
+
+function isWeaponEq(eq){
+  return eq && WEAPON_TYPES.indexOf(eq.type) !== -1;
+}
+
+/* ============================================================
+   ★ v8.3 IndexedDB 目錄句柄持久化
+   ============================================================ */
+function openIDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function saveDirHandle(handle){
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+async function loadDirHandle(){
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+    req.onsuccess = () => { db.close(); resolve(req.result); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
+}
+async function ensureDirPermission(handle, mode){
+  mode = mode || 'readwrite';
+  const opts = { mode };
+  if((await handle.queryPermission(opts)) === 'granted') return true;
+  if((await handle.requestPermission(opts)) === 'granted') return true;
+  return false;
+}
+
+/* ============================================================
+   ★ v8.3 生成 WEAPON_LAYOUT 程式碼（從目前編輯器狀態）
+   ============================================================ */
+function formatNum(n, decimals){
+  if(typeof n !== 'number' || isNaN(n)) n = 0;
+  let s = n.toFixed(decimals);
+  // 去掉尾零但保留小數點至少一位（scale 用）
+  if(decimals > 0){
+    s = s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '.0');
+  }
+  return s;
+}
+function isSafeIdentifier(s){
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(s);
+}
+function generateWeaponLayoutCode(){
+  const lines = [];
+  const seen = new Set();
+  const skipped = [];
+  let count = 0;
+  for(const eq of T.equipment){
+    if(!isWeaponEq(eq)) continue;
+    const key = (eq.name || '').trim();
+    if(!key){ skipped.push('(未命名)'); continue; }
+    if(seen.has(key)) continue;
+    seen.add(key);
+    if(!eq.trim){
+      skipped.push(key + '(無 trim)');
+      continue;
+    }
+    const keyStr = isSafeIdentifier(key) ? key : `'${key}'`;
+    const scale   = formatNum(eq.scale || 1.0, 1);
+    const ox      = formatNum(eq.ox || 0, 6);
+    const oy      = formatNum(eq.oy || 0, 6);
+    const rotation= Math.round(eq.rotation || 0);
+    const t = eq.trim;
+    const trimStr = `{x:${t.x},y:${t.y},w:${t.w},h:${t.h}}`;
+    // 加上冒號後的對齊空格，讓輸出比較好看
+    const pad = keyStr.length < 10 ? ' '.repeat(10 - keyStr.length) : ' ';
+    lines.push(`  ${keyStr}:${pad}{ scale:${scale}, ox: ${ox}, oy:${oy}, rotation:${rotation}, trim:${trimStr} },`);
+    count++;
+  }
+  const code = `const WEAPON_LAYOUT = {\n${lines.join('\n')}\n};`;
+  return { code, count, skipped };
+}
+
+/* ============================================================
+   ★ v8.3 直接寫入遊戲 js/02-part.js
+   ============================================================ */
+async function saveToGameJs(){
+  if(!('showDirectoryPicker' in window) && !(await loadDirHandle())){
+    toast('此瀏覽器不支援 File System Access，請改用其他方式', true);
+    return;
+  }
+
+  // 生成新代碼
+  const gen = generateWeaponLayoutCode();
+  if(gen.count === 0){
+    toast('編輯器內沒有任何可導出的武器（需要名稱 + trim）', true);
+    return;
+  }
+
+  // 取得（或恢復）目錄句柄
+  let dirHandle = null;
+  try{
+    dirHandle = await loadDirHandle();
+  }catch(_){}
+
+  if(dirHandle){
+    const ok = await ensureDirPermission(dirHandle, 'readwrite');
+    if(!ok){
+      toast('目錄權限已失效，請重新選擇遊戲目錄', true);
+      dirHandle = null;
+    }
+  }
+
+  if(!dirHandle){
+    if(!('showDirectoryPicker' in window)){
+      toast('請先選擇一次遊戲目錄', true);
+      return;
+    }
+    try{
+      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      await saveDirHandle(dirHandle);
+      toast('已記住遊戲目錄，下次直接保存');
+    }catch(e){
+      toast('已取消選擇目錄');
+      return;
+    }
+  }
+
+  // 定位 js/02-part.js
+  let jsDir;
+  try{
+    jsDir = await dirHandle.getDirectoryHandle('js');
+  }catch(e){
+    toast('找不到 js/ 子目錄，請確認選擇的是遊戲根目錄', true);
+    return;
+  }
+  let fileHandle;
+  try{
+    fileHandle = await jsDir.getFileHandle('02-part.js');
+  }catch(e){
+    toast('找不到 js/02-part.js', true);
+    return;
+  }
+
+  // 讀取原檔
+  const file = await fileHandle.getFile();
+  const original = await file.text();
+
+  // 替換 WEAPON_LAYOUT 區段
+  const re = /const\s+WEAPON_LAYOUT\s*=\s*\{[\s\S]*?\n\};/;
+  if(!re.test(original)){
+    toast('原檔中找不到 WEAPON_LAYOUT 區段', true);
+    return;
+  }
+  const patched = original.replace(re, gen.code);
+
+  // 備份
+  try{
+    const bakHandle = await jsDir.getFileHandle('02-part.js.bak', { create: true });
+    const bakW = await bakHandle.createWritable();
+    await bakW.write(original);
+    await bakW.close();
+  }catch(e){
+    console.warn('備份失敗', e);
+  }
+
+  // 寫入
+  try{
+    const w = await fileHandle.createWritable();
+    await w.write(patched);
+    await w.close();
+  }catch(e){
+    toast('寫入失敗：' + e.message, true);
+    return;
+  }
+
+  markClean();
+  let msg = `✅ 已保存 ${gen.count} 件武器定位至 js/02-part.js`;
+  if(gen.skipped.length){
+    msg += `（略過 ${gen.skipped.length} 件）`;
+    console.warn('略過：', gen.skipped);
+  }
+  toast(msg, 'ok');
+}
+
+/* ============================================================
+   v8.2 導入：從 02-part.js 提取 WEAPON_LAYOUT
+   ============================================================ */
+function extractWeaponLayout(text){
+  const blockRe = /const\s+WEAPON_LAYOUT\s*=\s*\{([\s\S]*?)\n\};/;
+  const m = text.match(blockRe);
+  if(!m) return null;
+  const body = m[1];
+  const result = {};
+  const lineRe = /['"]?([A-Za-z0-9_]+)['"]?\s*:\s*\{\s*scale\s*:\s*([\d.+-]+)\s*,\s*ox\s*:\s*([\d.+-]+)\s*,\s*oy\s*:\s*([\d.+-]+)\s*,\s*rotation\s*:\s*([\d.+-]+)\s*,\s*trim\s*:\s*\{\s*x\s*:\s*([\d.+-]+)\s*,\s*y\s*:\s*([\d.+-]+)\s*,\s*w\s*:\s*([\d.+-]+)\s*,\s*h\s*:\s*([\d.+-]+)\s*\}\s*\}/g;
+  let match;
+  while((match = lineRe.exec(body)) !== null){
+    result[match[1]] = {
+      scale:    parseFloat(match[2]),
+      ox:       parseFloat(match[3]),
+      oy:       parseFloat(match[4]),
+      rotation: parseFloat(match[5]),
+      trim: {
+        x: parseFloat(match[6]),
+        y: parseFloat(match[7]),
+        w: parseFloat(match[8]),
+        h: parseFloat(match[9]),
+      }
+    };
+  }
+  return result;
+}
+
+function importEditorJSONFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try{ data = JSON.parse(reader.result); }
+    catch(e){ toast('JSON 解析失敗：' + e.message, true); return; }
+    if(!data || (!data.layers && !data.equipment)){ toast('這不是編輯器 JSON', true); return; }
+
+    if(data.layers && typeof data.layers === 'object'){
+      for(const lid in data.layers){
+        if(!T.layers[lid]) continue;
+        const src = data.layers[lid], dst = T.layers[lid];
+        if(typeof src.img === 'string') dst.img = src.img;
+        if(typeof src.x === 'number') dst.x = src.x;
+        if(typeof src.y === 'number') dst.y = src.y;
+        if(typeof src.w === 'number') dst.w = src.w;
+        if(typeof src.h === 'number') dst.h = src.h;
+        if(typeof src.hidden === 'boolean') dst.hidden = src.hidden;
+      }
+    }
+    if(data.animPositions && typeof data.animPositions === 'object') T.animPositions = data.animPositions;
+    if(Array.isArray(data.equipment)){
+      T.equipment = data.equipment.map(eq => ({
+        id: eq.id || uid(),
+        name: eq.name || '',
+        type: eq.type || 'primary',
+        layer: eq.layer || 'front_arm',
+        behind: !!eq.behind,
+        img: eq.img || '',
+        scale: (typeof eq.scale === 'number') ? eq.scale : 1.0,
+        ox: (typeof eq.ox === 'number') ? eq.ox : 0,
+        oy: (typeof eq.oy === 'number') ? eq.oy : 0,
+        rotation: (typeof eq.rotation === 'number') ? eq.rotation : 0,
+        hidden: !!eq.hidden,
+        trim: eq.trim || null,
+      }));
+    }
+    if(data.anim && ANIMS[data.anim]) T.anim = data.anim;
+    if(data.weaponContext) T.weaponContext = data.weaponContext;
+    if(data.secondaryMode) T.secondaryMode = data.secondaryMode;
+    if(data.topMode) T.topMode = data.topMode;
+
+    T.selectedEq = null; T.selectedLayer = 'torso'; T.currentFrame = 0;
+    for(const eq of T.equipment) if(eq.img) getImg(eq.img);
+    save(); renderAll();
+    toast(`已導入編輯器 JSON（裝備 ${T.equipment.length} 件）`, 'ok');
+  };
+  reader.onerror = () => toast('讀取檔案失敗', true);
+  reader.readAsText(file);
+}
+
+function importGameFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = String(reader.result || '');
+    const layout = extractWeaponLayout(text);
+    if(!layout){ toast('找不到 WEAPON_LAYOUT 區段', true); return; }
+    const ids = Object.keys(layout);
+    if(!ids.length){ toast('WEAPON_LAYOUT 中沒有可解析的條目', true); return; }
+
+    let updated = 0, added = 0;
+    for(const wid of ids){
+      const wl = layout[wid];
+      const existing = T.equipment.find(eq => (eq.name || '').toLowerCase() === wid.toLowerCase());
+      if(existing){
+        existing.layer = existing.layer || 'front_arm';
+        existing.behind = true;
+        existing.scale = wl.scale;
+        existing.ox = wl.ox;
+        existing.oy = wl.oy;
+        existing.rotation = wl.rotation;
+        existing.trim = wl.trim;
+        updated++;
+      } else {
+        const eqType = GAME_WEAPON_TYPE[wid] || 'primary';
+        const cfg = EQ_TYPE_TO_LAYER[eqType] || EQ_TYPE_TO_LAYER.primary;
+        T.equipment.push({
+          id: uid(), name: wid, type: eqType,
+          layer: cfg.layer, behind: cfg.behind, img: '',
+          scale: wl.scale, ox: wl.ox, oy: wl.oy, rotation: wl.rotation,
+          hidden: false, trim: wl.trim,
+        });
+        added++;
+      }
+    }
+    const missingImg = T.equipment.filter(eq => !eq.img).length;
+    save(); renderAll();
+    let msg = `已導入遊戲定位：更新 ${updated}、新增 ${added}`;
+    if(missingImg > 0) msg += `（${missingImg} 件尚無圖片）`;
+    toast(msg, 'ok');
+  };
+  reader.onerror = () => toast('讀取檔案失敗', true);
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   基礎工具
+   ============================================================ */
+function computeAlphaBounds(img, alphaThreshold){
+  if(!img || !img.naturalWidth || !img.naturalHeight) return null;
+  const thr = (typeof alphaThreshold === 'number') ? alphaThreshold : 8;
+  try {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height).data;
+    let minX = c.width, minY = c.height, maxX = -1, maxY = -1;
+    for(let y = 0; y < c.height; y++){
+      const rowOff = y * c.width * 4;
+      for(let x = 0; x < c.width; x++){
+        const a = data[rowOff + x * 4 + 3];
+        if(a > thr){
+          if(x < minX) minX = x;
+          if(y < minY) minY = y;
+          if(x > maxX) maxX = x;
+          if(y > maxY) maxY = y;
+        }
+      }
+    }
+    if(maxX < 0) return null;
+    return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  } catch(e){ console.warn('[computeAlphaBounds]', e); return null; }
+}
+
+function defaultState(){
+  const layers = {};
+  for(const L of LAYERS) layers[L.id] = { img:'', x:L.def.x, y:L.def.y, w:L.def.w, h:L.def.h, hidden:false };
+  return {
+    layers, animPositions: {}, equipment: [],
+    anim:'idle', speed:10, playing:true, selectedEq:null, selectedLayer:'torso', currentFrame:0, folded:{},
+    weaponContext: 'primary', secondaryMode: 'pistol', topMode: 'normal',
+  };
+}
+let T = load() || defaultState();
+
+(function migrate(){
+  const oldToNew = { back_leg:'left_leg', front_leg:'right_leg' };
+  if(T.layers){
+    for(const oldId in oldToNew){
+      if(T.layers[oldId] && !T.layers[oldToNew[oldId]]) T.layers[oldToNew[oldId]] = T.layers[oldId];
+      delete T.layers[oldId];
+    }
+  }
+  for(const L of LAYERS){
+    if(!T.layers[L.id]) T.layers[L.id] = { img:'', x:L.def.x, y:L.def.y, w:L.def.w, h:L.def.h, hidden:false };
+    const st = T.layers[L.id];
+    if(st.x === undefined) st.x = L.def.x;
+    if(st.y === undefined) st.y = L.def.y;
+    if(st.w === undefined) st.w = L.def.w;
+    if(st.h === undefined) st.h = L.def.h;
+    if(st.hidden === undefined) st.hidden = false;
+  }
+  for(const eq of (T.equipment||[])) if(oldToNew[eq.layer]) eq.layer = oldToNew[eq.layer];
+  for(const eq of (T.equipment||[])){
+    if(eq.type === 'secondary') eq.type = 'secondary_pistol';
+    if(eq.rotation === undefined) eq.rotation = 0;
+    if(eq.hidden === undefined) eq.hidden = false;
+  }
+  if(!T.selectedLayer) T.selectedLayer = 'torso';
+  if(!ANIMS[T.anim]) T.anim = 'idle';
+  T.folded = T.folded || {};
+  T.animPositions = T.animPositions || {};
+  if(!T.weaponContext) T.weaponContext = 'primary';
+  if(!T.secondaryMode) T.secondaryMode = 'pistol';
+  if(!T.topMode) T.topMode = 'normal';
+})();
+
+const imgCache = new Map();
+let saveTimer = null;
+let rafId = null;
+let lastT = performance.now();
+
+/* ★ v8.3 dirty 標記 */
+let _dirty = false;
+function markDirty(){
+  if(_dirty) return;
+  _dirty = true;
+  const btn = document.getElementById('btnSaveToJs');
+  if(btn) btn.classList.add('dirty');
+}
+function markClean(){
+  _dirty = false;
+  const btn = document.getElementById('btnSaveToJs');
+  if(btn) btn.classList.remove('dirty');
+}
+
+function $(s,e){ return (e||document).querySelector(s); }
+function $$(s,e){ return Array.from((e||document).querySelectorAll(s)); }
+function toast(msg, err){
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = 'on' + (err === true ? ' err' : (err === 'ok' ? ' ok' : ''));
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>el.className='', 2000);
+}
+function load(){ try{ const r=localStorage.getItem(STORAGE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(T)); }catch(e){} }
+function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(save,400); }
+function uid(){ return 'eq'+(Math.random()*1e8|0).toString(36); }
+
+function getImg(url){
+  if(!url) return null;
+  if(imgCache.has(url)) return imgCache.get(url);
+  const img = new Image();
+  img.onload = ()=>{ renderLeftList(); renderEqList(); render(); };
+  img.onerror = ()=>{};
+  img.src = url;
+  imgCache.set(url, img);
+  return img;
+}
+
+function drawContain(ctx, img, cx, cy, boxW, boxH){
+  const ar = img.naturalWidth / img.naturalHeight;
+  const boxAr = boxW / boxH;
+  let dw, dh;
+  if(ar > boxAr){ dw = boxW; dh = boxW / ar; }
+  else { dh = boxH; dw = boxH * ar; }
+  ctx.drawImage(img, cx - dw/2, cy - dh/2, dw, dh);
+}
+
+function layerBaseSt(layerId){ return T.layers[layerId]; }
+function layerOverride(anim, layerId){ return T.animPositions && T.animPositions[anim] && T.animPositions[anim][layerId]; }
+function layerEffectiveSt(anim, layerId){
+  const base = layerBaseSt(layerId);
+  const ov = layerOverride(anim, layerId);
+  if(!ov) return base;
+  return { x:ov.x, y:ov.y, w:ov.w, h:ov.h, img: base.img, hidden: base.hidden };
+}
+function setLayerSt(layerId, patch){
+  if(T.anim === 'idle'){
+    const st = T.layers[layerId];
+    for(const k in patch) st[k] = patch[k];
+  } else {
+    if(!T.animPositions[T.anim]) T.animPositions[T.anim] = {};
+    if(!T.animPositions[T.anim][layerId]){
+      const b = T.layers[layerId];
+      T.animPositions[T.anim][layerId] = { x:b.x, y:b.y, w:b.w, h:b.h };
+    }
+    const ov = T.animPositions[T.anim][layerId];
+    for(const k in patch) ov[k] = patch[k];
+  }
+  markDirty();
+}
+function clearOverride(anim, layerId){
+  if(T.animPositions && T.animPositions[anim]){
+    delete T.animPositions[anim][layerId];
+    if(Object.keys(T.animPositions[anim]).length === 0) delete T.animPositions[anim];
+  }
+  markDirty();
+}
+function hasOverride(anim, layerId){ return !!layerOverride(anim, layerId); }
+
+function currentAnim(){ return ANIMS[T.anim] || ANIMS.idle; }
+function getFrameIdx(){ const a = currentAnim(); return ((T.currentFrame % a.frameCount) + a.frameCount) % a.frameCount; }
+function getKey(layerId){
+  const a = currentAnim();
+  const arr = a.keys && a.keys[layerId];
+  if(!arr) return {rot:0,dx:0,dy:0};
+  return arr[Math.min(getFrameIdx(), arr.length-1)] || {rot:0,dx:0,dy:0};
+}
+
+function matchesSecondaryMode(type){
+  if(type === 'secondary_pistol')  return T.secondaryMode === 'pistol';
+  if(type === 'secondary_shotgun') return T.secondaryMode === 'shotgun';
+  return false;
+}
+function matchesTopMode(type){
+  if(type === 'top')         return T.topMode === 'normal';
+  if(type === 'top_armored') return T.topMode === 'armored';
+  return true;
+}
+function shouldShowEq(eq){
+  if(!eq) return false;
+  if(eq.hidden) return false;
+  const type = eq.type;
+  const isSecondary = (type === 'secondary_pistol' || type === 'secondary_shotgun');
+  const isTop = (type === 'top' || type === 'top_armored');
+  if(!WEAPON_TYPES.includes(type)){
+    if(isTop) return matchesTopMode(type);
+    return true;
+  }
+  const show = currentAnim().showEq;
+  if(!show) return true;
+  if(show === 'all') return true;
+  if(show === 'context'){
+    if(T.weaponContext === 'secondary') return isSecondary && matchesSecondaryMode(type);
+    return type === (T.weaponContext || 'primary');
+  }
+  if(show === 'secondary') return isSecondary && matchesSecondaryMode(type);
+  return type === show;
+}
+function shouldShowLayer(layerId){
+  const st = T.layers[layerId];
+  return !(st && st.hidden);
+}
+function heroBox(){ return {x:30, y:30, w:CW-60, h:CH-60}; }
+function layerRect(layerId){
+  const st = layerEffectiveSt(T.anim, layerId);
+  if(!st) return {cx:0, cy:0, w:0, h:0};
+  const B = heroBox();
+  const key = getKey(layerId);
+  return {
+    cx: B.x + B.w * (st.x + (key.dx||0) * 0.01),
+    cy: B.y + B.h * (st.y + (key.dy||0) * 0.01),
+    w: B.w * st.w,
+    h: B.h * st.h,
+  };
+}
+function layerTransform(layerId){
+  const L = LAYERS.find(l=>l.id===layerId);
+  const r = layerRect(layerId);
+  const key = getKey(layerId);
+  const px = r.w * L.pivot.x;
+  const py = r.h * L.pivot.y;
+  const rad = (key.rot||0) * Math.PI/180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  return {
+    px, py, cx: r.cx, cy: r.cy, cos, sin, w: r.w, h: r.h,
+    toWorld(lx, ly){
+      return { x: r.cx + cos*(lx-px) - sin*(ly-py), y: r.cy + sin*(lx-px) + cos*(ly-py) };
+    }
+  };
+}
+function getEqRenderParams(eq){
+  const img = getImg(eq.img);
+  if(!img || !img.complete || !img.naturalWidth) return null;
+  const weapon = isWeaponEq(eq);
+  const trim = (weapon && eq.trim) ? eq.trim : {
+    x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight
+  };
+  let baseW, baseH;
+  if(weapon){
+    baseW = trim.w * (eq.scale || 1.0);
+    baseH = baseW * (trim.h / trim.w);
+  } else {
+    baseW = CW * (eq.scale || 0.3);
+    baseH = baseW / (img.naturalWidth / img.naturalHeight);
+  }
+  return { img, weapon, trim, baseW, baseH };
+}
+
+function render(){
+  const canvas = $('#canvas');
+  canvas.width = CW; canvas.height = CH;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,CW,CH);
+  drawChecker(ctx, CW, CH, 20);
+
+  const units = [];
+  for(const L of LAYERS){
+    if(shouldShowLayer(L.id)) units.push({ z: L.z, kind:'layer', layer: L });
+    for(const eq of T.equipment){
+      if(eq.layer !== L.id) continue;
+      if(!shouldShowEq(eq)) continue;
+      const z = L.z + (eq.behind ? -0.5 : 0.5);
+      units.push({ z, kind:'eq', layer: L, eq });
+    }
+  }
+  units.sort((a,b)=>a.z-b.z);
+  for(const u of units){
+    if(u.kind === 'layer') drawLayer(ctx, u.layer);
+    else drawEq(ctx, u.eq, u.layer);
+  }
+
+  if(T.selectedLayer && shouldShowLayer(T.selectedLayer)){
+    const L = LAYERS.find(l=>l.id===T.selectedLayer);
+    if(L){
+      const tr = layerTransform(L.id);
+      const ov = hasOverride(T.anim, L.id);
+      ctx.save();
+      ctx.translate(tr.cx, tr.cy);
+      ctx.rotate(Math.atan2(tr.sin, tr.cos));
+      ctx.translate(-tr.px, -tr.py);
+      ctx.strokeStyle = ov ? '#4caf50' : (L.group === 'core' ? '#ffb300' : '#8a7f60');
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5,3]);
+      ctx.strokeRect(0, 0, tr.w, tr.h);
+      ctx.setLineDash([]);
+      const corners = [[0,0],[tr.w,0],[0,tr.h],[tr.w,tr.h]];
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.strokeStyle = '#0a0806';
+      ctx.lineWidth = 2;
+      for(const [cx, cy] of corners){ ctx.fillRect(cx-5, cy-5, 10, 10); ctx.strokeRect(cx-5, cy-5, 10, 10); }
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(tr.px-8, tr.py); ctx.lineTo(tr.px+8, tr.py); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(tr.px, tr.py-8); ctx.lineTo(tr.px, tr.py+8); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  const selectedEq = T.equipment.find(eq => eq.id === T.selectedEq);
+  if(selectedEq && isWeaponEq(selectedEq) && selectedEq.img && !selectedEq.hidden){
+    const L = LAYERS.find(l => l.id === selectedEq.layer);
+    if(L){
+      const params = getEqRenderParams(selectedEq);
+      if(params){
+        const tr = layerTransform(L.id);
+        const lx = tr.px + tr.w * (selectedEq.ox || 0);
+        const ly = tr.py + tr.h * (selectedEq.oy || 0);
+        ctx.save();
+        ctx.translate(tr.cx, tr.cy);
+        ctx.rotate(Math.atan2(tr.sin, tr.cos));
+        ctx.translate(-tr.px, -tr.py);
+        ctx.translate(lx, ly);
+        if(selectedEq.rotation) ctx.rotate(selectedEq.rotation * Math.PI/180);
+        ctx.strokeStyle = '#4ad8e8';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(0, -params.baseH/2, params.baseW, params.baseH);
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#4ad8e8';
+        ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI*2); ctx.fill();
+        if(selectedEq.trim){
+          const origW = params.img.naturalWidth;
+          const origH = params.img.naturalHeight;
+          const origScale = params.baseW / selectedEq.trim.w;
+          const origDispW = origW * origScale;
+          const origDispH = origH * origScale;
+          const offX = -selectedEq.trim.x * origScale;
+          const offY = -selectedEq.trim.y * origScale - origDispH/2 + params.baseH/2;
+          ctx.strokeStyle = 'rgba(200,200,200,0.35)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 3]);
+          ctx.strokeRect(offX, offY, origDispW, origDispH);
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+      }
+    }
+  }
+}
+
+function drawChecker(ctx, w, h, s){
+  for(let y=0;y<h;y+=s) for(let x=0;x<w;x+=s){
+    ctx.fillStyle = ((x/s)+(y/s))%2===0 ? '#14110c' : '#181410';
+    ctx.fillRect(x,y,s,s);
+  }
+}
+function drawLayer(ctx, L){
+  const tr = layerTransform(L.id);
+  const st = T.layers[L.id] || {};
+  const img = st.img ? getImg(st.img) : null;
+  ctx.save();
+  ctx.translate(tr.cx, tr.cy);
+  ctx.rotate(Math.atan2(tr.sin, tr.cos));
+  ctx.translate(-tr.px, -tr.py);
+  if(img && img.complete && img.naturalWidth){
+    drawContain(ctx, img, tr.w/2, tr.h/2, tr.w, tr.h);
+  } else {
+    ctx.fillStyle = L.color;
+    ctx.fillRect(0, 0, tr.w, tr.h);
+    ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(0.75, 0.75, tr.w-1.5, tr.h-1.5);
+  }
+  ctx.restore();
+}
+function drawEq(ctx, eq, L){
+  const params = getEqRenderParams(eq);
+  if(!params) return;
+  const { img, weapon, trim, baseW, baseH } = params;
+
+  const tr = layerTransform(L.id);
+  const localX = tr.px + tr.w * (eq.ox || 0);
+  const localY = tr.py + tr.h * (eq.oy || 0);
+
+  ctx.save();
+  ctx.translate(tr.cx, tr.cy);
+  ctx.rotate(Math.atan2(tr.sin, tr.cos));
+  ctx.translate(-tr.px, -tr.py);
+  ctx.translate(localX, localY);
+  if(eq.rotation) ctx.rotate(eq.rotation * Math.PI/180);
+
+  if(weapon){
+    ctx.drawImage(img, trim.x, trim.y, trim.w, trim.h, 0, -baseH/2, baseW, baseH);
+  } else {
+    ctx.drawImage(img, -baseW/2, -baseH/2, baseW, baseH);
+  }
+  ctx.restore();
+}
+
+function tick(now){
+  if(T.playing){
+    const a = currentAnim();
+    const dt = (now - lastT) / 1000;
+    const frameDuration = 1 / (a.fps * T.speed / 10);
+    if(dt >= frameDuration){
+      if(a.loop !== false){
+        T.currentFrame = (T.currentFrame + 1) % a.frameCount;
+      } else {
+        if(T.currentFrame < a.frameCount - 1) T.currentFrame++;
+      }
+      lastT = now;
+    }
+    render();
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function renderLeftList(){
+  const coreBox = $('#coreLayerList');
+  const extraBox = $('#extraLayerList');
+  coreBox.innerHTML = '';
+  extraBox.innerHTML = '';
+  const sorted = LAYERS.slice().sort((a,b)=>a.z-b.z);
+  for(const L of sorted){
+    const st = T.layers[L.id] || {};
+    const eff = layerEffectiveSt(T.anim, L.id);
+    const ov = hasOverride(T.anim, L.id);
+    const img = st.img ? getImg(st.img) : null;
+    const hidden = !!st.hidden;
+    const card = document.createElement('div');
+    card.className = 'layerCard ' + L.group + (T.selectedLayer===L.id?' selected':'') + (hidden?' hidden':'');
+    card.innerHTML = `
+      <div class="lc-head">
+        <div class="eye ${hidden?'off':'on'}" title="${hidden?'點擊顯示':'點擊隱藏'}">${hidden?'🚫':'👁'}</div>
+        <div class="ico">${img?`<img src="${st.img}">`:''}</div>
+        <div class="nm">${L.name}</div>
+        <div class="ztag">z${L.z}${ov?' <span style="color:#4caf50">✦</span>':''}</div>
+        <div class="btns">${st.img?'<button data-clear="1">✕</button>':''}</div>
+      </div>
+      <div class="uploadRow">
+        <label for="layerFile_${L.id}">${st.img?'更換圖片':'上傳圖片'}</label>
+        <input type="file" id="layerFile_${L.id}" accept="image/*">
+      </div>
+      <div class="info">x=${eff.x.toFixed(3)} y=${eff.y.toFixed(3)} w=${eff.w.toFixed(3)} h=${eff.h.toFixed(3)}</div>
+    `;
+    card.querySelector(`#layerFile_${L.id}`).onchange = (e)=>{
+      const f = e.target.files[0]; if(!f) return;
+      const r = new FileReader();
+      r.onload = ()=>{ T.layers[L.id].img = r.result; getImg(r.result); scheduleSave(); markDirty(); renderLeftList(); render(); };
+      r.readAsDataURL(f);
+    };
+    const clr = card.querySelector('[data-clear]');
+    if(clr) clr.onclick = (ev)=>{ ev.stopPropagation(); T.layers[L.id].img=''; scheduleSave(); markDirty(); renderLeftList(); render(); };
+    card.querySelector('.eye').onclick = (ev)=>{
+      ev.stopPropagation();
+      T.layers[L.id].hidden = !T.layers[L.id].hidden;
+      scheduleSave(); markDirty(); renderLeftList(); render();
+    };
+    card.onclick = (ev)=>{
+      if(ev.target.tagName === 'INPUT' || ev.target.tagName === 'LABEL') return;
+      if(ev.target.classList.contains('eye')) return;
+      T.selectedLayer = L.id; T.selectedEq = null; scheduleSave(); renderAll();
+    };
+    (L.group === 'core' ? coreBox : extraBox).appendChild(card);
+  }
+}
+
+function renderEqList(){
+  const box = $('#eqList');
+  box.innerHTML = '';
+  if(!T.equipment.length){ box.innerHTML = '<div class="hint">还没有装备。点「+ 新增」加一件，或使用上方「導入」按鈕。</div>'; return; }
+  for(const eq of T.equipment){
+    const tp = EQ_TYPES.find(x=>x.id===eq.type) || {name:'?'};
+    const isW = isWeaponEq(eq);
+    const hidden = !!eq.hidden;
+    const card = document.createElement('div');
+    card.className = 'eqCard' + (T.selectedEq===eq.id?' selected':'') + (hidden?' hidden':'');
+    let trimLine = '';
+    if(isW){
+      if(eq.trim){
+        trimLine = `<div class="trimTag">內容 ${eq.trim.w}×${eq.trim.h}（原圖含透明邊距）</div>`;
+      } else {
+        trimLine = `<div style="color:#e05252">⚠ 未掃描內容邊界（用整圖）</div>`;
+      }
+    }
+    card.innerHTML = `
+      <div class="ec-head">
+        <div class="eye ${hidden?'off':'on'}" title="${hidden?'點擊顯示':'點擊隱藏'}">${hidden?'🚫':'👁'}</div>
+        <div class="ico">${eq.img?`<img src="${eq.img}">`:''}</div>
+        <div class="nm">${eq.name || tp.name}</div>
+        <div class="del" data-del="1">✕</div>
+      </div>
+      <div class="ec-body">${tp.name} · 掛載: ${eq.layer}${trimLine}</div>
+    `;
+    card.querySelector('.eye').onclick = (ev)=>{
+      ev.stopPropagation();
+      eq.hidden = !eq.hidden;
+      scheduleSave(); markDirty(); renderAll();
+    };
+    card.onclick = (e)=>{
+      if(e.target.dataset.del) return;
+      if(e.target.classList.contains('eye')) return;
+      T.selectedEq = eq.id; T.selectedLayer = null; scheduleSave(); renderAll();
+    };
+    card.querySelector('[data-del]').onclick = (e)=>{
+      e.stopPropagation();
+      T.equipment = T.equipment.filter(x=>x.id!==eq.id);
+      if(T.selectedEq===eq.id) T.selectedEq = null;
+      scheduleSave(); markDirty(); renderAll();
+    };
+    box.appendChild(card);
+  }
+}
+
+function renderLayerDetail(){
+  const box = $('#layerDetailBody');
+  const L = LAYERS.find(l=>l.id===T.selectedLayer);
+  if(!L){ box.innerHTML = '<div class="hint">点左侧卡片或画布色块选中一层。</div>'; return; }
+  const ov = hasOverride(T.anim, L.id);
+  const isIdle = T.anim === 'idle';
+  const eff = layerEffectiveSt(T.anim, L.id);
+  const hidden = !!T.layers[L.id].hidden;
+  let badge, btn;
+  if(isIdle){
+    badge = '<span class="modeBadge base">基礎位置（idle）</span>';
+    btn = '';
+  } else if(ov){
+    badge = '<span class="modeBadge override">本動作獨立</span>';
+    btn = '<button id="ldClearOv" class="btn">與基礎共用</button>';
+  } else {
+    badge = '<span class="modeBadge base">與基礎共用</span>';
+    btn = '<button id="ldMakeOv" class="btn">本動作獨立</button>';
+  }
+  box.innerHTML = `
+    <div class="row"><label>名称</label><span style="flex:1;color:#e8a33d">${L.name}</span></div>
+    <div class="row"><label>動作</label><span style="flex:1;color:#a89a85;font-size:10px">${T.anim}</span></div>
+    <div class="row"><label>位置模式</label>${badge}</div>
+    <div class="row"><label>顯示</label>
+      <button id="ldToggleVis" class="btn ${hidden?'danger':'primary'}">${hidden?'🚫 已隱藏（點擊顯示）':'👁 顯示中（點擊隱藏）'}</button>
+    </div>
+    <div class="row"><label>中心 X</label><input type="number" id="ldX" value="${eff.x.toFixed(3)}" step="0.005"></div>
+    <div class="row"><label>中心 Y</label><input type="number" id="ldY" value="${eff.y.toFixed(3)}" step="0.005"></div>
+    <div class="row"><label>宽</label><input type="number" id="ldW" value="${eff.w.toFixed(3)}" step="0.005" min="0.01"></div>
+    <div class="row"><label>高</label><input type="number" id="ldH" value="${eff.h.toFixed(3)}" step="0.005" min="0.01"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="ldReset" class="btn">重置此層位置</button>
+    </div>
+    <div class="row">${btn}</div>
+    <div class="hint" style="color:#4caf50">✦ = 该动作下此层已独立覆盖位置</div>
+  `;
+  const bind = (sel, key)=>{
+    $(sel).oninput = (e)=>{
+      const v = parseFloat(e.target.value);
+      if(isNaN(v)) return;
+      setLayerSt(L.id, { [key]: v });
+      scheduleSave(); renderLeftList(); renderLayerDetail();
+    };
+  };
+  bind('#ldX','x'); bind('#ldY','y'); bind('#ldW','w'); bind('#ldH','h');
+  $('#ldReset').onclick = ()=>{
+    if(isIdle){ setLayerSt(L.id, { x:L.def.x, y:L.def.y, w:L.def.w, h:L.def.h }); }
+    else { clearOverride(T.anim, L.id); }
+    scheduleSave(); renderAll();
+  };
+  $('#ldToggleVis').onclick = ()=>{
+    T.layers[L.id].hidden = !T.layers[L.id].hidden;
+    scheduleSave(); markDirty(); renderAll();
+    toast(T.layers[L.id].hidden ? '已隱藏：' + L.name : '已顯示：' + L.name);
+  };
+  const makeBtn = $('#ldMakeOv');
+  if(makeBtn) makeBtn.onclick = ()=>{
+    const src = layerEffectiveSt(T.anim, L.id);
+    setLayerSt(L.id, { x:src.x, y:src.y, w:src.w, h:src.h });
+    scheduleSave(); renderAll();
+  };
+  const clearBtn = $('#ldClearOv');
+  if(clearBtn) clearBtn.onclick = ()=>{
+    clearOverride(T.anim, L.id);
+    scheduleSave(); renderAll();
+  };
+}
+
+function renderEqDetail(){
+  const wrap = $('#eqDetail');
+  const box = $('#eqDetailBody');
+  const eq = T.equipment.find(x=>x.id===T.selectedEq);
+  if(!eq){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const tp = EQ_TYPES.find(x=>x.id===eq.type) || {name:'?'};
+  const isW = isWeaponEq(eq);
+  const hidden = !!eq.hidden;
+  const layerOptions = LAYERS.map(l=>`<option value="${l.id}" ${eq.layer===l.id?'selected':''}>${l.name}</option>`).join('');
+
+  let trimBlock = '';
+  if(isW){
+    const img = eq.img ? getImg(eq.img) : null;
+    const origW = (img && img.naturalWidth) ? img.naturalWidth : '?';
+    const origH = (img && img.naturalHeight) ? img.naturalHeight : '?';
+    let trimDetail;
+    if(eq.trim){
+      trimDetail = `<b>內容尺寸</b>：${eq.trim.w} × ${eq.trim.h}<br><b>內容偏移</b>：(${eq.trim.x}, ${eq.trim.y})`;
+    } else {
+      trimDetail = `<span style="color:#e05252">⚠ 尚未掃描，繪製時用整圖</span>`;
+    }
+    trimBlock = `
+      <div class="trimInfo">
+        <div class="orig">原圖尺寸：${origW} × ${origH}</div>
+        <div>${trimDetail}</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="edRescan">重新掃描內容邊界</button>
+      </div>
+    `;
+  }
+
+  box.innerHTML = `
+    <div class="row"><label>名称</label><input type="text" id="edName" value="${eq.name||''}"></div>
+    <div class="row"><label>类型</label>
+      <select id="edType">${EQ_TYPES.map(t=>`<option value="${t.id}" ${eq.type===t.id?'selected':''}>${t.name}</option>`).join('')}</select>
+    </div>
+    <div class="row"><label>挂载层</label>
+      <select id="edLayer">${layerOptions}</select>
+    </div>
+    <div class="row"><label>前后</label>
+      <select id="edBehind">
+        <option value="0" ${!eq.behind?'selected':''}>层之上（前）</option>
+        <option value="1" ${eq.behind?'selected':''}>层之下（后）</option>
+      </select>
+    </div>
+    <div class="row"><label>顯示</label>
+      <button id="edToggleVis" class="btn ${hidden?'danger':'primary'}">${hidden?'🚫 已隱藏（點擊顯示）':'👁 顯示中（點擊隱藏）'}</button>
+    </div>
+    ${trimBlock}
+    <div class="row"><label>缩放</label>
+      <input type="range" id="edScale" min="${isW?'10':'3'}" max="${isW?'400':'200'}" value="${Math.round((eq.scale||(isW?1:0.3))*100)}">
+      <span class="val" id="edScaleV">${Math.round((eq.scale||(isW?1:0.3))*100)}</span>
+    </div>
+    <div class="row"><label>左缘 X</label>
+      <input type="range" id="edOx" min="-100" max="200" value="${Math.round((eq.ox||0)*100)}">
+      <span class="val" id="edOxV">${(eq.ox||0).toFixed(2)}</span>
+    </div>
+    <div class="row"><label>垂直 Y</label>
+      <input type="range" id="edOy" min="-100" max="100" value="${Math.round((eq.oy||0)*100)}">
+      <span class="val" id="edOyV">${(eq.oy||0).toFixed(2)}</span>
+    </div>
+    <div class="row"><label>旋转</label>
+      <input type="range" id="edRot" min="-180" max="180" value="${eq.rotation||0}">
+      <span class="val" id="edRotV">${eq.rotation||0}</span>
+    </div>
+    ${isW ? `<div class="row"><button class="btn" id="edApplyType">套用至同類型全部</button></div>` : ''}
+    <div class="hint">💡 武器以「左邊緣垂直中心」為錨點；可拖曳畫布上的青色框移動。</div>
+  `;
+  $('#edName').oninput = (e)=>{ eq.name=e.target.value; scheduleSave(); markDirty(); renderEqList(); };
+  $('#edType').onchange = (e)=>{ eq.type=e.target.value; applyAutoMount(eq); scheduleSave(); markDirty(); renderAll(); };
+  $('#edLayer').onchange = (e)=>{ eq.layer=e.target.value; scheduleSave(); markDirty(); renderAll(); };
+  $('#edBehind').onchange = (e)=>{ eq.behind=e.target.value==='1'; scheduleSave(); markDirty(); };
+  $('#edToggleVis').onclick = ()=>{
+    eq.hidden = !eq.hidden;
+    scheduleSave(); markDirty(); renderAll();
+    toast(eq.hidden ? '已隱藏：' + (eq.name||tp.name) : '已顯示：' + (eq.name||tp.name));
+  };
+  $('#edScale').oninput = (e)=>{ eq.scale=parseInt(e.target.value,10)/100; $('#edScaleV').textContent=Math.round(eq.scale*100); scheduleSave(); markDirty(); render(); };
+  $('#edOx').oninput = (e)=>{ eq.ox=parseInt(e.target.value,10)/100; $('#edOxV').textContent=eq.ox.toFixed(2); scheduleSave(); markDirty(); render(); };
+  $('#edOy').oninput = (e)=>{ eq.oy=parseInt(e.target.value,10)/100; $('#edOyV').textContent=eq.oy.toFixed(2); scheduleSave(); markDirty(); render(); };
+  $('#edRot').oninput = (e)=>{ eq.rotation=parseInt(e.target.value,10)||0; $('#edRotV').textContent=eq.rotation; scheduleSave(); markDirty(); render(); };
+
+  const rescanBtn = $('#edRescan');
+  if(rescanBtn) rescanBtn.onclick = ()=>{
+    if(!eq.img){ toast('此裝備沒有圖片', true); return; }
+    const img = getImg(eq.img);
+    const doScan = () => {
+      const b = computeAlphaBounds(img);
+      if(b){ eq.trim = b; scheduleSave(); markDirty(); renderAll(); toast(`已掃描：內容 ${b.w}×${b.h}`); }
+      else { toast('無法掃描（圖片全透明？）', true); }
+    };
+    if(img.complete && img.naturalWidth) doScan();
+    else img.onload = doScan;
+  };
+
+  const applyBtn = $('#edApplyType');
+  if(applyBtn) applyBtn.onclick = ()=>{
+    const src = { scale: eq.scale, ox: eq.ox, oy: eq.oy, rotation: eq.rotation };
+    let n = 0;
+    for(const other of T.equipment){
+      if(other === eq) continue;
+      if(other.type !== eq.type) continue;
+      other.scale = src.scale; other.ox = src.ox; other.oy = src.oy; other.rotation = src.rotation;
+      n++;
+    }
+    scheduleSave(); markDirty(); renderAll();
+    toast(`已套用至 ${n} 件同類型裝備`);
+  };
+}
+
+function applyAutoMount(eq){
+  const cfg = EQ_TYPE_TO_LAYER[eq.type];
+  if(!cfg) return;
+  eq.layer = cfg.layer;
+  eq.behind = cfg.behind;
+  eq.scale = cfg.scale;
+  eq.ox = cfg.ox || 0;
+  eq.oy = cfg.oy || 0;
+  eq.rotation = cfg.rotation || 0;
+}
+
+function bindCanvas(){
+  const canvas = $('#canvas');
+  let mode = null, dragLayer = null, dragEq = null, resizeCorner = null;
+  let startCanvasX = 0, startCanvasY = 0, startState = null, lastMx = 0, lastMy = 0;
+
+  function mousePos(e){
+    const r = canvas.getBoundingClientRect();
+    return { x:(e.clientX-r.left)*(canvas.width/r.width), y:(e.clientY-r.top)*(canvas.height/r.height) };
+  }
+  function hitCorner(layerId, mx, my){
+    if(!shouldShowLayer(layerId)) return null;
+    const tr = layerTransform(layerId);
+    const corners = [{name:'nw',lx:0,ly:0},{name:'ne',lx:tr.w,ly:0},{name:'sw',lx:0,ly:tr.h},{name:'se',lx:tr.w,ly:tr.h}];
+    for(const c of corners){
+      const w = tr.toWorld(c.lx, c.ly);
+      if(Math.hypot(w.x-mx, w.y-my) < 14) return c.name;
+    }
+    return null;
+  }
+  function hitBody(layerId, mx, my){
+    if(!shouldShowLayer(layerId)) return false;
+    const tr = layerTransform(layerId);
+    const rad = -Math.atan2(tr.sin, tr.cos);
+    const c = Math.cos(rad), s = Math.sin(rad);
+    const dx = mx-tr.cx, dy = my-tr.cy;
+    const rx = c*dx-s*dy, ry = s*dx+c*dy;
+    const lx = rx+tr.px, ly = ry+tr.py;
+    return lx>=0 && lx<=tr.w && ly>=0 && ly<=tr.h;
+  }
+
+  canvas.addEventListener('pointerdown', (e)=>{
+    if(e.button !== undefined && e.button !== 0) return;
+    const m = mousePos(e);
+    if(T.selectedLayer && shouldShowLayer(T.selectedLayer)){
+      const corner = hitCorner(T.selectedLayer, m.x, m.y);
+      if(corner){
+        mode = 'resizeLayer'; dragLayer = T.selectedLayer; resizeCorner = corner;
+        const st = layerEffectiveSt(T.anim, dragLayer);
+        startState = { x:st.x, y:st.y, w:st.w, h:st.h };
+        startCanvasX = m.x; startCanvasY = m.y;
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+    }
+    const sortedEq = T.equipment.slice().filter(eq => shouldShowEq(eq)).sort((a,b)=>{
+      const la = LAYERS.find(l=>l.id===a.layer), lb = LAYERS.find(l=>l.id===b.layer);
+      const za = (la?la.z:0) + (a.behind?-0.5:0.5);
+      const zb = (lb?lb.z:0) + (b.behind?-0.5:0.5);
+      return zb - za;
+    });
+    for(const eq of sortedEq){
+      if(!eq.img) continue;
+      const L = LAYERS.find(l=>l.id===eq.layer); if(!L) continue;
+      const tr = layerTransform(L.id);
+      const params = getEqRenderParams(eq);
+      if(!params) continue;
+      const { weapon, baseW, baseH } = params;
+      const lx = tr.px + tr.w*(eq.ox||0);
+      const ly = tr.py + tr.h*(eq.oy||0);
+      const hitLx = weapon ? (lx + baseW/2) : lx;
+      const wc = tr.toWorld(hitLx, ly);
+      const dx = m.x-wc.x, dy = m.y-wc.y;
+      const a = -Math.atan2(tr.sin, tr.cos), c = Math.cos(a), s = Math.sin(a);
+      const rx = c*dx-s*dy, ry = s*dx+c*dy;
+      if(Math.abs(rx) <= baseW/2 && Math.abs(ry) <= baseH/2){
+        T.selectedEq = eq.id; T.selectedLayer = null;
+        mode = 'moveEq'; dragEq = eq;
+        lastMx = m.x; lastMy = m.y;
+        canvas.setPointerCapture(e.pointerId);
+        renderAll();
+        return;
+      }
+    }
+    const sortedLayers = LAYERS.slice().sort((a,b)=>b.z-a.z);
+    for(const L of sortedLayers){
+      if(hitBody(L.id, m.x, m.y)){
+        T.selectedLayer = L.id; T.selectedEq = null;
+        mode = 'moveLayer'; dragLayer = L.id;
+        const st = layerEffectiveSt(T.anim, L.id);
+        startState = { x:st.x, y:st.y, w:st.w, h:st.h };
+        startCanvasX = m.x; startCanvasY = m.y;
+        canvas.setPointerCapture(e.pointerId);
+        renderAll();
+        return;
+      }
+    }
+    T.selectedLayer = null; T.selectedEq = null;
+    renderAll();
+  });
+
+  canvas.addEventListener('pointermove', (e)=>{
+    if(!mode){
+      const m = mousePos(e);
+      let cursor = 'default';
+      if(T.selectedLayer && shouldShowLayer(T.selectedLayer)){
+        const corner = hitCorner(T.selectedLayer, m.x, m.y);
+        if(corner) cursor = corner==='nw'||corner==='se' ? 'nwse-resize' : 'nesw-resize';
+        else if(hitBody(T.selectedLayer, m.x, m.y)) cursor = 'move';
+      }
+      canvas.style.cursor = cursor;
+      return;
+    }
+    const m = mousePos(e);
+    const B = heroBox();
+    if(mode === 'moveLayer'){
+      const dx = m.x - startCanvasX, dy = m.y - startCanvasY;
+      setLayerSt(dragLayer, { x: startState.x + dx/B.w, y: startState.y + dy/B.h });
+      scheduleSave(); renderLeftList(); render();
+    } else if(mode === 'resizeLayer'){
+      const dx = m.x - startCanvasX, dy = m.y - startCanvasY;
+      const dwx = dx/B.w, dhy = dy/B.h;
+      let { x, y, w, h } = startState;
+      let cx = x, cy = y;
+      if(resizeCorner.includes('e')){ w = startState.w + dwx; cx = startState.x + dwx/2; }
+      if(resizeCorner.includes('w')){ w = startState.w - dwx; cx = startState.x + dwx/2; }
+      if(resizeCorner.includes('s')){ h = startState.h + dhy; cy = startState.y + dhy/2; }
+      if(resizeCorner.includes('n')){ h = startState.h - dhy; cy = startState.y + dhy/2; }
+      setLayerSt(dragLayer, { w: Math.max(0.01, w), h: Math.max(0.01, h), x: cx, y: cy });
+      scheduleSave(); renderLeftList(); render();
+    } else if(mode === 'moveEq'){
+      const L = LAYERS.find(l=>l.id===dragEq.layer); if(!L) return;
+      const tr = layerTransform(L.id);
+      const dx = m.x - lastMx, dy = m.y - lastMy;
+      const a = -Math.atan2(tr.sin, tr.cos), c = Math.cos(a), s = Math.sin(a);
+      const ldx = c*dx-s*dy, ldy = s*dx+c*dy;
+      dragEq.ox = (dragEq.ox||0) + ldx/tr.w;
+      dragEq.oy = (dragEq.oy||0) + ldy/tr.h;
+      markDirty();
+      lastMx = m.x; lastMy = m.y;
+      scheduleSave(); render();
+    }
+  });
+
+  canvas.addEventListener('pointerup', (e)=>{
+    if(mode){
+      mode = null; dragLayer = null; dragEq = null;
+      try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+      scheduleSave(); renderAll();
+    }
+  });
+  canvas.addEventListener('pointercancel', ()=>{ mode=null; dragLayer=null; dragEq=null; });
+
+  document.addEventListener('keydown', (e)=>{
+    const tag = (e.target.tagName || '').toUpperCase();
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if(!T.selectedLayer) return;
+    let dx = 0, dy = 0;
+    const step = e.shiftKey ? 0.02 : 0.002;
+    if(e.key === 'ArrowLeft') dx = -step;
+    else if(e.key === 'ArrowRight') dx = step;
+    else if(e.key === 'ArrowUp') dy = -step;
+    else if(e.key === 'ArrowDown') dy = step;
+    else return;
+    e.preventDefault();
+    const cur = layerEffectiveSt(T.anim, T.selectedLayer);
+    setLayerSt(T.selectedLayer, { x: cur.x + dx, y: cur.y + dy });
+    scheduleSave(); renderAll();
+  });
+}
+
+function updateContextTag(){
+  const labels = {primary:'主武器', secondary:'副武器', melee:'近戰'};
+  const el = $('#ctxTag');
+  if(el) el.textContent = '受擊顯示：' + (labels[T.weaponContext] || '主武器');
+}
+function updateSecondaryModeUI(){
+  $('#secPistolBtn').classList.toggle('on', T.secondaryMode === 'pistol');
+  $('#secShotgunBtn').classList.toggle('on', T.secondaryMode === 'shotgun');
+}
+function updateTopModeUI(){
+  $('#topNormalBtn').classList.toggle('on', T.topMode === 'normal');
+  $('#topArmoredBtn').classList.toggle('on', T.topMode === 'armored');
+}
+
+function attachWeaponImage(eq, fileOrDataUrl, onDone){
+  const proceed = (dataUrl) => {
+    eq.img = dataUrl;
+    const probeImg = new Image();
+    probeImg.onload = () => {
+      if(isWeaponEq(eq)){
+        const b = computeAlphaBounds(probeImg);
+        if(b){ eq.trim = b; toast(`已掃描內容：${b.w}×${b.h}`); }
+        else { eq.trim = null; toast('⚠ 全透明圖片，內容掃描失敗', true); }
+      }
+      getImg(dataUrl);
+      scheduleSave(); markDirty();
+      renderAll();
+      if(onDone) onDone();
+    };
+    probeImg.onerror = () => {
+      getImg(dataUrl);
+      scheduleSave(); markDirty(); renderAll();
+      if(onDone) onDone();
+    };
+    probeImg.src = dataUrl;
+  };
+  if(typeof fileOrDataUrl === 'string'){ proceed(fileOrDataUrl); }
+  else {
+    const r = new FileReader();
+    r.onload = () => proceed(r.result);
+    r.readAsDataURL(fileOrDataUrl);
+  }
+}
+
+function bindUI(){
+  $('#btnAddEq').onclick = ()=>{
+    const eq = { id: uid(), name:'', type:'head', layer:'head', behind:false, img:'', scale:0.26, ox:0, oy:-0.06, rotation:0, hidden:false };
+    T.equipment.push(eq);
+    T.selectedEq = eq.id; T.selectedLayer = null;
+    scheduleSave(); markDirty(); renderAll();
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*';
+    input.onchange = (e)=>{
+      const f = e.target.files[0]; if(!f) return;
+      const baseName = f.name.replace(/\.[^.]+$/, '');
+      eq.name = baseName;
+      attachWeaponImage(eq, f, () => {
+        applyAutoMount(eq);
+        scheduleSave(); markDirty(); renderAll();
+        toast('已加入装备：' + baseName);
+      });
+    };
+    input.click();
+  };
+
+  $$('#animBar [data-anim]').forEach(b=>{
+    b.onclick = ()=>{
+      const newAnim = b.dataset.anim;
+      const sa = ANIMS[newAnim] && ANIMS[newAnim].showEq;
+      if(sa && sa !== 'all' && sa !== 'context'){ T.weaponContext = sa; updateContextTag(); }
+      T.anim = newAnim; T.currentFrame = 0; T.playing = true;
+      $('#btnPlay').textContent = '⏸';
+      $$('#animBar [data-anim]').forEach(x=>x.classList.toggle('on', x===b));
+      lastT = performance.now();
+      scheduleSave(); renderAll();
+    };
+  });
+
+  $('#secPistolBtn').onclick = ()=>{ T.secondaryMode='pistol'; updateSecondaryModeUI(); scheduleSave(); renderAll(); toast('副武器顯示：手槍'); };
+  $('#secShotgunBtn').onclick = ()=>{ T.secondaryMode='shotgun'; updateSecondaryModeUI(); scheduleSave(); renderAll(); toast('副武器顯示：霰彈槍'); };
+  $('#topNormalBtn').onclick = ()=>{ T.topMode='normal'; updateTopModeUI(); scheduleSave(); renderAll(); toast('上衣顯示：一般'); };
+  $('#topArmoredBtn').onclick = ()=>{ T.topMode='armored'; updateTopModeUI(); scheduleSave(); renderAll(); toast('上衣顯示：帶護臂甲'); };
+
+  $('#ctxTag').onclick = ()=>{
+    const order = ['primary','secondary','melee'];
+    const cur = order.indexOf(T.weaponContext);
+    T.weaponContext = order[(cur+1)%order.length];
+    updateContextTag(); scheduleSave(); renderAll();
+  };
+
+  $('#btnPlay').onclick = ()=>{
+    T.playing = !T.playing;
+    $('#btnPlay').textContent = T.playing ? '⏸' : '▶';
+    if(T.playing) lastT = performance.now();
+    scheduleSave();
+  };
+  $('#speed').oninput = (e)=>{
+    T.speed = parseInt(e.target.value,10) || 10;
+    $('#speedVal').textContent = T.speed;
+    scheduleSave();
+  };
+
+  $$('.sec .fold').forEach(f=>{
+    f.onclick = ()=>{
+      const sec = f.closest('.sec');
+      sec.classList.toggle('folded');
+      f.textContent = sec.classList.contains('folded') ? '+' : '−';
+    };
+  });
+
+  $('#btnShowAll').onclick = ()=>{
+    for(const L of LAYERS) T.layers[L.id].hidden = false;
+    for(const eq of T.equipment) eq.hidden = false;
+    scheduleSave(); markDirty(); renderAll();
+    toast('已顯示所有圖層與裝備');
+  };
+
+  $('#btnHideAllEq').onclick = ()=>{
+    const n = T.equipment.filter(eq => !eq.hidden).length;
+    if(n === 0){ toast('裝備已全部隱藏'); return; }
+    for(const eq of T.equipment) eq.hidden = true;
+    scheduleSave(); markDirty(); renderAll();
+    toast(`已隱藏 ${n} 件裝備`);
+  };
+
+  $('#btnReset').onclick = ()=>{
+    if(!confirm('重置所有内容？此操作不可撤销。')) return;
+    T = defaultState(); save(); markDirty(); renderAll();
+  };
+
+  $('#btnRescanAll').onclick = ()=>{
+    const weapons = T.equipment.filter(eq => isWeaponEq(eq) && eq.img);
+    if(!weapons.length){ toast('沒有武器需要掃描', true); return; }
+    let pending = weapons.length, done = 0, failed = 0;
+    for(const eq of weapons){
+      const img = getImg(eq.img);
+      const doScan = () => {
+        const b = computeAlphaBounds(img);
+        if(b){ eq.trim = b; done++; } else { eq.trim = null; failed++; }
+        pending--;
+        if(pending === 0){
+          scheduleSave(); markDirty(); renderAll();
+          toast(`掃描完成：成功 ${done}，失敗 ${failed}`);
+        }
+      };
+      if(img.complete && img.naturalWidth) doScan();
+      else img.onload = doScan;
+    }
+  };
+
+  $('#btnExport').onclick = ()=>{
+    const data = JSON.stringify({
+      canvas:{w:CW,h:CH},
+      layers:T.layers, animPositions:T.animPositions, equipment:T.equipment,
+      anim:T.anim, weaponContext:T.weaponContext, secondaryMode:T.secondaryMode, topMode:T.topMode,
+      anims:ANIMS, version:'v8.3',
+      notes:{
+        weaponAnchor:'武器以「實際內容（trim）左邊緣垂直中心」為錨點',
+        scaleUnit:  '武器 scale=1.0 表示原始內容像素 1:1；其他裝備 scale 為相對畫布寬',
+        hidden:     'layers[X].hidden / equipment[i].hidden 為隱藏旗標'
+      }
+    }, null, 2);
+    const a = document.createElement('a');
+    a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(data);
+    a.download = 'layered_doll.json'; a.click();
+    toast('已下載設定');
+  };
+
+  $('#btnImportJson').onclick = ()=>{ const i=$('#importJsonInput'); i.value=''; i.click(); };
+  $('#importJsonInput').onchange = (e)=>{ const f=e.target.files[0]; if(f) importEditorJSONFile(f); };
+  $('#btnImportGame').onclick = ()=>{ const i=$('#importGameInput'); i.value=''; i.click(); };
+  $('#importGameInput').onchange = (e)=>{ const f=e.target.files[0]; if(f) importGameFile(f); };
+
+  /* ★ v8.3 保存到 js */
+  $('#btnSaveToJs').onclick = ()=>{ saveToGameJs().catch(e => toast('保存失敗：' + e.message, true)); };
+  $('#btnPickDir').onclick = async ()=>{
+    if(!('showDirectoryPicker' in window)){ toast('此瀏覽器不支援目錄選擇 API', true); return; }
+    try{
+      const h = await window.showDirectoryPicker({ mode: 'readwrite' });
+      // 檢查是否為遊戲根目錄
+      let hasJs = false;
+      try{ await h.getDirectoryHandle('js'); hasJs = true; }catch(_){}
+      await saveDirHandle(h);
+      if(hasJs) toast('已記住遊戲目錄，之後可一鍵保存', 'ok');
+      else toast('已記住目錄（找不到 js/，仍可保存其他用途）', 'ok');
+    }catch(e){ toast('已取消'); }
+  };
+}
+
+function renderAll(){
+  $$('#animBar [data-anim]').forEach(b=>b.classList.toggle('on', b.dataset.anim===T.anim));
+  $('#speed').value = T.speed;
+  $('#speedVal').textContent = T.speed;
+  $('#btnPlay').textContent = T.playing ? '⏸' : '▶';
+  updateContextTag();
+  updateSecondaryModeUI();
+  updateTopModeUI();
+  const secExtra = $('#secExtra');
+  if(secExtra && T.folded.secExtra){ secExtra.classList.add('folded'); secExtra.querySelector('.fold').textContent = '+'; }
+  renderLeftList();
+  renderEqList();
+  renderLayerDetail();
+  renderEqDetail();
+  render();
+}
+
+bindUI();
+bindCanvas();
+renderAll();
+lastT = performance.now();
+rafId = requestAnimationFrame(tick);
+console.log('分層人偶編輯器 v8.3 已啟動 — 支援一鍵保存至遊戲 js');
+</script>
+</body>
+</html>
