@@ -1210,19 +1210,20 @@ const GAME_ANIMS = {
 };
 
 const WEAPON_LAYOUT = {
-  ak74:    { scale:1.0, ox: 0.115847, oy:-0.090232, rotation:0,  trim:{x:15,y:17,w:288,h:93} },
-  aks74u:  { scale:1.0, ox: 0.274369, oy:-0.198512, rotation:0,  trim:{x:19,y:28,w:194,h:85} },
-  pkm:     { scale:1.0, ox:-0.052429, oy:-0.297768, rotation:0,  trim:{x: 0,y:42,w:376,h:112} },
-  ash12:   { scale:1.0, ox:-0.028041, oy:-0.595536, rotation:0,  trim:{x:15,y:17,w:229,h:93} },
-  svd:     { scale:1.0, ox: 0.054877, oy:-0.460187, rotation:0,  trim:{x:19,y:33,w:345,h:61} },
-  sv98:    { scale:1.0, ox: 0.091459, oy:-0.442139, rotation:0,  trim:{x:18,y:33,w:345,h:61} },
-  vss:     { scale:1.0, ox:-0.003653, oy:-0.730885, rotation:0,  trim:{x:16,y: 1,w:294,h:99} },
-  aps:     { scale:1.0, ox: 0.621998, oy:-0.197900, rotation:0,  trim:{x:19,y: 0,w: 89,h:64} },
-  pb:      { scale:1.0, ox: 0.572905, oy:-0.215498, rotation:0,  trim:{x:30,y: 0,w:130,h:64} },
-  ks23:    { scale:1.0, ox: 0.154468, oy:-0.038305, rotation:-6, trim:{x:57,y: 0,w:266,h:64} },
-  mp155:   { scale:1.0, ox: 0.154468, oy:-0.038305, rotation:-6, trim:{x:18,y: 1,w:344,h:60} },
-  toz106:  { scale:1.0, ox: 0.285599, oy:-0.090809, rotation:-6, trim:{x: 8,y:10,w:182,h:54} },
-  '6kh5':  { scale:1.0, ox: 0.75,     oy: 0.71,     rotation:-79, trim:{x: 5,y:19,w:117,h:28} },
+  ak74:      { scale:1.0, ox: 0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:17,w:288,h:93} },
+  aks74u:    { scale:1.0, ox: 0.274369, oy:-0.198512, rotation:0, trim:{x:19,y:28,w:194,h:85} },
+  pkm:       { scale:1.0, ox: -0.035602, oy:-0.288791, rotation:0, trim:{x:0,y:42,w:376,h:112} },
+  ash12:     { scale:1.0, ox: -0.028041, oy:-0.595536, rotation:0, trim:{x:15,y:17,w:229,h:93} },
+  aps:       { scale:1.0, ox: 0.621998, oy:-0.1979, rotation:0, trim:{x:19,y:0,w:89,h:64} },
+  pb:        { scale:1.0, ox: 0.572905, oy:-0.215498, rotation:0, trim:{x:30,y:0,w:130,h:64} },
+  ks23:      { scale:1.0, ox: 0.154468, oy:-0.038305, rotation:-6, trim:{x:57,y:0,w:266,h:64} },
+  svd:       { scale:1.0, ox: 0.054877, oy:-0.460187, rotation:0, trim:{x:19,y:33,w:345,h:61} },
+  vss:       { scale:1.0, ox: -0.003653, oy:-0.730885, rotation:0, trim:{x:16,y:1,w:294,h:99} },
+  mp155:     { scale:1.0, ox: 0.154468, oy:-0.038305, rotation:-6, trim:{x:18,y:1,w:344,h:60} },
+  toz106:    { scale:1.0, ox: 0.285599, oy:-0.090809, rotation:-6, trim:{x:8,y:10,w:182,h:54} },
+  '6kh5':    { scale:1.0, ox: 0.75, oy:0.71, rotation:-79, trim:{x:5,y:19,w:117,h:28} },
+  sv98:      { scale:1.0, ox: 0.091459, oy:-0.442139, rotation:0, trim:{x:18,y:33,w:345,h:61} },
+  pkp:       { scale:1.0, ox: -0.06, oy:-0.336093, rotation:0, trim:{x:0,y:42,w:378,h:119} },
 };
 
 /* 統一的錨點/邊界計算：drawEqLayer、getExploreWeaponRightEdge、getPlayerMuzzlePos 共用
