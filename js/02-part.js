@@ -1452,37 +1452,6 @@ function drawEqLayer(ctx, u, B, anim, fi){
   ctx.restore();
 }
 
-function drawSilhouette(ctx, canvasW, canvasH, topY, bottomY){
-  const anim = GAME_ANIMS.idle;
-  const fi = 0;
-  const B = { x: 30, y: 30, w: 340, h: 460 };
-  const ORIG_FOOT_X = 200;
-  const ORIG_FOOT_Y = 515;
-  const CHAR_TOP_Y = 58.4;
-  const span = (bottomY - topY) / (ORIG_FOOT_Y - CHAR_TOP_Y);
-  ctx.save();
-  ctx.translate(canvasW / 2, bottomY);
-  ctx.scale(span, span);
-  ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
-  for(const L of GAME_LAYERS){
-    const key = (anim.keys[L.id] || [])[fi] || {rot:0, dx:0, dy:0};
-    const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-    const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-    const w = B.w * L.w;
-    const h = B.h * L.h;
-    const px = w * L.pivot.x;
-    const py = h * L.pivot.y;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate((key.rot || 0) * Math.PI / 180);
-    ctx.translate(-px, -py);
-    ctx.fillStyle = '#2a231c';
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-  }
-  ctx.restore();
-}
-
 function renderExploreHeroCanvas(){
   if(currentTab !== 'explore') return;
   const canvas = document.getElementById('hero-canvas');

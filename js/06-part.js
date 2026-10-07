@@ -246,6 +246,14 @@ function openModding(workbenchLv){
       candidates.push({id, rarity:r, baseId, mag:def.mag, scope:def.scope||null, equippedSlot:null, def, count:state.inventory[k]});
     }
   }
+/* v26-sort-candidates */
+  candidates.sort((a,b)=>{
+    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    if(ra !== 0) return ra;
+    const an = (a.def && a.def.name) || '';
+    const bn = (b.def && b.def.name) || '';
+    return an.localeCompare(bn, 'zh-Hant');
+  });
   let body='<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:6px">🔧 改造傳奇武器</div>';
   body+='<div style="font-size:9px;color:#7a6f60;margin-bottom:8px">改造需要：對應武器熟練度滿級（Lv.'+MAX_PROF_LEVEL+'）</div>';
   body+=`<div id="mod-queue-area">${renderModQueueHtml(workbenchLv)}</div>`;
@@ -298,7 +306,15 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
       }
     }
     if(rules.scopes&&rules.scopes.length){
-      const sortedScopes=rules.scopes.slice().sort((a,b)=>(SCOPE_BONUS[b]||0)-(SCOPE_BONUS[a]||0));
+      /* v26-sort-scopes */
+      const _scopesRaw = rules.scopes.slice();
+      _scopesRaw.sort((a,b)=>{
+        const ia = RARITY_ORDER.indexOf(SCOPE_RARITY && SCOPE_RARITY[a]);
+        const ib = RARITY_ORDER.indexOf(SCOPE_RARITY && SCOPE_RARITY[b]);
+        if(ia !== ib) return ib - ia;
+        return (SCOPE_NAME[a] || a).localeCompare(SCOPE_NAME[b] || b, 'zh-Hant');
+      });
+      const sortedScopes = _scopesRaw;
       body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:8px 0 4px">瞄具（可選）</div>`;
       body+=`<div class="mod-opt ${state_mod.scope===null?'on':''}" data-opt="scope" data-val=""><div class="nm">不裝瞄具</div><div class="bonus">—</div></div>`;
       for(const s of sortedScopes){body+=`<div class="mod-opt ${state_mod.scope===s?'on':''}" data-opt="scope" data-val="${s}"><div class="nm">${SCOPE_NAME[s]||s}</div><div class="bonus">命中 +${SCOPE_BONUS[s]||0}%</div></div>`;}
@@ -375,11 +391,11 @@ function openPreference(){
   const p=state.preferences;
   let body='';
   body+=rarityPolicyBlockHTML('exp','🎯 探索模式彈藥',p.ammoExplore, true);
-  body+=rarityPolicyBlockHTML('cmb','⚔️ 戰鬥模式彈藥',p.ammoCombat, false);
-  body+=rarityPolicyBlockHTML('con','💊 消耗品使用',p.consume, false);
+  /* ★ v17.5：移除戰鬥彈藥偏好（改由戰鬥準備面板控制） */
+  /* ★ v17.5：移除消耗品偏好 */
   /* ★ 手雷偏好：探索預設排除高稀有度，避免打 Boss 用的手雷被浪費 */
   body+=rarityPolicyBlockHTML('texp','💣 探索模式手雷',p.throwableExplore, true);
-  body+=rarityPolicyBlockHTML('tcmb','💣 戰鬥模式手雷',p.throwableCombat, false);
+  /* ★ v17.5：移除戰鬥手雷偏好 */
   body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:10px 0 6px">🩸 自動使用消耗品血量閾值：${Math.round(p.autoConsumeThreshold*100)}%</div><input type="range" min="5" max="90" value="${Math.round(p.autoConsumeThreshold*100)}" id="thr-slider" style="width:100%">`;
   const bd=openModal({title:'⚙️ 偏好設定',body});
   const getCtx=(k)=>{
@@ -390,7 +406,7 @@ function openPreference(){
     if(k==='tcmb') return state.preferences.throwableCombat;
     return null;
   };
-  for(const prefix of ['exp','cmb','con','texp','tcmb']){
+  for(const prefix of ['exp','texp']){
     const ctx=getCtx(prefix);
     const pri=bd.querySelector('#'+prefix+'-pri');
     if(pri)pri.onchange=()=>{ctx.priority=pri.value;save();};
@@ -431,31 +447,7 @@ function openPreference(){
     cb.checked = !cb.checked;
     cb.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  $$('.excl-label',bd).forEach(label=>{
-    label.onclick=(e)=>{
-      if(e.target && (e.target.classList.contains('excl-cb') || e.target.tagName === 'INPUT')) return;
-      e.preventDefault();
-      const cb = label.querySelector('.excl-cb');
-      if(!cb) return;
-      const ctx=getCtx(cb.dataset.prefix);
-      if(!ctx) return;
-      const r=cb.dataset.r;
-      if(!ctx.exclude)ctx.exclude=[];
-      cb.checked = !cb.checked;
-      const idx=ctx.exclude.indexOf(r);
-      if(cb.checked){
-        if(idx<0)ctx.exclude.push(r);
-      } else {
-        if(idx>=0)ctx.exclude.splice(idx,1);
-      }
-      if(cb.checked){
-        label.style.borderColor='#e05252';label.style.background='#3a1a1a';label.style.color='#e05252';
-      } else {
-        label.style.borderColor='#3a2f25';label.style.background='#241d16';label.style.color='#a89a85';
-      }
-      save();
-    };
-  });
+  /* v53-dedup: excl-label 的 onclick 已移除，僅保留 bd 委派 */
   const slider=bd.querySelector('#thr-slider');
   if(slider)slider.oninput=()=>{state.preferences.autoConsumeThreshold=parseInt(slider.value)/100;slider.previousElementSibling.textContent=`🩸 自動使用消耗品血量閾值：${slider.value}%`;save();};
 }
@@ -484,7 +476,49 @@ function onlineTick(){
   doExploreTick();
 }
 
-setInterval(()=>{onlineTick();save();},EVENT_INTERVAL_MS);
+let _tickTimer = null;
+function _getNextDelay(){
+  const now = Date.now();
+  const interval = getExploreInterval();
+  if(state.exploreDelayUntil && state.exploreDelayUntil > now){
+    return state.exploreDelayUntil - now;
+  }
+  return interval;
+}
+function _scheduleNextTick(){
+  if(_tickTimer) clearTimeout(_tickTimer);
+  _tickTimer = setTimeout(()=>{
+    const now = Date.now();
+    const dt = now - lastTickTime;
+    lastTickTime = now;
+    const maxInterval = Math.max(getExploreInterval(), EVENT_INTERVAL_MS);
+    if(dt > maxInterval*3){
+      offlineSettle();
+      _scheduleNextTick();
+      return;
+    }
+    if(BossModule.isActive()){
+      _scheduleNextTick();
+      return;
+    }
+    if(state.exploreDelayUntil && now < state.exploreDelayUntil){
+      _scheduleNextTick();
+      return;
+    }
+    if(state.exploreDelayUntil && now >= state.exploreDelayUntil){
+      state.exploreDelayUntil = 0;
+      if(state.pendingHealFull){
+        state.player.hp = state.player.maxHp;
+        state.pendingHealFull = false;
+        refreshPlayerStats();
+      }
+    }
+    doExploreTick();
+    save();
+    _scheduleNextTick();
+  }, _getNextDelay());
+}
+_scheduleNextTick();
 setInterval(()=>{buildingTick();},30000);
 
 function heroLoop(now){

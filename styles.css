@@ -268,7 +268,17 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .head-break-fx .frag{position:absolute;width:7px;height:7px;background:#3a1a10;border:1px solid #8a3a20;border-radius:1px;pointer-events:none;left:-3.5px;top:-3.5px}
 .head-break-fx .blood{position:absolute;width:5px;height:5px;background:#8a1010;border-radius:50%;pointer-events:none;left:-2.5px;top:-2.5px}
 
+/* v52-dedup */
 /* ===== v17.5 PATCH ===== */
+.ammo-order-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
+.ammo-order-row .lbl{flex:0 0 48px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:right}
+.ammo-order-slots{display:flex;gap:5px}
+.ammo-slot{width:40px;height:46px;background:#1a1510;border:1px solid #3a2f25;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;flex:0 0 auto;padding:2px 0}
+.ammo-slot.filled{border-color:#8a5f18}
+.ammo-slot img{width:26px;height:26px;object-fit:contain;display:block;margin-bottom:1px}
+.ammo-slot .nm{font-size:7px;color:#e8a33d;line-height:1;text-align:center;max-width:38px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:bold}
+.ammo-slot .empty-lbl{font-size:9px;color:#5a5040}
+.weight-display{position:absolute;left:3%;font-size:10px;color:#a89a85;z-index:4;background:rgba(14,12,10,.92);border:1px solid #3a2f25;border-radius:6px;padding:3px 8px;white-space:nowrap;line-height:1.5}
 #zone3 .reg-item .rd,#zone3 .reg-item .lock-hint,#zone3 .reg-item .chk{display:none}
 #zone3 .reg-item{align-items:center;padding:8px 10px;gap:8px}
 #zone3 .reg-item .ri{flex:1;min-width:0}
@@ -291,4 +301,5 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .boss-tier-btn:active:not(.locked){transform:scale(.94)}
 .tier-ii{font-size:8px;color:#a45ede;background:#1f1528;border:1px solid #a45ede;border-radius:3px;padding:0 3px;margin-left:3px;vertical-align:middle}
 .boss-ii-tint{filter:hue-rotate(270deg) saturate(1.3) brightness(.95)}
+.hit-fx.heal{color:#4caf50;font-size:22px}
 /* ===== END ===== */

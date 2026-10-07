@@ -318,7 +318,9 @@ function tryHitPlayer(dmg, pen){
   spawnHitFx(battle.px, battle.py, isCrit ? `-${Math.round(finalDmg)}!` : `-${Math.round(finalDmg)}`, isCrit ? 'crit' : (res.hpLost > 0 ? 'enemy' : 'armor'));
   if(battle.playerHp <= 0){
     endBattle(false);
-  } else if((res.hpLost > 0 || res.armorLost > 0) && !battle.bossRetreat){
+  } else if((res.hpLost > 0 || res.armorLost > 0) && !battle.bossRetreat
+            && battle.bossId !== 'swamp_hydra' && battle.bossId !== 'swamp_hydra_ii'){
+    /* v51: 沼澤九頭不被擊退 */
     battle.bossRetreat = { targetX: clamp(battle.bx + 0.10, 0.05 + BOSS_MIN_GAP, 0.95) };
   }
 }
@@ -417,10 +419,21 @@ function applyBossSkillDamage(sk){
     const newPx = clamp(battle.px + dir * sk.knockback, 0.05, 0.95);
     battle.px = Math.min(newPx, battle.bx - BOSS_MIN_GAP);
   }
-  if(!battle || !battle.active) return;
 }
 
 function battleLoop(now){
+  /* v42-refill: 備彈耗盡時自動切換到下一優先級 */
+  if(battle && !battle.settling && battle.weapon && battle.weapon.def && battle.weapon.def.cal){
+    if(!battle.ammoRef || battle.ammoRef.count <= 0){
+      const _rfNext = pickAmmoByPreferenceOrOrder(battle.weapon.def.cal, 'combat');
+      if(_rfNext){
+        battle.ammoRef = {id:_rfNext.id, rarity:_rfNext.rarity, count:_rfNext.count};
+        if(battle.weaponSlot){ battle.weaponStates[battle.weaponSlot] = {ammoInMag: battle.ammoInMag, ammoRef: battle.ammoRef}; }
+        refreshBattleControlsLive();
+      }
+    }
+  }
+
   if(!battle||!battle.active)return;
   const dt=Math.min(0.05,(now-battle.lastTime)/1000);battle.lastTime=now;
   const moveSpd=0.35*dt;
@@ -689,7 +702,7 @@ function slotCanFire(slot){
     if((st.ammoInMag||0) > 0) return true;
     if(st.ammoRef && st.ammoRef.count > 0) return true;
   }
-  const ammo = pickAmmoByPreference(def.cal,'combat');
+  const ammo = pickAmmoByPreferenceOrOrder(def.cal,'combat');
   return !!ammo;
 }
 function autoSwitchOnNoAmmo(){
@@ -908,19 +921,6 @@ function initHydraHeads(){
   for(const id of HYDRA_HEAD_IDS){ battle.heads[id] = { hp: HYDRA_HEAD_HP, max: HYDRA_HEAD_HP, alive: true }; }
   battle.bossMaxHp = HYDRA_HEAD_HP * HYDRA_HEAD_IDS.length;
   battle.bossHp = battle.bossMaxHp;
-}
-function getHeadOwnerOfLayer(layerId){
-  if(!battle) return null;
-  const def = BOSS_LAYERS[battle.bossId];
-  if(!def) return null;
-  let cur = def.layers.find(l => l.id === layerId);
-  const seen = new Set();
-  while(cur && !seen.has(cur.id)){
-    if(/^head_\d+$/.test(cur.id)) return cur.id;
-    seen.add(cur.id);
-    cur = cur.anchor ? def.layers.find(l => l.id === cur.anchor.target) : null;
-  }
-  return null;
 }
 function pickHeadForPoint(px, py, def, world, anim, fi){
   for(let i = 1; i <= 7; i++){

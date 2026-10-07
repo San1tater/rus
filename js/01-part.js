@@ -41,7 +41,7 @@ const BATTLE_HERO_FOOT_Y_RATIO = 0.95;
 const BOSS_MIN_GAP = 0.12;
 
 const TK_MAG={aks74u:30,aks74un:30,ak74:30,ak74n:30,ak74m:30,akm:30,akms:30,akmn:30,ak103:30,ak104:30,ak105:30,ak12:30,asval:20,'9a91':20,sr3m:30,vss:10,svd:10,sv98:10,rpk16:95,rpd:100,pkm:100,pkp:100,ash12:20,pp19:30,pm:8,pb:8,mp443:17,aps:20,mp133:6,mp153:7,mp155:6,saiga12:8,toz106:2,ks23:3};
-const TK_ARMOR={ssh68:20,ssh68m:22,kolpak:30,'6b47':40,'6b47m':45,altyn:50,kiver:40,maska:45,zsh12m:50,balaclava:5,shemagh:5,gp7:15,ballglasses:5,paca:45,'6b13':65,'6b13m':65,'6b23':70,'6b231':70,'6b232':70,'6b43':85,zhuk6a:85,zhuk3:75,defender2:75,cargopants:5,'6sh122':25,'6sh104':25,'6sh112':25,workboots:5,tactboots:15,lowaz:22,haix:25,belleville:20};
+const TK_ARMOR={ssh68:20,ssh68m:22,kolpak:30,'6b47':40,'6b47m':45,altyn:50,kiver:40,maska:45,zsh12m:3.7,balaclava:5,shemagh:5,gp7:15,ballglasses:5,paca:3.5,'6b13':10.6,'6b13m':9.15,'6b23':7.9,'6b231':7.9,'6b232':10.5,'6b43':20,zhuk6a:11.5,zhuk3:5.2,defender2:11.5,cargopants:5,'6sh122':25,'6sh104':25,'6sh112':25,workboots:5,tactboots:15,lowaz:22,haix:25,belleville:20};
 
 function armorClass(level){if(!level||level<=0)return '';const lv=Math.min(6,Math.max(1,Math.floor(level)));return ['','I','II','III','IV','V','VI'][lv]||'';}
 function getHelmetTotalLevel(id){const def=ARMOR[id];if(!def||def.slot!=='head')return 0;if(def.subArmor&&def.subArmor.length){let s=0;for(const el of def.subArmor)s+=(el.level||0);return s;}return def.level||0;}
@@ -70,7 +70,7 @@ const ARMOR={
   '6b43':{name:'6B43 防彈衣',slot:'top',armor:108,level:6,armored:true},
   zhuk6a:{name:'Zhuk-6a 防彈衣',slot:'top',armor:90,level:6},
   zhuk3:{name:'Zhuk-3 防彈衣',slot:'top',armor:45,level:3},
-  defender2:{name:'Defender 2 防彈衣',slot:'top',armor:90,level:5,armored:true},
+  defender2:{name:'Defender 2 防彈衣',slot:'top',armor:90,level:5},
   cargopants:{name:'工裝褲',slot:'pants',armor:10,level:1},
   workboots:{name:'工作靴',slot:'shoes',armor:5,level:1},
   tactboots:{name:'戰術靴',slot:'shoes',armor:5,level:1},
@@ -96,25 +96,25 @@ const WEAPONS={
   asval:{name:'AS VAL',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.asval,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.5},
   '9a91':{name:'9A-91',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG['9a91'],modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.5},
   sr3m:{name:'SR-3M',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.sr3m,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.5},
-  vss:{name:'VSS Vintorez',slot:'primary',type:'狙擊槍',cal:'9x39',mag:TK_MAG.vss,modes:['點射'],rpm:700,range:0.55},
-  svd:{name:'SVD',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.svd,modes:['點射'],rpm:180,range:0.9},
-  sv98:{name:'SV-98',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.sv98,modes:['點射'],rpm:60,range:0.95},
-  rpk16:{name:'RPK-16',slot:'primary',type:'機槍',cal:'5.45',mag:TK_MAG.rpk16,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.65},
-  rpd:{name:'RPD',slot:'primary',type:'機槍',cal:'7.62',mag:TK_MAG.rpd,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
+  vss:{name:'VSS Vintorez',slot:'primary',type:'狙擊槍',cal:'9x39',mag:TK_MAG.vss,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.55},
+  svd:{name:'SVD',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.svd,modes:['點射'],rpm:700,range:0.9},
+  sv98:{name:'SV-98',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.sv98,modes:['點射'],rpm:30,range:0.95},
+  rpk16:{name:'RPK-16',slot:'primary',type:'機槍',cal:'5.45',mag:TK_MAG.rpk16,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
+  rpd:{name:'RPD',slot:'primary',type:'機槍',cal:'7.62',mag:TK_MAG.rpd,modes:['短點射','長點射','掃射'],rpm:700,range:0.7},
   pkm:{name:'PKM',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkm,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
   pkp:{name:'PKP Pecheneg',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkp,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
-  ash12:{name:'ASH-12',slot:'primary',type:'突擊步槍',cal:'12.7',mag:TK_MAG.ash12,modes:['點射','短點射'],rpm:600,range:0.6},
+  ash12:{name:'ASH-12',slot:'primary',type:'突擊步槍',cal:'12.7',mag:10,modes:['點射','掃射'],rpm:650,range:0.6},
   pp19:{name:'PP-19-01 Vityaz',slot:'primary',type:'衝鋒槍',cal:'9x19',mag:TK_MAG.pp19,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.45},
-  pm:{name:'PM 手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pm,modes:['點射'],rpm:400,range:0.35},
-  pb:{name:'PB 微聲手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pb,modes:['點射'],rpm:400,range:0.35},
-  mp443:{name:'MP-443 Grach',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.mp443,modes:['點射'],rpm:400,range:0.4},
-  aps:{name:'APS 斯捷奇金',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.aps,modes:['點射','短點射','長點射','掃射'],rpm:800,range:0.35},
-  mp133:{name:'MP-133 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp133,modes:['點射'],rpm:60,range:0.4},
+  pm:{name:'PM 手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pm,modes:['點射'],rpm:120,range:0.35},
+  pb:{name:'PB 微聲手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pb,modes:['點射'],rpm:120,range:0.35},
+  mp443:{name:'MP-443 Grach',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.mp443,modes:['點射'],rpm:120,range:0.4},
+  aps:{name:'APS 斯捷奇金',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.aps,modes:['點射','短點射','長點射','掃射'],rpm:750,range:0.35},
+  mp133:{name:'MP-133 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp133,modes:['點射'],rpm:30,range:0.4},
   mp153:{name:'MP-153 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp153,modes:['點射'],rpm:70,range:0.42},
   mp155:{name:'MP-155 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp155,modes:['點射'],rpm:70,range:0.4},
-  saiga12:{name:'Saiga-12',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.saiga12,modes:['點射'],rpm:300,range:0.45},
-  toz106:{name:'TOZ-106',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.toz106,modes:['點射'],rpm:40,range:0.35},
-  ks23:{name:'KS-23',slot:'secondary',type:'霰彈槍',cal:'23x75',mag:TK_MAG.ks23,modes:['點射'],rpm:40,range:0.45},
+  saiga12:{name:'Saiga-12',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:5,modes:['點射','掃射'],rpm:450,range:0.45},
+  toz106:{name:'TOZ-106',slot:'secondary',type:'霰彈槍',cal:'20/70',mag:TK_MAG.toz106,modes:['點射'],rpm:30,range:0.35},
+  ks23:{name:'KS-23',slot:'secondary',type:'霰彈槍',cal:'23x75',mag:TK_MAG.ks23,modes:['點射'],rpm:30,range:0.45},
   '6kh2':{name:'6Kh2 刺刀',slot:'melee',type:'刺刀',dmg:25,pen:1,modes:['近戰'],rpm:120,range:0.15},
   '6kh5':{name:'6Kh5 刺刀',slot:'melee',type:'刺刀',dmg:26,pen:1,modes:['近戰'],rpm:120,range:0.15},
   kukri:{name:'Kukri 彎刀',slot:'melee',type:'刀',dmg:32,pen:1,modes:['近戰'],rpm:100,range:0.18},
@@ -164,6 +164,14 @@ const AMMO={
   '12.7_ps12':{name:'12.7×55mm PS12',cal:'12.7',dmg:115,pen:3,rarity:'庫存',pellets:1},
   '12.7_ps12b':{name:'12.7×55mm PS12B',cal:'12.7',dmg:102,pen:5,rarity:'傳奇',pellets:1},
   '23x75_shrapnel25':{name:'23×75mmR Shrapnel-25',cal:'23x75',dmg:78,pen:1,rarity:'庫存',pellets:8},
+  '9x18_pbm_gzh':{name:'9×18mm PM PBM gzh',cal:'9x18',dmg:40,pen:3,rarity:'傳奇'},
+  '12.7_ps12a':{name:'12.7×55mm PS12A',cal:'12.7',dmg:165,pen:1,rarity:'傳奇',pellets:1},
+  '23x75_shrapnel10_legend':{name:'23×75mmR Shrapnel-10',cal:'23x75',dmg:87,pen:1,rarity:'傳奇',pellets:8},
+  '20x70_5.6':{name:'20/70 5.6mm Buckshot',cal:'20/70',dmg:26,pen:1,rarity:'破舊',pellets:8},
+  '20x70_6.2':{name:'20/70 6.2mm Buckshot',cal:'20/70',dmg:22,pen:2,rarity:'一般',pellets:8},
+  '20x70_7.3':{name:'20/70 7.3mm Buckshot',cal:'20/70',dmg:23,pen:3,rarity:'庫存',pellets:9},
+  '20x70_7.5':{name:'20/70 7.5mm Buckshot',cal:'20/70',dmg:25,pen:3,rarity:'精品',pellets:8},
+  '20x70_devastator':{name:'20/70 Devastator',cal:'20/70',dmg:198,pen:3,rarity:'傳奇',pellets:1},
   '23x75_shrapnel10':{name:'23×75mmR Shrapnel-10',cal:'23x75',dmg:87,pen:1,rarity:'精品',pellets:8},
   '23x75_barrikada':{name:'23×75mmR Barrikada',cal:'23x75',dmg:192,pen:4,rarity:'傳奇',pellets:1},
 };
@@ -172,6 +180,39 @@ const CONSUMABLES={bandage:{name:'繃帶',heal:15},water:{name:'瓶裝水',heal:
 const MATERIALS={wood:{name:'木材'},metal:{name:'金屬廢料'},screws:{name:'螺絲'},cloth:{name:'布料'},gears:{name:'齒輪'},electronics:{name:'電子零件'}};
 
 const MATERIAL_EMOJI = {wood:'🪵', metal:'🔩', screws:'🔧', cloth:'🧵', gears:'⚙️', electronics:'💡'};
+
+/* ★ v17.5 重量系統（kg）——武器為空槍重，實戰時再加上滿彈匣彈藥重量 */
+const ITEM_WEIGHT = {
+  aks74u:1.809,aks74un:2.694,ak74:3.3,ak74n:3.3,ak74m:3.605,akm:3.495,akms:3.495,akmn:3.495,
+  ak103:3.605,ak104:3.605,ak105:3.2,ak12:3.606,asval:2.5,'9a91':2.452,sr3m:2.5,
+  vss:2.6,svd:4.386,sv98:5.188,
+  rpk16:3.017,rpd:7.4,pkm:8.994,pkp:8.2,
+  ash12:6.17,pp19:2.858,
+  pm:0.73,pb:0.952,mp443:0.95,aps:1.021,
+  mp133:3.54,mp153:3.6,mp155:3.4,saiga12:5.659,toz106:2.715,ks23:3.76,
+  '6kh2':0.4,'6kh5':0.4,kukri:0.5,
+  f1:0.6,rgd5:0.5,rgo:0.53,rgn:0.53,vog17:0.35,vog25:0.28,
+  ssh68:1.4,ssh68m:1.4,kolpak:1.0,'6b47':1.3,'6b47m':1.3,altyn:2.5,kiver:1.2,maska:2.6,zsh12m:3.0,
+  balaclava:0.1,shemagh:0.15,gp7:0.5,ballglasses:0.1,
+  paca:3.5,'6b13':10.6,'6b13m':9.15,'6b23':7.9,'6b231':7.9,'6b232':10.5,'6b43':20,zhuk6a:11.5,zhuk3:5.2,defender2:11.5,
+  cargopants:0.4,workboots:0.6,tactboots:0.7,lowaz:0.8,haix:0.75,belleville:0.8,
+  bplarge:1.6,
+  bandage:0.05,water:0.6,ai2:0.2,painkiller:0.1,tushonka:0.5,splint:0.1,salewa:1.0,ifak:0.5,surv12:1.5,
+  wood:1.5,metal:2.5,screws:0.05,cloth:0.5,gears:0.3,electronics:0.4,
+};
+/* 每發彈藥重量（kg） */
+const AMMO_UNIT_WEIGHT = {
+  '9x18':0.007,'9x19':0.009,'5.45':0.0105,'7.62':0.0165,'7.62x54':0.021,
+  '9x39':0.017,'12ga':0.045,'12.7':0.068,'20/70':0.030,'23x75':0.08
+};
+/* 彈匣重量（kg）——僅計算彈匣本體，不含子彈 */
+const MAGAZINE_WEIGHT = {
+  default:0.15, ak_30:0.215, ak_45:0.3, ak_60:0.4, ak_95:0.68,
+  rpk_95:0.68, pkm_200:0.9, svd_10:0.15, vss_10:0.12, vss_20:0.2,
+  pistol_8:0.05, pistol_17:0.08, pistol_20:0.09, pistol_30:0.12,
+  shotgun_5:0.095, shotgun_8:0.15, saiga_5:0.095, saiga_20:0.68,
+  ash12_10:0.35, ks23_3:0.18
+};
 const PANTS_SHOES_EMOJI = {
   cargopants:'👖', '6sh122':'👖', '6sh104':'👖', '6sh112':'👖',
   workboots:'🥾', tactboots:'🥾', lowaz:'🥾', haix:'🥾', belleville:'🥾',
@@ -180,7 +221,8 @@ const AMMO_ICON_BY_CAL = {
   '9x18':'918.png', '9x19':'919.png', '5.45':'545.png',
   '7.62':'76239.png', '7.62x54':'76254.png', '9x39':'939.png',
   '12ga':'12ga.png', '12.7':'12755.png',
-  '23x75':'2375.png'
+  '23x75':'2375.png',
+  '20/70':'2070.png'
 };
 
 const WEAPON_MOD_RULES={
@@ -194,8 +236,8 @@ const WEAPON_MOD_RULES={
   vss:{mags:[20,30],scopes:['PSO-1']},svd:{mags:[15,20],scopes:['PSO-1']},sv98:{mags:[],scopes:['PSO-1','1P87']},
   rpk16:{mags:[95],scopes:['1P87','PSO-1']},rpd:{mags:[],scopes:['PSO-1']},
   pkm:{mags:[200],scopes:[]},
-  pkp:{mags:[200],scopes:['1P87','PSO-1']},ash12:{mags:[],scopes:['1P87']},pp19:{mags:[],scopes:['1P87','PK-06']},
-  pm:{mags:[10],scopes:[]},pb:{mags:[10],scopes:[]},mp443:{mags:[20],scopes:[]},aps:{mags:[30],scopes:[]},
+  pkp:{mags:[200],scopes:['1P87','PSO-1']},ash12:{mags:[10,20],scopes:['1P87']},pp19:{mags:[],scopes:['1P87','PK-06']},
+  pm:{mags:[8],scopes:[]},pb:{mags:[8],scopes:[]},mp443:{mags:[18],scopes:[]},aps:{mags:[30],scopes:[]},saiga12:{mags:[5,8,10,20],scopes:[]},
 };
 const SCOPE_BONUS={'1P87':5,'PSO-1':8,'EKP-8-02':4,'PK-06':6};
 const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-02 紅點','PK-06':'PK-06 紅點'};
@@ -327,7 +369,15 @@ function getMagOptionsForWeapon(weaponId){
   return candidates.filter(m => m >= defaultMag);
 }
 
-const ENEMIES={mutant_squirrel:{name:'變異松鼠',hp:10},mutant_rat:{name:'變異巨鼠',hp:20},ghoul:{name:'食屍鬼',hp:35},raider:{name:'掠奪者',hp:45},raider_vet:{name:'掠奪者老兵',hp:80},mutant_wolf:{name:'變異狼',hp:55},mutant_bear:{name:'變異熊',hp:150}};
+const ENEMIES={
+  mutant_squirrel:{name:'變異松鼠',hp:10,dmg:5,pen:1,armorLevel:1},
+  mutant_rat:{name:'變異巨鼠',hp:20,dmg:8,pen:1,armorLevel:1},
+  ghoul:{name:'食屍鬼',hp:35,dmg:15,pen:2,armorLevel:2},
+  raider:{name:'掠奪者',hp:45,dmg:22,pen:3,armorLevel:3},
+  raider_vet:{name:'掠奪者老兵',hp:80,dmg:38,pen:4,armorLevel:4},
+  mutant_wolf:{name:'變異狼',hp:55,dmg:25,pen:3,armorLevel:2},
+  mutant_bear:{name:'變異熊',hp:150,dmg:65,pen:5,armorLevel:3}
+};
 
 const REGIONS={
   '廢棄工廠':{name:'廢棄工廠',desc:'生鏽的機械與堆積的貨櫃',enemies:['mutant_squirrel','mutant_rat','raider','ghoul'],loot:['wood','wood','wood','metal','metal','screws','cloth','9x18_pst','9x18_ps','9x19_pbp','9x19_pst','12ga_buck','12ga_7mm','5.45_hp','23x75_shrapnel25','pp19','aks74u','aks74un','mp133','toz106','mp153','pm','pb','6kh2','kukri','rgd5','ssh68','ssh68m','balaclava','shemagh','ballglasses','paca','cargopants','workboots','tactboots','ai2','bandage','water','painkiller'],combat:{attack:0.55,stealth:0.22},seal:'seal_factory',sealRate:0.03,enemyHpMult:1.0},

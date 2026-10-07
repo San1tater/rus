@@ -46,7 +46,6 @@ function pickAimPartFromClick(canvasX, canvasY){
 /* ★ 像素級圖形邊界 helper（用於射程判定、碰撞、推動） */
 const HERO_SPRITE_W = 88;
 function getSceneW(){const fxEl=document.getElementById('battle-fx');return fxEl?fxEl.clientWidth:400;}
-function getBossSpriteWidthPx(){const sp=document.getElementById('boss-sprite');return sp?sp.clientWidth:280;}
 function getPlayerSpriteWidthPx(){return HERO_SPRITE_W;}
 /* ★ 計算 BOSS 圖形在 sprite 內的實際像素邊界（依動畫 + sprite 尺寸快取） */
 function getBossGfxBounds(){
@@ -235,14 +234,148 @@ function renderCombat(){
   listHtml+='</div>';
   z1.innerHTML=listHtml;
   renderEquipZone(z2);
-  z3.innerHTML=`<div class="z3-head"><div class="z3-title">⚔️ Boss 挑戰</div></div>
-    <div style="padding:10px;font-size:10px;color:#7a6f60;line-height:1.6">
-      · 點擊 Boss 設定瞄準部位<br>
-      · 連續射擊會降低命中率，點放可維持精準<br>
-      · 主副武器耗盡自動切換近戰
-    </div>`;
-  $$('.boss-tier-btn[data-boss-key]',z1).forEach(btn=>{btn.onclick=(e)=>{e.stopPropagation();if(btn.classList.contains('locked'))return;_bossSelectedTier[btn.dataset.bossKey]=parseInt(btn.dataset.tier,10);renderCombat();};});
+  renderCombatInfoPanel(z3);
+  $$('.boss-tier-btn[data-boss-key]',z1).forEach(btn=>{btn.onclick=(e)=>{e.stopPropagation();if(btn.classList.contains('locked'))return;/* v48-preserve-scroll */ {const _bl=z1.querySelector('.boss-list');const _sp=_bl?_bl.scrollTop:0;_bossSelectedTier[btn.dataset.bossKey]=parseInt(btn.dataset.tier,10);renderCombat();const _bl2=z1.querySelector('.boss-list');if(_bl2)_bl2.scrollTop=_sp;}};});
   $$('.boss-card .btn',z1).forEach(btn=>{btn.onclick=()=>startBossBattle(btn.dataset.bid);});
+}
+
+/* v51-dedup */
+function _getAmmoDefRarity(id, slot){
+  if(slot === 'throwable'){
+    let _best = null, _bi = -1;
+    for(const _k in state.inventory){
+      const _p = _k.split('@');
+      if(_p[0] !== id) continue;
+      const _i = RARITY_ORDER.indexOf(_p[1]);
+      if(_i > _bi){ _bi = _i; _best = _p[1]; }
+    }
+    return _best || '一般';
+  }
+  const d = AMMO[id];
+  return d ? d.rarity : '一般';
+}
+function renderCombatInfoPanel(z3){
+  const slots = [
+    {key:'primary', label:'主武器'},
+    {key:'secondary', label:'副武器'},
+    {key:'throwable', label:'投擲物'}
+  ];
+  let html = '<div class="z3-head"><div class="z3-title">⚔️ 彈藥準備</div></div>';
+  html += '<div style="padding:2px 8px;font-size:9px;color:#7a6f60;line-height:1.2;flex:0 0 auto">依序設定優先彈種，留空則自動分配</div>';
+  html += '<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-start;padding:8px;gap:4px;overflow:hidden">';
+  for(const s of slots){
+    html += renderAmmoOrderRow(s.key, s.label);
+  }
+  html += '</div>';
+  z3.innerHTML = html;
+  z3.querySelectorAll('.ammo-slot').forEach(el=>{
+    el.onclick = () => { openAmmoPicker(el.dataset.slot, parseInt(el.dataset.idx, 10)); };
+  });
+}
+function getEquippedCal(slot){
+  const id = state.player.equipped[slot];
+  if(!id) return null;
+  const def = itemDef(id);
+  if(!def) return null;
+  return def.cal || null;
+}
+function getAvailableAmmoForSlot(slot){
+  if(slot === 'throwable'){
+    const list = [];
+    for(const k in state.inventory){
+      const parts = k.split('@');
+      const id = parts[0], rar = parts[1];
+      const d = WEAPONS[id];
+      if(!d || d.slot !== 'throwable') continue;
+      const cnt = state.inventory[k];
+      if(cnt <= 0) continue;
+      list.push({id, rarity: rar, count: cnt, def: d});
+    }
+    return list;
+  }
+  const cal = getEquippedCal(slot);
+  if(!cal) return [];
+  const list = [];
+  for(const k in state.inventory){
+    const parts = k.split('@');
+    const id = parts[0], rar = parts[1];
+    const d = AMMO[id];
+    if(!d || d.cal !== cal) continue;
+    const cnt = state.inventory[k];
+    if(cnt <= 0) continue;
+    /* 稀有度從 AMMO 定義讀取，確保顯示與定義一致 */
+    list.push({id, rarity: d.rarity, count: cnt, def: d});
+  }
+  return list;
+}
+function getAmmoShortName(id, slot){
+  if(slot === 'throwable'){
+    const d = WEAPONS[id];
+    return d ? d.name.substring(0, 6) : '?';
+  }
+  const d = AMMO[id];
+  if(!d) return '?';
+  const parts = d.name.split(' ');
+  return parts.length > 1 ? parts[parts.length - 1] : d.name;
+}
+function renderAmmoOrderRow(slot, label){
+  const equipped = state.player.equipped[slot];
+  const order = getAmmoOrder(slot);
+  let html = '<div class="ammo-order-row">';
+  html += '<div class="lbl">' + label + '</div>';
+  html += '<div class="ammo-order-slots">';
+  for(let i = 0; i < 3; i++){
+    const aid = order[i];
+    let inner = '<span class="empty-lbl">空</span>';
+    let cls = 'ammo-slot';
+    let style = '';
+    if(aid){
+      const rar = _getAmmoDefRarity(aid, slot);
+      style = 'background:' + rarityBg(rar) + ';';
+      const nm = getAmmoShortName(aid, slot);
+      inner = itemIcon(aid, 26) + '<div class="nm">' + nm + '</div>';
+      cls += ' filled';
+    }
+    const dis = !equipped ? 'opacity:.35;pointer-events:none;' : '';
+    html += '<div class="' + cls + '" data-slot="' + slot + '" data-idx="' + i + '" style="' + style + dis + '">' + inner + '</div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+function openAmmoPicker(slot, idx){
+  const equipped = state.player.equipped[slot];
+  if(!equipped){ notify('尚未裝備對應武器', 'error'); return; }
+  const available = getAvailableAmmoForSlot(slot);
+  if(!available.length){ openModal({title: '選擇彈種（優先級 ' + (idx + 1) + '）', body: '<div class="empty-hint">沒有可用的彈藥</div>'}); return; }
+  available.sort((a, b) => {
+    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    if(ra !== 0) return ra;
+    return (a.def.name || '').localeCompare(b.def.name || '');
+  });
+  let body = '';
+  for(const it of available){
+    let statLine = '';
+    if(slot === 'throwable'){
+      statLine = it.rarity + ' · 傷害 ' + (it.def.dmg || 0) + ' · 穿甲 ' + (it.def.pen || 0) + ' · 庫存 ' + it.count;
+    } else {
+      statLine = it.rarity + ' · 穿甲 ' + (it.def.pen || 0) + ' · 傷害 ' + (it.def.dmg || 0) + ' · 庫存 ' + it.count;
+    }
+    body += '<div class="item-row" data-amid="' + it.id + '" data-rar="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + '</div><div class="sub">' + statLine + '</div></div></div>';
+  }
+  const bd = openModal({title: '選擇彈種（優先級 ' + (idx + 1) + '）', body});
+  bd.querySelectorAll('.item-row').forEach(row => {
+    row.onclick = () => {
+      const aid = row.dataset.amid;
+      let order = getAmmoOrder(slot).slice();
+      while(order.length < 3) order.push(null);
+      for(let i = 0; i < order.length; i++){ if(order[i] === aid) order[i] = null; }
+      order[idx] = aid;
+      while(order.length && !order[order.length - 1]) order.pop();
+      setAmmoOrder(slot, order);
+      closeModal();
+      renderCombatInfoPanel(document.getElementById('zone3'));
+    };
+  });
 }
 
 function renderBattleScene(z1){
@@ -395,7 +528,9 @@ function refreshBattleControlsLive(){
 function renderBattleControls(z3){
   const w=battle.weapon;
   const wdef=w?w.def:null;
-  const modes=wdef&&wdef.modes?wdef.modes:['點射'];
+  const _allModes=wdef&&wdef.modes?wdef.modes:['點射'];
+  const modes=_allModes.filter(m=>m!=='長點射');
+  if(battle.fireMode==='長點射') battle.fireMode=modes[0]||'點射';
   const canFire=!battle.reloading&&!battle.consuming;
   z3.innerHTML=`
     <div class="ctrl-wrap">
@@ -437,6 +572,8 @@ function renderBattleControls(z3){
   refreshBattleControlsLive();
 }
 function switchBattleWeapon(slot){
+  /* ★ v17.5 更換武器時清空該槽位的彈藥準備 */
+  /* v39: 不再清空，改為按武器分開存 */
   if(slot==='throwable'&&getThrowableCount()<=0){ensureThrowableFromBackpack();}
   const w=equippedWeapon(slot);if(!w||!itemDef(w.id))return;
   const def=itemDef(w.id);
@@ -453,7 +590,7 @@ function switchBattleWeapon(slot){
   const prevSt=battle.weaponStates[slot];
   if(prevSt){battle.ammoInMag=prevSt.ammoInMag||0;battle.ammoRef=prevSt.ammoRef;}
   else if(def.cal){
-    const ammo=pickAmmoByPreference(def.cal,'combat');
+    const ammo=pickAmmoByPreferenceOrOrder(def.cal,'combat');
     if(!ammo){battle.ammoRef=null;battle.ammoInMag=0;}
     else{
       const need=def.mag||30;
