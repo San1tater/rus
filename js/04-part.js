@@ -210,7 +210,9 @@ function isWeakPointHit(){
   return weak.includes(battle.aimPart);
 }
 
-let _bossSelectedTier={};
+/* v54-boss-tier-persist */
+if(!state.preferences.bossTier) state.preferences.bossTier = {};
+let _bossSelectedTier = state.preferences.bossTier;
 function renderCombat(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   if(battle&&battle.active){renderBattleScene(z1);renderBattleJoystick(z2);renderBattleControls(z3);return;}
@@ -235,7 +237,7 @@ function renderCombat(){
   z1.innerHTML=listHtml;
   renderEquipZone(z2);
   renderCombatInfoPanel(z3);
-  $$('.boss-tier-btn[data-boss-key]',z1).forEach(btn=>{btn.onclick=(e)=>{e.stopPropagation();if(btn.classList.contains('locked'))return;/* v48-preserve-scroll */ {const _bl=z1.querySelector('.boss-list');const _sp=_bl?_bl.scrollTop:0;_bossSelectedTier[btn.dataset.bossKey]=parseInt(btn.dataset.tier,10);renderCombat();const _bl2=z1.querySelector('.boss-list');if(_bl2)_bl2.scrollTop=_sp;}};});
+  $$('.boss-tier-btn[data-boss-key]',z1).forEach(btn=>{btn.onclick=(e)=>{e.stopPropagation();if(btn.classList.contains('locked'))return;/* v48-preserve-scroll */ {const _bl=z1.querySelector('.boss-list');const _sp=_bl?_bl.scrollTop:0;_bossSelectedTier[btn.dataset.bossKey]=parseInt(btn.dataset.tier,10);save();renderCombat();const _bl2=z1.querySelector('.boss-list');if(_bl2)_bl2.scrollTop=_sp;}};});
   $$('.boss-card .btn',z1).forEach(btn=>{btn.onclick=()=>startBossBattle(btn.dataset.bid);});
 }
 
@@ -529,8 +531,17 @@ function renderBattleControls(z3){
   const w=battle.weapon;
   const wdef=w?w.def:null;
   const _allModes=wdef&&wdef.modes?wdef.modes:['點射'];
-  const modes=_allModes.filter(m=>m!=='長點射');
-  if(battle.fireMode==='長點射') battle.fireMode=modes[0]||'點射';
+  /* v55-burst-whitelist: 只有現實中有短點射的槍才顯示短點射按鈕 */
+  const _BURST_WHITELIST=['ak12'];
+  const _wid=battle.weapon?battle.weapon.id:'';
+  let _baseId=_wid;
+  if(_wid && _wid.indexOf('named_')===0){ const _p=_wid.split('_'); if(_p.length>=2) _baseId=_p[1]; }
+  const modes=_allModes.filter(function(m){
+    if(m==='長點射') return false;
+    if(m==='短點射' && _BURST_WHITELIST.indexOf(_baseId)===-1) return false;
+    return true;
+  });
+  if(modes.indexOf(battle.fireMode)===-1) battle.fireMode=modes[0]||'點射';
   const canFire=!battle.reloading&&!battle.consuming;
   z3.innerHTML=`
     <div class="ctrl-wrap">

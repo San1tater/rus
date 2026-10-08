@@ -547,7 +547,7 @@ function findNextConsumable(){const ctx=state.preferences.consume||{priority:'�
 function equippedWeapon(slot){const id=state.player.equipped[slot];if(!id)return null;const rar=state.player.equippedRarity[slot]||'一般';const def=itemDef(id);if(!def)return null;return{id,rarity:rar,def,slot};}
 function getBuildingLv(id){for(const s of state.base.slots)if(s&&s.id===id)return s.lv||1;return 0;}
 function buildingBonusText(bid,lv){
-  switch(bid){case 'workbench':return `改造隊列 +${lv}`;case 'storage':return `掉落數量 +${lv*10}%`;
+  switch(bid){case 'workbench':{const _c=Math.min(50,Math.max(1,lv));const _s=Math.round(86400*Math.pow(300/86400,(_c-1)/49));const _m=Math.round(_s/60);const _t=_m<60?(_m+' 分鐘'):(Math.round(_m/60)+' 小時');return `改造所需：${_t}/件`;}case 'storage':return `掉落數量 +${lv*10}%`;
   case 'toilet':return `熟練度獲取 +${lv*10}%`;case 'rest':return `生命成長率 ${(0.03*Math.pow(1.02,lv)*100).toFixed(2)}%`;
   case 'generator':return `製造/冷卻加速 +${lv*20}%`;case 'medbay':return `消耗品恢復 +${lv*15}%`;
   case 'forge':return `護甲值 +${lv*3}%`;
@@ -650,7 +650,12 @@ function refreshPlayerStats(){
   if(forgeLv>0) armor = Math.round(armor * (1 + forgeLv * 0.03));
   state.player.maxArmor=armor;
   state.player.armorLevel=getPlayerArmorLevel();
-  if(armor !== prevMaxArmor){ state.player.armor = armor; }
+  /* v54-preserve-loss: 換裝時保持已損失的護甲 */
+  const _prevLoss = Math.max(0, prevMaxArmor - (state.player.armor || 0));
+  state.player.maxArmor = armor;
+  if(armor !== prevMaxArmor){
+    state.player.armor = Math.max(0, armor - _prevLoss);
+  }
   if(state.player.hp>state.player.maxHp)state.player.hp=state.player.maxHp;
   if(state.player.armor>state.player.maxArmor)state.player.armor=state.player.maxArmor;
   if(state.player.armor<0)state.player.armor=0;
@@ -981,8 +986,9 @@ function autoCombat(region,node,enemies){
       const baseDmg=Math.round(ammo.def.dmg*(RARITY_MULT[ammo.rarity]||1)*_pd);
       const magCap=def.mag||1;const maxBullets=Math.min(magCap,ammo.count);
       const hitP=Math.max(0.01,hitRate/100);
-      const avgHp=totalEnemyHp/Math.max(1,ec);
-      const expHits=Math.ceil(avgHp/Math.max(1,baseDmg));
+      /* v60-expHits-sum: 累加每隻敵人的命中次數 */
+      let expHits=0;
+      for(const _e of enemies){ expHits += Math.ceil(_e.hp/Math.max(1,baseDmg)); }
       const expBullets=Math.ceil(expHits/hitP);
       const profErr=(1-_pe)*0.8;
       const jitter=1+(Math.random()*2-1)*profErr;
@@ -992,18 +998,51 @@ function autoCombat(region,node,enemies){
       rounds=1;
       if(bulletsUsed>0)invRemove(ammo.id,ammo.rarity,bulletsUsed);
     } else if(def.cal){
-      mode=chooseFireMode(weapon,ec,ammo.count);
-      const hitRate=getHitRate(def.type,mode,scopeBonus);
-      const perTarget=modeBulletsPerTarget(mode);
-      let needBullets=0;
-      if(mode==='掃射')needBullets=Math.min(def.mag||30,ammo.count);else needBullets=perTarget*ec;
-      needBullets=Math.min(needBullets,ammo.count);bulletsUsed=needBullets;
-      if(bulletsUsed>0)invRemove(ammo.id,ammo.rarity,bulletsUsed);
-      const _pd2=0.6+clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL,0,1)*0.9;
-      const baseDmg=Math.round(ammo.def.dmg*(RARITY_MULT[ammo.rarity]||1)*_pd2);
-      const pellets=ammo.def.pellets||1;
-      let bi=bulletsUsed;
-      while(bi>0&&remaining.some(e=>e.hp>0)){const alive=remaining.filter(e=>e.hp>0);if(!alive.length)break;const target=pick(alive);bi--;for(let p=0;p<pellets;p++){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-3,3);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}if(remaining.every(e=>e.hp<=0))break;}
+      /* v59: 傷害期望發數 + 迭代匹配模式 + jitter */
+      const _pl2 = Math.floor(state.proficiency[def.type] || 0);
+      const _pe2 = clamp(_pl2 / MAX_PROF_LEVEL, 0, 1);
+      const _pd2 = 0.6 + _pe2 * 0.9;
+      const baseDmg = Math.round(ammo.def.dmg * (RARITY_MULT[ammo.rarity]||1) * _pd2);
+      /* v60-expHits-sum: 累加每隻敵人的命中次數 */
+      let expHits = 0;
+      for(const _e of enemies){ expHits += Math.ceil(_e.hp / Math.max(1, baseDmg)); }
+      let _mode = '點射';
+      let _expB = 0;
+      for(let _it = 0; _it < 5; _it++){
+        const _hr = getHitRate(def.type, _mode, scopeBonus) / 100;
+        const _newExp = Math.max(1, Math.ceil(expHits / Math.max(0.01, _hr)));
+        let _newMode;
+        if(_newExp === ec) _newMode = '點射';
+        else if(_newExp % 3 === 0) _newMode = '短點射';
+        else if(_newExp % 7 === 0) _newMode = '長點射';
+        else _newMode = '掃射';
+        if(_newMode === _mode){ _expB = _newExp; break; }
+        _mode = _newMode; _expB = _newExp;
+      }
+      const _profErr2 = (1 - _pe2) * 0.8;
+      const _jitter2 = 1 + (Math.random()*2 - 1) * _profErr2;
+      bulletsUsed = Math.max(1, Math.round(_expB * _jitter2));
+      bulletsUsed = Math.min(bulletsUsed, ammo.count);
+      mode = _mode;
+      const hitRate = getHitRate(def.type, mode, scopeBonus);
+      if(bulletsUsed > 0) invRemove(ammo.id, ammo.rarity, bulletsUsed);
+      const pellets = ammo.def.pellets || 1;
+      let bi = bulletsUsed;
+      while(bi > 0 && remaining.some(e => e.hp > 0)){
+        const alive = remaining.filter(e => e.hp > 0);
+        if(!alive.length) break;
+        const target = pick(alive);
+        bi--;
+        for(let p = 0; p < pellets; p++){
+          if(Math.random()*100 < hitRate){
+            let d = baseDmg + rndInt(-3,3);
+            if(Math.random() < critRate){ d = Math.round(d*critMult); crits++; }
+            target.hp -= Math.max(1, d);
+            hits++; dmgDealt += Math.max(1, d);
+          }
+        }
+        if(remaining.every(e => e.hp <= 0)) break;
+      }
     } else if(def.explosive){
       /* ★ 投擲物：探索模式一律從背包消耗，裝備槽保留給 Boss 戰 */
       mode=def.modes?def.modes[0]:'投擲';
@@ -1053,8 +1092,16 @@ function autoCombat(region,node,enemies){
     const isMelee=def.slot==='melee';
     const meleeHits=isMelee?getMeleeHits(def.rpm):0;
     const _remHp=remaining.reduce((s,e)=>s+Math.max(0,e.hp),0);const _effDmg=Math.max(0,totalEnemyHp-_remHp);const hitTxt=def.cal?`(命中:${hits}/${bulletsUsed}，暴擊:${crits}，傷害:${_effDmg}/${totalEnemyHp})`:(isMelee?`(近戰 ${meleeHits} 次，命中:${hits}，暴擊:${crits}，傷害:${_effDmg}/${totalEnemyHp})`:`(命中:${hits}，暴擊:${crits}，傷害:${_effDmg}/${totalEnemyHp})`);
-    const modeDisplay=(def.cal&&isSemiAutoOnly(def)&&rounds>1)?`${rounds}輪點射`:mode;
+    /* v59-mode-display: 短點射/長點射加輪數 */
+    let modeDisplay = mode;
+    if(def.cal && !isSemiAutoOnly(def) && (mode === '短點射' || mode === '長點射')){
+      const _rd = mode === '短點射' ? 3 : 7;
+      const _r = Math.max(1, Math.round(bulletsUsed / _rd));
+      if(_r > 1) modeDisplay = mode + ' ×' + _r;
+    }
+    if(def.cal && isSemiAutoOnly(def) && rounds > 1) modeDisplay = rounds + '輪點射';
     let resultTxt='',loot=[];
+    let _aftermathTxt='';
     if(reallyVictory){
       resultTxt=`<span class="win">勝利</span>`;state.stats.kills+=enemies.length;
       const dropN=rndInt(1,2);
@@ -1083,31 +1130,30 @@ function autoCombat(region,node,enemies){
           totalHpLost += res.hpLost;
           totalArmorLost += res.armorLost;
         }
-        handleExploreAftermath(totalHpLost, totalArmorLost, survivors.length);
+        _aftermathTxt = handleExploreAftermath(totalHpLost, totalArmorLost, survivors.length);
       }
     }
     const lootTxt=loot.length?`，${resultTxt}:獲得 ${loot.map(l=>fmtItemSpan(l.id,l.rarity,l.count)).join('、')}`:`，${resultTxt}`;
-    const html=`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 遭遇了 ${fmtEnemies(enemies)}，使用 ${def.name} 進行了 ${modeDisplay}，${ammoTxt}${hitTxt}${lootTxt}。`;
+    /* v54-merge-aftermath: 反擊描述放逃跑前 */
+    const html=`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 遭遇了 ${fmtEnemies(enemies)}，使用 ${def.name} 進行了 ${modeDisplay}，${ammoTxt}${hitTxt}${_aftermathTxt ? '，' + _aftermathTxt : ''}${lootTxt}。`;
     pushLog(html,loot,'explore');
     return{victory:reallyVictory,loot};
   }catch(e){console.error(e);pushLog(`<span class="lose">戰鬥結算異常：${e.message}</span>`,[],'explore');return{victory:false,loot:[]};}
 }
-/* ★ 探索模式反擊結算 */
+/* v54-aftermath-merged */
 function handleExploreAftermath(hpLost, armorLost, enemyCount){
-  if(hpLost<=0 && armorLost<=0) return;
-  const txt = `受到 ${enemyCount} 名敵人反擊（HP -${hpLost}｜甲 -${armorLost}）`;
+  if(hpLost<=0 && armorLost<=0) return '';
+  const txt = '受到 ' + enemyCount + ' 名敵人反擊（HP -' + hpLost + '｜甲 -' + armorLost + '）';
   if(state.player.hp <= 0){
     state.player.hp = 1;
     state.pendingHealFull = true;
     state.exploreDelayUntil = Date.now() + 60000;
-    pushLog(`<span class="lose">重傷！</span> ${txt}，需休息 60 秒後以滿血繼續。`,[],'explore');
     refreshPlayerStats();
-    return;
+    return txt + '，<span class="lose">重傷！</span>需休息 60 秒後以滿血繼續';
   }
   if(state.player.hp >= state.player.maxHp){
-    pushLog(`<span class="pl">玩家</span> ${txt}。`,[],'explore');
     refreshPlayerStats();
-    return;
+    return txt;
   }
   let usedCount = 0, healed = 0;
   while(state.player.hp < state.player.maxHp){
@@ -1122,12 +1168,11 @@ function handleExploreAftermath(hpLost, armorLost, enemyCount){
     usedCount++;
   }
   state.exploreDelayUntil = Date.now() + 5000;
-  if(state.player.hp >= state.player.maxHp){
-    pushLog(`<span class="pl">玩家</span> ${txt}，使用 ${usedCount} 件消耗品恢復 ${healed} HP（延遲 5 秒）。`,[],'explore');
-  } else {
-    pushLog(`<span class="pl">玩家</span> ${txt}，消耗品用罄，休息 5 秒後以 ${Math.round(state.player.hp)} HP 繼續。`,[],'explore');
-  }
   refreshPlayerStats();
+  if(state.player.hp >= state.player.maxHp){
+    return txt + '，使用 ' + usedCount + ' 件消耗品恢復 ' + healed + ' HP（延遲 5 秒）';
+  }
+  return txt + '，消耗品用罄，休息 5 秒後以 ' + Math.round(state.player.hp) + ' HP 繼續';
 }
 function searchEvent(region,node){
   const r=REGIONS[region];const roll=Math.random();
@@ -1227,7 +1272,7 @@ function buildingTick(){
         }
         if(_cands.length){
           const chosen=_cands[0];
-          const cnt=rndInt(15,30)*Math.max(1,Math.ceil(armoryLv/3));
+          const cnt=rndInt(5,10)*Math.max(1,Math.ceil(armoryLv/5)); /* v54-nerf */
           invAdd(chosen,AMMO[chosen].rarity,cnt);
           notify(`🔫 軍械庫產出：${AMMO[chosen].name}*${cnt}`,'ok');
         }
@@ -1247,8 +1292,14 @@ function processCrafting(){
         const info=c.modInfo;
         const namedId=getOrCreateNamedItem(info.baseId,info.mag,info.scope);
         if(info.fromEquippedSlot){
-          state.player.equipped[info.fromEquippedSlot]=namedId;
-          state.player.equippedRarity[info.fromEquippedSlot]='具名';
+          if(!state.player.equipped[info.fromEquippedSlot]){
+            state.player.equipped[info.fromEquippedSlot]=namedId;
+            state.player.equippedRarity[info.fromEquippedSlot]='具名';
+          } else {
+            /* v56-safeguard: 槽位已被占用 → 具名武器進背包 */
+            invAddRaw(namedId,'具名',1);
+            notify('改造完成：'+itemDef(namedId).name+' 已放入背包（槽位已被占用）','warn');
+          }
         } else {
           if(info.originalId){
             invRemove(info.originalId, info.originalRarity, 1);
@@ -1345,7 +1396,7 @@ function _offlineBuildingSettle(now, baseTime){
           }
           if(_cands.length){
             const chosen = _cands[0];
-            const cnt = rndInt(15, 30) * Math.max(1, Math.ceil(armoryLv / 3));
+            const cnt = rndInt(5, 10) * Math.max(1, Math.ceil(armoryLv / 5)); /* v54-nerf */
             invAdd(chosen, AMMO[chosen].rarity, cnt);
           }
         }

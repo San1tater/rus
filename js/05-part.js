@@ -318,10 +318,6 @@ function tryHitPlayer(dmg, pen){
   spawnHitFx(battle.px, battle.py, isCrit ? `-${Math.round(finalDmg)}!` : `-${Math.round(finalDmg)}`, isCrit ? 'crit' : (res.hpLost > 0 ? 'enemy' : 'armor'));
   if(battle.playerHp <= 0){
     endBattle(false);
-  } else if((res.hpLost > 0 || res.armorLost > 0) && !battle.bossRetreat
-            && battle.bossId !== 'swamp_hydra' && battle.bossId !== 'swamp_hydra_ii'){
-    /* v51: 沼澤九頭不被擊退 */
-    battle.bossRetreat = { targetX: clamp(battle.bx + 0.10, 0.05 + BOSS_MIN_GAP, 0.95) };
   }
 }
 
@@ -419,6 +415,62 @@ function applyBossSkillDamage(sk){
     const newPx = clamp(battle.px + dir * sk.knockback, 0.05, 0.95);
     battle.px = Math.min(newPx, battle.bx - BOSS_MIN_GAP);
   }
+}
+
+
+/* v54-heal */
+/* v57-autoConsume *//* v57-manualHeal *//* v58-autoConsume */
+function autoConsumeInBattle(){
+  if(!battle) return;
+  if(battle.consuming) return;
+  if(performance.now() < (battle.healDisabledUntil||0)) return;
+  if(battle.playerHp >= battle.playerMaxHp){ battle.autoHealing = false; return; }
+  if(!battle.autoHealing && battle.playerHp/battle.playerMaxHp >= (state.preferences.autoConsumeThreshold||0.3)) return;
+  battle.autoHealing = true;
+  const item = findNextConsumable();
+  if(!item){ battle.autoHealing = false; return; }
+  battle.consuming=true;
+  battle.firing=false;
+  if(battle.healTimer) clearTimeout(battle.healTimer);
+  battle.healTimer = setTimeout(function(){
+    if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
+    const medbayLv=getBuildingLv('medbay');
+    const actualHeal=Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
+    battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
+    invRemove(item.id,item.rarity,1);
+    battle.consuming=false;
+    battle.healTimer=null;
+    if(typeof spawnHitFx==='function'){ spawnHitFx(battle.px, battle.py, '+' + actualHeal, 'heal'); }
+    pushLog('<span class="pl">玩家</span> 使用 ' + itemDef(item.id).name + '，恢復 ' + actualHeal + ' HP。',[],'combat');
+    if(battle.playerHp < battle.playerMaxHp){ autoConsumeInBattle(); } else { battle.autoHealing = false; }
+  },1200);
+}
+/* v58-manualHeal */
+function manualHeal(){
+  if(!battle||!battle.active)return;
+  if(battle.settling)return;
+  if(battle.consuming||battle.reloading)return;
+  if(performance.now() < (battle.healDisabledUntil||0)){ notify('治療冷卻中','error'); return; }
+  if(battle.playerHp >= battle.playerMaxHp){ notify('生命值已滿','error'); return; }
+  const item = findNextConsumable();
+  if(!item){ notify('沒有可用的消耗品','error'); return; }
+  battle.consuming=true;
+  battle.firing=false;
+  battle.autoHealing = false;
+  if(battle.healTimer) clearTimeout(battle.healTimer);
+  battle.healTimer = setTimeout(function(){
+    if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
+    const medbayLv=getBuildingLv('medbay');
+    const actualHeal=Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
+    battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
+    invRemove(item.id,item.rarity,1);
+    battle.consuming=false;
+    battle.healTimer=null;
+    if(typeof spawnHitFx==='function'){ spawnHitFx(battle.px, battle.py, '+' + actualHeal, 'heal'); }
+    pushLog('<span class="pl">玩家</span> 使用 ' + itemDef(item.id).name + '，恢復 ' + actualHeal + ' 生命。',[],'combat');
+    if(typeof refreshBattleControlsLive==='function') refreshBattleControlsLive();
+  },1200);
+  if(typeof refreshBattleControlsLive==='function') refreshBattleControlsLive();
 }
 
 function battleLoop(now){
@@ -527,64 +579,7 @@ function battleLoop(now){
   if(bossShield && battle.shieldMaxHp>0)bossShield.style.width=Math.max(0,battle.shieldHp/battle.shieldMaxHp*100)+'%';
   if(!battle.settling&&!battle.consuming&&battle.playerHp/battle.playerMaxHp<(state.preferences.autoConsumeThreshold||0.3))autoConsumeInBattle();
   requestAnimationFrame(battleLoop);
-}
-function autoConsumeInBattle(){
-  if(!battle) return;
-  if(battle.consuming) return;
-  if(performance.now() < (battle.healDisabledUntil||0)) return;
-  if(battle.playerHp >= battle.playerMaxHp){
-    battle.autoHealing = false;
-    return;
-  }
-  if(!battle.autoHealing && battle.playerHp/battle.playerMaxHp >= (state.preferences.autoConsumeThreshold||0.3)) return;
-  battle.autoHealing = true;
-  const item = findNextConsumable();
-  if(!item){ battle.autoHealing = false; return; }
-  battle.consuming=true;
-  battle.firing=false;
-  if(battle.healTimer) clearTimeout(battle.healTimer);
-  battle.healTimer = setTimeout(()=>{
-    if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
-    const medbayLv=getBuildingLv('medbay');
-    const actualHeal=Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
-    battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
-    invRemove(item.id,item.rarity,1);
-    battle.consuming=false;
-    battle.healTimer=null;
-    pushLog(`<span class="pl">玩家</span> 使用 ${itemDef(item.id).name}，恢復 ${actualHeal} HP。`,[],'combat');
-    if(battle.playerHp < battle.playerMaxHp){
-      autoConsumeInBattle();
-    } else {
-      battle.autoHealing = false;
-    }
-  },1200);
-}
-function manualHeal(){
-  if(!battle||!battle.active)return;
-  if(battle.settling)return;
-  if(battle.consuming||battle.reloading)return;
-  if(performance.now() < (battle.healDisabledUntil||0)){ notify('治療冷卻中','error'); return; }
-  if(battle.playerHp >= battle.playerMaxHp){ notify('生命值已滿','error'); return; }
-  const item = findNextConsumable();
-  if(!item){ notify('沒有可用的消耗品','error'); return; }
-  battle.consuming=true;
-  battle.firing=false;
-  battle.autoHealing = false;
-  if(battle.healTimer) clearTimeout(battle.healTimer);
-  battle.healTimer = setTimeout(()=>{
-    if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
-    const medbayLv=getBuildingLv('medbay');
-    const actualHeal=Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
-    battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
-    invRemove(item.id,item.rarity,1);
-    battle.consuming=false;
-    battle.healTimer=null;
-    pushLog(`<span class="pl">玩家</span> 使用 ${itemDef(item.id).name}，恢復 ${actualHeal} 生命。`,[],'combat');
-    refreshBattleControlsLive();
-  },1200);
-  refreshBattleControlsLive();
-}
-function fireInterval(mode,weapon){
+}function fireInterval(mode,weapon){
   const def=weapon?weapon.def:null;
   const rpm=def&&def.rpm?def.rpm:600;
   const maxInterval=60000/rpm;
@@ -1146,6 +1141,15 @@ function applyBossDamage(dmg,isCrit,pen){
   battle.damageDealt += (res.armorLost + res.hpLost);
   const shownDmg = res.hpLost > 0 ? res.hpLost : res.armorLost;
   spawnHitFx(battle.bx,battle.by,`-${Math.round(shownDmg)}${isCrit?'!':''}`,isCrit?'crit':(res.hpLost>0?'':'armor'));
+  /* v56-retreat: 按 hp 傷害 / bossMaxHp 比例擊退（僅生命傷害觸發） */
+  if(res.hpLost > 0 && !battle.bossRetreat
+     && battle.bossId !== 'swamp_hydra' && battle.bossId !== 'swamp_hydra_ii'){
+    const hpPct = res.hpLost / Math.max(1, battle.bossMaxHp);
+    const retreatDist = Math.min(0.20, hpPct * 8);
+    if(retreatDist >= 0.01){
+      battle.bossRetreat = { targetX: clamp(battle.bx + retreatDist, 0.05 + BOSS_MIN_GAP, 0.95) };
+    }
+  }
   if(battle.bossHp<=0)endBattle(true);
 }
 function breakBossShield(){

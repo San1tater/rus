@@ -309,8 +309,9 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
       /* v26-sort-scopes */
       const _scopesRaw = rules.scopes.slice();
       _scopesRaw.sort((a,b)=>{
-        const ia = RARITY_ORDER.indexOf(SCOPE_RARITY && SCOPE_RARITY[a]);
-        const ib = RARITY_ORDER.indexOf(SCOPE_RARITY && SCOPE_RARITY[b]);
+        /* v54-fix-scope-sort */
+        const ia = SCOPE_BONUS[a] || 0;
+        const ib = SCOPE_BONUS[b] || 0;
         if(ia !== ib) return ib - ia;
         return (SCOPE_NAME[a] || a).localeCompare(SCOPE_NAME[b] || b, 'zh-Hant');
       });
@@ -330,7 +331,7 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
       body+=`<div style="color:#a45ede;font-weight:bold;font-size:12px;margin:4px 0">${newName}</div>`;
       let ok=true;
       for(const [k,v] of Object.entries(totalCost)){const have=materialEquivalent(k);const ok2=have>=v;if(!ok2)ok=false;body+=`<div class="stat-line"><span class="k">${MATERIALS[k].name}</span><span class="v" style="color:${ok2?'#4caf50':'#e05252'}">${have}/${v}</span></div>`;}
-      body+=`<div class="stat-line"><span class="k">花費時間</span><span class="v">${totalTime} 秒</span></div>`;
+      {const _ft=totalTime>=3600?Math.round(totalTime/3600)+' 小時':(totalTime>=60?Math.round(totalTime/60)+' 分鐘':totalTime+' 秒');body+=`<div class="stat-line"><span class="k">花費時間</span><span class="v">${_ft}</span></div>`;}
       return {body,ok,totalCost,totalTime};
     }
     return {body,ok:false,totalCost:{},totalTime:0};
@@ -478,10 +479,11 @@ function onlineTick(){
 
 let _tickTimer = null;
 function _getNextDelay(){
+  /* v59-delay-add: 治療延遲疊加在基礎探索時長上 */
   const now = Date.now();
   const interval = getExploreInterval();
   if(state.exploreDelayUntil && state.exploreDelayUntil > now){
-    return state.exploreDelayUntil - now;
+    return interval + (state.exploreDelayUntil - now);
   }
   return interval;
 }

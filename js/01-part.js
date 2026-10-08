@@ -337,12 +337,16 @@ function calcModCost(baseId,mag,scope){
   }
   return cost;
 }
+/* v56-mod-speedup: Lv.1=24h, Lv.50=5min */
 function calcModTime(baseId,mag,scope){
-  let t=0;
-  const bm=WEAPONS[baseId].mag;
-  if(mag && mag>bm) t+=60+(mag-bm)*2;
-  if(scope) t+=120;
-  return t;
+  const wbLv = Math.min(50, Math.max(1, getBuildingLv('workbench') || 1));
+  const ratio = Math.pow(300/86400, (wbLv-1)/49);
+  let baseSec = 86400 * ratio;
+  const bm = WEAPONS[baseId].mag;
+  let extra = 0;
+  if(mag && mag > bm) extra += 0.05 + (mag-bm) * 0.002;
+  if(scope) extra += 0.10;
+  return Math.round(baseSec * (1 + extra));
 }
 function getMagOptionsForWeapon(weaponId){
   const def = WEAPONS[weaponId];
@@ -380,11 +384,11 @@ const ENEMIES={
 };
 
 const REGIONS={
-  '廢棄工廠':{name:'廢棄工廠',desc:'生鏽的機械與堆積的貨櫃',enemies:['mutant_squirrel','mutant_rat','raider','ghoul'],loot:['wood','wood','wood','metal','metal','screws','cloth','9x18_pst','9x18_ps','9x19_pbp','9x19_pst','12ga_buck','12ga_7mm','5.45_hp','23x75_shrapnel25','pp19','aks74u','aks74un','mp133','toz106','mp153','pm','pb','6kh2','kukri','rgd5','ssh68','ssh68m','balaclava','shemagh','ballglasses','paca','cargopants','workboots','tactboots','ai2','bandage','water','painkiller'],combat:{attack:0.55,stealth:0.22},seal:'seal_factory',sealRate:0.03,enemyHpMult:1.0},
-  '廢棄實驗室':{name:'廢棄實驗室',desc:'冷白的燈管與腐蝕的培養槽',enemies:['ghoul','raider','raider_vet','mutant_rat'],loot:['electronics','electronics','metal','screws','cloth','gears','9x18_pmm','9x18_psv','9x19_ap63','9x19_pbp','9x39_fmj','9x39_sp5','9x39_pab9','9x39_spp','9a91','sr3m','vss','asval','pb','mp155','kukri','6kh5','f1','rgd5','vog17','kolpak','6b47','6b47m','balaclava','gp7','6b23','6b231','tactboots','salewa','ifak','painkiller','splint'],combat:{attack:0.6,stealth:0.28},seal:'seal_lab',sealRate:0.02,enemyHpMult:1.5},
-  '郊區公路':{name:'郊區公路',desc:'翻覆的車隊與荒廢的加油站',enemies:['raider','raider_vet','mutant_wolf','mutant_rat'],loot:['wood','wood','metal','gears','cloth','screws','5.45_ps','5.45_bt','7.62_hp','7.62_fmj','7.62_ps','9x19_pst','9x19_ap63','12ga_buck','12ga_express','23x75_shrapnel10','akm','akms','akmn','ak74','ak74n','ak74m','ak105','ak12','pp19','mp443','aps','mp133','mp153','rgd5','f1','rgo','kiver','kolpak','shemagh','6b13','6b13m','6b23','cargopants','tactboots','painkiller','tushonka','water','ai2','splint'],combat:{attack:0.62,stealth:0.3},seal:'seal_road',sealRate:0.02,enemyHpMult:2.5},
-  '輻射沼澤':{name:'輻射沼澤',desc:'發綠的水窪與扭曲的枯樹',enemies:['mutant_bear','mutant_wolf','ghoul','raider_vet'],loot:['wood','electronics','gears','cloth','metal','7.62x54_hp','7.62x54_fmj','7.62x54_ps','7.62x54_bt','7.62_bp','9x39_spp','9x39_sp6','12ga_express','12ga_magnum','23x75_shrapnel10','23x75_shrapnel25','sv98','svd','ak103','ak104','vss','saiga12','asval','mp155','ks23','f1','rgo','kiver','6b23','6b231','salewa','ifak','surv12','tushonka','splint'],combat:{attack:0.7,stealth:0.35},seal:'seal_swamp',sealRate:0.015,enemyHpMult:4.0,needUnlock:true,unlockHint:'擊敗 實驗室女王 · 白蝕 解鎖'},
-  '廢土核心':{name:'廢土核心',desc:'鋼鐵巨構與永不熄滅的火光',enemies:['mutant_bear','raider_vet','raider_vet','mutant_wolf'],loot:['electronics','gears','metal','cloth','7.62x54_bs','7.62_ma','5.45_bp','5.45_7n39','7.62_bp','12ga_magnum','12.7_ps12','9x18_sp7','9x19_cci','9x19_pso','9x39_sp6','9x39_spp','23x75_barrikada','rpd','rpk16','svd','sv98','vss','asval','saiga12','ks23','mp155','vog25','f1','rgo','maska','zhuk3','6b232','haix','salewa','ifak','surv12'],combat:{attack:0.75,stealth:0.4},seal:'seal_core',sealRate:0.008,enemyHpMult:6.0,needUnlock:true,unlockHint:'擊敗 沼澤九頭 · 腐母 解鎖'},
+  '廢棄工廠':{name:'廢棄工廠',desc:'生鏽的機械與堆積的貨櫃',enemies:['mutant_squirrel','mutant_rat','raider','ghoul'],loot:['wood','wood','wood','metal','metal','screws','cloth','9x18_pst','9x18_ps','9x19_pbp','9x19_pst','12ga_buck','12ga_7mm','20x70_5.6','20x70_6.2','5.45_hp','23x75_shrapnel25','pp19','aks74u','aks74un','mp133','toz106','mp153','pm','pb','6kh2','kukri','rgd5','ssh68','ssh68m','balaclava','shemagh','ballglasses','paca','cargopants','workboots','tactboots','ai2','bandage','water','painkiller'],combat:{attack:0.55,stealth:0.22},seal:'seal_factory',sealRate:0.03,enemyHpMult:1.0},
+  '廢棄實驗室':{name:'廢棄實驗室',desc:'冷白的燈管與腐蝕的培養槽',enemies:['ghoul','raider','raider_vet','mutant_rat'],loot:['electronics','electronics','metal','screws','cloth','gears','9x18_pmm','9x18_psv','9x19_ap63','9x19_pbp','20x70_5.6','20x70_6.2','9x39_fmj','9x39_sp5','9x39_pab9','9x39_spp','9a91','sr3m','vss','asval','pb','mp155','kukri','6kh5','f1','rgd5','vog17','kolpak','6b47','6b47m','balaclava','gp7','6b23','6b231','tactboots','salewa','ifak','painkiller','splint'],combat:{attack:0.6,stealth:0.28},seal:'seal_lab',sealRate:0.02,enemyHpMult:1.5},
+  '郊區公路':{name:'郊區公路',desc:'翻覆的車隊與荒廢的加油站',enemies:['raider','raider_vet','mutant_wolf','mutant_rat'],loot:['wood','wood','metal','gears','cloth','screws','5.45_ps','5.45_bt','7.62_hp','7.62_fmj','7.62_ps','9x19_pst','9x19_ap63','12ga_buck','12ga_express','20x70_5.6','20x70_6.2','23x75_shrapnel10','akm','akms','akmn','ak74','ak74n','ak74m','ak105','ak12','pp19','mp443','aps','mp133','mp153','rgd5','f1','rgo','kiver','kolpak','shemagh','6b13','6b13m','6b23','cargopants','tactboots','painkiller','tushonka','water','ai2','splint'],combat:{attack:0.62,stealth:0.3},seal:'seal_road',sealRate:0.02,enemyHpMult:2.5},
+  '輻射沼澤':{name:'輻射沼澤',desc:'發綠的水窪與扭曲的枯樹',enemies:['mutant_bear','mutant_wolf','ghoul','raider_vet'],loot:['wood','electronics','gears','cloth','metal','7.62x54_hp','7.62x54_fmj','7.62x54_ps','7.62x54_bt','7.62_bp','9x39_spp','9x39_sp6','12ga_express','12ga_magnum','20x70_5.6','20x70_6.2','23x75_shrapnel10','23x75_shrapnel25','sv98','svd','ak103','ak104','vss','saiga12','asval','mp155','ks23','f1','rgo','kiver','6b23','6b231','salewa','ifak','surv12','tushonka','splint'],combat:{attack:0.7,stealth:0.35},seal:'seal_swamp',sealRate:0.015,enemyHpMult:4.0,needUnlock:true,unlockHint:'擊敗 實驗室女王 · 白蝕 解鎖'},
+  '廢土核心':{name:'廢土核心',desc:'鋼鐵巨構與永不熄滅的火光',enemies:['mutant_bear','raider_vet','raider_vet','mutant_wolf'],loot:['electronics','gears','metal','cloth','7.62x54_bs','7.62_ma','5.45_bp','5.45_7n39','7.62_bp','12ga_magnum','20x70_5.6','20x70_6.2','12.7_ps12','9x18_sp7','9x19_cci','9x19_pso','9x39_sp6','9x39_spp','23x75_barrikada','rpd','rpk16','svd','sv98','vss','asval','saiga12','ks23','mp155','vog25','f1','rgo','maska','zhuk3','6b232','haix','salewa','ifak','surv12'],combat:{attack:0.75,stealth:0.4},seal:'seal_core',sealRate:0.008,enemyHpMult:6.0,needUnlock:true,unlockHint:'擊敗 沼澤九頭 · 腐母 解鎖'},
 };
 
 REGIONS['廢棄工廠II']={name:'廢棄工廠 II',desc:'二級入口：更深處的機械墓場',enemies:['ghoul','raider','raider_vet','mutant_wolf'],loot:['electronics','gears','metal','cloth','5.45_bt','5.45_bp','7.62_ps','7.62_bp','7.62x54_ps','7.62x54_bt','9x39_pab9','9x39_spp','ak74m','ak103','rpk16','vss','asval','saiga12','ks23','6b47','kiver','6b23','6b231','6b232','salewa','ifak','surv12','vog25','f1','rgo'],combat:{attack:0.65,stealth:0.28},seal:'seal_factory_ii',sealRate:0.02,enemyHpMult:4.0,needUnlock:true,unlockHint:'擊敗 核心終焉 · OMEGA 解鎖',spawnWeights:{1:0.40,2:0.35,3:0.20,4:0.05},maxEnemies:4};
