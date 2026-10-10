@@ -4,14 +4,14 @@
 const BOSSES={
   factory_king:{name:'鐵匠',region:'廢棄工廠',hp:10000,armor:2000,armorLevel:4,dmg:125,pen:2,critRate:0.10,critMult:1.5,seal:'seal_factory',unlock:'廢棄實驗室',drops:['zhuk6a','svd','altyn','rpk16','maska']},
   lab_queen:{name:'醫師',region:'廢棄實驗室',hp:25000,armor:6000,armorLevel:5,dmg:225,pen:3,critRate:0.12,critMult:1.6,seal:'seal_lab',unlock:'郊區公路',drops:['altyn','zsh12m','rpk16','asval','maska','6b232']},
-  road_tyrant:{name:'鉗子',region:'郊區公路',hp:50000,armor:12500,armorLevel:6,dmg:350,pen:4,critRate:0.15,critMult:1.8,seal:'seal_road',unlock:'輻射沼澤',drops:['zhuk6a','svd','pkp','rpk16','belleville','zhuk3','reductm']},
+  road_tyrant:{name:'鉗子',region:'郊區公路',hp:50000,armor:12500,armorLevel:6,dmg:350,pen:4,critRate:0.15,critMult:1.8,seal:'seal_road',unlock:'輻射沼澤',drops:['zhuk6a','svd','pkp','rpk16','belleville','zhuk3','redutm']},
   swamp_hydra:{name:'蝮蛇',region:'輻射沼澤',hp:90000,armor:20000,armorLevel:6,dmg:500,pen:5,critRate:0.18,critMult:2.0,seal:'seal_swamp',unlock:'廢土核心',drops:['altyn','zsh12m','svd','pkp','6b43','zhuk6a','maska']},
-  core_omega:{name:'熔爐',region:'廢土核心',hp:160000,armor:120000,armorLevel:7,dmg:650,pen:6,critRate:0.20,critMult:2.2,seal:'seal_core',unlock:null,unlockTier2:'廢棄工廠',drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','6b45','reductm','rgn']},
-  factory_king_ii:{name:'鐵匠 II',region:'廢棄工廠',tier:2,hp:25000,armor:8000,armorLevel:5,dmg:160,pen:3,critRate:0.12,critMult:1.6,seal:'seal_factory_ii',unlock:'廢棄實驗室',drops:['zhuk6a','svd','altyn','rpk16','maska','6b43','reductm']},
+  core_omega:{name:'熔爐',region:'廢土核心',hp:160000,armor:120000,armorLevel:7,dmg:650,pen:6,critRate:0.20,critMult:2.2,seal:'seal_core',unlock:null,unlockTier2:'廢棄工廠',drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','6b45','redutm','rgn']},
+  factory_king_ii:{name:'鐵匠 II',region:'廢棄工廠',tier:2,hp:25000,armor:8000,armorLevel:5,dmg:160,pen:3,critRate:0.12,critMult:1.6,seal:'seal_factory_ii',unlock:'廢棄實驗室',drops:['zhuk6a','svd','altyn','rpk16','maska','6b43','redutm']},
   lab_queen_ii:{name:'醫師 II',region:'廢棄實驗室',tier:2,hp:50000,armor:15000,armorLevel:6,dmg:280,pen:4,critRate:0.14,critMult:1.7,seal:'seal_lab_ii',unlock:'郊區公路',drops:['altyn','zsh12m','rpk16','asval','maska','6b232','zhuk3','6b45']},
   road_tyrant_ii:{name:'鉗子 II',region:'郊區公路',tier:2,hp:90000,armor:25000,armorLevel:6,dmg:420,pen:5,critRate:0.16,critMult:1.9,seal:'seal_road_ii',unlock:'輻射沼澤',drops:['zhuk6a','svd','pkp','rpk16','belleville','zhuk3','6b43','6b45']},
-  swamp_hydra_ii:{name:'蝮蛇 II',region:'輻射沼澤',tier:2,hp:160000,armor:40000,armorLevel:7,dmg:560,pen:5,critRate:0.18,critMult:2.0,seal:'seal_swamp_ii',unlock:'廢土核心',drops:['altyn','zsh12m','svd','pkp','6b43','zhuk6a','maska','defender2','6b45','reductm']},
-  core_omega_ii:{name:'熔爐 II',region:'廢土核心',tier:2,hp:280000,armor:240000,armorLevel:7,dmg:750,pen:6,critRate:0.22,critMult:2.4,seal:'seal_core_ii',unlock:null,drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','6b45','reductm','rgn']},
+  swamp_hydra_ii:{name:'蝮蛇 II',region:'輻射沼澤',tier:2,hp:160000,armor:40000,armorLevel:7,dmg:560,pen:5,critRate:0.18,critMult:2.0,seal:'seal_swamp_ii',unlock:'廢土核心',drops:['altyn','zsh12m','svd','pkp','6b43','zhuk6a','maska','defender2','6b45','redutm']},
+  core_omega_ii:{name:'熔爐 II',region:'廢土核心',tier:2,hp:280000,armor:240000,armorLevel:7,dmg:750,pen:6,critRate:0.22,critMult:2.4,seal:'seal_core_ii',unlock:null,drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','6b45','redutm','rgn']},
 };
 for(const bid in BOSSES){if(!BOSSES[bid].tier)BOSSES[bid].tier=1;}
 
@@ -1268,6 +1268,7 @@ const HEAD_ARMOR_LAYOUT = {
   '6b231':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
   '6b232':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
   '6b43':     { layer:"torso", behind:false, scale:0.65, ox:0, oy:0.47, rotation:0 },
+  '6b45':     { layer:"torso", behind:false, scale:0.35, ox:0.04, oy:0.26, rotation:0 },
   '6b47':     { layer:"head", behind:false, scale:0.28, ox:-0.019509, oy:-0.61, rotation:4 },
   '6b47m':    { layer:"head", behind:false, scale:0.28, ox:-0.019509, oy:-0.61, rotation:4 },
   'altyn':    { layer:"head", behind:false, scale:0.34, ox:-0.02, oy:-0.68, rotation:4 },
@@ -1276,6 +1277,7 @@ const HEAD_ARMOR_LAYOUT = {
   'kolpak':   { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
   'maska':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
   'paca':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  'redutm':   { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
   'ssh68':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
   'ssh68m':   { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.68, rotation:4 },
   'zhuk3':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
