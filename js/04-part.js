@@ -291,8 +291,8 @@ function renderCombatInfoPanel(z3){
     {key:'throwable', label:'投擲物'}
   ];
   let html = '<div class="z3-head"><div class="z3-title">⚔️ 彈藥準備</div></div>';
-  html += '<div style="padding:2px 8px;font-size:9px;color:#7a6f60;line-height:1.2;flex:0 0 auto">依序設定優先彈種，留空則自動分配</div>';
-  html += '<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-start;padding:8px;gap:4px;overflow:hidden">';
+  html += '<div style="padding:2px 4px;font-size:9px;color:#7a6f60;line-height:1.2;flex:0 0 auto">依序設定優先彈種，留空則自動分配</div>';
+  html += '<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-start;padding:4px;gap:2px;overflow:hidden">';
   for(const s of slots){
     html += renderAmmoOrderRow(s.key, s.label);
   }
@@ -351,9 +351,9 @@ function getAmmoShortName(id, slot){
 function renderAmmoOrderRow(slot, label){
   const equipped = state.player.equipped[slot];
   const order = getAmmoOrder(slot);
-  let html = '<div class="ammo-order-row">';
-  html += '<div class="lbl">' + label + '</div>';
-  html += '<div class="ammo-order-slots">';
+  let html = '<div class="ammo-order-row" style="display:flex;align-items:flex-start;gap:3px;margin-bottom:4px">';
+  html += '<div class="lbl" style="flex:0 0 18px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:center;writing-mode:vertical-rl;text-orientation:upright;line-height:1;letter-spacing:1px">' + label + '</div>';
+  html += '<div class="ammo-order-slots" style="display:flex;gap:3px;flex:1;min-width:0">';
   for(let i = 0; i < 3; i++){
     const aid = order[i];
     let inner = '<span class="empty-lbl">空</span>';
@@ -367,7 +367,7 @@ function renderAmmoOrderRow(slot, label){
       cls += ' filled';
     }
     const dis = !equipped ? 'opacity:.35;pointer-events:none;' : '';
-    html += '<div class="' + cls + '" data-slot="' + slot + '" data-idx="' + i + '" style="' + style + dis + '">' + inner + '</div>';
+    html += '<div class="' + cls + '" data-slot="' + slot + '" data-idx="' + i + '" style="width:36px;height:46px;' + style + dis + '">' + inner + '</div>';
   }
   html += '</div></div>';
   return html;
