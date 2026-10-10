@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>HTML 模塊化拆分工具 v3.2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  padding: 16px;
+  max-width: 900px;
+  margin: 0 auto;
+  background: #fafafa;
+  color: #333;
+  font-size: 13px;
+  line-height: 1.6;
+}
+h1 { font-size: 18px; margin-bottom: 16px; }
+h2 { font-size: 13px; margin: 0 0 8px; color: #666; }
+.section {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+button {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 6px;
+}
+button:hover { background: #1d4ed8; }
+button:disabled { background: #ccc; cursor: not-allowed; }
+button.ghost {
+  background: #fff;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+}
+button.ghost:hover { background: #eff6ff; }
+input[type=file] { font-size: 12px; }
+label { display: block; padding: 4px 0; cursor: pointer; user-select: none; }
+pre {
+  margin-top: 8px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow: auto;
+}
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #f8f8f8;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+.file-row .name {
+  flex: 1;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+.file-row .size {
+  color: #888;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.file-row button {
+  padding: 4px 10px;
+  font-size: 11px;
+  margin: 0;
+}
+.hint {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+.err { color: #dc2626; font-weight: bold; }
+.ok { color: #16a34a; }
+.warn { color: #d97706; }
+.chk-row { margin-top: 8px; font-size: 12px; color: #555; }
+.chk-row input { vertical-align: middle; margin-right: 4px; }
+</style>
+</head>
+<body>
+
+<h1>HTML 模塊化拆分工具 v3.2</h1>
+
+<div class="section">
+  <h2>1. 選擇原始 HTML 文件</h2>
+  <input type="file" id="fileInput" accept=".html,.htm,.txt">
+  <div id="fileInfo" class="hint"></div>
+</div>
+
+<div class="section">
+  <h2>2. 分析結果</h2>
+  <pre id="analysis">請先選擇文件…</pre>
+</div>
+
+<div class="section">
+  <h2>3. 拆分模式</h2>
+  <label><input type="radio" name="mode" value="A" checked>
+    <strong>A：最小拆分</strong> — index.html + styles.css + game.js
+  </label>
+  <label><input type="radio" name="mode" value="B">
+    <strong>B：按段拆 JS</strong> — 依 <code>/* ===…=== */</code> 段標記拆多檔
+  </label>
+  <div class="chk-row">
+    <label>
+      <input type="checkbox" id="strictChk">
+      為輸出 JS 加上 <code>"use strict";</code>（會改變原腳本語意，預設關閉）
+    </label>
+  </div>
+</div>
+
+<div class="section">
+  <h2>4. 執行拆分</h2>
+  <button id="splitBtn" disabled>拆分</button>
+  <div class="hint">
+    拆分後逐一提供下載。用 <code>file://</code> 開時部分瀏覽器會擋外部腳本，建議用 <code>python -m http.server</code>。
+  </div>
+</div>
+
+<div class="section">
+  <h2>5. 結果</h2>
+  <div id="result"></div>
+</div>
+
+<script>
+"use strict";
+
+var $ = function(id) { return document.getElementById(id); };
+var originalHtml = '';
+var originalName = '';
+
+// 產生 HTML 內 script 的結束標籤（避免原始碼中出現未轉義的結束序列）
+var SCRIPT_CLOSE = '<' + '/script>';
+
+// ============================================================
+// 通用工具
+// ============================================================
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function formatError(prefix, err) {
+  var msg = escapeHtml(prefix + (err && err.message ? err.message : err));
+  var stack = err && err.stack ? escapeHtml(err.stack).replace(/\n/g, '<br>') : '';
+  return '<span class="err">' + msg + (stack ? '<br>' + stack : '') + '</span>';
+}
+
+// ============================================================
+// 抽取：analyze 與 doSplit 共用同一套正則
+// ============================================================
+function extractParts(html) {
+  var parts = {
+    styles: [],
+    inlineScripts: [],
+    externalScripts: [],
+    styleOpen: 0,
+    styleClose: 0,
+    scriptOpen: 0,
+    scriptClose: 0
+  };
+
+  parts.styleOpen   = (html.match(/<style\b[^>]*>/gi) || []).length;
+  parts.styleClose  = (html.match(/<\/style\s*>/gi) || []).length;
+  parts.scriptOpen  = (html.match(/<script\b[^>]*>/gi) || []).length;
+  parts.scriptClose = (html.match(/<\/script\s*>/gi) || []).length;
+
+  var m;
+  var styleRe = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
+  while ((m = styleRe.exec(html)) !== null) {
+    parts.styles.push({ attrs: m[1] || '', content: m[2] });
+  }
+
+  var scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+  while ((m = scriptRe.exec(html)) !== null) {
+    var attrs = m[1] || '';
+    if (/\bsrc\s*=/i.test(attrs)) {
+      parts.externalScripts.push({ attrs: attrs, fullTag: m[0] });
+    } else {
+      parts.inlineScripts.push({ attrs: attrs, content: m[2] });
+    }
+  }
+
+  return parts;
+}
+
+function stripTags(html) {
+  html = html.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>[ \t]*\n?/gi, '');
+  html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>[ \t]*\n?/gi,
+    function(full, attrs) {
+      return /\bsrc\s*=/i.test(attrs) ? full : '';
+    });
+  return html;
+}
+
+// ============================================================
+// 分析
+// ============================================================
+function analyze() {
+  var parts = extractParts(originalHtml);
+  var lines = [];
+  var warnings = [];
+  var errors = [];
+
+  lines.push('原始大小：' + originalHtml.length.toLocaleString() + ' 字元');
+  lines.push('');
+
+  // --- CSS ---
+  var cssSize = 0;
+  for (var i = 0; i < parts.styles.length; i++) cssSize += parts.styles[i].content.length;
+  lines.push('CSS：' + parts.styles.length + ' 塊，共 ' + cssSize.toLocaleString() + ' 字元');
+  lines.push('  <style> 開 ' + parts.styleOpen + ' / 閉 ' + parts.styleClose +
+             (parts.styleOpen === parts.styleClose ? ' ✓' : ' ✗ 不一致'));
+  if (parts.styleOpen !== parts.styleClose) errors.push('<style> 開閉數量不一致');
+  lines.push('');
+
+  // --- JS ---
+  var jsSize = 0;
+  for (var j = 0; j < parts.inlineScripts.length; j++) {
+    jsSize += parts.inlineScripts[j].content.length;
+  }
+  lines.push('JS：內聯 ' + parts.inlineScripts.length + ' 塊（' + jsSize.toLocaleString() +
+             ' 字元），外部引用 ' + parts.externalScripts.length + ' 個');
+  lines.push('  <script> 開 ' + parts.scriptOpen + ' / 閉 ' + parts.scriptClose +
+             (parts.scriptOpen === parts.scriptClose ? ' ✓' : ' ✗ 不一致'));
+  if (parts.scriptOpen !== parts.scriptClose) errors.push('<script> 開閉數量不一致');
+  if (parts.externalScripts.length > 0) {
+    lines.push('  ※ 外部 <script src> 會原樣保留於 index.html');
+  }
+  lines.push('');
+
+  // --- 合併 JS ---
+  var combinedJs = '';
+  for (var k = 0; k < parts.inlineScripts.length; k++) {
+    if (k > 0) combinedJs += '\n\n';
+    combinedJs += parts.inlineScripts[k].content;
+  }
+
+  var jsLines = combinedJs.split('\n');
+  var marks = 0;
+  for (var L = 0; L < jsLines.length; L++) {
+    if (/^\s*\/\*\s*={20,}/.test(jsLines[L])) marks++;
+  }
+  lines.push('段標記（/* ===…=== */）：' + marks + ' 個');
+  if (marks === 0) warnings.push('模式 B 將退化為 A（找不到段標記）');
+  lines.push('');
+
+  // --- 結構檢查 ---
+  var structs = [
+    ['<head>',  /<head\b[^>]*>/i],
+    ['</head>', /<\/head\s*>/i],
+    ['<body>',  /<body\b[^>]*>/i],
+    ['</body>', /<\/body\s*>/i]
+  ];
+  lines.push('結構檢查：');
+  for (var s = 0; s < structs.length; s++) {
+    var has = structs[s][1].test(originalHtml);
+    lines.push('  ' + structs[s][0] + ' ' + (has ? '✓' : '✗ 缺少'));
+    if (!has) warnings.push('缺少 ' + structs[s][0]);
+  }
+  lines.push('');
+
+  // --- 語意風險警告 ---
+  if (parts.inlineScripts.length > 1) {
+    warnings.push('偵測到多個內聯 script，合併後頂層 let/const/class 可能衝突');
+  }
+  for (var t = 0; t < parts.inlineScripts.length; t++) {
+    if (/\btype\s*=\s*["']?module/i.test(parts.inlineScripts[t].attrs)) {
+      warnings.push('偵測到 type="module" 的內聯 script，合併可能改變作用域語意');
+      break;
+    }
+  }
+
+  if (warnings.length > 0) {
+    lines.push('⚠ 警告：');
+    for (var w = 0; w < warnings.length; w++) lines.push('  · ' + warnings[w]);
+    lines.push('');
+  }
+  if (errors.length > 0) {
+    lines.push('✗ 錯誤：');
+    for (var e = 0; e < errors.length; e++) lines.push('  · ' + errors[e]);
+    lines.push('');
+  }
+  if (warnings.length === 0 && errors.length === 0) {
+    lines.push('✓ 準備完成——選擇模式後點擊「拆分」');
+  } else {
+    lines.push('⚠ 仍可拆分，但請自行檢查結果');
+  }
+
+  $('analysis').textContent = lines.join('\n');
+}
+
+// ============================================================
+// 段拆分
+// ============================================================
+function splitJsByMarkers(js) {
+  var lines = js.split('\n');
+  var segs = [];
+  var cur = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (/^\s*\/\*\s*={20,}/.test(line) && cur.length > 0) {
+      segs.push(cur.join('\n'));
+      cur = [];
+    }
+    cur.push(line);
+  }
+  if (cur.length) segs.push(cur.join('\n'));
+  return segs;
+}
+
+function ensureStrict(code) {
+  if (/^\s*(['"])use strict\1\s*;/.test(code)) return code;
+  return '"use strict";\n' + code;
+}
+
+// ============================================================
+// 主流程
+// ============================================================
+function doSplit() {
+  var mode = document.querySelector('input[name="mode"]:checked').value;
+  var forceStrict = $('strictChk').checked;
+
+  var parts = extractParts(originalHtml);
+
+  // --- 合併 CSS ---
+  var combinedCss = '';
+  for (var c = 0; c < parts.styles.length; c++) {
+    if (c > 0) combinedCss += '\n\n';
+    combinedCss += parts.styles[c].content;
+  }
+  var hasCss = combinedCss.trim() !== '';
+
+  // --- 合併 JS ---
+  var combinedJs = '';
+  for (var i = 0; i < parts.inlineScripts.length; i++) {
+    if (i > 0) combinedJs += '\n\n';
+    combinedJs += parts.inlineScripts[i].content;
+  }
+  var hasJs = combinedJs.trim() !== '';
+
+  // --- 內聯 script 公共屬性 ---
+  var sharedAttrs = '';
+  if (parts.inlineScripts.length > 0) {
+    var first = parts.inlineScripts[0].attrs.trim();
+    var same = true;
+    for (var q = 1; q < parts.inlineScripts.length; q++) {
+      if (parts.inlineScripts[q].attrs.trim() !== first) { same = false; break; }
+    }
+    if (same && first) sharedAttrs = ' ' + first;
+  }
+
+  // --- 產生 JS 檔 ---
+  var jsFiles = [];
+  if (hasJs) {
+    if (mode === 'A') {
+      jsFiles.push({
+        name: 'game.js',
+        content: forceStrict ? ensureStrict(combinedJs) : combinedJs
+      });
+    } else {
+      var segs = splitJsByMarkers(combinedJs);
+      if (segs.length <= 1) {
+        jsFiles.push({
+          name: 'game.js',
+          content: forceStrict ? ensureStrict(combinedJs) : combinedJs
+        });
+      } else {
+        for (var s = 0; s < segs.length; s++) {
+          var num = String(s + 1);
+          while (num.length < 2) num = '0' + num;
+          jsFiles.push({
+            name: num + '-part.js',
+            content: forceStrict ? ensureStrict(segs[s]) : segs[s]
+          });
+        }
+      }
+    }
+  }
+
+  // --- 修改 HTML ---
+  var newHtml = stripTags(originalHtml);
+
+  // 注入外部樣式表連結（僅當真的有 CSS 時）
+  if (hasCss) {
+    var linkTag = '  <link rel="stylesheet" href="styles.css">';
+    if (/<\/head\s*>/i.test(newHtml)) {
+      newHtml = newHtml.replace(/(<\/head\s*>)/i, linkTag + '\n$1');
+    } else if (/<body\b[^>]*>/i.test(newHtml)) {
+      newHtml = newHtml.replace(/(<body\b[^>]*>)/i, linkTag + '\n$1');
+    } else {
+      newHtml = linkTag + '\n' + newHtml;
+    }
+  }
+
+  // 注入外部 JS 引用（僅當真的有 JS 檔時）
+  if (jsFiles.length > 0) {
+    var scriptTags = [];
+    for (var t = 0; t < jsFiles.length; t++) {
+      scriptTags.push(
+        '  <script src="js/' + jsFiles[t].name + '"' + sharedAttrs + '>' + SCRIPT_CLOSE
+      );
+    }
+    var block = scriptTags.join('\n');
+    if (/<\/body\s*>/i.test(newHtml)) {
+      newHtml = newHtml.replace(/(<\/body\s*>)/i, block + '\n$1');
+    } else {
+      newHtml += '\n' + block;
+    }
+  }
+
+  // --- 組裝輸出 ---
+  var output = [];
+  output.push({ path: 'index.html', content: newHtml, mime: 'text/html' });
+  if (hasCss) {
+    output.push({ path: 'styles.css', content: combinedCss, mime: 'text/css' });
+  }
+  for (var r = 0; r < jsFiles.length; r++) {
+    output.push({
+      path: 'js/' + jsFiles[r].name,
+      content: jsFiles[r].content,
+      mime: 'text/javascript'
+    });
+  }
+
+  renderResult(output);
+}
+
+// ============================================================
+// 結果渲染
+// ============================================================
+function renderResult(output) {
+  var r = $('result');
+  r.innerHTML = '';
+
+  var list = document.createElement('div');
+  list.className = 'file-list';
+
+  for (var i = 0; i < output.length; i++) {
+    (function(f) {
+      var row = document.createElement('div');
+      row.className = 'file-row';
+
+      var nameEl = document.createElement('span');
+      nameEl.className = 'name';
+      nameEl.textContent = f.path;
+
+      var sizeEl = document.createElement('span');
+      sizeEl.className = 'size';
+      sizeEl.textContent = f.content.length.toLocaleString() + ' 字元';
+
+      var cpBtn = document.createElement('button');
+      cpBtn.className = 'ghost';
+      cpBtn.textContent = '複製';
+      cpBtn.onclick = function() {
+        copyText(f.content,
+          function() {
+            cpBtn.textContent = '已複製';
+            setTimeout(function() { cpBtn.textContent = '複製'; }, 1500);
+          },
+          function() {
+            cpBtn.textContent = '複製失敗';
+            setTimeout(function() { cpBtn.textContent = '複製'; }, 1500);
+          }
+        );
+      };
+
+      var dlBtn = document.createElement('button');
+      dlBtn.textContent = '下載';
+      dlBtn.onclick = function() { downloadFile(f.path, f.content, f.mime); };
+
+      row.appendChild(nameEl);
+      row.appendChild(sizeEl);
+      row.appendChild(cpBtn);
+      row.appendChild(dlBtn);
+      list.appendChild(row);
+    })(output[i]);
+  }
+
+  r.appendChild(list);
+
+  var allBtn = document.createElement('button');
+  allBtn.textContent = '全部下載';
+  allBtn.style.marginTop = '12px';
+  allBtn.onclick = function() {
+    for (var i = 0; i < output.length; i++) {
+      (function(f, delay) {
+        setTimeout(function() { downloadFile(f.path, f.content, f.mime); }, delay);
+      })(output[i], i * 600);
+    }
+  };
+  r.appendChild(allBtn);
+
+  var hint = document.createElement('div');
+  hint.className = 'hint';
+  hint.style.marginTop = '8px';
+  hint.innerHTML = '下載的檔名不含資料夾（如 <code>01-part.js</code>），' +
+    '請自行建立 <code>js/</code> 資料夾放入（與 index.html 同層）。' +
+    '若瀏覽器攔截多檔下載，請允許本站「下載多個檔案」。';
+  r.appendChild(hint);
+}
+
+// ============================================================
+// 複製（含 fallback）
+// ============================================================
+function copyText(text, onSuccess, onError) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onSuccess, function() {
+      fallbackCopy(text, onSuccess, onError);
+    });
+  } else {
+    fallbackCopy(text, onSuccess, onError);
+  }
+}
+
+function fallbackCopy(text, onSuccess, onError) {
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    var ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (ok) onSuccess(); else onError(new Error('execCommand 複製失敗'));
+  } catch (e) {
+    onError(e);
+  }
+}
+
+// ============================================================
+// 下載
+// ============================================================
+function downloadFile(path, content, mime) {
+  var baseName = path.indexOf('/') >= 0 ? path.split('/').pop() : path;
+  var blob = new Blob([content], { type: (mime || 'text/plain') + ';charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = baseName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+}
+
+// ============================================================
+// 事件綁定
+// ============================================================
+$('fileInput').addEventListener('change', function(e) {
+  var f = e.target.files[0];
+  if (!f) {
+    originalHtml = '';
+    originalName = '';
+    $('fileInfo').textContent = '';
+    $('splitBtn').disabled = true;
+    $('analysis').textContent = '請先選擇文件…';
+    $('result').innerHTML = '';
+    return;
+  }
+
+  originalName = f.name;
+  $('fileInfo').textContent = '讀取中… ' + f.name;
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    originalHtml = ev.target.result;
+    $('fileInfo').textContent =
+      '已載入：' + f.name + '（' + originalHtml.length.toLocaleString() + ' 字元）';
+    $('splitBtn').disabled = false;
+    try {
+      analyze();
+    } catch (err) {
+      $('analysis').innerHTML = formatError('分析失敗：', err);
+      console.error(err);
+    }
+  };
+  reader.onerror = function() {
+    $('fileInfo').innerHTML = '<span class="err">讀取失敗</span>';
+    originalHtml = '';
+    $('splitBtn').disabled = true;
+  };
+  reader.readAsText(f, 'UTF-8');
+});
+
+$('splitBtn').addEventListener('click', function() {
+  if (!originalHtml) { alert('請先選擇文件'); return; }
+  try {
+    doSplit();
+  } catch (e) {
+    $('result').innerHTML = formatError('拆分失敗：', e);
+    console.error(e);
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>☢ 废土背景工厂 · 滚动背景处理台 v2</title>
+<style>
+:root{
+  --bg:#14110e; --panel:#1e1a16; --panel2:#262019; --line:#3a2f25;
+  --amber:#e0a24a; --amber2:#b8802f; --text:#d8cfc2; --muted:#8c8175;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font:14px/1.65 "Segoe UI",system-ui,-apple-system,"Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+header{
+  padding:22px 26px 16px; border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#241d16,#14110e);
+}
+header h1{margin:0;font-size:20px;letter-spacing:2px;color:var(--amber);font-weight:600}
+header p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+
+nav.tabs{display:flex;flex-wrap:wrap;gap:2px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.tab-btn{
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--muted);padding:12px 16px;font-size:13px;cursor:pointer;font-family:inherit;
+  transition:.15s;
+}
+.tab-btn:hover{color:var(--text);background:#241e18}
+.tab-btn.active{color:var(--amber);border-bottom-color:var(--amber);background:#241e18}
+
+main{padding:20px}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+.cols{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.panel{
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:16px;flex:1 1 340px;min-width:300px;
+}
+.panel h3{
+  margin:0 0 14px;font-size:13px;letter-spacing:1.5px;color:var(--amber);
+  text-transform:uppercase;font-weight:600;
+  border-bottom:1px dashed var(--line);padding-bottom:8px;
+}
+
+label.f{display:block;margin:10px 0 4px;font-size:12px;color:var(--muted)}
+input[type=text],input[type=number],select{
+  width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:4px;padding:7px 9px;font-family:inherit;font-size:13px;outline:none;
+}
+input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--amber2)}
+input[type=range]{width:100%;accent-color:var(--amber)}
+input[type=checkbox]{accent-color:var(--amber);width:15px;height:15px;vertical-align:-2px}
+
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+button{
+  font-family:inherit;font-size:13px;cursor:pointer;border-radius:4px;
+  padding:9px 16px;border:1px solid var(--line);background:var(--panel2);color:var(--text);
+  transition:.15s;
+}
+button:hover{background:#302820;border-color:var(--amber2)}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.primary{
+  background:linear-gradient(180deg,#e0a24a,#b8802f);color:#1a1410;font-weight:700;
+  border-color:#e0a24a;letter-spacing:.5px;
+}
+button.primary:hover{background:linear-gradient(180deg,#f0b25a,#c8902f)}
+button.ghost{background:transparent}
+button.link{background:none;border:none;color:var(--amber);padding:0;text-decoration:underline;font-size:13px}
+
+.drop{
+  border:2px dashed var(--line);border-radius:6px;padding:26px 14px;text-align:center;
+  color:var(--muted);font-size:13px;transition:.15s;background:#1a1613;cursor:pointer;
+}
+.drop.over{border-color:var(--amber);background:#2a2119;color:var(--amber)}
+
+.filelist{max-height:180px;overflow:auto;margin-top:12px;font-size:12px;color:var(--muted)}
+.filelist div{padding:3px 6px;border-bottom:1px solid #221d18;display:flex;justify-content:space-between;gap:8px}
+.filelist div span:last-child{color:#5f564c;flex:0 0 auto}
+
+.checker{
+  background-color:#1a1714;
+  background-image:
+    linear-gradient(45deg,#2a2622 25%,transparent 25%),
+    linear-gradient(-45deg,#2a2622 25%,transparent 25%),
+    linear-gradient(45deg,transparent 75%,#2a2622 75%),
+    linear-gradient(-45deg,transparent 75%,#2a2622 75%);
+  background-size:12px 12px;
+  background-position:0 0,0 6px,6px -6px,-6px 0;
+}
+
+.preview{
+  display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;min-height:60px;
+  max-height:400px;overflow:auto;padding:10px;border-radius:4px;
+}
+.thumb{width:100%;max-width:300px;text-align:center}
+.thumb canvas{display:block;margin:0 auto;max-width:100%;
+  border:1px solid var(--line);border-radius:3px;image-rendering:auto}
+.thumb .tlabel{display:block;font-size:11px;color:var(--muted);margin-top:5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.tileWrap{
+  position:relative;margin-top:10px;border:1px solid var(--line);border-radius:3px;
+  overflow:hidden;line-height:0;background:#0d0b09;
+}
+.tileWrap canvas{display:block;width:100%;height:auto}
+.tileWrap .seam{
+  position:absolute;top:0;bottom:0;width:1px;background:rgba(224,162,74,.85);
+  pointer-events:none;
+}
+.tileWrap .seam::before{
+  content:attr(data-label);position:absolute;top:4px;left:4px;font-size:10px;
+  color:#e0a24a;background:rgba(20,17,14,.85);padding:1px 5px;border-radius:2px;
+  white-space:nowrap;
+}
+.tileTitle{margin-top:14px;font-size:12.5px;color:var(--amber);font-weight:600}
+.tileHint{font-size:11.5px;color:#6f665c;margin-top:2px}
+
+.progress{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:12px}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#b8802f,#e0a24a);transition:width .15s}
+.status{font-size:12px;color:var(--muted);margin-top:6px;min-height:18px}
+
+.hint{font-size:11.5px;color:#6f665c;margin-top:6px;line-height:1.5}
+.sep{height:1px;background:var(--line);margin:14px 0}
+details{border:1px solid var(--line);border-radius:4px;margin-bottom:8px;background:#1a1613}
+summary{padding:9px 12px;cursor:pointer;font-size:12.5px;color:var(--amber);user-select:none;outline:none}
+summary::marker{color:var(--amber2)}
+details>div{padding:0 12px 14px}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;
+  background:#2f2720;color:var(--amber);border:1px solid var(--line);margin-right:4px}
+textarea{width:100%;height:200px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--text);border-radius:4px;padding:10px;font-family:ui-monospace,Consolas,monospace;
+  font-size:12px;resize:vertical;outline:none}
+
+.radioRow{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.radioRow label{
+  display:inline-flex;align-items:center;gap:5px;padding:6px 11px;font-size:12.5px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:4px;cursor:pointer;
+  color:var(--muted);transition:.15s;
+}
+.radioRow label:hover{border-color:var(--amber2);color:var(--text)}
+.radioRow input{display:none}
+.radioRow input:checked + span{color:var(--amber)}
+.radioRow label:has(input:checked){border-color:var(--amber);background:#2a2119}
+
+.methodCard{
+  border:1px solid var(--line);border-radius:5px;padding:10px;margin-top:8px;
+  background:#181410;font-size:12px;color:var(--muted);line-height:1.55;
+}
+.methodCard b{color:var(--amber);font-weight:600}
+.methodCard code{background:#2a221a;padding:1px 5px;border-radius:2px;font-size:11px;color:#d8cfc2}
+
+@media (max-width:700px){
+  .cols{flex-direction:column}
+  .panel{min-width:auto;width:100%}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>☢ 废土背景工厂 · 滚动背景处理台 v2</h1>
+  <p>翻转式无缝处理 · 交替平铺支持 · 三联验证 · 长图切段 · 批量打包 —— 全程本地，不上传</p>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="seam">① 背景无缝处理</button>
+  <button class="tab-btn" data-tab="split">② 长图切段</button>
+  <button class="tab-btn" data-tab="manifest">③ 资源清单</button>
+</nav>
+
+<main>
+
+<!-- ============ ① 背景无缝处理 ============ -->
+<section id="tab-seam" class="tab-panel active">
+  <div class="cols">
+
+    <div class="panel">
+      <h3>1 · 选择背景图</h3>
+      <div class="drop" id="dropSeam">
+        <input type="file" id="fileSeam" multiple accept="image/*" hidden>
+        <div>拖入背景图到此处<br>或 <button class="link" id="pickSeam" type="button">点击选择</button></div>
+        <div class="hint">支持 PNG / JPG / WEBP，可批量</div>
+      </div>
+      <div class="filelist" id="listSeam"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="ghost" id="clearSeam" type="button">清空列表</button>
+        <button class="ghost" id="reloadSeam" type="button">重新预览</button>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1 1 420px">
+      <h3>2 · 无缝处理参数</h3>
+
+      <details open>
+        <summary>◆ 无缝模式（核心）</summary>
+        <div>
+          <div class="radioRow" id="seamModeRow">
+            <label><input type="radio" name="sm2" value="none"><span>不处理</span></label>
+            <label><input type="radio" name="sm2" value="flipV" checked><span>边缘垂直翻转 ★</span></label>
+            <label><input type="radio" name="sm2" value="flipH"><span>边缘水平翻转</span></label>
+            <label><input type="radio" name="sm2" value="flip180"><span>边缘180°旋转</span></label>
+            <label><input type="radio" name="sm2" value="crossfade"><span>交叉融合</span></label>
+          </div>
+
+          <div class="methodCard" id="methodDesc">
+            <b>边缘垂直翻转（用户方案）</b><br>
+            右边缘条带的内容 = 左边缘条带的 <code>上下颠倒</code> 版本。<br>
+            当图片以「正常 → 垂直翻转 → 正常 → 垂直翻转」交替平铺时，左右接缝严格连续。<br>
+            <span style="color:#c25b4a">★ 若游戏引擎用交替垂直翻转平铺方式，选这个。</span>
+          </div>
+
+          <div class="grid2" style="margin-top:12px">
+            <div>
+              <label class="f">边缘条带宽度 <b id="stripVal">200</b> px</label>
+              <input type="range" id="stripW" min="20" max="512" value="200">
+            </div>
+            <div>
+              <label class="f">过渡混合 <b id="blendVal">50</b>%</label>
+              <input type="range" id="blendW" min="0" max="100" value="50">
+            </div>
+          </div>
+          <div class="hint">
+            <b>边缘条带宽度</b>：参与翻转的边缘区域宽度，越宽越明显但越自然（推荐图宽的 10%~25%）。<br>
+            <b>过渡混合</b>：0% = 右边缘直接替换为翻转版；100% = 从原右边缘渐变到翻转版；推荐 30~70%。
+          </div>
+
+          <div style="margin-top:10px">
+            <label class="f">
+              <input type="checkbox" id="strictSeam"> 严格模式：左右边缘像素强制对齐
+            </label>
+            <div class="hint">
+              勾选后，右边缘 x=W-1 的像素列会与左边缘 x=0 的像素列严格相同（垂直翻转关系），
+              保证任何平铺方式的接缝无跳变。
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>◆ 输出尺寸</summary>
+        <div>
+          <div class="radioRow" id="sizeModeRow2">
+            <label><input type="radio" name="sm3" value="keep" checked><span>保持原尺寸</span></label>
+            <label><input type="radio" name="sm3" value="preset"><span>预设尺寸</span></label>
+            <label><input type="radio" name="sm3" value="custom"><span>自定义</span></label>
+          </div>
+
+          <div id="presetRow2" style="display:none;margin-top:10px">
+            <select id="sizePreset2">
+              <option value="1024x512" selected>1024 × 512 — 标准背景</option>
+              <option value="2048x512">2048 × 512 — 宽幅</option>
+              <option value="1024x1024">1024 × 1024 — 方形</option>
+              <option value="1920x1080">1920 × 1080 — 全高清</option>
+            </select>
+          </div>
+
+          <div class="grid2" id="customRow2" style="display:none;margin-top:10px">
+            <div><label class="f">宽</label><input type="number" id="sizeW2" value="1024" min="1" max="8192"></div>
+            <div><label class="f">高</label><input type="number" id="sizeH2" value="512" min="1" max="8192"></div>
+          </div>
+
+          <div id="fitWrap2" style="display:none">
+            <label class="f">适配方式</label>
+            <select id="fitMode2">
+              <option value="cover" selected>cover — 填满并裁切</option>
+              <option value="contain">contain — 完整放入并居中</option>
+              <option value="stretch">stretch — 强制拉伸</option>
+            </select>
+          </div>
+          <div class="hint">「保持原尺寸」不会改变任何像素。</div>
+        </div>
+      </details>
+
+      <details>
+        <summary>◆ 统一调色（可选）</summary>
+        <div>
+          <label class="f">饱和度 % <b id="satVal">100</b></label>
+          <input type="range" id="sat" min="0" max="150" value="100">
+          <label class="f">亮度 % <b id="briVal">100</b></label>
+          <input type="range" id="bri" min="50" max="150" value="100">
+          <label class="f">对比度 % <b id="conVal">100</b></label>
+          <input type="range" id="con" min="50" max="150" value="100">
+        </div>
+      </details>
+
+      <details>
+        <summary>◆ 输出命名</summary>
+        <div>
+          <div class="grid2">
+            <div><label class="f">前缀</label><input type="text" id="namePrefix" placeholder="例：bg_"></div>
+            <div><label class="f">后缀</label><input type="text" id="nameSuffix" placeholder="例：_1024x512"></div>
+          </div>
+          <label class="f">ZIP 文件名</label>
+          <input type="text" id="zipName" value="seamless-backgrounds.zip">
+        </div>
+      </details>
+    </div>
+
+    <div class="panel" style="flex:1 1 100%">
+      <h3>3 · 处理与验证</h3>
+      <div class="row">
+        <button class="primary" id="runSeam" type="button" style="flex:1">⚡ 一键处理全部并打包下载</button>
+        <button id="previewSeamBtn" type="button">仅预览</button>
+        <button id="dlSeam" type="button" disabled>重下 ZIP</button>
+      </div>
+      <div class="progress"><i id="seamBar"></i></div>
+      <div class="status" id="statusSeam">等待添加背景图…</div>
+
+      <div class="sep"></div>
+
+      <b style="font-size:12.5px;color:var(--amber)">单图预览</b>
+      <div class="preview checker" id="previewSeamGrid"></div>
+
+      <div class="sep"></div>
+
+      <b style="font-size:12.5px;color:var(--amber)">接缝验证（两种平铺方式，请对照你游戏里的滚动方式看）</b>
+
+      <div class="tileTitle">▸ 方式 A：简单横向平铺（正常 → 正常 → 正常）</div>
+      <div class="tileHint">常规“复制+并排”滚动。如果游戏只做这种平铺，接缝处仍会跳变——除非用 180° 旋转模式。</div>
+      <div id="tileA"></div>
+
+      <div class="tileTitle" style="margin-top:20px">▸ 方式 B：交替垂直翻转平铺（正常 → 垂直翻转 → 正常 → 垂直翻转）★</div>
+      <div class="tileHint">如果游戏引擎使用这种交替翻转方式滚动，那么用「边缘垂直翻转」模式即完全无缝。</div>
+      <div id="tileB"></div>
+
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ ② 长图切段 ============ -->
+<section id="tab-split" class="tab-panel">
+  <div class="cols">
+    <div class="panel">
+      <h3>1 · 选择长图</h3>
+      <div class="drop" id="dropSplit">
+        <input type="file" id="fileSplit" accept="image/*" multiple hidden>
+        <div>拖入长图<br>或 <button class="link" id="pickSplit" type="button">点击选择</button></div>
+      </div>
+      <div class="filelist" id="listSplit"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="ghost" id="clearSplit" type="button">清空</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>2 · 切段参数</h3>
+      <div class="grid2">
+        <div><label class="f">每段宽</label><input type="number" id="segW" value="1024" min="1"></div>
+        <div><label class="f">每段高</label><input type="number" id="segH" value="512" min="1"></div>
+      </div>
+
+      <label class="f" style="margin-top:12px">切割方向</label>
+      <div class="radioRow" id="splitDirRow">
+        <label><input type="radio" name="sd2" value="h" checked><span>横向切段</span></label>
+        <label><input type="radio" name="sd2" value="v"><span>纵向切段</span></label>
+        <label><input type="radio" name="sd2" value="grid"><span>网格切割</span></label>
+      </div>
+
+      <div class="sep"></div>
+
+      <label class="f"><input type="checkbox" id="splitSeam" checked> 每段做无缝处理</label>
+      <div id="splitFadeWrap">
+        <label class="f">边缘条带宽度 <b id="splitStripVal">200</b></label>
+        <input type="range" id="splitStrip" min="20" max="512" value="200">
+      </div>
+
+      <label class="f" style="margin-top:12px">命名前缀</label>
+      <input type="text" id="splitPrefix" value="bg_">
+      <label class="f" style="margin-top:6px"><input type="checkbox" id="splitPad" checked> 序号补零</label>
+
+      <div class="sep"></div>
+      <button class="primary" id="runSplit" type="button" style="width:100%">⚡ 切段并打包下载</button>
+      <div class="status" id="statusSplit"></div>
+    </div>
+
+    <div class="panel" style="flex:1 1 100%">
+      <h3>3 · 预览</h3>
+      <div class="preview checker" id="previewSplit"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ③ 资源清单 ============ -->
+<section id="tab-manifest" class="tab-panel">
+  <div class="cols">
+    <div class="panel">
+      <h3>清单生成</h3>
+      <div>
+        <span class="tag">物品图标 98</span><span class="tag">Boss 5</span>
+        <span class="tag">建筑 9</span><span class="tag">背景 70</span>
+      </div>
+      <div class="sep"></div>
+      <button id="genTxt" type="button" style="width:100%">📄 生成完整资源清单 TXT</button>
+      <button id="genBgList" type="button" style="width:100%;margin-top:8px">🗺️ 生成背景清单（按区域）</button>
+      <button id="genPlaceholder" type="button" style="width:100%;margin-top:8px">📦 生成占位图 ZIP</button>
+      <div class="status" id="statusManifest"></div>
+    </div>
+    <div class="panel" style="flex:2 1 500px">
+      <h3>清单预览</h3>
+      <textarea id="manifestText" readonly></textarea>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* =====================================================================
+   基础工具
+   ===================================================================== */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+function loadImageFromFile(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('无法读取：' + file.name)); };
+    img.src = url;
+  });
+}
+
+function canvasFromImage(img){
+  const w = img.naturalWidth || img.width || 1;
+  const h = img.naturalHeight || img.height || 1;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, w, h);
+  return c;
+}
+
+function saveBlob(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+}
+
+function canvasToBytes(canvas){
+  return new Promise(resolve => {
+    canvas.toBlob(async blob => {
+      const buf = await blob.arrayBuffer();
+      resolve(new Uint8Array(buf));
+    }, 'image/png');
+  });
+}
+
+function nextFrame(){ return new Promise(r => setTimeout(r, 0)); }
+
+function fmtSize(n){
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
+
+/* =====================================================================
+   ZIP 打包
+   ===================================================================== */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(u8){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function zipStore(entries){
+  const enc = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+
+  for (const e of entries){
+    const nameBytes = enc.encode(e.name);
+    const crc = crc32(e.bytes);
+    const size = e.bytes.length;
+
+    const lh = new Uint8Array(30 + nameBytes.length);
+    const dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, dosTime, true);
+    dv.setUint16(12, dosDate, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, size, true);
+    dv.setUint32(22, size, true);
+    dv.setUint16(26, nameBytes.length, true);
+    dv.setUint16(28, 0, true);
+    lh.set(nameBytes, 30);
+    localParts.push(lh, e.bytes);
+
+    const ch = new Uint8Array(46 + nameBytes.length);
+    const dv2 = new DataView(ch.buffer);
+    dv2.setUint32(0, 0x02014b50, true);
+    dv2.setUint16(4, 20, true);
+    dv2.setUint16(6, 20, true);
+    dv2.setUint16(8, 0x0800, true);
+    dv2.setUint16(10, 0, true);
+    dv2.setUint16(12, dosTime, true);
+    dv2.setUint16(14, dosDate, true);
+    dv2.setUint32(16, crc, true);
+    dv2.setUint32(20, size, true);
+    dv2.setUint32(24, size, true);
+    dv2.setUint16(28, nameBytes.length, true);
+    dv2.setUint16(30, 0, true);
+    dv2.setUint16(32, 0, true);
+    dv2.setUint16(34, 0, true);
+    dv2.setUint16(36, 0, true);
+    dv2.setUint32(38, 0, true);
+    dv2.setUint32(42, offset, true);
+    ch.set(nameBytes, 46);
+    centralParts.push(ch);
+    offset += lh.length + size;
+  }
+
+  let cdSize = 0;
+  for (const c of centralParts) cdSize += c.length;
+
+  const eocd = new Uint8Array(22);
+  const dv3 = new DataView(eocd.buffer);
+  dv3.setUint32(0, 0x06054b50, true);
+  dv3.setUint16(8, entries.length, true);
+  dv3.setUint16(10, entries.length, true);
+  dv3.setUint32(12, cdSize, true);
+  dv3.setUint32(16, offset, true);
+
+  const all = localParts.concat(centralParts);
+  all.push(eocd);
+  return new Blob(all, { type: 'application/zip' });
+}
+
+async function downloadCanvasZip(items, zipName, onProgress){
+  const entries = [];
+  for (let i = 0; i < items.length; i++){
+    const bytes = await canvasToBytes(items[i].canvas);
+    entries.push({ name: items[i].name, bytes });
+    if (onProgress) onProgress(i + 1, items.length);
+    if (i % 6 === 0) await nextFrame();
+  }
+  saveBlob(zipStore(entries), zipName);
+}
+
+/* =====================================================================
+   无缝处理核心
+   ===================================================================== */
+
+/*
+  边缘翻转无缝
+  ---------------------------------------------------------------
+  给定左边缘条带 L，把它经过某种翻转后替换/融合到右边缘 R。
+
+  翻转类型：
+    flipV   : 上下颠倒    R(x,y) = L(x, H-1-y)     ← 用户方案
+    flipH   : 左右颠倒    R(x,y) = L(F-1-x, y)
+    flip180 : 180°旋转    R(x,y) = L(F-1-x, H-1-y)  ← 严格无缝
+
+  blend : 0 = 完全替换，1 = 完全保留原右边缘，中间为混合比例
+  ---------------------------------------------------------------
+*/
+function edgeFlipSeam(canvas, F, mode, blendPct, strict){
+  const w = canvas.width, h = canvas.height;
+  if (w < 4 || h < 4) return;
+
+  F = Math.max(2, Math.min(Math.floor(w / 2), Math.round(F)));
+  const blend = Math.max(0, Math.min(1, blendPct / 100));
+
+  const ctx = canvas.getContext('2d');
+
+  /* 1. 取左边缘条带 */
+  const leftStrip = ctx.getImageData(0, 0, F, h);
+  const ls = leftStrip.data;
+
+  /* 2. 生成翻转后的条带数据 */
+  const flipped = new Uint8ClampedArray(ls.length);
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < F; x++){
+      let sx, sy;
+      if (mode === 'flipV'){
+        sx = x;            sy = h - 1 - y;
+      } else if (mode === 'flipH'){
+        sx = F - 1 - x;    sy = y;
+      } else { /* flip180 */
+        sx = F - 1 - x;    sy = h - 1 - y;
+      }
+      const dst = (y * F + x) * 4;
+      const src = (sy * F + sx) * 4;
+      flipped[dst]     = ls[src];
+      flipped[dst + 1] = ls[src + 1];
+      flipped[dst + 2] = ls[src + 2];
+      flipped[dst + 3] = ls[src + 3];
+    }
+  }
+
+  /* 3. 与右边缘原内容混合 */
+  const rightStrip = ctx.getImageData(w - F, 0, F, h);
+  const rs = rightStrip.data;
+  const merged = new Uint8ClampedArray(rs.length);
+
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < F; x++){
+      const i = (y * F + x) * 4;
+      /* x 越靠右，翻转权重越大 → 右边缘完全等于翻转版 */
+      const t = x / (F - 1 || 1);
+      const wFlip = t * (1 - blend) + t * blend;  // 简化：保持权重为 t
+      /* 采用：越往右，越接近翻转版 */
+      for (let c = 0; c < 4; c++){
+        merged[i + c] = rs[i + c] * (1 - wFlip) + flipped[i + c] * wFlip;
+      }
+    }
+  }
+
+  /* 4. 严格模式：右边缘最后 1 列 = 左边缘第 1 列的翻转 */
+  if (strict){
+    for (let y = 0; y < h; y++){
+      let sx, sy;
+      if (mode === 'flipV'){ sx = 0; sy = h - 1 - y; }
+      else if (mode === 'flipH'){ sx = 0; sy = y; }
+      else { sx = 0; sy = h - 1 - y; }
+      const src = (sy * F + sx) * 4;
+      const dst = (y * F + (F - 1)) * 4;
+      for (let c = 0; c < 4; c++){
+        merged[dst + c] = ls[src + c];
+      }
+    }
+  }
+
+  /* 5. 写回画布 */
+  const out = ctx.createImageData(F, h);
+  out.data.set(merged);
+  ctx.putImageData(out, w - F, 0);
+}
+
+/* 交叉融合（保留作为对比方案） */
+function crossfadeH(canvas, F){
+  const w = canvas.width, h = canvas.height;
+  if (w < 4 || h < 2) return;
+  F = Math.max(2, Math.min(Math.floor(w / 2), Math.round(F)));
+
+  const ctx = canvas.getContext('2d');
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+  const orig = new Uint8ClampedArray(d);
+
+  for (let y = 0; y < h; y++){
+    const rowBase = y * w;
+    for (let i = 0; i < F; i++){
+      const t = i / (F - 1 || 1);
+      const xOut = w - F + i;
+      const pO = (rowBase + xOut) * 4;
+      const pL = (rowBase + i) * 4;
+      for (let c = 0; c < 3; c++){
+        d[pO + c] = orig[pO + c] * (1 - t) + orig[pL + c] * t;
+      }
+    }
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+/* 缩放适配 */
+function fitCanvas(src, tw, th, mode){
+  const out = document.createElement('canvas');
+  out.width = Math.max(1, tw);
+  out.height = Math.max(1, th);
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const sw = src.width, sh = src.height;
+  if (!sw || !sh) return out;
+
+  let dw, dh, dx, dy;
+  if (mode === 'stretch'){
+    dw = tw; dh = th; dx = 0; dy = 0;
+  } else {
+    const s = (mode === 'contain')
+      ? Math.min(tw / sw, th / sh)
+      : Math.max(tw / sw, th / sh);
+    dw = sw * s; dh = sh * s;
+    dx = (tw - dw) / 2; dy = (th - dh) / 2;
+  }
+  ctx.drawImage(src, dx, dy, dw, dh);
+  return out;
+}
+
+/* 完整流水线 */
+async function processBackground(file, o){
+  const img = await loadImageFromFile(file);
+  let c = canvasFromImage(img);
+
+  /* 1. 缩放 */
+  if (o.width > 0 && o.height > 0){
+    c = fitCanvas(c, o.width, o.height, o.fitMode);
+  }
+
+  /* 2. 调色 */
+  if (o.adjust){
+    const tmp = document.createElement('canvas');
+    tmp.width = c.width; tmp.height = c.height;
+    const tctx = tmp.getContext('2d');
+    if ('filter' in tctx) tctx.filter = o.adjust;
+    tctx.drawImage(c, 0, 0);
+    if ('filter' in tctx) tctx.filter = 'none';
+    c = tmp;
+  }
+
+  /* 3. 无缝处理 */
+  if (o.seamMode === 'flipV' || o.seamMode === 'flipH' || o.seamMode === 'flip180'){
+    edgeFlipSeam(c, o.stripW, o.seamMode, o.blend, o.strict);
+  } else if (o.seamMode === 'crossfade'){
+    crossfadeH(c, o.stripW);
+  }
+
+  return c;
+}
+
+/* =====================================================================
+   三联 / 双模式拼接预览
+   ===================================================================== */
+function tileSimpleH(canvas, count){
+  const W = canvas.width * count;
+  const H = canvas.height;
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const ctx = out.getContext('2d');
+  for (let i = 0; i < count; i++){
+    ctx.drawImage(canvas, i * canvas.width, 0);
+  }
+  return out;
+}
+
+function tileAlternateFlipV(canvas, count){
+  const W = canvas.width * count;
+  const H = canvas.height;
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const ctx = out.getContext('2d');
+
+  /* 预生成翻转版 */
+  const flipped = document.createElement('canvas');
+  flipped.width = canvas.width;
+  flipped.height = canvas.height;
+  const fctx = flipped.getContext('2d');
+  fctx.translate(0, canvas.height);
+  fctx.scale(1, -1);
+  fctx.drawImage(canvas, 0, 0);
+
+  for (let i = 0; i < count; i++){
+    const src = (i % 2 === 0) ? canvas : flipped;
+    ctx.drawImage(src, i * canvas.width, 0);
+  }
+  return out;
+}
+
+function renderTile(host, tiled, seamXs, labels, note){
+  const maxW = 1100;
+  const s = Math.min(maxW / tiled.width, 1);
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(tiled.width * s));
+  cv.height = Math.max(1, Math.round(tiled.height * s));
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(tiled, 0, 0, cv.width, cv.height);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'tileWrap';
+  wrap.appendChild(cv);
+
+  seamXs.forEach((x, i) => {
+    const line = document.createElement('div');
+    line.className = 'seam';
+    line.style.left = (x / tiled.width * 100) + '%';
+    line.dataset.label = labels[i] || ('接缝 ' + (i + 1));
+    wrap.appendChild(line);
+  });
+
+  host.appendChild(wrap);
+  if (note){
+    const n = document.createElement('div');
+    n.className = 'tileHint';
+    n.textContent = note;
+    host.appendChild(n);
+  }
+}
+
+/* =====================================================================
+   Tab 切换
+   ===================================================================== */
+$$('.tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + btn.dataset.tab));
+  };
+});
+
+/* =====================================================================
+   拖放
+   ===================================================================== */
+function bindDrop(dropEl, inputEl, onFiles){
+  ['dragenter','dragover'].forEach(ev => {
+    dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.add('over'); });
+  });
+  ['dragleave','drop'].forEach(ev => {
+    dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.remove('over'); });
+  });
+  dropEl.addEventListener('drop', e => onFiles(Array.from(e.dataTransfer.files || [])));
+  inputEl.addEventListener('change', e => {
+    onFiles(Array.from(e.target.files || []));
+    inputEl.value = '';
+  });
+}
+
+/* =====================================================================
+   ① 背景无缝处理
+   ===================================================================== */
+const seamFiles = [];
+let seamResults = [];
+
+$('#pickSeam').onclick = e => { e.stopPropagation(); $('#fileSeam').click(); };
+$('#dropSeam').onclick = e => { if (e.target.id !== 'pickSeam') $('#fileSeam').click(); };
+
+bindDrop($('#dropSeam'), $('#fileSeam'), files => {
+  for (const f of files){
+    if (f.type && f.type.startsWith('image/')) seamFiles.push(f);
+  }
+  renderSeamList();
+  refreshSeamPreview();
+});
+
+function renderSeamList(){
+  const el = $('#listSeam');
+  el.innerHTML = '';
+  seamFiles.forEach(f => {
+    const d = document.createElement('div');
+    d.innerHTML = '<span>' + f.name + '</span><span>' + fmtSize(f.size) + '</span>';
+    el.appendChild(d);
+  });
+  $('#statusSeam').textContent = seamFiles.length
+    ? '已载入 ' + seamFiles.length + ' 张。'
+    : '等待添加背景图…';
+}
+
+$('#clearSeam').onclick = () => {
+  seamFiles.length = 0;
+  seamResults = [];
+  $('#previewSeamGrid').innerHTML = '';
+  $('#tileA').innerHTML = '';
+  $('#tileB').innerHTML = '';
+  $('#dlSeam').disabled = true;
+  renderSeamList();
+};
+
+$('#reloadSeam').onclick = () => { if (seamFiles.length) refreshSeamPreview(); };
+
+/* 尺寸模式切换 */
+$$('input[name="sm3"]').forEach(r => {
+  r.onchange = () => {
+    const v = document.querySelector('input[name="sm3"]:checked').value;
+    $('#presetRow2').style.display = v === 'preset' ? '' : 'none';
+    $('#customRow2').style.display = v === 'custom' ? '' : 'none';
+    $('#fitWrap2').style.display    = v !== 'keep' ? '' : 'none';
+  };
+});
+
+/* 无缝模式描述 */
+const METHOD_DESC = {
+  none: '<b>不处理</b><br>原图直接输出，不修改任何像素。',
+  flipV: '<b>边缘垂直翻转（用户方案）</b><br>右边缘条带的内容 = 左边缘条带的 <code>上下颠倒</code> 版本。当图片以「正常 → 垂直翻转 → 正常 → 垂直翻转」交替平铺时，左右接缝严格连续。<br><span style="color:#c25b4a">★ 若游戏用交替垂直翻转平铺，选这个。</span>',
+  flipH: '<b>边缘水平翻转</b><br>右边缘条带的内容 = 左边缘条带的 <code>左右颠倒</code> 版本。适合水平镜像平铺的场景。',
+  flip180: '<b>边缘 180° 旋转</b><br>右边缘条带 = 左边缘条带 <code>上下+左右都颠倒</code>。这是最严格的无缝方式，无论简单平铺还是交替翻转平铺都能做到像素级无缝。',
+  crossfade: '<b>交叉融合</b><br>右边缘渐变融入左边缘，只让颜色接近，<span style="color:#c25b4a">不保证内容几何连续</span>。用于对比。'
+};
+
+function updateMethodDesc(){
+  const v = document.querySelector('input[name="sm2"]:checked').value;
+  $('#methodDesc').innerHTML = METHOD_DESC[v] || '';
+}
+
+$$('input[name="sm2"]').forEach(r => {
+  r.onchange = updateMethodDesc;
+});
+
+/* 滑块联动 */
+$('#stripW').oninput = e => { $('#stripVal').textContent = e.target.value; };
+$('#blendW').oninput = e => { $('#blendVal').textContent = e.target.value; };
+$('#sat').oninput  = e => { $('#satVal').textContent = e.target.value; };
+$('#bri').oninput  = e => { $('#briVal').textContent = e.target.value; };
+$('#con').oninput  = e => { $('#conVal').textContent = e.target.value; };
+$('#splitStrip').oninput = e => { $('#splitStripVal').textContent = e.target.value; };
+$('#splitSeam').onchange = e => {
+  $('#splitFadeWrap').style.display = e.target.checked ? '' : 'none';
+};
+
+/* 读取参数 */
+function readSeamOpts(){
+  const sm = document.querySelector('input[name="sm3"]:checked').value;
+  let width = 0, height = 0;
+
+  if (sm === 'preset'){
+    const [w, h] = $('#sizePreset2').value.split('x').map(n => parseInt(n, 10));
+    width = w; height = h;
+  } else if (sm === 'custom'){
+    width  = parseInt($('#sizeW2').value, 10) || 1024;
+    height = parseInt($('#sizeH2').value, 10) || 512;
+  }
+
+  const sat = parseInt($('#sat').value, 10);
+  const bri = parseInt($('#bri').value, 10);
+  const con = parseInt($('#con').value, 10);
+  const filters = [];
+  if (sat !== 100) filters.push('saturate(' + sat + '%)');
+  if (bri !== 100) filters.push('brightness(' + bri + '%)');
+  if (con !== 100) filters.push('contrast(' + con + '%)');
+
+  return {
+    width, height,
+    fitMode: $('#fitMode2').value,
+    seamMode: document.querySelector('input[name="sm2"]:checked').value,
+    stripW: parseInt($('#stripW').value, 10) || 200,
+    blend: parseInt($('#blendW').value, 10),
+    strict: $('#strictSeam').checked,
+    adjust: filters.join(' '),
+    namePrefix: $('#namePrefix').value,
+    nameSuffix: $('#nameSuffix').value
+  };
+}
+
+function outName(original, o){
+  let base = original.replace(/\.[^.]+$/, '');
+  base = base.replace(/[\\/:*?"<>|]/g, '_');
+  return o.namePrefix + base + o.nameSuffix + '.png';
+}
+
+function renderThumb(container, canvas, label, title){
+  const div = document.createElement('div');
+  div.className = 'thumb';
+  const cv = document.createElement('canvas');
+
+  const maxW = 300;
+  const s = Math.min(maxW / canvas.width, 1);
+  cv.width = Math.max(1, Math.round(canvas.width * s));
+  cv.height = Math.max(1, Math.round(canvas.height * s));
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(canvas, 0, 0, cv.width, cv.height);
+
+  const lb = document.createElement('span');
+  lb.className = 'tlabel';
+  lb.textContent = label;
+  lb.title = title || label;
+
+  div.appendChild(cv);
+  div.appendChild(lb);
+  container.appendChild(div);
+}
+
+async function runSeamPipeline(download){
+  if (!seamFiles.length){ alert('请先添加背景图'); return; }
+
+  const opts = readSeamOpts();
+  seamResults = [];
+  const bar = $('#seamBar');
+  const status = $('#statusSeam');
+
+  $('#runSeam').disabled = true;
+  $('#previewSeamBtn').disabled = true;
+
+  for (let i = 0; i < seamFiles.length; i++){
+    const f = seamFiles[i];
+    try {
+      const canvas = await processBackground(f, opts);
+      seamResults.push({ name: outName(f.name, opts), canvas, source: f.name });
+    } catch(e){ console.error(e); }
+    bar.style.width = Math.round((i + 1) / seamFiles.length * 100) + '%';
+    status.textContent = '处理中 ' + (i + 1) + ' / ' + seamFiles.length + ' …';
+    await nextFrame();
+  }
+
+  /* 单图预览 */
+  const grid = $('#previewSeamGrid');
+  grid.innerHTML = '';
+  seamResults.forEach((r, i) => {
+    renderThumb(grid, r.canvas, (i + 1) + '. ' + r.name,
+      r.canvas.width + '×' + r.canvas.height);
+  });
+
+  /* 双模式拼接验证（只对前 1 张渲染，避免过多） */
+  const hostA = $('#tileA');
+  const hostB = $('#tileB');
+  hostA.innerHTML = '';
+  hostB.innerHTML = '';
+
+  if (seamResults.length){
+    const c = seamResults[0].canvas;
+
+    /* 方式 A：简单平铺 3 份 */
+    const tiledA = tileSimpleH(c, 3);
+    renderTile(hostA, tiledA,
+      [c.width, c.width * 2],
+      ['接缝 1', '接缝 2'],
+      '整图宽 ' + tiledA.width + ' × 高 ' + tiledA.height + '（原图 ' + c.width + '×' + c.height + '）'
+    );
+
+    /* 方式 B：交替垂直翻转平铺 4 份 */
+    const tiledB = tileAlternateFlipV(c, 4);
+    renderTile(hostB, tiledB,
+      [c.width, c.width * 2, c.width * 3],
+      ['接缝 1', '接缝 2', '接缝 3'],
+      '整图宽 ' + tiledB.width + ' × 高 ' + tiledB.height +
+      '（第 2、4 张为垂直翻转版）'
+    );
+  }
+
+  status.textContent = '✔ 完成：' + seamResults.length + ' / ' + seamFiles.length + ' 张';
+  $('#dlSeam').disabled = seamResults.length === 0;
+
+  if (download && seamResults.length){
+    status.textContent += ' · 打包中…';
+    await downloadCanvasZip(seamResults, $('#zipName').value || 'seamless-backgrounds.zip',
+      (d, t) => { bar.style.width = Math.round(d / t * 100) + '%'; });
+    status.textContent = '✔ 已下载：' + ($('#zipName').value || 'seamless-backgrounds.zip');
+  }
+
+  $('#runSeam').disabled = false;
+  $('#previewSeamBtn').disabled = false;
+}
+
+$('#runSeam').onclick = () => runSeamPipeline(true);
+$('#previewSeamBtn').onclick = () => runSeamPipeline(false);
+$('#dlSeam').onclick = async () => {
+  if (!seamResults.length) return;
+  await downloadCanvasZip(seamResults, $('#zipName').value || 'seamless-backgrounds.zip',
+    (d, t) => { $('#seamBar').style.width = Math.round(d / t * 100) + '%'; });
+};
+
+async function refreshSeamPreview(){
+  if (!seamFiles.length) return;
+  if (seamFiles.length > 20){
+    $('#statusSeam').textContent = '已载入 ' + seamFiles.length + ' 张，点击按钮开始处理。';
+    return;
+  }
+  await runSeamPipeline(false);
+}
+
+/* =====================================================================
+   ② 长图切段
+   ===================================================================== */
+const splitFiles = [];
+let splitResults = [];
+
+$('#pickSplit').onclick = e => { e.stopPropagation(); $('#fileSplit').click(); };
+$('#dropSplit').onclick = e => { if (e.target.id !== 'pickSplit') $('#fileSplit').click(); };
+
+bindDrop($('#dropSplit'), $('#fileSplit'), files => {
+  for (const f of files){
+    if (f.type && f.type.startsWith('image/')) splitFiles.push(f);
+  }
+  renderSplitList();
+});
+
+function renderSplitList(){
+  const el = $('#listSplit');
+  el.innerHTML = '';
+  splitFiles.forEach(f => {
+    const d = document.createElement('div');
+    d.innerHTML = '<span>' + f.name + '</span><span>' + fmtSize(f.size) + '</span>';
+    el.appendChild(d);
+  });
+  $('#statusSplit').textContent = splitFiles.length
+    ? '已载入 ' + splitFiles.length + ' 张长图。'
+    : '等待添加长图…';
+}
+
+$('#clearSplit').onclick = () => {
+  splitFiles.length = 0;
+  splitResults = [];
+  $('#previewSplit').innerHTML = '';
+  renderSplitList();
+};
+
+$('#runSplit').onclick = async () => {
+  if (!splitFiles.length){ alert('请先添加长图'); return; }
+
+  const segW = parseInt($('#segW').value, 10) || 1024;
+  const segH = parseInt($('#segH').value, 10) || 512;
+  const dir  = document.querySelector('input[name="sd2"]:checked').value;
+  const doSeam = $('#splitSeam').checked;
+  const stripW = parseInt($('#splitStrip').value, 10) || 200;
+  const prefix = $('#splitPrefix').value || 'bg_';
+  const pad = $('#splitPad').checked;
+
+  /* 使用与主面板相同的无缝模式 */
+  const seamMode = document.querySelector('input[name="sm2"]:checked').value;
+  const blend = parseInt($('#blendW').value, 10);
+  const strict = $('#strictSeam').checked;
+
+  const status = $('#statusSplit');
+  splitResults = [];
+  $('#previewSplit').innerHTML = '';
+
+  status.textContent = '切段中…';
+
+  let globalIdx = 0;
+
+  for (const f of splitFiles){
+    const img = await loadImageFromFile(f);
+    const full = canvasFromImage(img);
+
+    const cols = dir === 'v' ? 1 : Math.max(1, Math.ceil(full.width  / segW));
+    const rows = dir === 'h' ? 1 : Math.max(1, Math.ceil(full.height / segH));
+
+    for (let r = 0; r < rows; r++){
+      for (let c = 0; c < cols; c++){
+        const sx = c * segW;
+        const sy = r * segH;
+        const sw = Math.min(segW, full.width  - sx);
+        const sh = Math.min(segH, full.height - sy);
+        if (sw <= 0 || sh <= 0) continue;
+
+        const cc = document.createElement('canvas');
+        cc.width = segW; cc.height = segH;
+        const cctx = cc.getContext('2d');
+        cctx.imageSmoothingEnabled = true;
+        cctx.imageSmoothingQuality = 'high';
+        cctx.drawImage(full, sx, sy, sw, sh, 0, 0, sw, sh);
+
+        if (doSeam){
+          if (seamMode === 'flipV' || seamMode === 'flipH' || seamMode === 'flip180'){
+            edgeFlipSeam(cc, stripW, seamMode, blend, strict);
+          } else if (seamMode === 'crossfade'){
+            crossfadeH(cc, stripW);
+          }
+        }
+
+        const num = pad ? String(globalIdx).padStart(3, '0') : String(globalIdx);
+        const name = prefix + num + '.png';
+        splitResults.push({ name, canvas: cc });
+        globalIdx++;
+      }
+    }
+    await nextFrame();
+  }
+
+  const host = $('#previewSplit');
+  splitResults.forEach((r, i) => {
+    if (i >= 40) return;
+    renderThumb(host, r.canvas, r.name, r.canvas.width + '×' + r.canvas.height);
+  });
+  if (splitResults.length > 40){
+    const more = document.createElement('div');
+    more.className = 'hint';
+    more.style.width = '100%';
+    more.textContent = '（仅预览前 40 段，实际会输出 ' + splitResults.length + ' 段）';
+    host.appendChild(more);
+  }
+
+  status.textContent = '✔ 切出 ' + splitResults.length + ' 段，正在打包…';
+  await downloadCanvasZip(splitResults, 'split-backgrounds.zip');
+  status.textContent = '✔ 已下载 split-backgrounds.zip（' + splitResults.length + ' 段）';
+};
+
+/* =====================================================================
+   ③ 资源清单
+   ===================================================================== */
+const ITEM_NAMES = [
+  'ssh68','ssh68m','kolpak','6b47','6b47m','altyn','kiver','kiverrsp','maska','zsh12m',
+  'rbrp','caiman','6b26','balaclava','shemagh','gaiter','gp7','pmk2','pmk3','pmks',
+  'alfa','tacgoggle','ballglasses','nomexhood','paca','6b13','6b13m','6b23','6b231','6b43',
+  'zhuk6a','zhuk3','defender2','korakulon','cargopants','6sh122','6sh104','6sh112',
+  'workboots','tactboots','lowaz','haix','belleville','bplarge',
+  'aks74u','aks74un','ak74n','ak74m','akm','akms','akMN','ak103','ak104','ak105',
+  'ak12','an94','asval','9a91','sr3m','vss','svd','sv98','rpk16','rpk74',
+  'pkm','pkp','pp19','pm','pb','mp443','aps','mp133','mp153','mp155',
+  'saiga12','toz106','ks23','6kh2','6kh5','m9bayonet','kukri','kabar',
+  'f1','rgd5','rgo','rgn','vog17','vog25',
+  'bandage','water','ai2','painkiller','tushonka','splint','salewa','ifak','grizzly','surv12'
+];
+const BOSS_NAMES = ['factory_king','lab_queen','road_tyrant','swamp_hydra','core_omega'];
+const BUILDING_NAMES = [
+  'control','workbench','storage','toilet','rest','generator','medbay','radio','armory'
+];
+const REGION_ROUTES = [
+  ['factory', [8, 6, 5]],
+  ['lab',     [6, 6, 5]],
+  ['road',    [6, 5, 4]],
+  ['swamp',   [6, 4]],
+  ['core',    [5, 4]]
+];
+
+function buildBgNames(){
+  const out = [];
+  for (const [region, routes] of REGION_ROUTES){
+    routes.forEach((count, ri) => {
+      for (let ni = 0; ni < count; ni++){
+        out.push(region + '_r' + ri + '_n' + ni + '.png');
+      }
+    });
+  }
+  return out;
+}
+
+function buildManifestText(){
+  const bg = buildBgNames();
+  const L = [];
+  L.push('==============================================');
+  L.push('  废土素材工厂 · 资源清单');
+  L.push('  生成时间：' + new Date().toLocaleString());
+  L.push('==============================================');
+  L.push('');
+  L.push('【icons/items/】 64×64 透明 PNG — ' + ITEM_NAMES.length + ' 个');
+  L.push('----------------------------------------------');
+  ITEM_NAMES.forEach((n, i) => L.push(String(i + 1).padStart(3, ' ') + '.  icons/items/' + n + '.png'));
+  L.push('');
+  L.push('【icons/bosses/】 128×128 透明 PNG — ' + BOSS_NAMES.length + ' 个');
+  L.push('----------------------------------------------');
+  BOSS_NAMES.forEach((n, i) => L.push(String(i + 1).padStart(3, ' ') + '.  icons/bosses/' + n + '.png'));
+  L.push('');
+  L.push('【icons/buildings/】 128×128 透明 PNG — ' + BUILDING_NAMES.length + ' 个');
+  L.push('----------------------------------------------');
+  BUILDING_NAMES.forEach((n, i) => L.push(String(i + 1).padStart(3, ' ') + '.  icons/buildings/' + n + '.png'));
+  L.push('');
+  L.push('【images/bg/】 1024×512 横向无缝背景 PNG — ' + bg.length + ' 张');
+  L.push('----------------------------------------------');
+  bg.forEach((n, i) => L.push(String(i + 1).padStart(3, ' ') + '.  images/bg/' + n));
+  L.push('');
+  L.push('==============================================');
+  L.push('  合计：' + (ITEM_NAMES.length + BOSS_NAMES.length + BUILDING_NAMES.length + bg.length) + ' 个文件');
+  L.push('==============================================');
+  return L.join('\n');
+}
+
+function buildBgListText(){
+  const L = [];
+  const regionCN = {
+    factory: '废弃工厂', lab: '废弃实验室', road: '郊区公路',
+    swamp: '辐射沼泽', core: '废土核心'
+  };
+  L.push('==============================================');
+  L.push('  背景滚动图清单（按区域/路线）');
+  L.push('  尺寸：1024 × 512，横向无缝 PNG');
+  L.push('  共 70 张');
+  L.push('==============================================');
+  L.push('');
+  let total = 0;
+  for (const [region, routes] of REGION_ROUTES){
+    const sub = routes.reduce((a, b) => a + b, 0);
+    total += sub;
+    L.push('◆ ' + regionCN[region] + '（' + region + '）— ' + sub + ' 张');
+    routes.forEach((count, ri) => {
+      L.push('  · 路线 r' + ri + '（' + count + ' 个节点）');
+      for (let ni = 0; ni < count; ni++){
+        L.push('      images/bg/' + region + '_r' + ri + '_n' + ni + '.png');
+      }
+    });
+    L.push('');
+  }
+  L.push('----------------------------------------------');
+  L.push('  合计：' + total + ' 张');
+  L.push('==============================================');
+  return L.join('\n');
+}
+
+$('#genTxt').onclick = () => {
+  const txt = buildManifestText();
+  $('#manifestText').value = txt;
+  saveBlob(new Blob([txt], { type: 'text/plain;charset=utf-8' }), '资源清单.txt');
+  $('#statusManifest').textContent = '✔ 已下载 资源清单.txt';
+};
+
+$('#genBgList').onclick = () => {
+  const txt = buildBgListText();
+  $('#manifestText').value = txt;
+  saveBlob(new Blob([txt], { type: 'text/plain;charset=utf-8' }), '背景清单.txt');
+  $('#statusManifest').textContent = '✔ 已下载 背景清单.txt';
+};
+
+$('#genPlaceholder').onclick = async () => {
+  const status = $('#statusManifest');
+  status.textContent = '正在生成占位图…';
+
+  function ph(label, w, h, sub){
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(58,47,37,0.35)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(224,162,74,0.75)';
+    ctx.lineWidth = Math.max(1, Math.round(w / 64));
+    ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
+
+    const fs = Math.max(7, Math.round(w / 14));
+    ctx.fillStyle = '#e0a24a';
+    ctx.font = 'bold ' + fs + 'px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const text = label.length > 14 ? label.slice(0, 13) + '…' : label;
+    ctx.fillText(text, w / 2, h / 2 - (sub ? fs * 0.6 : 0));
+
+    if (sub){
+      ctx.font = Math.round(fs * 0.7) + 'px "Segoe UI", sans-serif';
+      ctx.fillStyle = 'rgba(216,207,194,0.7)';
+      ctx.fillText(sub, w / 2, h / 2 + fs * 0.8);
+    }
+    return c;
+  }
+
+  const items = [];
+  for (const n of ITEM_NAMES) items.push({ name: 'icons/items/' + n + '.png', canvas: ph(n, 64, 64, '') });
+  for (const n of BOSS_NAMES) items.push({ name: 'icons/bosses/' + n + '.png', canvas: ph(n, 128, 128, 'BOSS') });
+  for (const n of BUILDING_NAMES) items.push({ name: 'icons/buildings/' + n + '.png', canvas: ph(n, 128, 128, 'BLDG') });
+  for (const n of buildBgNames()) items.push({ name: 'images/bg/' + n, canvas: ph(n.replace('.png',''), 1024, 512, '1024×512') });
+
+  status.textContent = '打包 ' + items.length + ' 个占位文件…';
+  await downloadCanvasZip(items, 'placeholder-assets.zip');
+  status.textContent = '✔ 已下载 placeholder-assets.zip（' + items.length + ' 个）';
+};
+
+/* =====================================================================
+   初始化
+   ===================================================================== */
+(function init(){
+  $('#presetRow2').style.display = 'none';
+  $('#customRow2').style.display = 'none';
+  $('#fitWrap2').style.display = 'none';
+  updateMethodDesc();
+  $('#manifestText').value = buildBgListText();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>☢ 废土素材工厂 · 批量图片处理台</title>
+<style>
+:root{
+  --bg:#14110e; --panel:#1e1a16; --panel2:#262019; --line:#3a2f25;
+  --amber:#e0a24a; --amber2:#b8802f; --text:#d8cfc2; --muted:#8c8175;
+  --ok:#7aa95c; --danger:#c25b4a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font:14px/1.65 "Segoe UI",system-ui,-apple-system,"Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+header{
+  padding:22px 26px 16px; border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#241d16,#14110e);
+}
+header h1{margin:0;font-size:20px;letter-spacing:2px;color:var(--amber);font-weight:600}
+header p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+
+nav.tabs{display:flex;flex-wrap:wrap;gap:2px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.tab-btn{
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--muted);padding:12px 16px;font-size:13px;cursor:pointer;font-family:inherit;
+  transition:.15s;
+}
+.tab-btn:hover{color:var(--text);background:#241e18}
+.tab-btn.active{color:var(--amber);border-bottom-color:var(--amber);background:#241e18}
+
+main{padding:20px}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+.cols{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.panel{
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:16px;flex:1 1 320px;min-width:300px;
+}
+.panel h3{
+  margin:0 0 14px;font-size:13px;letter-spacing:1.5px;color:var(--amber);
+  text-transform:uppercase;font-weight:600;
+  border-bottom:1px dashed var(--line);padding-bottom:8px;
+}
+
+label.f{display:block;margin:10px 0 4px;font-size:12px;color:var(--muted)}
+input[type=text],input[type=number],select{
+  width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:4px;padding:7px 9px;font-family:inherit;font-size:13px;outline:none;
+}
+input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--amber2)}
+input[type=color]{
+  width:100%;height:32px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:4px;padding:2px;cursor:pointer;
+}
+input[type=range]{width:100%;accent-color:var(--amber)}
+input[type=checkbox]{accent-color:var(--amber);width:15px;height:15px;vertical-align:-2px}
+
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1}
+.row.tight>*{flex:0 0 auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+button{
+  font-family:inherit;font-size:13px;cursor:pointer;border-radius:4px;
+  padding:9px 16px;border:1px solid var(--line);background:var(--panel2);color:var(--text);
+  transition:.15s;
+}
+button:hover{background:#302820;border-color:var(--amber2)}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.primary{
+  background:linear-gradient(180deg,#e0a24a,#b8802f);color:#1a1410;font-weight:700;
+  border-color:#e0a24a;letter-spacing:.5px;
+}
+button.primary:hover{background:linear-gradient(180deg,#f0b25a,#c8902f)}
+button.ghost{background:transparent}
+button.link{background:none;border:none;color:var(--amber);padding:0;text-decoration:underline;font-size:13px}
+
+.drop{
+  border:2px dashed var(--line);border-radius:6px;padding:26px 14px;text-align:center;
+  color:var(--muted);font-size:13px;transition:.15s;background:#1a1613;cursor:pointer;
+}
+.drop.over{border-color:var(--amber);background:#2a2119;color:var(--amber)}
+
+.filelist{max-height:190px;overflow:auto;margin-top:12px;font-size:12px;color:var(--muted)}
+.filelist div{padding:3px 6px;border-bottom:1px solid #221d18;display:flex;justify-content:space-between;gap:8px}
+.filelist div span:last-child{color:#5f564c;flex:0 0 auto}
+
+.checker{
+  background-color:#1a1714;
+  background-image:
+    linear-gradient(45deg,#2a2622 25%,transparent 25%),
+    linear-gradient(-45deg,#2a2622 25%,transparent 25%),
+    linear-gradient(45deg,transparent 75%,#2a2622 75%),
+    linear-gradient(-45deg,transparent 75%,#2a2622 75%);
+  background-size:12px 12px;
+  background-position:0 0,0 6px,6px -6px,-6px 0;
+}
+
+.preview{
+  display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;min-height:80px;
+  max-height:420px;overflow:auto;padding:10px;border-radius:4px;
+}
+.thumb{width:104px;text-align:center}
+.thumb canvas{
+  display:block;margin:0 auto;image-rendering:pixelated;
+  border:1px solid var(--line);border-radius:3px;
+}
+.thumb span{display:block;font-size:10px;color:var(--muted);margin-top:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.progress{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:12px}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#b8802f,#e0a24a);transition:width .15s}
+.status{font-size:12px;color:var(--muted);margin-top:6px;min-height:18px}
+
+.hint{font-size:11.5px;color:#6f665c;margin-top:6px;line-height:1.5}
+.sep{height:1px;background:var(--line);margin:14px 0}
+details{border:1px solid var(--line);border-radius:4px;margin-bottom:8px;background:#1a1613}
+summary{padding:9px 12px;cursor:pointer;font-size:12.5px;color:var(--amber);user-select:none;outline:none}
+summary::marker{color:var(--amber2)}
+details>div{padding:0 12px 14px}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;
+  background:#2f2720;color:var(--amber);border:1px solid var(--line);margin-right:4px}
+textarea{width:100%;height:200px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--text);border-radius:4px;padding:10px;font-family:ui-monospace,Consolas,monospace;
+  font-size:12px;resize:vertical;outline:none}
+
+/* 取色区 */
+.seedWrap{margin-top:10px;padding:10px;background:#1a1613;border:1px solid var(--line);border-radius:4px}
+.seedCanvasWrap{
+  display:inline-block;position:relative;max-width:100%;
+  border:1px solid var(--line);border-radius:3px;overflow:hidden;
+  cursor:crosshair;line-height:0;
+}
+.seedCanvasWrap canvas{display:block;max-width:100%;image-rendering:pixelated}
+.seedChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:22px}
+.seedChip{
+  width:22px;height:22px;border-radius:3px;border:1px solid #000;
+  box-shadow:0 0 0 1px var(--line) inset;position:relative;cursor:help;
+}
+.seedChip::after{
+  content:'';position:absolute;inset:0;
+  box-shadow:0 0 0 1px rgba(255,255,255,.25) inset;
+}
+
+@media (max-width:700px){
+  .cols{flex-direction:column}
+  .panel{min-width:auto;width:100%}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>☢ 废土素材工厂 · 批量图片处理台</h1>
+  <p>边缘感知去背 · 手动取色种子 · 羽化 · 裁切 · 统一尺寸 · 描边 · 投影 · 精灵图拼接切分 · 无缝背景 —— 全部本地处理，不联网、不上传</p>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="batch">① 批量图标处理</button>
+  <button class="tab-btn" data-tab="sheet">② 精灵图拼接</button>
+  <button class="tab-btn" data-tab="slice">③ 精灵图切分</button>
+  <button class="tab-btn" data-tab="seamless">④ 背景无缝处理</button>
+  <button class="tab-btn" data-tab="manifest">⑤ 资源清单 / 占位图</button>
+</nav>
+
+<main>
+
+<!-- ============ ① 批量图标处理 ============ -->
+<section id="tab-batch" class="tab-panel active">
+  <div class="cols">
+
+    <!-- 选择图片 -->
+    <div class="panel">
+      <h3>1 · 选择图片</h3>
+      <div class="drop" id="dropBatch">
+        <input type="file" id="fileBatch" multiple accept="image/*" hidden>
+        <div>拖入图片到此处<br>或 <button class="link" id="pickBatch" type="button">点击选择</button></div>
+        <div class="hint">支持 PNG / JPG / WEBP / GIF（取首帧）</div>
+      </div>
+      <div class="filelist" id="listBatch"></div>
+      <div class="row tight" style="margin-top:12px">
+        <button class="ghost" id="clearBatch" type="button">清空列表</button>
+      </div>
+      <div class="hint">文件名保持原样（仅扩展名改为 .png），可在右侧加前缀 / 后缀。</div>
+    </div>
+
+    <!-- 参数 -->
+    <div class="panel" style="flex:1 1 400px">
+      <h3>2 · 处理参数</h3>
+
+      <details open>
+        <summary>◆ 输出尺寸</summary>
+        <div>
+          <label class="f">尺寸模式</label>
+          <select id="sizeMode">
+            <option value="preset" selected>固定尺寸（预设）</option>
+            <option value="custom">固定尺寸（自定义）</option>
+            <option value="keep">保持原尺寸</option>
+          </select>
+
+          <label class="f">预设</label>
+          <select id="sizePreset">
+            <option value="64x64" selected>64 × 64 — 物品图标</option>
+            <option value="128x128">128 × 128 — Boss / 建筑</option>
+            <option value="144x192">144 × 192 — 人物单帧</option>
+            <option value="1024x512">1024 × 512 — 背景</option>
+            <option value="256x256">256 × 256 — 大图标</option>
+          </select>
+
+          <div class="grid2" id="customSize" style="display:none">
+            <div><label class="f">宽</label><input type="number" id="sizeW" value="64" min="1" max="4096"></div>
+            <div><label class="f">高</label><input type="number" id="sizeH" value="64" min="1" max="4096"></div>
+          </div>
+
+          <label class="f">适配方式</label>
+          <select id="fitMode">
+            <option value="contain" selected>contain — 完整放入并居中（推荐）</option>
+            <option value="cover">cover — 填满并裁切</option>
+            <option value="stretch">stretch — 强制拉伸</option>
+          </select>
+        </div>
+      </details>
+
+      <details open>
+        <summary>◆ 去背景（边缘感知泛洪）</summary>
+        <div>
+          <label class="f">去背模式</label>
+          <select id="bgMode">
+            <option value="auto" selected>自动 — 边缘感知泛洪（推荐）</option>
+            <option value="color">纯色键 — 全局删色（慎用，会破洞）</option>
+            <option value="none">不去背</option>
+          </select>
+
+          <label class="f">容差 <b id="tolVal">18</b>
+            <span class="hint" style="display:inline;margin:0">（越小越精准）</span>
+          </label>
+          <input type="range" id="tolerance" min="0" max="120" value="18">
+          <div class="hint">
+            颜色与背景差异在此值内的像素才可能被抠除。
+            <b>元素含与背景相近颜色时，调到 12~20</b>。
+          </div>
+
+          <label class="f">边缘保护强度 <b id="guardVal">28</b></label>
+          <input type="range" id="edgeGuard" min="0" max="120" value="28">
+          <div class="hint">
+            相邻像素颜色差异超过此值时停止泛洪。<b>元素含与背景相近颜色时，调到 15~25</b>。
+            调到 0 = 关闭保护（旧行为，易破洞）。
+          </div>
+
+          <label class="f">边缘羽化 <b id="featherVal">0.4</b></label>
+          <input type="range" id="feather" min="0" max="1" step="0.1" value="0.4">
+          <div class="hint">让抠图边界半透明过渡，避免锯齿。0 = 不羽化。</div>
+
+          <div class="sep"></div>
+
+          <div class="seedWrap">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <b style="font-size:12px;color:var(--amber)">🎯 手动背景取色（可选）</b>
+              <button id="clearSeed" type="button" class="ghost" style="padding:4px 10px;font-size:11.5px">清空</button>
+            </div>
+            <div class="hint" style="margin-top:4px">
+              若自动采样不准，在下方原图上点击几处真正的背景，让算法拿到准确种子色。
+            </div>
+            <div id="seedCanvasHost" style="margin-top:8px">
+              <div class="hint" style="padding:14px;text-align:center;color:#5f564c">
+                请先在上方添加图片
+              </div>
+            </div>
+            <div class="seedChips" id="seedChips"></div>
+            <div class="hint" id="seedInfo">未手动取色（仅靠四边自动采样）</div>
+          </div>
+
+          <div class="sep"></div>
+
+          <label class="f">边缘收缩（像素，去除残留杂边）</label>
+          <select id="edgeShrink">
+            <option value="0" selected>0 — 不收缩</option>
+            <option value="1">1 px</option>
+            <option value="2">2 px</option>
+          </select>
+
+          <div id="keyColorWrap" style="display:none">
+            <label class="f">键控颜色（纯色键模式）</label>
+            <input type="color" id="keyColor" value="#ffffff">
+          </div>
+        </div>
+      </details>
+
+      <details open>
+        <summary>◆ 裁切与美化</summary>
+        <div>
+          <label class="f"><input type="checkbox" id="trim" checked> 自动裁掉透明边距（紧贴内容）</label>
+
+          <div class="sep"></div>
+          <label class="f"><input type="checkbox" id="outlineOn" checked> 添加统一描边</label>
+          <div class="grid2">
+            <div><label class="f">描边色</label><input type="color" id="outlineColor" value="#3a2f25"></div>
+            <div><label class="f">宽度(px)</label><input type="number" id="outlineWidth" value="1" min="1" max="6"></div>
+          </div>
+
+          <div class="sep"></div>
+          <label class="f"><input type="checkbox" id="shadowOn"> 添加右下投影</label>
+          <div class="grid2">
+            <div><label class="f">偏移 X</label><input type="number" id="shadowX" value="2" min="-8" max="8"></div>
+            <div><label class="f">偏移 Y</label><input type="number" id="shadowY" value="3" min="-8" max="8"></div>
+          </div>
+          <div class="grid2">
+            <div><label class="f">模糊</label><input type="number" id="shadowBlur" value="3" min="0" max="12"></div>
+            <div><label class="f">不透明度</label><input type="number" id="shadowAlpha" value="0.4" min="0" max="1" step="0.05"></div>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>◆ 统一调色（可选）</summary>
+        <div>
+          <label class="f">饱和度 % <b id="satVal">100</b></label>
+          <input type="range" id="sat" min="0" max="150" value="100">
+          <label class="f">亮度 % <b id="briVal">100</b></label>
+          <input type="range" id="bri" min="50" max="150" value="100">
+          <label class="f">对比度 % <b id="conVal">100</b></label>
+          <input type="range" id="con" min="50" max="150" value="100">
+          <div class="hint">建议：饱和度 75% / 亮度 98% / 对比度 108% → 低饱和废土味</div>
+        </div>
+      </details>
+
+      <details>
+        <summary>◆ 输出命名</summary>
+        <div>
+          <div class="grid2">
+            <div><label class="f">前缀</label><input type="text" id="namePrefix" placeholder="例：icon_"></div>
+            <div><label class="f">后缀</label><input type="text" id="nameSuffix" placeholder="例：_64"></div>
+          </div>
+          <label class="f">ZIP 文件名</label>
+          <input type="text" id="zipName" value="processed-icons.zip">
+        </div>
+      </details>
+    </div>
+
+    <!-- 输出 -->
+    <div class="panel">
+      <h3>3 · 一键处理</h3>
+      <button class="primary" id="runBatch" type="button" style="width:100%">⚡ 一键处理全部并打包下载</button>
+      <div class="progress"><i id="bar"></i></div>
+      <div class="status" id="status">等待添加图片…</div>
+      <div class="sep"></div>
+      <button id="previewOnly" type="button" style="width:100%">仅预览（不下载）</button>
+      <button id="dlZip" type="button" style="width:100%;margin-top:8px" disabled>重新下载上次结果</button>
+      <div class="preview checker" id="previewBatch"></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ ② 精灵图拼接 ============ -->
+<section id="tab-sheet" class="tab-panel">
+  <div class="cols">
+    <div class="panel">
+      <h3>1 · 选择帧图片</h3>
+      <div class="drop" id="dropSheet">
+        <input type="file" id="fileSheet" multiple accept="image/*" hidden>
+        <div>拖入帧序列图片<br>或 <button class="link" id="pickSheet" type="button">点击选择</button></div>
+        <div class="hint">顺序按文件名自然排序（frame_01、frame_02…）</div>
+      </div>
+      <div class="filelist" id="listSheet"></div>
+      <div class="row tight" style="margin-top:12px">
+        <button class="ghost" id="clearSheet" type="button">清空</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>2 · 拼接参数</h3>
+      <div class="grid2">
+        <div><label class="f">单帧宽（留空=自动取最大）</label><input type="number" id="sheetFrameW" placeholder="144"></div>
+        <div><label class="f">单帧高（留空=自动取最大）</label><input type="number" id="sheetFrameH" placeholder="192"></div>
+      </div>
+      <label class="f">排列方向</label>
+      <select id="sheetDir">
+        <option value="h" selected>横向一排（行走 / 换弹动画）</option>
+        <option value="v">纵向一列</option>
+        <option value="grid">网格</option>
+      </select>
+      <label class="f">网格列数（仅网格模式）</label>
+      <input type="number" id="sheetCols" value="6" min="1" max="64">
+      <label class="f"><input type="checkbox" id="sheetTrim" checked> 每帧自动裁掉透明边后再居中</label>
+      <div class="hint">输出尺寸 = 单帧宽 × 列数 ， 单帧高 × 行数</div>
+
+      <div class="sep"></div>
+      <button class="primary" id="runSheet" type="button" style="width:100%">⚡ 生成精灵图</button>
+      <div class="status" id="statusSheet"></div>
+      <button id="dlSheet" type="button" style="width:100%;margin-top:8px" disabled>下载精灵图 PNG</button>
+    </div>
+
+    <div class="panel">
+      <h3>3 · 预览</h3>
+      <div class="preview checker" id="previewSheet" style="max-height:520px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ③ 精灵图切分 ============ -->
+<section id="tab-slice" class="tab-panel">
+  <div class="cols">
+    <div class="panel">
+      <h3>1 · 选择精灵图</h3>
+      <div class="drop" id="dropSlice">
+        <input type="file" id="fileSlice" accept="image/*" hidden>
+        <div>拖入一张精灵图（Sprite Sheet）<br>或 <button class="link" id="pickSlice" type="button">点击选择</button></div>
+      </div>
+      <div class="filelist" id="listSlice"></div>
+    </div>
+
+    <div class="panel">
+      <h3>2 · 切分参数</h3>
+      <div class="grid2">
+        <div><label class="f">单帧宽</label><input type="number" id="sliceW" value="144" min="1"></div>
+        <div><label class="f">单帧高</label><input type="number" id="sliceH" value="192" min="1"></div>
+      </div>
+      <label class="f">起始序号</label>
+      <input type="number" id="sliceStart" value="0" min="0">
+      <label class="f">文件名前缀</label>
+      <input type="text" id="slicePrefix" value="frame_">
+      <label class="f"><input type="checkbox" id="sliceTrim"> 每帧自动裁掉透明边（尺寸将不统一）</label>
+      <label class="f"><input type="checkbox" id="slicePad" checked> 序号补零（frame_00.png）</label>
+
+      <div class="sep"></div>
+      <button class="primary" id="runSlice" type="button" style="width:100%">⚡ 切分并打包下载</button>
+      <div class="status" id="statusSlice"></div>
+    </div>
+
+    <div class="panel">
+      <h3>3 · 预览</h3>
+      <div class="preview checker" id="previewSlice"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ④ 背景无缝处理 ============ -->
+<section id="tab-seamless" class="tab-panel">
+  <div class="cols">
+    <div class="panel">
+      <h3>1 · 选择背景图</h3>
+      <div class="drop" id="dropSeam">
+        <input type="file" id="fileSeam" accept="image/*" multiple hidden>
+        <div>拖入 1024×512 背景图（可多张）<br>或 <button class="link" id="pickSeam" type="button">点击选择</button></div>
+      </div>
+      <div class="filelist" id="listSeam"></div>
+    </div>
+
+    <div class="panel">
+      <h3>2 · 无缝参数</h3>
+      <label class="f">交叉融合宽度（像素）</label>
+      <input type="number" id="seamFade" value="120" min="8" max="512">
+      <div class="hint">把图片右边缘的内容渐入到左边缘，使左右拼接（平铺循环）时看不到接缝。</div>
+
+      <label class="f" style="margin-top:14px"><input type="checkbox" id="seamTrimBg"> 同时执行自动去背（抠掉天空/纯色底）</label>
+
+      <div class="sep"></div>
+      <button class="primary" id="runSeam" type="button" style="width:100%">⚡ 处理并打包下载</button>
+      <div class="status" id="statusSeam"></div>
+    </div>
+
+    <div class="panel" style="flex:1 1 100%">
+      <h3>3 · 拼接预览（左右平铺，检查接缝）</h3>
+      <div class="preview checker" id="previewSeam" style="max-height:560px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ⑤ 资源清单 ============ -->
+<section id="tab-manifest" class="tab-panel">
+  <div class="cols">
+    <div class="panel">
+      <h3>清单生成</h3>
+      <div>
+        <span class="tag">装备 44</span><span class="tag">武器 44</span><span class="tag">消耗品 10</span>
+        <span class="tag">Boss 5</span><span class="tag">建筑 9</span><span class="tag">背景 70</span>
+      </div>
+      <div class="sep"></div>
+      <button id="genTxt" type="button" style="width:100%">📄 生成完整资源清单 TXT</button>
+      <button id="genPlaceholder" type="button" style="width:100%;margin-top:8px">📦 生成占位图 ZIP（按规格尺寸）</button>
+      <button id="genFolders" type="button" style="width:100%;margin-top:8px">🗂 生成目录结构 TXT</button>
+      <div class="status" id="statusManifest"></div>
+      <div class="hint">
+        占位图为透明底 + 文件名标注，尺寸按规格自动匹配：<br>
+        物品图标 64×64 ／ Boss、建筑 128×128 ／ 背景 1024×512。
+      </div>
+    </div>
+    <div class="panel" style="flex:2 1 500px">
+      <h3>清单预览</h3>
+      <textarea id="manifestText" readonly placeholder="点击左侧按钮生成…"></textarea>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* =====================================================================
+   工具函数
+   ===================================================================== */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+function hexToRgb(hex){
+  hex = String(hex).replace('#','');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  const n = parseInt(hex, 16) || 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function loadImageFromFile(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('无法读取：' + file.name)); };
+    img.src = url;
+  });
+}
+
+function canvasFromImage(img){
+  const w = img.naturalWidth || img.width || 1;
+  const h = img.naturalHeight || img.height || 1;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, w, h);
+  return c;
+}
+
+function saveBlob(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+}
+
+function canvasToBytes(canvas){
+  return new Promise(resolve => {
+    canvas.toBlob(async blob => {
+      const buf = await blob.arrayBuffer();
+      resolve(new Uint8Array(buf));
+    }, 'image/png');
+  });
+}
+
+function nextFrame(){ return new Promise(r => setTimeout(r, 0)); }
+
+/* =====================================================================
+   ZIP 打包（STORE 模式，纯手写，无需外部库）
+   ===================================================================== */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(u8){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function zipStore(entries){
+  const enc = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+
+  for (const e of entries){
+    const nameBytes = enc.encode(e.name);
+    const crc = crc32(e.bytes);
+    const size = e.bytes.length;
+
+    const lh = new Uint8Array(30 + nameBytes.length);
+    const dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, dosTime, true);
+    dv.setUint16(12, dosDate, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, size, true);
+    dv.setUint32(22, size, true);
+    dv.setUint16(26, nameBytes.length, true);
+    dv.setUint16(28, 0, true);
+    lh.set(nameBytes, 30);
+
+    localParts.push(lh, e.bytes);
+
+    const ch = new Uint8Array(46 + nameBytes.length);
+    const dv2 = new DataView(ch.buffer);
+    dv2.setUint32(0, 0x02014b50, true);
+    dv2.setUint16(4, 20, true);
+    dv2.setUint16(6, 20, true);
+    dv2.setUint16(8, 0x0800, true);
+    dv2.setUint16(10, 0, true);
+    dv2.setUint16(12, dosTime, true);
+    dv2.setUint16(14, dosDate, true);
+    dv2.setUint32(16, crc, true);
+    dv2.setUint32(20, size, true);
+    dv2.setUint32(24, size, true);
+    dv2.setUint16(28, nameBytes.length, true);
+    dv2.setUint16(30, 0, true);
+    dv2.setUint16(32, 0, true);
+    dv2.setUint16(34, 0, true);
+    dv2.setUint16(36, 0, true);
+    dv2.setUint32(38, 0, true);
+    dv2.setUint32(42, offset, true);
+    ch.set(nameBytes, 46);
+
+    centralParts.push(ch);
+    offset += lh.length + size;
+  }
+
+  let cdSize = 0;
+  for (const c of centralParts) cdSize += c.length;
+
+  const eocd = new Uint8Array(22);
+  const dv3 = new DataView(eocd.buffer);
+  dv3.setUint32(0, 0x06054b50, true);
+  dv3.setUint16(4, 0, true);
+  dv3.setUint16(6, 0, true);
+  dv3.setUint16(8, entries.length, true);
+  dv3.setUint16(10, entries.length, true);
+  dv3.setUint32(12, cdSize, true);
+  dv3.setUint32(16, offset, true);
+  dv3.setUint16(20, 0, true);
+
+  const all = localParts.concat(centralParts);
+  all.push(eocd);
+  return new Blob(all, { type: 'application/zip' });
+}
+
+async function downloadCanvasZip(items, zipName, onProgress){
+  const entries = [];
+  for (let i = 0; i < items.length; i++){
+    const bytes = await canvasToBytes(items[i].canvas);
+    entries.push({ name: items[i].name, bytes });
+    if (onProgress) onProgress(i + 1, items.length);
+    if (i % 8 === 0) await nextFrame();
+  }
+  saveBlob(zipStore(entries), zipName);
+}
+
+/* =====================================================================
+   图像处理核心
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   边缘感知泛洪去背
+   核心改进：
+   - 相邻像素颜色跳跃 > edgeGuard 时停止泛洪 → 不穿透元素边界
+   - 支持手动取色种子，让用户明确指定背景色
+   - 与容差配合：容差决定"像不像背景"，边缘保护决定"跨没跨过边界"
+   --------------------------------------------------------------------- */
+function floodKeyOut(canvas, tolerance, edgeGuard, manualSeeds){
+  const w = canvas.width, h = canvas.height;
+  if (!w || !h) return;
+  const ctx = canvas.getContext('2d');
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+
+  /* 1. 采集种子：边缘 8 点 + 用户手动取色 */
+  const rawSeeds = [];
+  const pts = [
+    [0,0],[w-1,0],[0,h-1],[w-1,h-1],
+    [w>>1,0],[w>>1,h-1],[0,h>>1],[w-1,h>>1]
+  ];
+  for (const [x,y] of pts){
+    const p = (y*w + x) * 4;
+    if (d[p+3] > 8) rawSeeds.push([d[p], d[p+1], d[p+2]]);
+  }
+  if (manualSeeds && manualSeeds.length) rawSeeds.push(...manualSeeds);
+  if (!rawSeeds.length) return;
+
+  /* 2. 相似种子合并（避免重复计算） */
+  const seeds = [];
+  for (const s of rawSeeds){
+    let dup = false;
+    for (const u of seeds){
+      const dist = Math.max(
+        Math.abs(s[0]-u[0]), Math.abs(s[1]-u[1]), Math.abs(s[2]-u[2])
+      );
+      if (dist <= Math.max(6, tolerance * 0.5)) { dup = true; break; }
+    }
+    if (!dup) seeds.push(s);
+  }
+
+  /* 3. 颜色是否像背景 */
+  const matchesBg = (idx) => {
+    const p = idx * 4;
+    if (d[p+3] === 0) return true;
+    const r = d[p], g = d[p+1], b = d[p+2];
+    let best = 999;
+    for (let i = 0; i < seeds.length; i++){
+      const dist = Math.max(
+        Math.abs(r - seeds[i][0]),
+        Math.abs(g - seeds[i][1]),
+        Math.abs(b - seeds[i][2])
+      );
+      if (dist < best) best = dist;
+    }
+    return best <= tolerance;
+  };
+
+  /* 4. 相邻像素颜色跳跃度 */
+  const colorJump = (a, b) => {
+    const pa = a*4, pb = b*4;
+    return Math.max(
+      Math.abs(d[pa]   - d[pb]),
+      Math.abs(d[pa+1] - d[pb+1]),
+      Math.abs(d[pa+2] - d[pb+2])
+    );
+  };
+
+  /* 5. 泛洪（带边缘保护） */
+  const visited = new Uint8Array(w * h);
+  const stack = new Int32Array(w * h);
+  let sp = 0;
+
+  const tryVisit = (idx, fromIdx) => {
+    if (visited[idx]) return;
+    if (!matchesBg(idx)) return;
+    /* 关键：与来源像素跳跃过大 → 是元素边界，不穿透 */
+    if (fromIdx >= 0 && edgeGuard > 0 && colorJump(idx, fromIdx) > edgeGuard){
+      return;
+    }
+    visited[idx] = 1;
+    stack[sp++] = idx;
+  };
+
+  for (let x = 0; x < w; x++){
+    tryVisit(x, -1);
+    tryVisit((h-1)*w + x, -1);
+  }
+  for (let y = 0; y < h; y++){
+    tryVisit(y*w, -1);
+    tryVisit(y*w + w - 1, -1);
+  }
+
+  while (sp > 0){
+    const idx = stack[--sp];
+    const x = idx % w;
+    const y = (idx - x) / w;
+    if (x > 0)     tryVisit(idx - 1, idx);
+    if (x < w - 1) tryVisit(idx + 1, idx);
+    if (y > 0)     tryVisit(idx - w, idx);
+    if (y < h - 1) tryVisit(idx + w, idx);
+  }
+
+  /* 6. 写入透明 */
+  for (let i = 0; i < w * h; i++){
+    if (visited[i]) d[i*4 + 3] = 0;
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+/* --- 边缘羽化：让抠图边界半透明过渡，消除锯齿 --- */
+function featherAlpha(canvas, strength){
+  if (strength <= 0) return;
+  const w = canvas.width, h = canvas.height;
+  if (w < 3 || h < 3) return;
+  const ctx = canvas.getContext('2d');
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+
+  const alpha = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) alpha[i] = d[i*4+3];
+
+  /* 半径：strength 0~1 → 1~3 像素 */
+  const r = Math.max(1, Math.round(strength * 3));
+
+  /* 分离式盒式模糊，速度快 */
+  const tmp = new Float32Array(w * h);
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < w; x++){
+      let sum = 0, count = 0;
+      for (let dx = -r; dx <= r; dx++){
+        const nx = x + dx;
+        if (nx < 0 || nx >= w) continue;
+        sum += alpha[y*w + nx];
+        count++;
+      }
+      tmp[y*w + x] = sum / count;
+    }
+  }
+  const blurred = new Float32Array(w * h);
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < w; x++){
+      let sum = 0, count = 0;
+      for (let dy = -r; dy <= r; dy++){
+        const ny = y + dy;
+        if (ny < 0 || ny >= h) continue;
+        sum += tmp[ny*w + x];
+        count++;
+      }
+      blurred[y*w + x] = sum / count;
+    }
+  }
+
+  /* 只在边界像素上应用（保留实体内部 alpha） */
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < w; x++){
+      const i = y*w + x;
+      let nearEdge = false;
+      for (let dy = -1; dy <= 1 && !nearEdge; dy++){
+        for (let dx = -1; dx <= 1; dx++){
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          if (alpha[ny*w + nx] < 30){ nearEdge = true; break; }
+        }
+      }
+      if (nearEdge){
+        d[i*4+3] = Math.round(blurred[i]);
+      }
+    }
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+/* --- 纯色键去背（全局删色，兜底方案） --- */
+function colorKeyOut(canvas, hex, tolerance){
+  const w = canvas.width, h = canvas.height;
+  if (!w || !h) return;
+  const ctx = canvas.getContext('2d');
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+  const [kr, kg, kb] = hexToRgb(hex);
+  for (let i = 0; i < w * h; i++){
+    const p = i * 4;
+    if (d[p + 3] === 0) continue;
+    const dist = Math.max(
+      Math.abs(d[p] - kr),
+      Math.abs(d[p + 1] - kg),
+      Math.abs(d[p + 2] - kb)
+    );
+    if (dist <= tolerance) d[p + 3] = 0;
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+/* --- Alpha 腐蚀（去杂边） --- */
+function erodeAlpha(canvas, px){
+  if (px <= 0) return;
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+  const alpha = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) alpha[i] = d[i * 4 + 3];
+
+  let cur = alpha;
+  for (let k = 0; k < px; k++){
+    const next = new Uint8Array(cur);
+    for (let y = 0; y < h; y++){
+      for (let x = 0; x < w; x++){
+        const i = y * w + x;
+        if (!cur[i]) continue;
+        if (x === 0 || y === 0 || x === w - 1 || y === h - 1){
+          next[i] = 0; continue;
+        }
+        if (!cur[i-1] || !cur[i+1] || !cur[i-w] || !cur[i+w]) next[i] = 0;
+      }
+    }
+    cur = next;
+  }
+  for (let i = 0; i < w * h; i++) d[i * 4 + 3] = cur[i];
+  ctx.putImageData(id, 0, 0);
+}
+
+/* --- 裁掉透明边 --- */
+function trimTransparent(canvas, threshold = 8){
+  const w = canvas.width, h = canvas.height;
+  if (!w || !h) return canvas;
+  const ctx = canvas.getContext('2d');
+  const d = ctx.getImageData(0, 0, w, h).data;
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+
+  for (let y = 0; y < h; y++){
+    const row = y * w;
+    for (let x = 0; x < w; x++){
+      if (d[(row + x) * 4 + 3] > threshold){
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return canvas;
+  const nw = maxX - minX + 1, nh = maxY - minY + 1;
+  if (nw === w && nh === h) return canvas;
+
+  const out = document.createElement('canvas');
+  out.width = nw; out.height = nh;
+  out.getContext('2d').drawImage(canvas, minX, minY, nw, nh, 0, 0, nw, nh);
+  return out;
+}
+
+/* --- 缩放 + 居中 --- */
+function fitCanvas(src, tw, th, mode){
+  const out = document.createElement('canvas');
+  out.width = Math.max(1, tw);
+  out.height = Math.max(1, th);
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const sw = src.width, sh = src.height;
+  if (!sw || !sh) return out;
+
+  let dw, dh, dx, dy;
+  if (mode === 'stretch'){
+    dw = tw; dh = th; dx = 0; dy = 0;
+  } else {
+    const s = (mode === 'cover')
+      ? Math.max(tw / sw, th / sh)
+      : Math.min(tw / sw, th / sh);
+    dw = sw * s; dh = sh * s;
+    dx = (tw - dw) / 2; dy = (th - dh) / 2;
+  }
+  ctx.drawImage(src, dx, dy, dw, dh);
+  return out;
+}
+
+/* --- 描边 --- */
+function addOutline(canvas, color, width){
+  width = Math.max(1, Math.round(width));
+  const w = canvas.width, h = canvas.height;
+  if (w < 2 || h < 2) return;
+  const ctx = canvas.getContext('2d');
+  const src = ctx.getImageData(0, 0, w, h);
+  const d = src.data;
+
+  const mask = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) mask[i] = d[i * 4 + 3] > 8 ? 1 : 0;
+
+  let cur = mask;
+  for (let k = 0; k < width; k++){
+    const next = new Uint8Array(cur);
+    for (let y = 0; y < h; y++){
+      const row = y * w;
+      for (let x = 0; x < w; x++){
+        const i = row + x;
+        if (cur[i]) continue;
+        if ((x > 0 && cur[i-1]) || (x < w-1 && cur[i+1]) ||
+            (y > 0 && cur[i-w]) || (y < h-1 && cur[i+w])){
+          next[i] = 1;
+        }
+      }
+    }
+    cur = next;
+  }
+
+  const [r, g, b] = hexToRgb(color);
+  const strokeData = new ImageData(w, h);
+  const sd = strokeData.data;
+  for (let i = 0; i < w * h; i++){
+    if (cur[i] && !mask[i]){
+      const p = i * 4;
+      sd[p] = r; sd[p+1] = g; sd[p+2] = b; sd[p+3] = 255;
+    }
+  }
+
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  tmp.getContext('2d').drawImage(canvas, 0, 0);
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.putImageData(strokeData, 0, 0);
+  ctx.drawImage(tmp, 0, 0);
+}
+
+/* --- 投影 --- */
+function addShadow(canvas, dx, dy, blur, alpha, color){
+  const w = canvas.width, h = canvas.height;
+  if (w < 2 || h < 2) return;
+  const ctx = canvas.getContext('2d');
+
+  const base = document.createElement('canvas');
+  base.width = w; base.height = h;
+  base.getContext('2d').drawImage(canvas, 0, 0);
+
+  const sc = document.createElement('canvas');
+  sc.width = w; sc.height = h;
+  const sctx = sc.getContext('2d');
+  sctx.drawImage(base, 0, 0);
+  sctx.globalCompositeOperation = 'source-in';
+  sctx.fillStyle = color;
+  sctx.fillRect(0, 0, w, h);
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if ('filter' in ctx) ctx.filter = 'blur(' + blur + 'px)';
+  ctx.drawImage(sc, dx, dy);
+  ctx.restore();
+  if ('filter' in ctx) ctx.filter = 'none';
+  ctx.drawImage(base, 0, 0);
+}
+
+/* --- 单张完整处理流水线 --- */
+async function processOne(file, o){
+  const img = await loadImageFromFile(file);
+  let c = canvasFromImage(img);
+
+  // 1. 去背
+  if (o.bgMode === 'auto'){
+    floodKeyOut(c, o.tolerance, o.edgeGuard, o.manualSeeds);
+    if (o.feather > 0) featherAlpha(c, o.feather);
+  } else if (o.bgMode === 'color'){
+    colorKeyOut(c, o.keyColor, o.tolerance);
+    if (o.feather > 0) featherAlpha(c, o.feather);
+  }
+
+  // 2. 边缘收缩
+  if (o.bgMode !== 'none' && o.edgeShrink > 0){
+    erodeAlpha(c, o.edgeShrink);
+  }
+
+  // 3. 裁透明边
+  if (o.trim){
+    c = trimTransparent(c, 8);
+  }
+
+  // 4. 目标尺寸
+  let tw = o.width, th = o.height;
+  if (!tw || !th){ tw = c.width; th = c.height; }
+
+  const padRaw = (o.outline ? o.outlineWidth : 0)
+    + (o.shadow ? (o.shadowBlur + Math.max(Math.abs(o.shadowX), Math.abs(o.shadowY))) : 0);
+  const padMax = Math.floor(Math.min(tw, th) / 4);
+  const pad = Math.min(padRaw, padMax);
+
+  const iw = Math.max(1, tw - pad * 2);
+  const ih = Math.max(1, th - pad * 2);
+
+  const scaled = fitCanvas(c, iw, ih, o.fitMode);
+
+  // 5. 合成到输出画布
+  const out = document.createElement('canvas');
+  out.width = tw; out.height = th;
+  const octx = out.getContext('2d');
+  octx.imageSmoothingEnabled = true;
+  octx.imageSmoothingQuality = 'high';
+  if (o.adjust && 'filter' in octx) octx.filter = o.adjust;
+  octx.drawImage(scaled, pad, pad);
+  if ('filter' in octx) octx.filter = 'none';
+
+  // 6. 描边 / 投影
+  if (o.outline) addOutline(out, o.outlineColor, o.outlineWidth);
+  if (o.shadow) addShadow(out, o.shadowX, o.shadowY, o.shadowBlur, o.shadowAlpha, o.shadowColor);
+
+  return out;
+}
+
+/* =====================================================================
+   Tab 切换
+   ===================================================================== */
+$$('.tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + btn.dataset.tab));
+  };
+});
+
+/* =====================================================================
+   通用：拖放 & 文件收集
+   ===================================================================== */
+function bindDrop(dropEl, inputEl, onFiles){
+  ['dragenter','dragover'].forEach(ev => {
+    dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.add('over'); });
+  });
+  ['dragleave','drop'].forEach(ev => {
+    dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.remove('over'); });
+  });
+  dropEl.addEventListener('drop', e => {
+    const files = Array.from(e.dataTransfer.files || []);
+    onFiles(files);
+  });
+  inputEl.addEventListener('change', e => {
+    onFiles(Array.from(e.target.files || []));
+    inputEl.value = '';
+  });
+}
+
+function fmtSize(n){
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
+
+/* =====================================================================
+   ① 批量图标处理
+   ===================================================================== */
+const batchFiles = [];
+const batchResults = [];
+let batchBusy = false;
+let seedSourceCanvas = null;   // 用于取色的原图画布
+
+$('#pickBatch').onclick = e => { e.stopPropagation(); $('#fileBatch').click(); };
+$('#dropBatch').onclick = e => { if (e.target.id !== 'pickBatch') $('#fileBatch').click(); };
+
+bindDrop($('#dropBatch'), $('#fileBatch'), files => {
+  for (const f of files){
+    if (f.type && f.type.startsWith('image/')) batchFiles.push(f);
+  }
+  renderBatchList();
+  refreshSeedCanvas();
+});
+
+function renderBatchList(){
+  const el = $('#listBatch');
+  el.innerHTML = '';
+  batchFiles.forEach(f => {
+    const d = document.createElement('div');
+    d.innerHTML = '<span>' + f.name + '</span><span>' + fmtSize(f.size) + '</span>';
+    el.appendChild(d);
+  });
+  $('#status').textContent = batchFiles.length
+    ? '已载入 ' + batchFiles.length + ' 张图片，可开始处理。'
+    : '等待添加图片…';
+}
+
+$('#clearBatch').onclick = () => {
+  batchFiles.length = 0;
+  batchResults.length = 0;
+  window._manualSeeds = [];
+  $('#previewBatch').innerHTML = '';
+  $('#dlZip').disabled = true;
+  seedSourceCanvas = null;
+  renderBatchList();
+  refreshSeedCanvas();
+  updateSeedUI();
+};
+
+/* --- 取色画布 --- */
+async function refreshSeedCanvas(){
+  const host = $('#seedCanvasHost');
+  if (!batchFiles.length){
+    host.innerHTML = '<div class="hint" style="padding:14px;text-align:center;color:#5f564c">请先在上方添加图片</div>';
+    seedSourceCanvas = null;
+    return;
+  }
+  try {
+    const img = await loadImageFromFile(batchFiles[0]);
+    const full = canvasFromImage(img);
+
+    // 缩放到合适大小显示
+    const maxW = 260;
+    const s = Math.min(maxW / full.width, 1);
+    const disp = document.createElement('canvas');
+    disp.width = Math.round(full.width * s);
+    disp.height = Math.round(full.height * s);
+    const dctx = disp.getContext('2d');
+    dctx.imageSmoothingEnabled = true;
+    dctx.imageSmoothingQuality = 'high';
+    dctx.drawImage(full, 0, 0, disp.width, disp.height);
+
+    host.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'seedCanvasWrap';
+    wrap.appendChild(disp);
+    host.appendChild(wrap);
+
+    seedSourceCanvas = { full, disp, scale: s };
+
+    disp.style.cursor = 'crosshair';
+    disp.onclick = (ev) => {
+      const rect = disp.getBoundingClientRect();
+      const x = Math.round((ev.clientX - rect.left) * disp.width / rect.width);
+      const y = Math.round((ev.clientY - rect.top)  * disp.height / rect.height);
+      const p = dctx.getImageData(x, y, 1, 1).data;
+      if (p[3] < 10) return;
+      window._manualSeeds.push([p[0], p[1], p[2]]);
+      updateSeedUI();
+      // 自动重跑一次预览
+      if (batchFiles.length) runBatch(false);
+    };
+  } catch(e){
+    console.error(e);
+  }
+}
+
+function updateSeedUI(){
+  const chips = $('#seedChips');
+  chips.innerHTML = '';
+  window._manualSeeds.forEach(s => {
+    const c = document.createElement('div');
+    c.className = 'seedChip';
+    c.style.background = 'rgb(' + s.join(',') + ')';
+    c.title = 'rgb(' + s.join(',') + ')';
+    chips.appendChild(c);
+  });
+  const n = window._manualSeeds.length;
+  $('#seedInfo').textContent = n
+    ? '已取色 ' + n + ' 处（点击已取色的色块无法删除，用右侧"清空"按钮重置）'
+    : '未手动取色（仅靠四边自动采样）';
+}
+
+$('#clearSeed').onclick = () => {
+  window._manualSeeds = [];
+  updateSeedUI();
+};
+
+/* 控件联动 */
+$('#sizeMode').onchange = e => {
+  const v = e.target.value;
+  $('#customSize').style.display = v === 'custom' ? '' : 'none';
+  $('#sizePreset').disabled = v !== 'preset';
+  if (v === 'keep') $('#sizePreset').disabled = true;
+};
+$('#bgMode').onchange = e => {
+  $('#keyColorWrap').style.display = e.target.value === 'color' ? '' : 'none';
+};
+$('#tolerance').oninput = e => { $('#tolVal').textContent = e.target.value; };
+$('#edgeGuard').oninput = e => { $('#guardVal').textContent = e.target.value; };
+$('#feather').oninput  = e => { $('#featherVal').textContent = e.target.value; };
+$('#sat').oninput = e => { $('#satVal').textContent = e.target.value; };
+$('#bri').oninput = e => { $('#briVal').textContent = e.target.value; };
+$('#con').oninput = e => { $('#conVal').textContent = e.target.value; };
+
+/* 读取参数 */
+function readOptions(){
+  const sizeMode = $('#sizeMode').value;
+  let width = 0, height = 0;
+
+  if (sizeMode === 'preset'){
+    const parts = $('#sizePreset').value.split('x');
+    width = parseInt(parts[0], 10);
+    height = parseInt(parts[1], 10);
+  } else if (sizeMode === 'custom'){
+    width = parseInt($('#sizeW').value, 10) || 64;
+    height = parseInt($('#sizeH').value, 10) || 64;
+  }
+
+  const sat = parseInt($('#sat').value, 10);
+  const bri = parseInt($('#bri').value, 10);
+  const con = parseInt($('#con').value, 10);
+  const filters = [];
+  if (sat !== 100) filters.push('saturate(' + sat + '%)');
+  if (bri !== 100) filters.push('brightness(' + bri + '%)');
+  if (con !== 100) filters.push('contrast(' + con + '%)');
+
+  return {
+    width, height,
+    fitMode: $('#fitMode').value,
+    bgMode: $('#bgMode').value,
+    tolerance: parseInt($('#tolerance').value, 10),
+    edgeGuard: parseInt($('#edgeGuard').value, 10),
+    feather: parseFloat($('#feather').value),
+    keyColor: $('#keyColor').value,
+    edgeShrink: parseInt($('#edgeShrink').value, 10),
+    trim: $('#trim').checked,
+    outline: $('#outlineOn').checked,
+    outlineColor: $('#outlineColor').value,
+    outlineWidth: parseInt($('#outlineWidth').value, 10) || 1,
+    shadow: $('#shadowOn').checked,
+    shadowX: parseFloat($('#shadowX').value) || 0,
+    shadowY: parseFloat($('#shadowY').value) || 0,
+    shadowBlur: parseFloat($('#shadowBlur').value) || 0,
+    shadowAlpha: parseFloat($('#shadowAlpha').value) || 0.4,
+    shadowColor: '#000000',
+    adjust: filters.join(' '),
+    namePrefix: $('#namePrefix').value,
+    nameSuffix: $('#nameSuffix').value,
+    manualSeeds: window._manualSeeds || []
+  };
+}
+
+function outName(original, o){
+  let base = original.replace(/\.[^.]+$/, '');
+  base = base.replace(/[\\/:*?"<>|]/g, '_');
+  return o.namePrefix + base + o.nameSuffix + '.png';
+}
+
+function renderThumbs(container, results, maxCount){
+  container.innerHTML = '';
+  const limit = Math.min(results.length, maxCount || 80);
+  for (let i = 0; i < limit; i++){
+    const r = results[i];
+    const div = document.createElement('div');
+    div.className = 'thumb';
+
+    const maxSide = 96;
+    const s = Math.min(maxSide / r.canvas.width, maxSide / r.canvas.height, 1);
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(r.canvas.width * s));
+    cv.height = Math.max(1, Math.round(r.canvas.height * s));
+    const c2 = cv.getContext('2d');
+    c2.imageSmoothingEnabled = true;
+    c2.drawImage(r.canvas, 0, 0, cv.width, cv.height);
+
+    const label = document.createElement('span');
+    label.textContent = r.name;
+    label.title = r.canvas.width + '×' + r.canvas.height + ' · ' + r.name;
+
+    div.appendChild(cv);
+    div.appendChild(label);
+    container.appendChild(div);
+  }
+  if (results.length > limit){
+    const more = document.createElement('div');
+    more.className = 'thumb';
+    more.innerHTML = '<span style="padding-top:30px;color:#8c8175">…还有 ' +
+      (results.length - limit) + ' 张</span>';
+    container.appendChild(more);
+  }
+}
+
+async function runBatch(download){
+  if (batchBusy) return;
+  if (!batchFiles.length){ alert('请先添加图片'); return; }
+
+  batchBusy = true;
+  $('#runBatch').disabled = true;
+  $('#previewOnly').disabled = true;
+
+  const o = readOptions();
+  batchResults.length = 0;
+
+  const bar = $('#bar');
+  const status = $('#status');
+
+  for (let i = 0; i < batchFiles.length; i++){
+    const f = batchFiles[i];
+    try {
+      const canvas = await processOne(f, o);
+      batchResults.push({ name: outName(f.name, o), canvas });
+    } catch (err){
+      console.error(err);
+    }
+    const pct = Math.round((i + 1) / batchFiles.length * 100);
+    bar.style.width = pct + '%';
+    status.textContent = '处理中 ' + (i + 1) + ' / ' + batchFiles.length + ' …';
+    await nextFrame();
+  }
+
+  renderThumbs($('#previewBatch'), batchResults, 80);
+  status.textContent = '✔ 完成：成功 ' + batchResults.length + ' / ' + batchFiles.length + ' 张';
+  $('#dlZip').disabled = batchResults.length === 0;
+
+  if (download && batchResults.length){
+    status.textContent += ' · 正在打包 ZIP…';
+    await downloadCanvasZip(batchResults, $('#zipName').value || 'processed-icons.zip',
+      (d, t) => { bar.style.width = Math.round(d / t * 100) + '%'; });
+    status.textContent = '✔ 已下载：' + ($('#zipName').value || 'processed-icons.zip');
+  }
+
+  $('#runBatch').disabled = false;
+  $('#previewOnly').disabled = false;
+  batchBusy = false;
+}
+
+$('#runBatch').onclick = () => runBatch(true);
+$('#previewOnly').onclick = () => runBatch(false);
+$('#dlZip').onclick = async () => {
+  if (!batchResults.length) return;
+  await downloadCanvasZip(batchResults, $('#zipName').value || 'processed-icons.zip',
+    (d, t) => { $('#bar').style.width = Math.round(d / t * 100) + '%'; });
+};
+
+/* =====================================================================
+   ② 精灵图拼接
+   ===================================================================== */
+const sheetFiles = [];
+let sheetResult = null;
+
+$('#pickSheet').onclick = e => { e.stopPropagation(); $('#fileSheet').click(); };
+$('#dropSheet').onclick = e => { if (e.target.id !== 'pickSheet') $('#fileSheet').click(); };
+
+bindDrop($('#dropSheet'), $('#fileSheet'), files => {
+  for (const f of files){
+    if (f.type && f.type.startsWith('image/')) sheetFiles.push(f);
+  }
+  sheetFiles.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  );
+  renderSheetList();
+});
+
+function renderSheetList(){
+  const el = $('#listSheet');
+  el.innerHTML = '';
+  sheetFiles.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.innerHTML = '<span>' + String(i + 1).padStart(3, '0') + ' · ' + f.name + '</span><span>' + fmtSize(f.size) + '</span>';
+    el.appendChild(d);
+  });
+}
+
+$('#clearSheet').onclick = () => {
+  sheetFiles.length = 0;
+  sheetResult = null;
+  $('#previewSheet').innerHTML = '';
+  $('#dlSheet').disabled = true;
+  renderSheetList();
+};
+
+$('#runSheet').onclick = async () => {
+  if (!sheetFiles.length){ alert('请先添加帧图片'); return; }
+  const status = $('#statusSheet');
+  status.textContent = '读取图片…';
+
+  const imgs = [];
+  for (const f of sheetFiles){
+    try { imgs.push(await loadImageFromFile(f)); } catch(e){ console.error(e); }
+  }
+  if (!imgs.length){ status.textContent = '没有可用图片'; return; }
+
+  const doTrim = $('#sheetTrim').checked;
+  let frames = imgs.map(img => {
+    let c = canvasFromImage(img);
+    if (doTrim) c = trimTransparent(c, 8);
+    return c;
+  });
+
+  let fw = parseInt($('#sheetFrameW').value, 10)
+    || Math.max.apply(null, frames.map(c => c.width));
+  let fh = parseInt($('#sheetFrameH').value, 10)
+    || Math.max.apply(null, frames.map(c => c.height));
+
+  const dir = $('#sheetDir').value;
+  let cols, rows;
+
+  if (dir === 'h'){ cols = frames.length; rows = 1; }
+  else if (dir === 'v'){ cols = 1; rows = frames.length; }
+  else {
+    cols = Math.max(1, parseInt($('#sheetCols').value, 10) || 6);
+    rows = Math.ceil(frames.length / cols);
+  }
+
+  const W = fw * cols, H = fh * rows;
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  frames.forEach((c, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const s = Math.min(fw / c.width, fh / c.height, 1) || 1;
+    const dw = c.width * s, dh = c.height * s;
+    ctx.drawImage(c, col * fw + (fw - dw) / 2, row * fh + (fh - dh) / 2, dw, dh);
+  });
+
+  sheetResult = out;
+  renderThumbs($('#previewSheet'), [{ name: 'sheet ' + W + '×' + H, canvas: out }], 1);
+  status.textContent = '✔ 已生成：' + W + ' × ' + H + ' 像素（' + frames.length + ' 帧，' + cols + ' 列 × ' + rows + ' 行）';
+  $('#dlSheet').disabled = false;
+};
+
+$('#dlSheet').onclick = () => {
+  if (!sheetResult) return;
+  sheetResult.toBlob(blob => {
+    saveBlob(blob, 'spritesheet.png');
+  }, 'image/png');
+};
+
+/* =====================================================================
+   ③ 精灵图切分
+   ===================================================================== */
+let sliceFile = null;
+
+$('#pickSlice').onclick = e => { e.stopPropagation(); $('#fileSlice').click(); };
+$('#dropSlice').onclick = e => { if (e.target.id !== 'pickSlice') $('#fileSlice').click(); };
+
+bindDrop($('#dropSlice'), $('#fileSlice'), files => {
+  const f = files.find(x => x.type && x.type.startsWith('image/'));
+  if (!f) return;
+  sliceFile = f;
+  const el = $('#listSlice');
+  el.innerHTML = '<div><span>' + f.name + '</span><span>' + fmtSize(f.size) + '</span></div>';
+});
+
+$('#runSlice').onclick = async () => {
+  if (!sliceFile){ alert('请先选择一张精灵图'); return; }
+  const status = $('#statusSlice');
+  const fw = parseInt($('#sliceW').value, 10);
+  const fh = parseInt($('#sliceH').value, 10);
+  if (!fw || !fh){ status.textContent = '请填写单帧宽高'; return; }
+
+  status.textContent = '切分中…';
+  const img = await loadImageFromFile(sliceFile);
+  const cols = Math.floor(img.naturalWidth / fw);
+  const rows = Math.floor(img.naturalHeight / fh);
+
+  if (!cols || !rows){ status.textContent = '尺寸不匹配，切不出任何帧'; return; }
+
+  const doTrim = $('#sliceTrim').checked;
+  const prefix = $('#slicePrefix').value || 'frame_';
+  const start = parseInt($('#sliceStart').value, 10) || 0;
+  const pad = $('#slicePad').checked;
+  const totalDigits = String(start + cols * rows - 1).length;
+
+  const results = [];
+  for (let r = 0; r < rows; r++){
+    for (let c = 0; c < cols; c++){
+      const cc = document.createElement('canvas');
+      cc.width = fw; cc.height = fh;
+      cc.getContext('2d').drawImage(img, c * fw, r * fh, fw, fh, 0, 0, fw, fh);
+      const finalCanvas = doTrim ? trimTransparent(cc, 8) : cc;
+      const idx = start + r * cols + c;
+      const num = pad ? String(idx).padStart(totalDigits, '0') : String(idx);
+      results.push({ name: prefix + num + '.png', canvas: finalCanvas });
+    }
+  }
+
+  renderThumbs($('#previewSlice'), results, 60);
+  status.textContent = '✔ 切出 ' + results.length + ' 帧（' + cols + ' 列 × ' + rows + ' 行），正在打包…';
+  await downloadCanvasZip(results, 'sliced-frames.zip');
+  status.textContent = '✔ 已下载 sliced-frames.zip（' + results.length + ' 帧）';
+};
+
+/* =====================================================================
+   ④ 背景无缝处理
+   ===================================================================== */
+const seamFiles = [];
+const seamResults = [];
+
+$('#pickSeam').onclick = e => { e.stopPropagation(); $('#fileSeam').click(); };
+$('#dropSeam').onclick = e => { if (e.target.id !== 'pickSeam') $('#fileSeam').click(); };
+
+bindDrop($('#dropSeam'), $('#fileSeam'), files => {
+  for (const f of files){
+    if (f.type && f.type.startsWith('image/')) seamFiles.push(f);
+  }
+  const el = $('#listSeam');
+  el.innerHTML = '';
+  seamFiles.forEach(f => {
+    const d = document.createElement('div');
+    d.innerHTML = '<span>' + f.name + '</span><span>' + fmtSize(f.size) + '</span>';
+    el.appendChild(d);
+  });
+});
+
+function makeSeamless(canvas, F){
+  const w = canvas.width, h = canvas.height;
+  if (F <= 1 || F * 2 > w) F = Math.max(2, Math.floor(w / 4));
+  const ctx = canvas.getContext('2d');
+
+  const left = ctx.getImageData(0, 0, F, h);
+  const right = ctx.getImageData(w - F, 0, F, h);
+  const ld = left.data, rd = right.data;
+
+  for (let y = 0; y < h; y++){
+    const base = y * F;
+    for (let x = 0; x < F; x++){
+      const t = x / (F - 1 || 1);
+      const i = (base + x) * 4;
+      for (let k = 0; k < 4; k++){
+        ld[i + k] = rd[i + k] * (1 - t) + ld[i + k] * t;
+      }
+    }
+  }
+  ctx.putImageData(left, 0, 0);
+  return canvas;
+}
+
+function renderSeamPreview(container, canvas){
+  container.innerHTML = '';
+  const maxW = 1000;
+  const s = Math.min(maxW / (canvas.width * 2), 1);
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(canvas.width * 2 * s);
+  cv.height = Math.round(canvas.height * s);
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(canvas, 0, 0, cv.width / 2, cv.height);
+  ctx.drawImage(canvas, cv.width / 2, 0, cv.width / 2, cv.height);
+
+  const wrap = document.createElement('div');
+  wrap.style.position = 'relative';
+  wrap.style.display = 'inline-block';
+  wrap.appendChild(cv);
+  const line = document.createElement('div');
+  line.style.cssText = 'position:absolute;left:50%;top:0;bottom:0;width:1px;background:#e0a24a;opacity:.8';
+  wrap.appendChild(line);
+
+  const outer = document.createElement('div');
+  outer.style.width = '100%';
+  outer.appendChild(wrap);
+  container.appendChild(outer);
+}
+
+$('#runSeam').onclick = async () => {
+  if (!seamFiles.length){ alert('请先添加背景图'); return; }
+  const status = $('#statusSeam');
+  const F = parseInt($('#seamFade').value, 10) || 120;
+  const doBg = $('#seamTrimBg').checked;
+
+  seamResults.length = 0;
+  for (const f of seamFiles){
+    try {
+      const img = await loadImageFromFile(f);
+      const c = canvasFromImage(img);
+      if (doBg) floodKeyOut(c, 32, 20, []);
+      makeSeamless(c, F);
+      seamResults.push({
+        name: f.name.replace(/\.[^.]+$/, '') + '_seamless.png',
+        canvas: c
+      });
+    } catch (err){ console.error(err); }
+    await nextFrame();
+  }
+
+  if (!seamResults.length){ status.textContent = '处理失败'; return; }
+
+  renderSeamPreview($('#previewSeam'), seamResults[0].canvas);
+  status.textContent = '✔ 已处理 ' + seamResults.length + ' 张，正在打包…';
+  await downloadCanvasZip(seamResults, 'seamless-backgrounds.zip');
+  status.textContent = '✔ 已下载 seamless-backgrounds.zip';
+};
+
+/* =====================================================================
+   ⑤ 资源清单 / 占位图
+   ===================================================================== */
+
+const ITEM_NAMES = [
+  'ssh68','ssh68m','kolpak','6b47','6b47m','altyn','kiver','kiverrsp','maska','zsh12m',
+  'rbrp','caiman','6b26','balaclava','shemagh','gaiter','gp7','pmk2','pmk3','pmks',
+  'alfa','tacgoggle','ballglasses','nomexhood','paca','6b13','6b13m','6b23','6b231','6b43',
+  'zhuk6a','zhuk3','defender2','korakulon','cargopants','6sh122','6sh104','6sh112',
+  'workboots','tactboots','lowaz','haix','belleville','bplarge',
+  'aks74u','aks74un','ak74n','ak74m','akm','akms','akMN','ak103','ak104','ak105',
+  'ak12','an94','asval','9a91','sr3m','vss','svd','sv98','rpk16','rpk74',
+  'pkm','pkp','pp19','pm','pb','mp443','aps','mp133','mp153','mp155',
+  'saiga12','toz106','ks23','6kh2','6kh5','m9bayonet','kukri','kabar',
+  'f1','rgd5','rgo','rgn','vog17','vog25',
+  'bandage','water','ai2','painkiller','tushonka','splint','salewa','ifak','grizzly','surv12'
+];
+
+const BOSS_NAMES = ['factory_king','lab_queen','road_tyrant','swamp_hydra','core_omega'];
+
+const BUILDING_NAMES = [
+  'control','workbench','storage','toilet','rest','generator','medbay','radio','armory'
+];
+
+const REGION_ROUTES = [
+  ['factory', [8, 6, 5]],
+  ['lab',     [6, 6, 5]],
+  ['road',    [6, 5, 4]],
+  ['swamp',   [6, 4]],
+  ['core',    [5, 4]]
+];
+
+function buildBgNames(){
+  const out = [];
+  for (const [region, routes] of REGION_ROUTES){
+    routes.forEach((count, ri) => {
+      for (let ni = 0; ni < count; ni++){
+        out.push(region + '_r' + ri + '_n' + ni + '.png');
+      }
+    });
+  }
+  return out;
+}
+
+function buildManifestText(){
+  const lines = [];
+  const bg = buildBgNames();
+
+  lines.push('==============================================');
+  lines.push('  废土素材工厂 · 资源清单');
+  lines.push('  生成时间：' + new Date().toLocaleString());
+  lines.push('==============================================');
+  lines.push('');
+  lines.push('【icons/items/】 64×64 透明 PNG — 共 ' + ITEM_NAMES.length + ' 个');
+  lines.push('----------------------------------------------');
+  ITEM_NAMES.forEach((n, i) => {
+    lines.push(String(i + 1).padStart(3, ' ') + '.  icons/items/' + n + '.png');
+  });
+  lines.push('');
+  lines.push('【icons/bosses/】 128×128 透明 PNG — 共 ' + BOSS_NAMES.length + ' 个');
+  lines.push('----------------------------------------------');
+  BOSS_NAMES.forEach((n, i) => {
+    lines.push(String(i + 1).padStart(3, ' ') + '.  icons/bosses/' + n + '.png');
+  });
+  lines.push('');
+  lines.push('【icons/buildings/】 128×128 透明 PNG — 共 ' + BUILDING_NAMES.length + ' 个');
+  lines.push('----------------------------------------------');
+  BUILDING_NAMES.forEach((n, i) => {
+    lines.push(String(i + 1).padStart(3, ' ') + '.  icons/buildings/' + n + '.png');
+  });
+  lines.push('');
+  lines.push('【images/】 人物精灵');
+  lines.push('----------------------------------------------');
+  lines.push('     images/hero_walk.png     864 × 192  (6 帧 × 144×192，面向右，行走循环)');
+  lines.push('     images/hero_idle.png     144 × 192  (静止射击姿势)');
+  lines.push('     images/hero_reload.png   576 × 192  (4 帧 × 144×192，换弹序列)');
+  lines.push('');
+  lines.push('【images/bg/】 1024×512 横向无缝背景 PNG — 共 ' + bg.length + ' 张');
+  lines.push('----------------------------------------------');
+  bg.forEach((n, i) => {
+    lines.push(String(i + 1).padStart(3, ' ') + '.  images/bg/' + n);
+  });
+  lines.push('');
+  lines.push('==============================================');
+  lines.push('  合计：' + (ITEM_NAMES.length + BOSS_NAMES.length + BUILDING_NAMES.length + bg.length + 3) + ' 个文件');
+  lines.push('==============================================');
+
+  return lines.join('\n');
+}
+
+function buildFolderText(){
+  return [
+    'assets/',
+    '├── icons/',
+    '│   ├── items/          (64×64)    ' + ITEM_NAMES.length + ' 个',
+    '│   ├── bosses/         (128×128)  ' + BOSS_NAMES.length + ' 个',
+    '│   └── buildings/      (128×128)  ' + BUILDING_NAMES.length + ' 个',
+    '└── images/',
+    '    ├── hero_walk.png   (864×192)  6 帧',
+    '    ├── hero_idle.png   (144×192)  1 帧',
+    '    ├── hero_reload.png (576×192)  4 帧',
+    '    └── bg/             (1024×512) ' + buildBgNames().length + ' 张',
+    ''
+  ].join('\n');
+}
+
+$('#genTxt').onclick = () => {
+  const txt = buildManifestText();
+  $('#manifestText').value = txt;
+  saveBlob(new Blob([txt], { type: 'text/plain;charset=utf-8' }), '资源清单.txt');
+  $('#statusManifest').textContent = '✔ 已下载 资源清单.txt';
+};
+
+$('#genFolders').onclick = () => {
+  const txt = buildFolderText();
+  $('#manifestText').value = txt;
+  saveBlob(new Blob([txt], { type: 'text/plain;charset=utf-8' }), '目录结构.txt');
+  $('#statusManifest').textContent = '✔ 已下载 目录结构.txt';
+};
+
+$('#genPlaceholder').onclick = async () => {
+  const status = $('#statusManifest');
+  status.textContent = '正在生成占位图…';
+
+  const items = [];
+
+  function makePlaceholder(label, w, h, sub){
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+
+    ctx.fillStyle = 'rgba(58,47,37,0.35)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(224,162,74,0.75)';
+    ctx.lineWidth = Math.max(1, Math.round(w / 64));
+    ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
+
+    const fs = Math.max(7, Math.round(w / 10));
+    ctx.fillStyle = '#e0a24a';
+    ctx.font = 'bold ' + fs + 'px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const text = label.length > 14 ? label.slice(0, 13) + '…' : label;
+    ctx.fillText(text, w / 2, h / 2 - (sub ? fs * 0.6 : 0));
+
+    if (sub){
+      ctx.font = Math.round(fs * 0.7) + 'px "Segoe UI", sans-serif';
+      ctx.fillStyle = 'rgba(216,207,194,0.7)';
+      ctx.fillText(sub, w / 2, h / 2 + fs * 0.8);
+    }
+    return c;
+  }
+
+  for (const n of ITEM_NAMES){
+    items.push({ name: 'icons/items/' + n + '.png', canvas: makePlaceholder(n, 64, 64, '') });
+  }
+  for (const n of BOSS_NAMES){
+    items.push({ name: 'icons/bosses/' + n + '.png', canvas: makePlaceholder(n, 128, 128, 'BOSS') });
+  }
+  for (const n of BUILDING_NAMES){
+    items.push({ name: 'icons/buildings/' + n + '.png', canvas: makePlaceholder(n, 128, 128, 'BLDG') });
+  }
+  const bg = buildBgNames();
+  for (const n of bg){
+    items.push({ name: 'images/bg/' + n, canvas: makePlaceholder(n.replace('.png',''), 1024, 512, '1024×512') });
+  }
+
+  status.textContent = '打包 ' + items.length + ' 个占位文件…';
+  await downloadCanvasZip(items, 'placeholder-assets.zip');
+  status.textContent = '✔ 已下载 placeholder-assets.zip（' + items.length + ' 个文件）';
+};
+
+/* =====================================================================
+   初始化
+   ===================================================================== */
+(function init(){
+  window._manualSeeds = [];
+
+  $('#sizePreset').disabled = false;
+  $('#customSize').style.display = 'none';
+  $('#keyColorWrap').style.display = 'none';
+  $('#status').textContent = '等待添加图片…';
+  $('#manifestText').value = buildFolderText();
+
+  updateSeedUI();
+})();
+</script>
+</body>
+</html>
