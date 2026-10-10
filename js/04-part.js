@@ -33,14 +33,6 @@ function interruptHeal(){
   return true;
 }
 
-/* rev93: 停止戰鬥中的玩家移動並取消當前搖桿會話 */
-function stopBattleMovement(){
-  if(!battle) return;
-  battle.moveDir = 0;
-  const stick = document.getElementById('stick');
-  if(stick){ stick.style.left='50%'; stick.style.top='50%'; stick.style.transform='translate(-50%,-50%)'; }
-  if(typeof battle._joystickCancel === 'function') battle._joystickCancel();
-}
 
 /* ★ Boss 戰背景：獨立圖片，不復用探索圖（比例、地面線、視角皆不同）
    檔名固定為 images/bg/boss_{bossId}.png */
@@ -248,7 +240,6 @@ function isWeakPointHit(){
   return weak.includes(battle.aimPart);
 }
 
-/* v54-boss-tier-persist */
 if(!state.preferences.bossTier) state.preferences.bossTier = {};
 let _bossSelectedTier = state.preferences.bossTier;
 function renderCombat(){
@@ -279,7 +270,6 @@ function renderCombat(){
   $$('.boss-card .btn',z1).forEach(btn=>{btn.onclick=()=>startBossBattle(btn.dataset.bid);});
 }
 
-/* v51-dedup */
 function _getAmmoDefRarity(id, slot){
   if(slot === 'throwable'){
     let _best = null, _bi = -1;

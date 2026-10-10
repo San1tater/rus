@@ -661,7 +661,6 @@ function stopPlayerFire(){
   battle.fireHeld = false;
 }
 
-/* v67-muzzle-tip */
 const _muzzleTipCache = new Map();
 function _getMuzzleTip(img){
   if(!img || !img.complete || !img.naturalWidth) return null;

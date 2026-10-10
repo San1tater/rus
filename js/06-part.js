@@ -246,7 +246,6 @@ function openModding(workbenchLv){
       candidates.push({id, rarity:r, baseId, mag:def.mag, scope:def.scope||null, equippedSlot:null, def, count:state.inventory[k]});
     }
   }
-/* v26-sort-candidates */
   candidates.sort((a,b)=>{
     const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
     if(ra !== 0) return ra;
@@ -306,10 +305,8 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
       }
     }
     if(rules.scopes&&rules.scopes.length){
-      /* v26-sort-scopes */
       const _scopesRaw = rules.scopes.slice();
       _scopesRaw.sort((a,b)=>{
-        /* v54-fix-scope-sort */
         const ia = SCOPE_BONUS[a] || 0;
         const ib = SCOPE_BONUS[b] || 0;
         if(ia !== ib) return ib - ia;

@@ -23,7 +23,6 @@ const BOSS_WEAKPOINTS = {
   core_omega:  ['ring_t','ring_b','ring_l','ring_r']
 };
 
-/* v66-phases */
 const BOSS_PHASES = {
   factory_king: [
     { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
@@ -964,7 +963,6 @@ const BOSS_ANIMS = {
 /* ★ 交換 core_omega 的 idle 和 walk ★ */
 (function(){ var A = BOSS_ANIMS.core_omega; if(A){ var t = A.idle; A.idle = A.walk; A.walk = t; } })();
 
-/* v66-arm */
 const BOSS_SKILLS = {
   factory_king: [
     { id:'smash', name:'碎地重錘', type:'aoe', cd:10, range:0.20,

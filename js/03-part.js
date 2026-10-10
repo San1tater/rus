@@ -325,7 +325,6 @@ function spawnExploreBullets(n){
 }
 
 function playExploreCombatFx(slot, isMelee){
-  if(_offlineMode) return;
   let animName = 'fire_primary';
   if(slot === 'secondary') animName = 'fire_secondary';
   else if(slot === 'melee' || slot === 'throwable') animName = 'attack_melee';
@@ -429,7 +428,6 @@ function invRemove(id,r,c){const k=invKey(id,r);if(!state.inventory[k]||state.in
 function invCount(id,r){return state.inventory[invKey(id,r)]||0;}
 function invList(){const l=[];for(const k in state.inventory){const [id,r]=k.split('@');l.push({id,rarity:r,count:state.inventory[k],def:itemDef(id)});}return l;}
 function getAmmoByCal(cal){const l=[];for(const k in state.inventory){const p=k.split('@');if(p.length!==2)continue;const id=p[0],r=p[1];const d=AMMO[id];if(!d||d.cal!==cal)continue;const cnt=state.inventory[k];if(!cnt||cnt<=0)continue;l.push({id,rarity:r,count:cnt,def:d});}return l;}
-/* v17.5-marker-ammoorder-v3 */
 function _ammoOrderKey(slot){
   const id = state.player.equipped[slot];
   if(!id) return slot;
@@ -465,8 +463,6 @@ function setThrowableOrder(order){
   delete o['throwable'];
   save();
 }
-/* v28-pick */
-/* v50-respect-exclude */
 function pickAmmoByPreferenceOrOrder(cal, context){
   const allOrders = state.preferences.ammoOrder || {};
   const _ctx = (context === 'combat')
@@ -488,7 +484,6 @@ function pickAmmoByPreferenceOrOrder(cal, context){
   }
   return pickAmmoByPreference(cal, context);
 }
-/* v50-respect-exclude */
 function pickThrowableByPreferenceOrOrder(context){
   const order = getThrowableOrder();
   const _ctx = (context === 'combat')
@@ -624,9 +619,7 @@ function getTotalWeight(){
 const BASE_EXPLORE_INTERVAL = 10000;
 const WEIGHT_FREE_KG = 20;
 const WEIGHT_PENALTY_PER_KG = 0.05;
-/* v17.5-marker-weightcolor-v2 */
 function getWeightColor(w){
-  /* v17.5-marker-wc 0-20綠，20立即橙黃，50+全紅 */
   if(w < WEIGHT_FREE_KG) return '#4caf50';
   const excess = w - WEIGHT_FREE_KG;
   const ratio = Math.min(1, excess / 30);
@@ -636,7 +629,6 @@ function getWeightColor(w){
   return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 function getExploreInterval(){
-  /* v17.5-marker-ei 0-20無扣減，20+每kg +5% */
   const w = getTotalWeight();
   const extra = Math.max(0, w - WEIGHT_FREE_KG);
   return Math.round(BASE_EXPLORE_INTERVAL * (1 + extra * WEIGHT_PENALTY_PER_KG));
@@ -765,7 +757,6 @@ function removeInvalidInventoryItems(){
   }
   return removed;
 }
-/* v17.5-marker-cleanammo */
 function _cleanupAmmoRarity(){
   const toRemove = [];
   const toAdd = {};
@@ -968,7 +959,7 @@ function autoCombat(region,node,enemies){
     if(!choice.slot){pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 遭遇了 ${fmtEnemies(enemies)}，<span class="lose">手無寸鐵，只能逃跑。</span>`,[],'explore');return{victory:false,loot:[]};}
     const {slot,weapon,ammo}=choice;const def=weapon.def;
     const isMeleeWeapon = def.slot === 'melee';
-    playExploreCombatFx(slot, isMeleeWeapon);
+    if(!_offlineMode) playExploreCombatFx(slot, isMeleeWeapon);
     addProf(slot,0.1);if(def.type)addProf(def.type,0.1);
     const ec=enemies.length;let bulletsUsed=0,hits=0,dmgDealt=0,crits=0;
     let mode='點射',rounds=1;
@@ -1140,7 +1131,6 @@ function autoCombat(region,node,enemies){
     return{victory:reallyVictory,loot};
   }catch(e){console.error(e);pushLog(`<span class="lose">戰鬥結算異常：${e.message}</span>`,[],'explore');return{victory:false,loot:[]};}
 }
-/* v54-aftermath-merged */
 function handleExploreAftermath(hpLost, armorLost, enemyCount){
   if(hpLost<=0 && armorLost<=0) return '';
   const txt = '受到 ' + enemyCount + ' 名敵人反擊（HP -' + hpLost + '｜甲 -' + armorLost + '）';
@@ -1272,8 +1262,7 @@ function buildingTick(){
         }
         if(_cands.length){
           const chosen=_cands[0];
-          const cnt=rndInt(5,10)*Math.max(1,Math.ceil(armoryLv/5)); /* v54-nerf */
-          invAdd(chosen,AMMO[chosen].rarity,cnt);
+          const cnt=rndInt(5,10)*Math.max(1,Math.ceil(armoryLv/5));          invAdd(chosen,AMMO[chosen].rarity,cnt);
           notify(`🔫 軍械庫產出：${AMMO[chosen].name}*${cnt}`,'ok');
         }
       }
@@ -1380,7 +1369,6 @@ function _offlineBuildingSettle(now, baseTime){
       if(pw && pw.def.cal) cals.push(pw.def.cal);
       if(sw && sw.def.cal && (!pw || sw.def.cal !== pw.def.cal)) cals.push(sw.def.cal);
       if(!cals.length) cals.push('9x19');
-      /* v28-armory-off */
       for(let i = 0; i < times; i++){
         for(const cal of cals){
           const ammos = Object.keys(AMMO).filter(k => AMMO[k].cal === cal);
@@ -1396,8 +1384,7 @@ function _offlineBuildingSettle(now, baseTime){
           }
           if(_cands.length){
             const chosen = _cands[0];
-            const cnt = rndInt(5, 10) * Math.max(1, Math.ceil(armoryLv / 5)); /* v54-nerf */
-            invAdd(chosen, AMMO[chosen].rarity, cnt);
+            const cnt = rndInt(5, 10) * Math.max(1, Math.ceil(armoryLv / 5));            invAdd(chosen, AMMO[chosen].rarity, cnt);
           }
         }
       }
@@ -1527,7 +1514,6 @@ function renderEquipZone(z2){
     html+=`<div class="slot ${def?'filled':'empty'} ${isFixed?'fixed':''}" style="${style};${bgStyle}" data-slot="${s.key}">${inner}</div>`;
   }
   /* v51: 移除未使用變數 */
-  /* v17.5-marker-statpanel */
   const _fmt = (v) => { v = Math.round(v); if(v >= 1e7) return Math.round(v/1e6) + "M"; if(v >= 1e6) return (v/1e6).toFixed(1) + "M"; if(v >= 1e4) return Math.round(v/1e3) + "K"; return v.toString(); };
   html+=`<div class="player-stat-panel" style="left:3%;top:4%;text-align:right">
     <div class="row lv-row"><b>Lv.${state.player.level}</b></div>
@@ -1540,8 +1526,6 @@ function renderEquipZone(z2){
   {
     const _wEl = document.createElement('div');
     _wEl.className = 'weight-display';
-    const _wVal = getTotalWeight();
-    /* v53-cache: 快取總重 */
     const _wt = getTotalWeight();
     _wEl.innerHTML = '⚖️ <b style="color:' + getWeightColor(_wt) + '">' + Math.round(_wt) + ' kg</b><br>🧭 <b>' + Math.round(getExploreInterval()/1000) + 's</b>';
     z2.appendChild(_wEl);
@@ -1557,6 +1541,7 @@ function renderEquipZone(z2){
   /* v17.5 剪影已移除 */
 }
 
+let _inventoryScrollPos = 0;
 const modalLayer=$('#modal-layer');
 const modalEl=$('.modal',modalLayer);
 function openModal({title,body,footer,full}){
@@ -1761,7 +1746,6 @@ function openEquipmentCompare(slot,newId,newRarity,onConfirm,onCancel){
   };
 }
 const inventoryCollapsed={};
-let _inventoryScrollPos = 0;
 const ARMOR_SLOT_ORDER={head:0,face:1,top:2,pants:3,shoes:4,backpack:5};
 const WEAPON_TYPE_ORDER={'突擊步槍':0,'機槍':1,'衝鋒槍':2,'狙擊槍':3,'手槍':4,'霰彈槍':5,'刺刀':6,'刀':7,'手榴彈':8};
 function _subCatOrder(it){
