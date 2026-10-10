@@ -4,6 +4,15 @@
 let battle=null;
 const BATTLE_ONESHOT_ANIMS=['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
 
+/* rev93: 停止戰鬥中的玩家移動並取消當前搖桿會話 */
+function stopBattleMovement(){
+  if(!battle) return;
+  battle.moveDir = 0;
+  const stick = document.getElementById('stick');
+  if(stick){ stick.style.left='50%'; stick.style.top='50%'; stick.style.transform='translate(-50%,-50%)'; }
+  if(typeof battle._joystickCancel === 'function') battle._joystickCancel();
+}
+
 /* ★ Boss 戰背景：獨立圖片，不復用探索圖（比例、地面線、視角皆不同）
    檔名固定為 images/bg/boss_{bossId}.png */
 function getBossBgPath(bossId){
@@ -560,7 +569,7 @@ function renderBattleControls(z3){
       <div class="ammo-info" id="battle-dmg-status" style="color:#7a6f60">對 Boss 傷害：${Math.round(battle.damageDealt)} ｜ ${battle.engaged?'⚔️ 已交戰':'⏸️ 準備中'}</div>
     </div>`;
   $$('.fm-btn',z3).forEach(b=>{b.onclick=()=>{
-    battle.fireMode=b.dataset.mode;
+    stopBattleMovement(); battle.fireMode=b.dataset.mode;
     battle.fireHeld=false;
     battle.burstLeft=0;
     renderBattleControls(z3);
@@ -582,7 +591,7 @@ function renderBattleControls(z3){
   }
   refreshBattleControlsLive();
 }
-function switchBattleWeapon(slot){
+function switchBattleWeapon(slot){ stopBattleMovement();
   /* ★ v17.5 更換武器時清空該槽位的彈藥準備 */
   /* v39: 不再清空，改為按武器分開存 */
   if(slot==='throwable'&&getThrowableCount()<=0){ensureThrowableFromBackpack();}

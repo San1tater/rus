@@ -1160,7 +1160,7 @@ function handleExploreAftermath(hpLost, armorLost, enemyCount){
     const item = findNextConsumable();
     if(!item) break;
     const medbayLv = getBuildingLv('medbay');
-    const actual = Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
+    const actual = calcConsumableHeal(item, medbayLv);
     const before = state.player.hp;
     state.player.hp = Math.min(state.player.maxHp, state.player.hp + actual);
     healed += state.player.hp - before;
@@ -1227,7 +1227,7 @@ function autoConsumeIfLow(){
     const item = findNextConsumable();
     if(!item) break;
     const medbayLv=getBuildingLv('medbay');
-    const actualHeal=Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
+    const actualHeal=calcConsumableHeal(item, medbayLv);
     state.player.hp=Math.min(state.player.maxHp,state.player.hp+actualHeal);
     invRemove(item.id,item.rarity,1);
     healTotal += actualHeal;

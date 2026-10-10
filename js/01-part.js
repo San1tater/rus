@@ -81,38 +81,38 @@ const ARMOR={
 };
 
 const WEAPONS={
-  aks74u:{name:'AKS-74U',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.aks74u,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
-  aks74un:{name:'AKS-74UN',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.aks74un,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
-  ak74:{name:'AK-74',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
-  ak74n:{name:'AK-74N',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74n,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
-  ak74m:{name:'AK-74M',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74m,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
-  akm:{name:'AKM',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akm,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
-  akms:{name:'AKMS',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akms,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.6},
-  akmn:{name:'AKMN',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akmn,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
-  ak103:{name:'AK-103',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak103,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.65},
-  ak104:{name:'AK-104',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak104,modes:['點射','短點射','長點射','掃射'],rpm:600,range:0.6},
-  ak105:{name:'AK-105',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak105,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.55},
-  ak12:{name:'AK-12',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak12,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.65},
-  asval:{name:'AS VAL',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.asval,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.5},
-  '9a91':{name:'9A-91',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG['9a91'],modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.5},
-  sr3m:{name:'SR-3M',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.sr3m,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.5},
-  vss:{name:'VSS Vintorez',slot:'primary',type:'狙擊槍',cal:'9x39',mag:TK_MAG.vss,modes:['點射','短點射','長點射','掃射'],rpm:900,range:0.55},
+  aks74u:{name:'AKS-74U',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.aks74u,modes:['掃射','長點射','短點射','點射'],rpm:650,range:0.55},
+  aks74un:{name:'AKS-74UN',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.aks74un,modes:['掃射','長點射','短點射','點射'],rpm:650,range:0.55},
+  ak74:{name:'AK-74',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74,modes:['掃射','長點射','短點射','點射'],rpm:650,range:0.65},
+  ak74n:{name:'AK-74N',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74n,modes:['掃射','長點射','短點射','點射'],rpm:650,range:0.65},
+  ak74m:{name:'AK-74M',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak74m,modes:['掃射','長點射','短點射','點射'],rpm:650,range:0.65},
+  akm:{name:'AKM',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akm,modes:['掃射','長點射','短點射','點射'],rpm:600,range:0.65},
+  akms:{name:'AKMS',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akms,modes:['掃射','長點射','短點射','點射'],rpm:600,range:0.6},
+  akmn:{name:'AKMN',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.akmn,modes:['掃射','長點射','短點射','點射'],rpm:600,range:0.65},
+  ak103:{name:'AK-103',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak103,modes:['掃射','長點射','短點射','點射'],rpm:600,range:0.65},
+  ak104:{name:'AK-104',slot:'primary',type:'突擊步槍',cal:'7.62',mag:TK_MAG.ak104,modes:['掃射','長點射','短點射','點射'],rpm:600,range:0.6},
+  ak105:{name:'AK-105',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak105,modes:['掃射','長點射','短點射','點射'],rpm:650,range:0.55},
+  ak12:{name:'AK-12',slot:'primary',type:'突擊步槍',cal:'5.45',mag:TK_MAG.ak12,modes:['掃射','長點射','短點射','點射'],rpm:700,range:0.65},
+  asval:{name:'AS VAL',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.asval,modes:['掃射','長點射','短點射','點射'],rpm:900,range:0.5},
+  '9a91':{name:'9A-91',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG['9a91'],modes:['掃射','長點射','短點射','點射'],rpm:700,range:0.5},
+  sr3m:{name:'SR-3M',slot:'primary',type:'突擊步槍',cal:'9x39',mag:TK_MAG.sr3m,modes:['掃射','長點射','短點射','點射'],rpm:900,range:0.5},
+  vss:{name:'VSS Vintorez',slot:'primary',type:'狙擊槍',cal:'9x39',mag:TK_MAG.vss,modes:['掃射','長點射','短點射','點射'],rpm:900,range:0.55},
   svd:{name:'SVD',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.svd,modes:['點射'],rpm:700,range:0.9},
   sv98:{name:'SV-98',slot:'primary',type:'狙擊槍',cal:'7.62x54',mag:TK_MAG.sv98,modes:['點射'],rpm:30,range:0.95},
-  rpk16:{name:'RPK-16',slot:'primary',type:'機槍',cal:'5.45',mag:TK_MAG.rpk16,modes:['點射','短點射','長點射','掃射'],rpm:650,range:0.65},
-  rpd:{name:'RPD',slot:'primary',type:'機槍',cal:'7.62',mag:TK_MAG.rpd,modes:['短點射','長點射','掃射'],rpm:700,range:0.7},
-  pkm:{name:'PKM',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkm,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
-  pkp:{name:'PKP Pecheneg',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkp,modes:['短點射','長點射','掃射'],rpm:650,range:0.7},
-  ash12:{name:'ASH-12',slot:'primary',type:'突擊步槍',cal:'12.7',mag:10,modes:['點射','掃射'],rpm:650,range:0.6},
-  pp19:{name:'PP-19-01 Vityaz',slot:'primary',type:'衝鋒槍',cal:'9x19',mag:TK_MAG.pp19,modes:['點射','短點射','長點射','掃射'],rpm:700,range:0.45},
+  rpk16:{name:'RPK-16',slot:'primary',type:'機槍',cal:'5.45',mag:TK_MAG.rpk16,modes:['掃射','長點射','短點射','點射'],rpm:650,range:0.65},
+  rpd:{name:'RPD',slot:'primary',type:'機槍',cal:'7.62',mag:TK_MAG.rpd,modes:['掃射','長點射','短點射'],rpm:700,range:0.7},
+  pkm:{name:'PKM',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkm,modes:['掃射','長點射','短點射'],rpm:650,range:0.7},
+  pkp:{name:'PKP Pecheneg',slot:'primary',type:'機槍',cal:'7.62x54',mag:TK_MAG.pkp,modes:['掃射','長點射','短點射'],rpm:650,range:0.7},
+  ash12:{name:'ASH-12',slot:'primary',type:'突擊步槍',cal:'12.7',mag:10,modes:['掃射','點射'],rpm:650,range:0.6},
+  pp19:{name:'PP-19-01 Vityaz',slot:'primary',type:'衝鋒槍',cal:'9x19',mag:TK_MAG.pp19,modes:['掃射','長點射','短點射','點射'],rpm:700,range:0.45},
   pm:{name:'PM 手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pm,modes:['點射'],rpm:120,range:0.35},
   pb:{name:'PB 微聲手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pb,modes:['點射'],rpm:120,range:0.35},
   mp443:{name:'MP-443 Grach',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.mp443,modes:['點射'],rpm:120,range:0.4},
-  aps:{name:'APS 斯捷奇金',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.aps,modes:['點射','短點射','長點射','掃射'],rpm:750,range:0.35},
+  aps:{name:'APS 斯捷奇金',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.aps,modes:['掃射','長點射','短點射','點射'],rpm:750,range:0.35},
   mp133:{name:'MP-133 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp133,modes:['點射'],rpm:30,range:0.4},
   mp153:{name:'MP-153 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp153,modes:['點射'],rpm:70,range:0.42},
   mp155:{name:'MP-155 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp155,modes:['點射'],rpm:70,range:0.4},
-  saiga12:{name:'Saiga-12',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:5,modes:['點射','掃射'],rpm:450,range:0.45},
+  saiga12:{name:'Saiga-12',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:5,modes:['掃射','點射'],rpm:450,range:0.45},
   toz106:{name:'TOZ-106',slot:'secondary',type:'霰彈槍',cal:'20/70',mag:TK_MAG.toz106,modes:['點射'],rpm:30,range:0.35},
   ks23:{name:'KS-23',slot:'secondary',type:'霰彈槍',cal:'23x75',mag:TK_MAG.ks23,modes:['點射'],rpm:30,range:0.45},
   '6kh2':{name:'6Kh2 刺刀',slot:'melee',type:'刺刀',dmg:25,pen:1,modes:['近戰'],rpm:120,range:0.15},
@@ -176,7 +176,18 @@ const AMMO={
   '23x75_barrikada':{name:'23×75mmR Barrikada',cal:'23x75',dmg:192,pen:4,rarity:'傳奇',pellets:1},
 };
 
-const CONSUMABLES={bandage:{name:'繃帶',heal:15},water:{name:'瓶裝水',heal:5},ai2:{name:'AI-2 急救包',heal:30},painkiller:{name:'止痛藥',heal:10},tushonka:{name:'燉肉罐頭',heal:15},splint:{name:'夾板',heal:10},salewa:{name:'Salewa 急救包',heal:60},ifak:{name:'IFAK 急救包',heal:50},surv12:{name:'Surv12 野戰包',heal:70}};
+const CONSUMABLES={bandage:{name:'繃帶',heal:25,healPct:0.10},water:{name:'瓶裝水',heal:15,healPct:0.05},painkiller:{name:'止痛藥',heal:20,healPct:0.08},splint:{name:'夾板',heal:20,healPct:0.08},tushonka:{name:'燉肉罐頭',heal:30,healPct:0.12},ai2:{name:'AI-2 急救包',heal:70,healPct:0.25},ifak:{name:'IFAK 急救包',heal:120,healPct:0.35},salewa:{name:'Salewa 急救包',heal:180,healPct:0.50},surv12:{name:'Surv12 野戰包',heal:250,healPct:0.70}};
+/* rev93: 消耗品治療量 = (固定值 + maxHp 百分比) × 稀有度 × 醫療站加成 */
+function calcConsumableHeal(item, medbayLv){
+  if(!item || !item.id) return 0;
+  const c = CONSUMABLES[item.id];
+  if(!c) return 0;
+  const rarityMult = RARITY_MULT[item.rarity] || 1;
+  const maxHp = state.player.maxHp || 100;
+  const base = (c.heal || 0) + (c.healPct || 0) * maxHp;
+  const medbayMult = 1 + (medbayLv || 0) * 0.15;
+  return Math.round(base * rarityMult * medbayMult);
+}
 const MATERIALS={wood:{name:'木材'},metal:{name:'金屬廢料'},screws:{name:'螺絲'},cloth:{name:'布料'},gears:{name:'齒輪'},electronics:{name:'電子零件'}};
 
 const MATERIAL_EMOJI = {wood:'🪵', metal:'🔩', screws:'🔧', cloth:'🧵', gears:'⚙️', electronics:'💡'};

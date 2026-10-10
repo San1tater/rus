@@ -116,7 +116,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .damage-header .bar .fill{height:100%;background:linear-gradient(90deg,#e05252,#ffb300);transition:width .2s}
 .fighter{position:absolute;transform:translateX(-50%);z-index:3}
 .fighter .sprite{border-radius:6px;position:relative;cursor:crosshair;background-size:contain;background-position:center;background-repeat:no-repeat}
-.hero-f .sprite{width:88px;height:118px;background-image:none}
+.hero-f .sprite{width:88px;height:118px;background-image:none;position:relative;overflow:visible} /* v78-sprite */ /* v78-sprite */ /* v78-sprite */ /* v78-sprite */ /* v77-sprite-wide */
 .hero-f .sprite canvas{width:100%;height:100%;display:block}
 .boss-f .sprite{width:280px;height:280px}
 .boss-f .sprite img{width:100%;height:100%;object-fit:contain;display:block}
@@ -271,7 +271,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 /* v52-dedup */
 /* ===== v17.5 PATCH ===== */
 .ammo-order-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
-.ammo-order-row .lbl{flex:0 0 48px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:right}
+.ammo-order-row .lbl{flex:0 0 48px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:right;writing-mode:vertical-rl;text-orientation:upright} /* v66-vertical */
 .ammo-order-slots{display:flex;gap:5px}
 .ammo-slot{width:40px;height:46px;background:#1a1510;border:1px solid #3a2f25;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;flex:0 0 auto;padding:2px 0}
 .ammo-slot.filled{border-color:#8a5f18}
@@ -302,4 +302,5 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .tier-ii{font-size:8px;color:#a45ede;background:#1f1528;border:1px solid #a45ede;border-radius:3px;padding:0 3px;margin-left:3px;vertical-align:middle}
 .boss-ii-tint{filter:hue-rotate(270deg) saturate(1.3) brightness(.95)}
 .hit-fx.heal{color:#4caf50;font-size:22px}
+#hero-battle-canvas{position:absolute;left:50%;top:0;width:220px;height:118px;margin-left:-110px;pointer-events:none;z-index:1} /* v78-canvas */
 /* ===== END ===== */

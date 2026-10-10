@@ -13,20 +13,22 @@ function updateBossPhase(){
   const phases = BOSS_PHASES[b.bossId];
   if(!phases || phases.length === 0) return;
   const hpPct = b.bossMaxHp > 0 ? (b.bossHp / b.bossMaxHp) : 0;
-  for(let i = phases.length - 1; i >= 0; i--){
+  const _isII = (b.bossId.indexOf('_ii') !== -1);
+  const _lastIdx = phases.length - 1;
+  for(let i = _lastIdx; i >= 0; i--){
     if(hpPct <= phases[i].hpPct && i > b.phaseIdx){
       b.phaseIdx = i;
       const p = phases[i];
       if(p.dmgMult !== undefined) b.bossDmgMult = p.dmgMult;
-      if(p.healFull){
-        const healed = b.healedPhases || [];
-        if(!(p.repeatable === false && healed.includes(i))){
-          b.bossHp = b.bossMaxHp;
-          if(!b.healedPhases) b.healedPhases = [];
-          b.healedPhases.push(i);
-        }
+      /* v66-heal: 一級僅最後階段回血；二級每階段回血，healedPhases 防重 */
+      if(!b.healedPhases) b.healedPhases = [];
+      const _shouldHeal = _isII ? (i > 0) : (i === _lastIdx);
+      if(_shouldHeal && b.healedPhases.indexOf(i) === -1){
+        b.bossHp = b.bossMaxHp;
+        b.healedPhases.push(i);
+        notify('⚠️ ' + b.bossName + ' 回滿生命！', 'error');
       }
-      notify(`⚠️ ${b.bossName} 進入第 ${i+1} 階段！`, 'error');
+      notify('⚠️ ' + b.bossName + ' 進入第 ' + (i+1) + ' 階段！', 'error');
       break;
     }
   }
@@ -61,6 +63,20 @@ function updateBossAI(dt, now){
   const b = battle;
   if(!b) return;
   if(b.settling) return;
+  /* v66-omega-disable: 四臂全破禁用移動+攻擊 */
+  if((b.bossId === 'core_omega' || b.bossId === 'core_omega_ii') && b.arms){
+    const _anyAlive = OMEGA_ARM_IDS.some(function(id){ return b.arms[id] && b.arms[id].alive; });
+    if(!_anyAlive){
+      if(BATTLE_BOSS_ONESHOT.indexOf(battleBossAnim.name) === -1){
+        if(battleBossAnim.name !== 'idle'){
+          battleBossAnim.name = 'idle';
+          battleBossAnim.frame = 0;
+          battleBossAnim.lastUpdate = performance.now();
+        }
+      }
+      return;
+    }
+  }
 
   if(!b.engaged){
     const dx = b.bx - b.px;
@@ -140,19 +156,21 @@ function updateBossAI(dt, now){
     }
   }
 
-  const bRange = 0.14;
+  /* v66-speed */
+  const _isII = (b.bossId.indexOf('_ii') >= 0);
+  const bRange = _isII ? 0.22 : 0.18;
   let bossMoving = false;
 
   if(b.bossId === 'swamp_hydra' || b.bossId === 'swamp_hydra_ii'){
-    /* ★ 沼澤九頭：完全不動，僅近戰範圍內咬擊 */
-    if(playerRightN >= b.bx - bRange){
+    /* v66-hydra-range: 全圖射程 0.85 */
+    if(playerRightN >= b.bx - 0.85){
       if(now - (b.lastMeleeAt || 0) > 1500){
         b.lastMeleeAt = now;
         doBossMeleeSwipe();
       }
     }
   } else if(playerRightN < b.bx - bRange){
-    const bspd = 0.028 * dt;
+    const bspd = ((b.bossId.indexOf('_ii') >= 0) ? 0.075 : 0.055) * dt; /* v66-speed */
     const gap = (b.bx - bRange) - playerRightN;
     const step = -Math.min(bspd, gap);
     if(Math.abs(step) > 0.0001){
@@ -324,6 +342,8 @@ function tryHitPlayer(dmg, pen){
 function doBossMeleeSwipe(){
   if(!battle || !battle.active) return;
   const b = battle;
+  /* v66-melee: ring_l 被破則禁用近戰 */
+  if((b.bossId === 'core_omega' || b.bossId === 'core_omega_ii') && typeof isOmegaArmBroken === 'function' && isOmegaArmBroken('ring_l')) return;
   if((b.bossId === 'core_omega' || b.bossId === 'core_omega_ii') && isOmegaArmBroken('ring_l')) return;
   if(getPlayerRightBoundaryN() < b.bx - 0.30) return;
   playBossOneshot('attack_swipe', 500);
@@ -435,7 +455,7 @@ function autoConsumeInBattle(){
   battle.healTimer = setTimeout(function(){
     if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
     const medbayLv=getBuildingLv('medbay');
-    const actualHeal=Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
+    const actualHeal=calcConsumableHeal(item, medbayLv);
     battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
     invRemove(item.id,item.rarity,1);
     battle.consuming=false;
@@ -449,6 +469,7 @@ function autoConsumeInBattle(){
 function manualHeal(){
   if(!battle||!battle.active)return;
   if(battle.settling)return;
+  stopBattleMovement();
   if(battle.consuming||battle.reloading)return;
   if(performance.now() < (battle.healDisabledUntil||0)){ notify('治療冷卻中','error'); return; }
   if(battle.playerHp >= battle.playerMaxHp){ notify('生命值已滿','error'); return; }
@@ -461,7 +482,7 @@ function manualHeal(){
   battle.healTimer = setTimeout(function(){
     if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
     const medbayLv=getBuildingLv('medbay');
-    const actualHeal=Math.round(CONSUMABLES[item.id].heal*(RARITY_MULT[item.rarity]||1)*(1+medbayLv*0.15));
+    const actualHeal=calcConsumableHeal(item, medbayLv);
     battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
     invRemove(item.id,item.rarity,1);
     battle.consuming=false;
@@ -611,11 +632,7 @@ function startPlayerFire(){
   if(now - (battle.lastManualClick || 0) < cdMs) return;
   battle.lastManualClick = now;
 
-  if(battle.moveDir !== 0){
-    battle.moveDir = 0;
-    const stick = document.getElementById('stick');
-    if(stick){ stick.style.left='50%'; stick.style.top='50%'; stick.style.transform='translate(-50%,-50%)'; }
-  }
+  stopBattleMovement();
 
   if(battle.fireMode === '掃射'){
     battle.fireHeld = true;
@@ -629,11 +646,46 @@ function stopPlayerFire(){
   battle.fireHeld = false;
 }
 
+/* v67-muzzle-tip */
+const _muzzleTipCache = new Map();
+function _getMuzzleTip(img){
+  if(!img || !img.complete || !img.naturalWidth) return null;
+  const key = img.src;
+  if(_muzzleTipCache.has(key)) return _muzzleTipCache.get(key);
+  try {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const cctx = c.getContext('2d');
+    cctx.drawImage(img, 0, 0);
+    const data = cctx.getImageData(0, 0, w, h).data;
+    let tipX = -1;
+    let ys = [];
+    for(let x = w - 1; x >= 0; x--){
+      const colYs = [];
+      for(let y = 0; y < h; y++){
+        if(data[(y*w + x)*4 + 3] > 10) colYs.push(y);
+      }
+      if(colYs.length > 0){ tipX = x; ys = colYs; break; }
+    }
+    if(tipX === -1){ _muzzleTipCache.set(key, null); return null; }
+    const yMid = (ys[0] + ys[ys.length - 1]) / 2;
+    const result = { rightRatioX: (tipX + 1) / w, yMidRatio: yMid / h };
+    _muzzleTipCache.set(key, result);
+    return result;
+  } catch(e){
+    _muzzleTipCache.set(key, null);
+    return null;
+  }
+}
 function getPlayerMuzzlePos(){
+  /* rev92: WEAPON_MUZZLE 為 trim 空間座標（0..trim.w / 0..trim.h），
+     需先轉換到英雄座標系，才能得到正確的槍口位置。
+     舊版直接把 trim 座標當作英雄座標使用，導致發射點嚴重偏高。 */
   const fx = document.getElementById('battle-fx');
   const W = fx ? fx.clientWidth : 400;
   const H = fx ? fx.clientHeight : 500;
-  const spriteW = 88, spriteH = BATTLE_HERO_SPRITE_H;
+  const spriteW = 220, spriteH = BATTLE_HERO_SPRITE_H;
 
   const ORIG_CHAR_H = 386;
   const ORIG_FOOT_X = 200;
@@ -657,8 +709,26 @@ function getPlayerMuzzlePos(){
     if(cfg){
       const layout = computeWeaponCharLayout(cfg);
       if(layout){
-        localX = centerX_local + scale * (layout.rightX - ORIG_FOOT_X);
-        localY = groundY_local + scale * (layout.anchorY - ORIG_FOOT_Y);
+        const _wid = resolveIconId(wpId);
+        const _wm = (typeof WEAPON_MUZZLE !== 'undefined' && WEAPON_MUZZLE[_wid]) ? WEAPON_MUZZLE[_wid] : null;
+        const _tr = cfg.trim;
+        if(_wm && _tr && _tr.w > 0 && _tr.h > 0 && layout.isTrimMode){
+          /* trim 空間 → 英雄座標（對齊 drawEqLayer 的實際繪製位置）
+             繪製時武器內容左上角位於 (anchorX, anchorY - baseH/2)，
+             因此 trim 座標 (mx, my) 對應的英雄座標為：
+               anchorX + (mx / trim.w) * baseW
+               anchorY - baseH / 2 + (my / trim.h) * baseH */
+          const _baseW = layout.baseW;
+          const _baseH = _tr.h * (cfg.scale || 1.0);
+          const _mzLocalX = layout.anchorX + (_wm.x / _tr.w) * _baseW;
+          const _mzLocalY = layout.anchorY - _baseH / 2 + (_wm.y / _tr.h) * _baseH;
+          localX = centerX_local + scale * (_mzLocalX - ORIG_FOOT_X);
+          localY = groundY_local + scale * (_mzLocalY - ORIG_FOOT_Y);
+        } else {
+          /* 回退：內容右邊界（近戰、無 trim 資料、無槍口表項時） */
+          localX = centerX_local + scale * (layout.rightX - ORIG_FOOT_X);
+          localY = groundY_local + scale * (layout.anchorY - ORIG_FOOT_Y);
+        }
       }
     }
   }

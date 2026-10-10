@@ -6,12 +6,12 @@ const BOSSES={
   lab_queen:{name:'醫師',region:'廢棄實驗室',hp:25000,armor:6000,armorLevel:5,dmg:225,pen:3,critRate:0.12,critMult:1.6,seal:'seal_lab',unlock:'郊區公路',drops:['altyn','zsh12m','rpk16','asval','maska','6b232']},
   road_tyrant:{name:'鉗子',region:'郊區公路',hp:50000,armor:12500,armorLevel:6,dmg:350,pen:4,critRate:0.15,critMult:1.8,seal:'seal_road',unlock:'輻射沼澤',drops:['zhuk6a','svd','pkp','rpk16','belleville','zhuk3']},
   swamp_hydra:{name:'蝮蛇',region:'輻射沼澤',hp:90000,armor:20000,armorLevel:6,dmg:500,pen:5,critRate:0.18,critMult:2.0,seal:'seal_swamp',unlock:'廢土核心',drops:['altyn','zsh12m','svd','pkp','6b43','zhuk6a','maska']},
-  core_omega:{name:'熔爐',region:'廢土核心',hp:160000,armor:30000,armorLevel:7,dmg:650,pen:6,critRate:0.20,critMult:2.2,seal:'seal_core',unlock:null,unlockTier2:'廢棄工廠',drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','rgn']},
+  core_omega:{name:'熔爐',region:'廢土核心',hp:160000,armor:120000,armorLevel:7,dmg:650,pen:6,critRate:0.20,critMult:2.2,seal:'seal_core',unlock:null,unlockTier2:'廢棄工廠',drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','rgn']},
   factory_king_ii:{name:'鐵匠 II',region:'廢棄工廠',tier:2,hp:25000,armor:8000,armorLevel:5,dmg:160,pen:3,critRate:0.12,critMult:1.6,seal:'seal_factory_ii',unlock:'廢棄實驗室',drops:['zhuk6a','svd','altyn','rpk16','maska','6b43']},
   lab_queen_ii:{name:'醫師 II',region:'廢棄實驗室',tier:2,hp:50000,armor:15000,armorLevel:6,dmg:280,pen:4,critRate:0.14,critMult:1.7,seal:'seal_lab_ii',unlock:'郊區公路',drops:['altyn','zsh12m','rpk16','asval','maska','6b232','zhuk3']},
   road_tyrant_ii:{name:'鉗子 II',region:'郊區公路',tier:2,hp:90000,armor:25000,armorLevel:6,dmg:420,pen:5,critRate:0.16,critMult:1.9,seal:'seal_road_ii',unlock:'輻射沼澤',drops:['zhuk6a','svd','pkp','rpk16','belleville','zhuk3','6b43']},
   swamp_hydra_ii:{name:'蝮蛇 II',region:'輻射沼澤',tier:2,hp:160000,armor:40000,armorLevel:7,dmg:560,pen:5,critRate:0.18,critMult:2.0,seal:'seal_swamp_ii',unlock:'廢土核心',drops:['altyn','zsh12m','svd','pkp','6b43','zhuk6a','maska','defender2']},
-  core_omega_ii:{name:'熔爐 II',region:'廢土核心',tier:2,hp:280000,armor:60000,armorLevel:7,dmg:750,pen:6,critRate:0.22,critMult:2.4,seal:'seal_core_ii',unlock:null,drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','rgn']},
+  core_omega_ii:{name:'熔爐 II',region:'廢土核心',tier:2,hp:280000,armor:240000,armorLevel:7,dmg:750,pen:6,critRate:0.22,critMult:2.4,seal:'seal_core_ii',unlock:null,drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','rgn']},
 };
 for(const bid in BOSSES){if(!BOSSES[bid].tier)BOSSES[bid].tier=1;}
 
@@ -23,25 +23,31 @@ const BOSS_WEAKPOINTS = {
   core_omega:  ['ring_t','ring_b','ring_l','ring_r']
 };
 
+/* v66-phases */
 const BOSS_PHASES = {
   factory_king: [
-    { hpPct:1.00, dmgMult:1.0, unlockSkills:[] },
-    { hpPct:0.66, dmgMult:1.2, unlockSkills:['dash'] },
-    { hpPct:0.33, dmgMult:1.5, unlockSkills:[] }
+    { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
+    { hpPct:0.75, dmgMult:1.15, unlockSkills:[] },
+    { hpPct:0.50, dmgMult:1.3,  unlockSkills:['dash'] },
+    { hpPct:0.25, dmgMult:1.5,  unlockSkills:[] }
   ],
   lab_queen: [
     { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
-    { hpPct:0.66, dmgMult:1.25, unlockSkills:['dash'] },
-    { hpPct:0.33, dmgMult:1.6,  unlockSkills:[] }
+    { hpPct:0.75, dmgMult:1.15, unlockSkills:[] },
+    { hpPct:0.50, dmgMult:1.3,  unlockSkills:['dash'] },
+    { hpPct:0.25, dmgMult:1.6,  unlockSkills:[] }
   ],
   road_tyrant: [
-    { hpPct:1.00, dmgMult:1.0, unlockSkills:[] },
-    { hpPct:0.50, dmgMult:1.3, unlockSkills:['charge'] }
+    { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
+    { hpPct:0.75, dmgMult:1.15, unlockSkills:[] },
+    { hpPct:0.50, dmgMult:1.3,  unlockSkills:['charge'] },
+    { hpPct:0.25, dmgMult:1.5,  unlockSkills:[] }
   ],
   swamp_hydra: [
     { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
-    { hpPct:0.66, dmgMult:1.25, unlockSkills:['breath'] },
-    { hpPct:0.33, dmgMult:1.6,  unlockSkills:[] }
+    { hpPct:0.75, dmgMult:1.15, unlockSkills:[] },
+    { hpPct:0.50, dmgMult:1.3,  unlockSkills:['breath'] },
+    { hpPct:0.25, dmgMult:1.6,  unlockSkills:[] }
   ],
   core_omega: [
     { hpPct:1.00, dmgMult:1.0,  unlockSkills:[] },
@@ -958,6 +964,7 @@ const BOSS_ANIMS = {
 /* ★ 交換 core_omega 的 idle 和 walk ★ */
 (function(){ var A = BOSS_ANIMS.core_omega; if(A){ var t = A.idle; A.idle = A.walk; A.walk = t; } })();
 
+/* v66-arm */
 const BOSS_SKILLS = {
   factory_king: [
     { id:'smash', name:'碎地重錘', type:'aoe', cd:10, range:0.20,
@@ -1026,15 +1033,15 @@ const BOSS_SKILLS = {
     { id:'laser_single', name:'單發雷射', type:'aoe', cd:6, range:0.40,
       dmg:50, pen:6, anim:'attack_swipe',
       telegraph:900, hitDelay:900, totalTime:1400,
-      aoe:true, knockback:0.05, telegraphRatio:0.12, unlockPhase:0 },
+      aoe:true, knockback:0.05, telegraphRatio:0.12, unlockPhase:0, armRequired:'ring_t' },
     { id:'laser_spray', name:'掃射雷射', type:'aoe', cd:12, range:0.35,
       dmg:32, pen:5, anim:'attack_swipe',
       telegraph:1200, hitDelay:1200, totalTime:1800,
-      aoe:true, knockback:0.06, telegraphRatio:0.15, unlockPhase:1 },
+      aoe:true, knockback:0.06, telegraphRatio:0.15, unlockPhase:1, armRequired:'ring_r' },
     { id:'laser_charge', name:'蓄力雷射', type:'aoe', cd:20, range:0.50,
       dmg:95, pen:7, anim:'skill_charge',
       telegraph:2000, hitDelay:2000, totalTime:2800,
-      aoe:true, knockback:0.10, telegraphRatio:0.18, unlockPhase:2 }
+      aoe:true, knockback:0.10, telegraphRatio:0.18, unlockPhase:2, armRequired:'ring_b' }
   ]
 };
 
@@ -1210,21 +1217,111 @@ const GAME_ANIMS = {
 };
 
 const WEAPON_LAYOUT = {
-  ak74:      { scale:1.0, ox: 0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:17,w:288,h:93} },
-  aks74u:    { scale:1.0, ox: 0.274369, oy:-0.198512, rotation:0, trim:{x:19,y:28,w:194,h:85} },
-  pkm:       { scale:1.0, ox: -0.035602, oy:-0.288791, rotation:0, trim:{x:0,y:42,w:376,h:112} },
-  ash12:     { scale:1.0, ox: -0.028041, oy:-0.595536, rotation:0, trim:{x:15,y:17,w:229,h:93} },
-  aps:       { scale:1.0, ox: 0.621998, oy:-0.1979, rotation:0, trim:{x:19,y:0,w:89,h:64} },
-  pb:        { scale:1.0, ox: 0.572905, oy:-0.215498, rotation:0, trim:{x:30,y:0,w:130,h:64} },
-  ks23:      { scale:1.0, ox: 0.154468, oy:-0.038305, rotation:-6, trim:{x:57,y:0,w:266,h:64} },
-  svd:       { scale:1.0, ox: 0.054877, oy:-0.460187, rotation:0, trim:{x:19,y:33,w:345,h:61} },
-  vss:       { scale:1.0, ox: -0.003653, oy:-0.730885, rotation:0, trim:{x:16,y:1,w:294,h:99} },
-  mp155:     { scale:1.0, ox: 0.154468, oy:-0.038305, rotation:-6, trim:{x:18,y:1,w:344,h:60} },
-  toz106:    { scale:1.0, ox: 0.285599, oy:-0.090809, rotation:-6, trim:{x:8,y:10,w:182,h:54} },
-  '6kh5':    { scale:1.0, ox: 0.75, oy:0.71, rotation:-79, trim:{x:5,y:19,w:117,h:28} },
-  sv98:      { scale:1.0, ox: 0.091459, oy:-0.442139, rotation:0, trim:{x:18,y:33,w:345,h:61} },
-  pkp:       { scale:1.0, ox: -0.06, oy:-0.336093, rotation:0, trim:{x:0,y:42,w:378,h:119} },
+  '6kh2':     { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:5,y:19,w:117,h:28} },
+  '6kh5':     { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:5,y:19,w:117,h:28} },
+  '9a91':     { scale:1, ox:0.05, oy:-0.2, rotation:0, trim:{x:0,y:28,w:215,h:79} },
+  'ak103':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:16,y:18,w:287,h:91} },
+  'ak104':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:12,y:21,w:232,h:84} },
+  'ak105':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:12,y:21,w:232,h:84} },
+  'ak12':     { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:18,w:288,h:92} },
+  'ak74':     { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:17,w:288,h:93} },
+  'ak74m':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:16,y:18,w:287,h:91} },
+  'ak74n':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:17,w:288,h:93} },
+  'akm':      { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:15,w:287,h:97} },
+  'akmn':     { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:15,w:288,h:97} },
+  'akms':     { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:16,w:288,h:94} },
+  'aks74u':   { scale:1, ox:0.3, oy:-0.15, rotation:0, trim:{x:19,y:28,w:194,h:85} },
+  'aks74un':  { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:19,y:28,w:194,h:85} },
+  'aps':      { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:19,y:0,w:89,h:64} },
+  'ash12':    { scale:1, ox:-0.1, oy:-0.51, rotation:0, trim:{x:15,y:17,w:229,h:93} },
+  'asval':    { scale:1, ox:0.01, oy:-0.090232, rotation:0, trim:{x:11,y:15,w:299,h:85} },
+  'f1':       { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:13,y:4,w:33,h:57} },
+  'ks23':     { scale:1, ox:0.154468, oy:-0.038305, rotation:-6, trim:{x:57,y:0,w:266,h:64} },
+  'kukri':    { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:8,y:13,w:112,h:34} },
+  'mp133':    { scale:1, ox:0.05, oy:0, rotation:-6, trim:{x:40,y:0,w:368,h:64} },
+  'mp153':    { scale:1, ox:0.05, oy:0, rotation:-6, trim:{x:13,y:0,w:290,h:62} },
+  'mp155':    { scale:1, ox:0.154468, oy:-0.038305, rotation:-6, trim:{x:18,y:1,w:344,h:60} },
+  'mp443':    { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:26,y:0,w:75,h:61} },
+  'pb':       { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:30,y:0,w:130,h:64} },
+  'pkm':      { scale:1, ox:-0.05, oy:-0.25, rotation:0, trim:{x:0,y:42,w:376,h:112} },
+  'pkp':      { scale:1, ox:-0.05, oy:-0.25, rotation:0, trim:{x:0,y:42,w:378,h:119} },
+  'pm':       { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:27,y:0,w:74,h:64} },
+  'pp19':     { scale:1, ox:0.4, oy:-0.2, rotation:0, trim:{x:8,y:34,w:149,h:69} },
+  'rgd5':     { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:11,y:3,w:36,h:60} },
+  'rgn':      { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:9,y:0,w:42,h:62} },
+  'rgo':      { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:11,y:1,w:37,h:58} },
+  'rpd':      { scale:1, ox:0, oy:-0.05, rotation:0, trim:{x:33,y:5,w:362,h:122} },
+  'rpk16':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:13,w:288,h:101} },
+  'saiga12':  { scale:1, ox:0.05, oy:0, rotation:-6, trim:{x:15,y:24,w:284,h:78} },
+  'sr3m':     { scale:1, ox:0.4, oy:-0.2, rotation:0, trim:{x:9,y:37,w:142,h:67} },
+  'sv98':     { scale:1, ox:0.115847, oy:-0.45, rotation:0, trim:{x:18,y:33,w:345,h:61} },
+  'svd':      { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:19,y:33,w:345,h:61} },
+  'toz106':   { scale:1, ox:0.285599, oy:-0.090809, rotation:-6, trim:{x:8,y:10,w:182,h:54} },
+  'vog17':    { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:14,y:3,w:33,h:54} },
+  'vog25':    { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:14,y:3,w:33,h:54} },
+  'vss':      { scale:1, ox:0, oy:-0.75, rotation:0, trim:{x:16,y:1,w:294,h:99} },
 };
+
+const HEAD_ARMOR_LAYOUT = {
+  '6b13':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  '6b13m':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  '6b23':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  '6b231':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  '6b232':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  '6b43':     { layer:"torso", behind:false, scale:0.65, ox:0, oy:0.47, rotation:0 },
+  '6b47':     { layer:"head", behind:false, scale:0.3, ox:-0.019509, oy:-0.61, rotation:4 },
+  '6b47m':    { layer:"head", behind:false, scale:0.3, ox:-0.019509, oy:-0.61, rotation:4 },
+  'altyn':    { layer:"head", behind:false, scale:0.34, ox:-0.02, oy:-0.68, rotation:4 },
+  'defender2': { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  'kiver':    { layer:"head", behind:false, scale:0.37, ox:-0.127016, oy:-0.527087, rotation:4 },
+  'kolpak':   { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
+  'maska':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
+  'paca':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  'ssh68':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
+  'ssh68m':   { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.68, rotation:4 },
+  'zhuk3':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  'zhuk6a':   { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  'zsh12m':   { layer:"head", behind:false, scale:0.35, ox:-0.1, oy:-0.6, rotation:4 },
+};
+
+/* v72: 槍口位置表（由編輯器 v8.3 匯出，填入畫布像素坐標） */
+const WEAPON_MUZZLE = {
+  '9a91':     { x: 214, y: 17 },
+  'ak103':    { x: 286, y: 19.5 },
+  'ak104':    { x: 231, y: 18.5 },
+  'ak105':    { x: 231, y: 18.5 },
+  'ak12':     { x: 287, y: 22.5 },
+  'ak74':     { x: 287, y: 20 },
+  'ak74m':    { x: 286, y: 19.5 },
+  'ak74n':    { x: 287, y: 20 },
+  'akm':      { x: 286, y: 23.5 },
+  'akmn':     { x: 287, y: 23.5 },
+  'akms':     { x: 287, y: 23 },
+  'aks74u':   { x: 193, y: 20 },
+  'aks74un':  { x: 193, y: 20 },
+  'aps':      { x: 88, y: 9.5 },
+  'ash12':    { x: 228, y: 34.5 },
+  'asval':    { x: 298, y: 17 },
+  'ks23':     { x: 265, y: 11 },
+  'mp133':    { x: 367, y: 7 },
+  'mp153':    { x: 289, y: 13.5 },
+  'mp155':    { x: 343, y: 11.5 },
+  'mp443':    { x: 74, y: 8.5 },
+  'pb':       { x: 129, y: 11 },
+  'pkm':      { x: 375, y: 29 },
+  'pkp':      { x: 377, y: 29 },
+  'pm':       { x: 73, y: 10.5 },
+  'pp19':     { x: 148, y: 13.5 },
+  'rpd':      { x: 361, y: 26 },
+  'rpk16':    { x: 287, y: 24.5 },
+  'saiga12':  { x: 283, y: 18 },
+  'sr3m':     { x: 141, y: 13.5 },
+  'sv98':     { x: 344, y: 12 },
+  'svd':      { x: 344, y: 16.5 },
+  'toz106':   { x: 181, y: 7 },
+  'vss':      { x: 293, y: 46 },
+};
+
 
 /* 統一的錨點/邊界計算：drawEqLayer、getExploreWeaponRightEdge、getPlayerMuzzlePos 共用
    回傳人物原始座標系下的 { anchorX, anchorY, rightX, baseW } */
@@ -1327,6 +1424,8 @@ function getWeaponCfg(slot, id){
   return null;
 }
 function getTopCfg(id){
+  /* rev92: 優先查 per-item 表，回退到類型級別 */
+  if(typeof HEAD_ARMOR_LAYOUT !== 'undefined' && HEAD_ARMOR_LAYOUT[id]) return HEAD_ARMOR_LAYOUT[id];
   const def = itemDef(id);
   if(def && def.armored) return HERO_VISIBLE_EQ.top_armored;
   return HERO_VISIBLE_EQ.top;
@@ -1358,6 +1457,58 @@ function getExploreWeaponRightEdge(canvasW, canvasH){
     y: groundY + scale * (layout.anchorY - ORIG_FOOT_Y)
   };
 }
+function drawBlockHeroAt(ctx, centerX, groundY, scale, animName, frameIdx, weaponSlotOverride){
+  const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
+  const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  const B = { x: 30, y: 30, w: 340, h: 460 };
+  const ORIG_FOOT_X = 200;
+  const ORIG_FOOT_Y = 515;
+  ctx.save();
+  ctx.translate(centerX, groundY);
+  ctx.scale(scale, scale);
+  ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
+  const units = [];
+  for(const L of GAME_LAYERS){ units.push({ z: L.z, kind:'layer', layer: L }); }
+  const eq = state.player.equipped;
+  if(eq.head){
+    const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
+    const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
+    if(layerDef){
+      const img = getHeroImg('icons/items/' + resolveIconId(eq.head) + '.png');
+      units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
+    }
+  }
+  if(eq.top){
+    const cfg = getTopCfg(eq.top);
+    const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
+    if(layerDef){
+      const img = getHeroImg('icons/items/' + resolveIconId(eq.top) + '.png');
+      units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
+    }
+  }
+  let wpSlot = null, wpId = null;
+  if(weaponSlotOverride && eq[weaponSlotOverride]){ wpSlot = weaponSlotOverride; wpId = eq[weaponSlotOverride]; }
+  else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
+  else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
+  else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
+  if(wpSlot && wpId){
+    const cfg = getWeaponCfg(wpSlot, wpId);
+    if(cfg){
+      const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
+      if(layerDef){
+        const img = getHeroImg('icons/items/' + resolveIconId(wpId) + '.png');
+        units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
+      }
+    }
+  }
+  units.sort((a,b)=>a.z-b.z);
+  for(const u of units){
+    if(u.kind === 'layer') drawBodyLayer(ctx, u.layer, B, anim, fi);
+    else drawEqLayer(ctx, u, B, anim, fi);
+  }
+  ctx.restore();
+}
+
 function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio){
   const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
@@ -1387,7 +1538,7 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
   const eq = state.player.equipped;
 
   if(eq.head){
-    const cfg = HERO_VISIBLE_EQ.head;
+    const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
     const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
     if(layerDef){
       const img = getHeroImg(`icons/items/${resolveIconId(eq.head)}.png`);
@@ -1512,9 +1663,9 @@ function renderBattleHeroCanvas(){
   if(!battle) return;
   const canvas = document.getElementById('hero-battle-canvas');
   if(!canvas) return;
-  const sprite = canvas.parentElement;
-  const w = sprite.clientWidth || 88;
-  const h = sprite.clientHeight || 118;
+  /* v78: 用 canvas 自己的 CSS 尺寸（避免 sprite 與 canvas 寬度不一致時被拉伸） */
+  const w = canvas.clientWidth || 220;
+  const h = canvas.clientHeight || 118;
   if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
