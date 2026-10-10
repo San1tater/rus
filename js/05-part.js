@@ -451,9 +451,12 @@ function autoConsumeInBattle(){
   if(!item){ battle.autoHealing = false; return; }
   battle.consuming=true;
   battle.firing=false;
+  battle._healToken=(battle._healToken||0)+1;
+  const _myHealToken=battle._healToken;
   if(battle.healTimer) clearTimeout(battle.healTimer);
   battle.healTimer = setTimeout(function(){
     if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
+    if(battle._healToken!==_myHealToken)return;
     const medbayLv=getBuildingLv('medbay');
     const actualHeal=calcConsumableHeal(item, medbayLv);
     battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
@@ -477,10 +480,13 @@ function manualHeal(){
   if(!item){ notify('沒有可用的消耗品','error'); return; }
   battle.consuming=true;
   battle.firing=false;
+  battle._healToken=(battle._healToken||0)+1;
+  const _myHealToken=battle._healToken;
   battle.autoHealing = false;
   if(battle.healTimer) clearTimeout(battle.healTimer);
   battle.healTimer = setTimeout(function(){
     if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
+    if(battle._healToken!==_myHealToken)return;
     const medbayLv=getBuildingLv('medbay');
     const actualHeal=calcConsumableHeal(item, medbayLv);
     battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
@@ -550,8 +556,16 @@ function battleLoop(now){
     }
   }
 
-  const canMove = !battle.firing && !battle.reloading && !battle.consuming;
+  /* rev94: 搖桿輸入優先級最高，有輸入時打斷裝填/消耗/開火 */
   const hasMoveInput = (battle.moveDir !== 0);
+  if(hasMoveInput){
+    if(battle.firing){ battle.fireHeld = false; battle.burstLeft = 0; }
+    if(battle.reloading) interruptReload();
+    if(battle.consuming) interruptHeal();
+    battle.firing = !battle.settling && !battle.reloading && !battle.consuming &&
+                    ((battle.fireHeld && battle.fireMode==='掃射') || battle.burstLeft>0);
+  }
+  const canMove = !battle.firing && !battle.reloading && !battle.consuming;
 
   if(canMove && hasMoveInput){
     let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
@@ -616,6 +630,7 @@ function startPlayerFire(){
   if(battle.reloading) return;
   if(battle.consuming){
     if(battle.healTimer){ clearTimeout(battle.healTimer); battle.healTimer=null; }
+    battle._healToken=(battle._healToken||0)+1;
     battle.consuming=false;
     battle.autoHealing=false;
     const now=performance.now();
@@ -830,6 +845,8 @@ function playerShoot(){
   if(def.cal){
     if(battle.ammoInMag<=0){
       battle.reloading=true;battle.firing=false;battle.burstLeft=0;
+      battle._reloadToken=(battle._reloadToken||0)+1;
+      const _myReloadToken=battle._reloadToken;
       refreshBattleControlsLive();
       battleHeroAnim.name='reload';
       battleHeroAnim.frame=0;
@@ -838,6 +855,7 @@ function playerShoot(){
       const currentSlot=battle.weaponSlot;
       setTimeout(()=>{
         if(!battle||!battle.active)return;
+        if(battle._reloadToken!==_myReloadToken)return;
         if(battle.weaponSlot!==currentSlot)return;
         const need=def.mag||30;const take=Math.min(need,battle.ammoRef.count);
         invRemove(battle.ammoRef.id,battle.ammoRef.rarity,take);

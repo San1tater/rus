@@ -41,7 +41,6 @@ const BATTLE_HERO_FOOT_Y_RATIO = 0.95;
 const BOSS_MIN_GAP = 0.12;
 
 const TK_MAG={aks74u:30,aks74un:30,ak74:30,ak74n:30,ak74m:30,akm:30,akms:30,akmn:30,ak103:30,ak104:30,ak105:30,ak12:30,asval:20,'9a91':20,sr3m:30,vss:10,svd:10,sv98:10,rpk16:95,rpd:100,pkm:100,pkp:100,ash12:20,pp19:30,pm:8,pb:8,mp443:17,aps:20,mp133:6,mp153:7,mp155:6,saiga12:8,toz106:2,ks23:3};
-const TK_ARMOR={ssh68:20,ssh68m:22,kolpak:30,'6b47':40,'6b47m':45,altyn:50,kiver:40,maska:45,zsh12m:3.7,balaclava:5,shemagh:5,gp7:15,ballglasses:5,paca:3.5,'6b13':10.6,'6b13m':9.15,'6b23':7.9,'6b231':7.9,'6b232':10.5,'6b43':20,zhuk6a:11.5,zhuk3:5.2,defender2:11.5,cargopants:5,'6sh122':25,'6sh104':25,'6sh112':25,workboots:5,tactboots:15,lowaz:22,haix:25,belleville:20};
 
 function armorClass(level){if(!level||level<=0)return '';const lv=Math.min(6,Math.max(1,Math.floor(level)));return ['','I','II','III','IV','V','VI'][lv]||'';}
 function getHelmetTotalLevel(id){const def=ARMOR[id];if(!def||def.slot!=='head')return 0;if(def.subArmor&&def.subArmor.length){let s=0;for(const el of def.subArmor)s+=(el.level||0);return s;}return def.level||0;}
@@ -216,16 +215,8 @@ const AMMO_UNIT_WEIGHT = {
   '9x18':0.007,'9x19':0.009,'5.45':0.0105,'7.62':0.0165,'7.62x54':0.021,
   '9x39':0.017,'12ga':0.045,'12.7':0.068,'20/70':0.030,'23x75':0.08
 };
-/* 彈匣重量（kg）——僅計算彈匣本體，不含子彈 */
-const MAGAZINE_WEIGHT = {
-  default:0.15, ak_30:0.215, ak_45:0.3, ak_60:0.4, ak_95:0.68,
-  rpk_95:0.68, pkm_200:0.9, svd_10:0.15, vss_10:0.12, vss_20:0.2,
-  pistol_8:0.05, pistol_17:0.08, pistol_20:0.09, pistol_30:0.12,
-  shotgun_5:0.095, shotgun_8:0.15, saiga_5:0.095, saiga_20:0.68,
-  ash12_10:0.35, ks23_3:0.18
-};
 const PANTS_SHOES_EMOJI = {
-  cargopants:'👖', '6sh122':'👖', '6sh104':'👖', '6sh112':'👖',
+  cargopants:'👖',
   workboots:'🥾', tactboots:'🥾', lowaz:'🥾', haix:'🥾', belleville:'🥾',
 };
 const AMMO_ICON_BY_CAL = {

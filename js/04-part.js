@@ -4,6 +4,35 @@
 let battle=null;
 const BATTLE_ONESHOT_ANIMS=['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
 
+/* rev93/rev94: 輸入優先級助手 —— 搖桿、攻擊、切換、治療互相打斷 */
+function stopBattleMovement(){
+  if(!battle) return;
+  battle.moveDir = 0;
+  const stick = document.getElementById('stick');
+  if(stick){ stick.style.left='50%'; stick.style.top='50%'; stick.style.transform='translate(-50%,-50%)'; }
+  if(typeof battle._joystickCancel === 'function') battle._joystickCancel();
+}
+function interruptReload(){
+  if(!battle || !battle.reloading) return false;
+  battle._reloadToken = (battle._reloadToken || 0) + 1;
+  battle.reloading = false;
+  if(typeof battleHeroAnim !== 'undefined' && battleHeroAnim.name === 'reload'){
+    battleHeroAnim.name = 'idle';
+    battleHeroAnim.frame = 0;
+  }
+  if(typeof refreshBattleControlsLive === 'function') refreshBattleControlsLive();
+  return true;
+}
+function interruptHeal(){
+  if(!battle || !battle.consuming) return false;
+  if(battle.healTimer){ clearTimeout(battle.healTimer); battle.healTimer = null; }
+  battle._healToken = (battle._healToken || 0) + 1;
+  battle.consuming = false;
+  battle.autoHealing = false;
+  if(typeof refreshBattleControlsLive === 'function') refreshBattleControlsLive();
+  return true;
+}
+
 /* rev93: 停止戰鬥中的玩家移動並取消當前搖桿會話 */
 function stopBattleMovement(){
   if(!battle) return;
@@ -468,6 +497,10 @@ function renderBattleJoystick(z2){
   z2.innerHTML=`<div class="joystick" id="joystick"><div class="stick" id="stick"></div></div><div class="z2-hint">拖動搖桿左右移動</div>`;
   const joy=$('#joystick'),stick=$('#stick');
   let touchId=null,cx,cy,radius;
+  /* rev93/rev94: 供外部取消當前搖桿會話 */
+  if(battle){
+    battle._joystickCancel = function(){ touchId = null; };
+  }
   function start(e){
     if(battle){
       if(battle.firing){ battle.fireHeld=false; battle.burstLeft=0; }
@@ -480,11 +513,12 @@ function renderBattleJoystick(z2){
   }
   function move(e){
     if(!battle||!battle.active)return;
-    if(battle.reloading || battle.consuming){
-      stick.style.left='50%';stick.style.top='50%';
-      battle.moveDir=0;
-      return;
-    }
+    /* rev93: 外部已取消會話 → 忽略後續 touchmove（直到重新按下） */
+    if(e.changedTouches && touchId===null) return;
+    /* rev94: 搖桿輸入優先級最高，主動打斷裝填/消耗/開火 */
+    if(battle.reloading) interruptReload();
+    if(battle.consuming) interruptHeal();
+    if(battle.firing){ battle.fireHeld=false; battle.burstLeft=0; }
     let t=e;if(e.changedTouches)t=Array.from(e.changedTouches).find(x=>x.identifier===touchId)||e.changedTouches[0];
     let dx=t.clientX-cx;let dy=t.clientY-cy;
     const dist=Math.sqrt(dx*dx+dy*dy);
