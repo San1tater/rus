@@ -1277,7 +1277,7 @@ const HEAD_ARMOR_LAYOUT = {
   'kolpak':   { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
   'maska':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
   'paca':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  'redutm':   { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
+  'redutm':   { layer:"torso", behind:false, scale:0.48, ox:0.04, oy:0.46, rotation:0 },
   'ssh68':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
   'ssh68m':   { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.68, rotation:4 },
   'zhuk3':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
