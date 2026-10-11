@@ -883,11 +883,54 @@ function getCurrentBg(){
   const nodeIdx=clamp(prog.nodeIdx||0,0,(routes&&routes[pathIdx]?routes[pathIdx].nodes.length:1)-1);
   return `images/bg/${key}_r${pathIdx}_n${nodeIdx}.png${assetSuffix()}`;
 }
+const _bgPreloadCache = new Set();
+function preloadExploreBackgrounds(){
+  let queued = 0;
+  for(const region in REGIONS){
+    const key = REGION_KEYS[region.replace(/II$/,'')];
+    if(!key) continue;
+    const routes = ROUTES[region];
+    if(!routes) continue;
+    for(let r = 0; r < routes.length; r++){
+      const route = routes[r];
+      if(!route || !route.nodes) continue;
+      for(let n = 0; n < route.nodes.length; n++){
+        const url = 'images/bg/' + key + '_r' + r + '_n' + n + '.png' + assetSuffix();
+        if(_bgPreloadCache.has(url)) continue;
+        _bgPreloadCache.add(url);
+        const img = new Image();
+        img.src = url;
+        queued++;
+      }
+    }
+  }
+  return queued;
+}
 function updateExploreBg(){
   const layers=document.querySelectorAll('#zone1 .bg-layer');
   if(!layers.length)return;
   const bg=getCurrentBg();
-  if(bg)layers.forEach(l=>{l.style.backgroundImage=`url('${bg}')`;});
+  if(bg){
+    const newUrl='url(\'' + bg + '\')';
+    const curRaw=layers[0].style.backgroundImage||'';
+    const curNorm=curRaw.replace(/["']/g,'"');
+    const newNorm=newUrl.replace(/["']/g,'"');
+    if(curNorm!==newNorm){
+      const fadeEl=document.getElementById('explore-bg-fade');
+      if(fadeEl){
+        fadeEl.style.transition='none';
+        fadeEl.style.backgroundImage=newUrl;
+        fadeEl.style.opacity='1';
+        layers.forEach(l=>{l.style.backgroundImage=newUrl;});
+        requestAnimationFrame(()=>{
+          fadeEl.style.transition='opacity .4s ease-out';
+          fadeEl.style.opacity='0';
+        });
+      } else {
+        layers.forEach(l=>{l.style.backgroundImage=newUrl;});
+      }
+    }
+  }
   const t=$('#zone1 .zone-title');
   if(t){const region=state.activeRegion||'';const cur=region?getCurrentNode(region):null;if(cur){const _dr=region.replace(/II$/,' II');t.innerHTML=`🧭 ${_dr} · ${cur.node}`;}}
 }
@@ -1467,7 +1510,7 @@ function renderExplore(){
   z1.innerHTML=`
     <div class="scene">
       <div class="bg-scroll" style="--spd:${spd}s"><div class="bg-layer" style="background-image:url('${bg}')"></div><div class="bg-layer" style="background-image:url('${bg}')"></div></div>
-      <div class="groundline"></div>
+      <div class="bg-fade" id="explore-bg-fade" style="background-image:url('${bg}');opacity:0"></div><div class="groundline"></div>
       <div class="explore-fx" id="explore-fx"></div>
       <canvas id="hero-canvas" class="hero-canvas"></canvas>
       <div class="zone-title">🧭 ${_displayRegion} · ${cur.node}</div>

@@ -451,10 +451,29 @@ function openPreference(){
 }
 
 let currentTab='explore';
+let _sceneFadeTimer = null;
+function _applySceneFadeIn(){
+  ['zone1','zone2','zone3'].forEach(function(id){
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.classList.remove('scene-enter');
+    void el.offsetWidth;
+    el.classList.add('scene-enter');
+  });
+  if(_sceneFadeTimer) clearTimeout(_sceneFadeTimer);
+  _sceneFadeTimer = setTimeout(function(){
+    ['zone1','zone2','zone3'].forEach(function(id){
+      const el=document.getElementById(id);
+      if(el)el.classList.remove('scene-enter');
+    });
+    _sceneFadeTimer = null;
+  }, 320);
+}
 function renderCurrentTab(){
   if(currentTab==='explore')renderExplore();
   else if(currentTab==='combat')renderCombat();
   else if(currentTab==='base')renderBase();
+  _applySceneFadeIn();
 }
 $$('.tab').forEach(t=>{
   t.onclick=()=>{
@@ -578,6 +597,15 @@ function init(){
   state.player.armor=Math.min(state.player.armor||0,state.player.maxArmor);
   lastTickTime=Date.now();
   save();renderCurrentTab();
+  /* rev106: 提前預載探索背景圖，避免播放時才下載造成閃爍 */
+  setTimeout(function(){
+    try{
+      if(typeof preloadExploreBackgrounds === 'function'){
+        const _queued = preloadExploreBackgrounds();
+        if(_queued > 0) console.log('[assets] 預載探索背景圖 ' + _queued + ' 張');
+      }
+    }catch(e){ console.warn('[assets] 背景預載失敗', e); }
+  }, 800);
   console.log('=== 廢土求生',VERSION,'啟動 ===');
 
   setTimeout(async ()=>{
@@ -585,6 +613,7 @@ function init(){
     if(changed){
       console.log('[assets] 重新渲染以套用新版資源');
       renderCurrentTab();
+      try{ if(typeof preloadExploreBackgrounds === 'function') preloadExploreBackgrounds(); }catch(e){}
     }
   }, 500);
 }
