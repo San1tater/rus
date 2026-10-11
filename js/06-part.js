@@ -396,6 +396,35 @@ function openGardenSeedPickerWithRemove(idx){
     })(rows[i]);
   }
 }
+function gardenPlantSeed(idx, seedId, rarity){
+  const plots = _gardenGetPlots();
+  const plot = plots[idx];
+  if(!plot || plot.type !== 'soil') return;
+  if(plot.crop) return;
+  const seed = SEEDS[seedId];
+  if(!seed) return;
+  if(!gardenStorageRemove(seedId, rarity, 1)){
+    notify('種子不足', 'error');
+    return;
+  }
+  const now = Date.now();
+  let growMs = seed.growMs;
+  if(state.garden && typeof state.garden.compostAccelSec === 'number' && state.garden.compostAccelSec > 0){
+    const maxUse = Math.min(state.garden.compostAccelSec, (growMs / 1000) * 0.5);
+    if(maxUse > 0){
+      growMs = Math.max(1000, Math.round(growMs - maxUse * 1000));
+      state.garden.compostAccelSec -= maxUse;
+    }
+  }
+  plot.crop = { seedId: seedId, rarity: rarity, plantedAt: now, matureAt: now + growMs, cleanupUntil: 0 };
+  plot.lastSeed = seedId;
+  plot.lastRarity = rarity;
+  save();
+  closeModal();
+  notify('已種下：' + seed.name, 'ok');
+  renderGardenGrid();
+  renderGardenContent();
+}
 
 function openGardenCropDetailWithRemove(idx, st){
   const plots = _gardenGetPlots();
@@ -4579,3 +4608,28 @@ document.addEventListener('click',e=>{
 window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,addProf,notify,offlineSettle,getMeleeHits,getOrCreateNamedItem,BossModule,probeAssetVersion,get assetVersion(){return ASSET_VERSION;}};
 
 
+
+/* ===== rev250: 种植链路诊断 ===== */
+(function(){
+  if(window._plantDiagInstalled) return;
+  window._plantDiagInstalled = true;
+  var _wrap = function(name){
+    if(typeof window[name] !== 'function'){ console.warn('[plant-diag] ' + name + ' 不存在'); return; }
+    var _orig = window[name];
+    window[name] = function(){
+      try { console.log('[plant-diag] 呼叫 ' + name, Array.prototype.slice.call(arguments)); } catch(e){}
+      var _r = _orig.apply(this, arguments);
+      try { console.log('[plant-diag] 返回 ' + name + ' →', _r); } catch(e){}
+      return _r;
+    };
+  };
+  setTimeout(function(){
+    _wrap('openGardenSoilAction');
+    _wrap('openGardenSeedPickerWithRemove');
+    _wrap('openGardenCropDetailWithRemove');
+    _wrap('gardenPlantSeed');
+    _wrap('gardenStorageRemove');
+    console.log('[plant-diag] 已包裝：openGardenSoilAction / openGardenSeedPickerWithRemove / openGardenCropDetailWithRemove / gardenPlantSeed / gardenStorageRemove');
+  }, 500);
+})();
+/* ===== end rev250 ===== */
