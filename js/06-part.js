@@ -3935,11 +3935,12 @@ function openArmoryInfo(){
   ft.querySelector('#arm-close').onclick = closeModal;
 }
 
-function _rebindStatsClick(container){
-  if(!container) return;
-  const el = container.querySelector('[data-stat-action="armory"]');
-  if(el) el.onclick = openArmoryInfo;
-}
+
+
+
+
+
+
 
 function _gardenSoilFoodPerHour(){
   const plots = _gardenGetPlots();
@@ -3962,7 +3963,7 @@ function _gardenSoilFoodPerHour(){
 function _getArmorySummary(){
   const p = _getArmoryProduction();
   if(!p) return null;
-  if(!p.items.length) return { text: '無可用彈藥', hasItems: false };
+  if(!p.items.length) return { text: '無彈藥', hasItems: false };
   let total = 0;
   let mn = 0, mx = 0;
   for(const it of p.items){
@@ -3970,25 +3971,23 @@ function _getArmorySummary(){
     mn += it.perHourMin;
     mx += it.perHourMax;
   }
-  const avgLo = Math.round(mn / Math.max(1, total));
-  const avgHi = Math.round(mx / Math.max(1, total));
   const avgMid = Math.round((mn + mx) / 2 / Math.max(1, total));
-  return { text: '約 ' + avgMid + ' 發/h（' + total + ' 種）', hasItems: true };
+  return { text: '約' + avgMid + '/h', hasItems: true };
 }
 
 function renderBaseStats(){
-  const parts = [];
+  const rows = [];
   const genLv = getBuildingLv('generator');
   const genMult = 1 + genLv * 0.2;
   const radioLv = getBuildingLv('radio');
   if(radioLv > 0){
     const mh = Math.round(12 * genMult * 5.5 * radioLv);
-    parts.push({ icon: '📡', label: '無線電', value: '材料 +' + mh + '/h', group: '基地' });
+    rows.push({ key: 'radio', label: '無線電', value: '+' + mh + '/h' });
   }
   const armoryLv = getBuildingLv('armory');
   if(armoryLv > 0){
     const sum = _getArmorySummary();
-    parts.push({ icon: '🔫', label: '軍械庫', value: sum ? sum.text : '—', group: '基地', action: 'armory' });
+    rows.push({ key: 'armory', label: '軍械庫', value: sum ? sum.text : '—' });
   }
   const g = _gardenMerchantInit();
   const m = g.merchant;
@@ -4002,43 +4001,152 @@ function renderBaseStats(){
     const prod = MERCHANT_FOOD_TABLE[m.foodLv].food * 12;
     const net = prod - consumePerHour;
     const st = _gardenMerchantLineStatus('food');
-    parts.push({ icon: '🍲', label: '食物產線', value: '淨 ' + (net >= 0 ? '+' : '') + net + '/h', group: '後院', status: st });
+    rows.push({ key: 'food', label: '食物', value: (net >= 0 ? '+' : '') + net + '/h', paused: st && st.paused });
   }
   if(m.seedLv > 0){
     const st = _gardenMerchantLineStatus('seed');
-    parts.push({ icon: '🌰', label: '種子產線', value: '🌰 +' + (MERCHANT_SEED_TABLE[m.seedLv].count * 12) + '/h', group: '後院', status: st });
+    rows.push({ key: 'seed', label: '種子', value: '+' + (MERCHANT_SEED_TABLE[m.seedLv].count * 12) + '/h', paused: st && st.paused });
   }
   if(m.throwLv > 0){
     const st = _gardenMerchantLineStatus('throw');
-    parts.push({ icon: '💣', label: '投擲產線', value: '💣 +' + (MERCHANT_THROW_TABLE[m.throwLv].count * 12) + '/h', group: '後院', status: st });
+    rows.push({ key: 'throw', label: '投擲', value: '+' + (MERCHANT_THROW_TABLE[m.throwLv].count * 12) + '/h', paused: st && st.paused });
   }
   const soil = _gardenSoilFoodPerHour();
   if(soil.planted > 0){
-    parts.push({ icon: '🌾', label: '田地', value: '食物值 +' + Math.round(soil.ratePerHour) + '/h（' + soil.planted + ' 塊）', group: '後院' });
+    rows.push({ key: 'soil', label: '田地', value: '+' + Math.round(soil.ratePerHour) + '/h' });
   }
-  if(!parts.length){
-    return '<div class="empty-hint">尚無生產活動<br><span style="font-size:10px;color:#5a5040">建造建築或訂閱商人生產線後顯示</span></div>';
+  if(!rows.length){
+    return '<div class="empty-hint">尚無生產活動</div>';
   }
   let html = '';
-  for(const p of parts){
-    const _clickable = p.action ? ' cursor:pointer;' : '';
-    const _attr = p.action ? ' data-stat-action="' + p.action + '"' : '';
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:5px;margin-bottom:4px;font-size:11px;' + _clickable + '"' + _attr + '>';
-    html += '<span style="font-size:16px">' + p.icon + '</span>';
-    html += '<span style="color:#a89a85;flex:0 0 62px">' + p.label + '</span>';
-    html += '<span style="color:#ddd;flex:1">' + p.value + '</span>';
-    if(p.status && p.status.active){
-      if(p.status.paused){
-        html += '<span style="font-size:10px;color:#e05252">暫停' + (p.status.missing && p.status.missing.length ? '（缺' + p.status.missing.join('、') + '）' : '') + '</span>';
-      } else {
-        html += '<span style="font-size:10px;color:#4caf50">運作中</span>';
-      }
-    }
-    html += '<span style="font-size:9px;color:#5a5040">' + p.group + '</span>';
+  for(const r of rows){
+    html += '<div class="stat-row" data-stat-key="' + r.key + '">';
+    html += '<span class="stat-label">' + r.label + '</span>';
+    html += '<span class="stat-value">' + r.value + '</span>';
+    html += '<span class="stat-status">' + (r.paused ? '暫停' : '') + '</span>';
     html += '</div>';
   }
   return html;
 }
+
+function _rebindStatsClick(container){
+  if(!container) return;
+  const rows = container.querySelectorAll('.stat-row[data-stat-key]');
+  for(let i = 0; i < rows.length; i++){
+    (function(el){
+      el.onclick = function(){ openStatsDetail(el.getAttribute('data-stat-key')); };
+    })(rows[i]);
+  }
+}
+
+function openStatsDetail(key){
+  if(key === 'armory'){ openArmoryInfo(); return; }
+  if(key === 'radio'){ _openRadioDetail(); return; }
+  if(key === 'food' || key === 'seed' || key === 'throw'){ _openMerchantLineDetail(key); return; }
+  if(key === 'soil'){ _openSoilDetail(); return; }
+}
+
+function _openRadioDetail(){
+  const lv = getBuildingLv('radio');
+  if(lv <= 0){ notify('尚未建造無線電', 'error'); return; }
+  const genLv = getBuildingLv('generator');
+  const genMult = 1 + genLv * 0.2;
+  const intervalMs = 5 * 60 * 1000 / genMult;
+  const perHour = Math.round(3600000 / intervalMs);
+  let body = '';
+  body += '<div class="detail-sub">Lv.' + lv + '</div>';
+  body += '<div class="divider"></div>';
+  body += '<div class="stat-line"><span class="k">週期</span><span class="v">' + Math.round(intervalMs/1000) + ' 秒</span></div>';
+  body += '<div class="stat-line"><span class="k">產出</span><span class="v">隨機材料 ×' + (3*lv) + '~' + (8*lv) + '（每 ' + perHour + ' 次/h）</span></div>';
+  body += '<div class="divider"></div>';
+  body += '<div style="font-size:11px;color:#7a6f60">可能產出：木材、金屬、螺絲、布料、齒輪、電子零件</div>';
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn ghost" id="dt-close">關閉</button>';
+  openModal({ title: '無線電', body: body, footer: ft });
+  ft.querySelector('#dt-close').onclick = closeModal;
+}
+
+function _openMerchantLineDetail(lineKey){
+  const meta = _gardenMerchantLineMeta(lineKey);
+  if(!meta) return;
+  const g = _gardenMerchantInit();
+  const m = g.merchant;
+  const lv = m[meta.lvKey] || 0;
+  if(lv <= 0){ notify('尚未訂閱', 'error'); return; }
+  const cfg = meta.table[lv];
+  const st = _gardenMerchantLineStatus(lineKey);
+  const last = m[meta.lastKey] || 0;
+  const now = Date.now();
+  const elapsed = now - last;
+  const remainMs = Math.max(0, MERCHANT_INTERVAL_MS - elapsed);
+  const remain = Math.ceil(remainMs / 1000);
+  let body = '';
+  body += '<div class="detail-sub">' + meta.title + ' · Lv.' + lv + '</div>';
+  body += '<div class="divider"></div>';
+  body += '<div class="stat-line"><span class="k">週期</span><span class="v">' + Math.round(MERCHANT_INTERVAL_MS/1000) + ' 秒</span></div>';
+  body += '<div class="stat-line"><span class="k">下次</span><span class="v">' + remain + ' 秒後</span></div>';
+  body += '<div class="stat-line"><span class="k">消耗</span><span class="v" style="color:#e05252">' + _gardenMerchantCostStr(cfg, lineKey) + '</span></div>';
+  body += '<div class="stat-line"><span class="k">產出</span><span class="v" style="color:#4caf50">' + _gardenMerchantProduceStr(cfg, lineKey) + '</span></div>';
+  if(lineKey === 'food'){
+    body += '<div class="stat-line"><span class="k">預付</span><span class="v">🌾' + (m.foodPool || 0) + '</span></div>';
+  }
+  body += '<div class="divider"></div>';
+  if(st && st.paused){
+    body += '<div style="color:#e05252;font-weight:bold">暫停中</div>';
+    if(st.missing && st.missing.length){
+      body += '<div style="font-size:11px;color:#7a6f60;margin-top:4px">缺少：' + st.missing.join('、') + '</div>';
+    }
+  } else {
+    body += '<div style="color:#4caf50;font-weight:bold">運作中</div>';
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn ghost" id="dt-close">關閉</button>';
+  openModal({ title: meta.title, body: body, footer: ft });
+  ft.querySelector('#dt-close').onclick = closeModal;
+}
+
+function _openSoilDetail(){
+  const plots = _gardenGetPlots();
+  const list = [];
+  const now = Date.now();
+  for(let i = 0; i < plots.length; i++){
+    const p = plots[i];
+    if(!p || p.type !== 'soil' || !p.crop) continue;
+    const seed = SEEDS[p.crop.seedId];
+    if(!seed) continue;
+    const mult = RARITY_MULT[p.crop.rarity] || 1;
+    const yieldPerCycle = seed.baseYield * mult;
+    const foodPerCycle = yieldPerCycle * cropFoodValue(seed.cropId, p.crop.rarity);
+    const growMs = seed.growMs || 1;
+    const ratePerHour = foodPerCycle * 3600000 / growMs;
+    const remainMs = Math.max(0, p.crop.matureAt - now);
+    list.push({
+      idx: i,
+      seedName: seed.name,
+      rarity: p.crop.rarity,
+      cropName: (CROPS[seed.cropId] || {}).name || '',
+      ratePerHour: Math.round(ratePerHour),
+      remainSec: Math.ceil(remainMs / 1000)
+    });
+  }
+  let body = '';
+  body += '<div class="detail-sub">共 ' + list.length + ' 塊種植中</div>';
+  body += '<div class="divider"></div>';
+  for(const it of list){
+    body += '<div style="padding:6px 0;border-bottom:1px dashed #2a231c">';
+    body += '<div class="' + rarityClass(it.rarity) + '" style="font-size:12px;font-weight:bold">' + plotCoordName(it.idx) + ' · ' + it.seedName + '</div>';
+    body += '<div style="font-size:10px;color:#a89a85;margin-top:2px">' + it.rarity + ' · 產 ' + it.cropName + ' · 速率 +' + it.ratePerHour + '/h · 剩 ' + it.remainSec + 's</div>';
+    body += '</div>';
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn ghost" id="dt-close">關閉</button>';
+  openModal({ title: '田地', body: body, footer: ft });
+  ft.querySelector('#dt-close').onclick = closeModal;
+}
+
 function renderBase(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   let html='<div class="build-grid">';
