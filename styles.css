@@ -310,3 +310,479 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 @keyframes sceneEnterFade{from{opacity:.25}to{opacity:1}}
 .bg-fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:2;will-change:opacity}
 /* ===== end rev106 ===== */
+
+/* ===== rev122: 家園二級導航 ===== */
+.subnav{display:flex;border-bottom:1px solid #2a231c;background:#17140f;flex:0 0 auto}
+.subnav-tab{flex:1;padding:8px 4px;font-size:11px;text-align:center;color:#7a6f60;cursor:pointer;border-bottom:2px solid transparent;transition:color .15s,border-color .15s,background .15s;user-select:none}
+.subnav-tab.on{color:#e8a33d;border-bottom-color:#e8a33d;background:#1a1510}
+.subnav-tab:hover{color:#e8a33d}
+.subnav-body{flex:1;min-height:0;overflow:hidden;padding:10px}
+/* ===== end rev122 ===== */
+
+/* ===== rev130: 後院全屏分頁 ===== */
+#garden-page{position:fixed;inset:0;z-index:9000;background:linear-gradient(180deg,#0e0c0a 0%,#151210 100%);display:none;flex-direction:column;overflow:hidden}
+#garden-page.on{display:flex}
+.gp-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #2a231c;background:#17140f}
+.gp-title{font-size:15px;color:#e8a33d;font-weight:bold;letter-spacing:1px}
+.gp-exit{font-size:13px;color:#a89a85;background:#241d16;border:1px solid #3a2f25;padding:6px 14px;border-radius:8px;cursor:pointer;user-select:none}
+.gp-exit:active{background:#3a2f25;color:#e8a33d}
+.gp-grid-wrap{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:40px 24px}
+.gp-grid{display:grid;grid-template-columns:repeat(4,64px);grid-template-rows:repeat(5,64px);gap:4px;flex:0 0 auto}
+.gp-plot{width:64px;height:64px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;user-select:none;transition:transform .1s,border-color .15s,background .15s;box-sizing:border-box}
+.gp-plot:active{transform:scale(.94)}
+.gp-plot.empty .gp-plot-icon{font-size:22px;color:#4a4038;line-height:1}
+.gp-plot.built{border-color:#8a5f18;background:linear-gradient(180deg,#3a2a15,#241d16)}
+.gp-plot.built .gp-plot-lbl{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:8px;color:#e8a33d;background:rgba(0,0,0,.55);padding:1px 0}
+.gp-plot.mature{border-color:#4caf50;box-shadow:0 0 8px rgba(76,175,80,.55)}
+.gp-plot.mature .gp-plot-lbl{color:#7ee07e}
+.gp-plot.rotten{border-color:#e05252;background:linear-gradient(180deg,#3a1a1a,#241010)}
+.gp-plot.rotten .gp-plot-lbl{color:#e05252}
+.gp-plot.cleaning{border-color:#7a6f60;background:linear-gradient(180deg,#2a2520,#1a1510)}
+.gp-plot.cleaning .gp-plot-lbl{color:#a89a85}
+.gp-plot-icon{font-size:26px;line-height:1;pointer-events:none}
+.gp-plot-lbl{pointer-events:none}
+.gp-func{flex:0 0 auto;border-top:1px solid #2a231c;background:#17140f;display:flex;flex-direction:column}
+.gp-tabs{display:flex;height:40px;border-bottom:1px solid #2a231c;flex:0 0 auto}
+.gp-tab{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;color:#7a6f60;cursor:pointer;border-bottom:2px solid transparent;user-select:none;transition:color .15s,border-color .15s,background .15s}
+.gp-tab.on{color:#e8a33d;border-bottom-color:#e8a33d;background:#1a1510}
+.gp-tab:active{background:#241d16}
+.gp-content{height:220px;overflow-y:auto;padding:8px 12px;color:#a89a85;font-size:11px}
+.gp-content-empty{text-align:center;color:#5a5040;padding:40px 0;font-size:11px}
+.gp-storage-title{font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:6px}
+.gp-storage-empty{font-size:10px;color:#5a5040;padding:6px 2px}
+.gp-storage-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:#241d16;margin-bottom:4px;border:1px solid #2a231c}
+.gp-storage-row .icon{flex:0 0 30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:18px;background:#151210;border-radius:5px;border:1px solid #3a2f25}
+.gp-storage-row .info{flex:1;min-width:0}
+.gp-storage-row .nm{font-size:11px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gp-storage-row .sub{font-size:9px;color:#7a6f60;margin-top:2px}
+.gp-storage-row .cnt{font-size:11px;color:#e8a33d;font-weight:bold}
+/* ===== end rev130 ===== */
+
+/* ===== rev132: 儲備格子 ===== */
+.gp-storage-grid{display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 4px}
+.gp-cell{width:48px;height:48px;border:1px solid #3a2f25;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;user-select:none;transition:transform .1s,border-color .15s;box-sizing:border-box}
+.gp-cell:active{transform:scale(.92)}
+.gp-cell:hover{border-color:#e8a33d}
+.gp-cell-icon{font-size:24px;line-height:1;pointer-events:none}
+.gp-cell-cnt{position:absolute;right:1px;bottom:0;font-size:9px;color:#fff;background:rgba(0,0,0,.72);padding:0 4px;border-radius:6px 0 0 0;font-weight:bold;line-height:1.3;pointer-events:none}
+/* ===== end rev132 ===== */
+/* ===== rev147: 儲備 + 僕人動畫 ===== */
+.gp-content{height:220px;overflow:hidden;padding:0;position:relative;display:block}
+.gs-cols{position:absolute;inset:0;display:flex;padding:6px;box-sizing:border-box}
+.gs-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;padding:0 6px;overflow:hidden;box-sizing:border-box}
+.gs-cols > .gs-col + .gs-col{border-left:1px solid #e8a33d}
+.gs-title{flex:0 0 auto;height:16px;line-height:16px;font-size:10px;color:#e8a33d;font-weight:bold;margin:0 0 4px 0;padding:0}
+.gs-wrap{flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0;margin:0;position:relative;scrollbar-gutter:stable;padding-right:2px}
+.gs-wrap::-webkit-scrollbar{width:4px}
+.gs-wrap::-webkit-scrollbar-track{background:transparent}
+.gs-wrap::-webkit-scrollbar-thumb{background:#6a5a30;border-radius:2px}
+.gs-row{display:flex;margin:0 0 4px 0;padding:0;justify-content:space-between;align-items:stretch}
+.gs-cell{flex:0 0 auto;box-sizing:border-box;background:rgba(30,25,20,.6);border:1px solid #3a2f25;border-radius:4px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;line-height:1}
+.gs-cell.empty{background:transparent;border-color:#2a231c}
+.gs-cell.placeholder{visibility:hidden}
+.gs-cell.filled{cursor:pointer}
+.gs-cell.filled:active{opacity:.75}
+.gs-cell.filled:hover{border-color:#e8a33d}
+.gs-cell-icon{font-size:inherit;line-height:1;pointer-events:none;color:#fff}
+.gs-cell-cnt{position:absolute;right:0;bottom:0;font-size:9px;color:#fff;background:rgba(0,0,0,.78);padding:0 3px;border-radius:4px 0 3px 0;font-weight:bold;line-height:1.3;pointer-events:none}
+.gs-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:#7a6f60;text-align:center;line-height:1.7}
+/* rev155 actor 層（任務 + 體力） */
+.gp-grid-wrap{position:relative}
+.gp-actor-layer{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}
+.gp-actor{position:absolute;width:0;height:0;pointer-events:none;transition-property:left,top;transition-timing-function:cubic-bezier(.4,0,.6,1);will-change:left,top}
+.gp-actor-icon{position:absolute;left:0;top:0;transform:translate(-50%,-100%);font-size:22px;line-height:1;text-align:center;user-select:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))}
+.gp-actor-progress{position:absolute;left:0;top:0;transform:translate(-50%,calc(-100% - 26px));width:28px;height:4px;background:rgba(0,0,0,.75);border:1px solid #3a2f25;border-radius:2px;overflow:hidden;display:none}
+.gp-actor-progress .fill{height:100%;width:0%;background:linear-gradient(90deg,#e8a33d,#4caf50);transition:width .1s linear}
+.gp-actor.state-walk .gp-actor-icon{animation:actorBob .45s ease-in-out infinite alternate}
+.gp-actor.state-work .gp-actor-icon{animation:actorWork .32s ease-in-out infinite alternate}
+.gp-actor.state-lazy .gp-actor-icon{opacity:.65;animation:actorLazy 1.6s ease-in-out infinite alternate}
+.gp-actor.state-lazy .gp-actor-icon::after{content:"💤";position:absolute;top:-2px;right:-10px;font-size:11px;opacity:.9}
+.gp-actor.state-rest .gp-actor-icon{opacity:.45;filter:grayscale(.7) drop-shadow(0 2px 3px rgba(0,0,0,.7))}
+.gp-actor.state-rest .gp-actor-icon::after{content:"💤";position:absolute;top:-2px;right:-10px;font-size:11px;opacity:.9}
+@keyframes actorBob{from{transform:translate(-50%,-100%) translateY(0)}to{transform:translate(-50%,-100%) translateY(-3px)}}
+@keyframes actorWork{from{transform:translate(-50%,-100%) rotate(-4deg)}to{transform:translate(-50%,-100%) rotate(4deg)}}
+@keyframes actorLazy{from{transform:translate(-50%,-100%) scale(1)}to{transform:translate(-50%,-100%) scale(0.92)}}
+/* ===== end rev155 ===== */
+/* ===== rev152: 僕人指派網格 + 確認層 ===== */
+.srv-sa-info{font-size:11px;color:#e8a33d;text-align:center;margin-bottom:10px}
+.srv-sa-grid{display:grid;grid-template-columns:repeat(4,44px);gap:8px;justify-content:center;margin:10px auto}
+.srv-sa-cell{width:44px;height:44px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:4px;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;user-select:none;box-sizing:border-box;transition:transform .1s,border-color .15s,background .15s}
+.srv-sa-cell:active:not([data-disabled="1"]){transform:scale(.92)}
+.srv-sa-cell[data-disabled="1"]{opacity:.3;cursor:default}
+.srv-sa-cell.selected{border-color:#e8a33d;background:rgba(232,163,61,.22);box-shadow:0 0 8px rgba(232,163,61,.45)}
+.srv-sa-cell.occupied:not(.selected){border-color:#a45ede;border-style:dashed}
+.srv-sa-icon{font-size:22px;line-height:1;pointer-events:none}
+.srv-sa-owner{position:absolute;bottom:0;right:1px;font-size:11px;line-height:1;pointer-events:none;background:rgba(0,0,0,.6);border-radius:3px;padding:0 2px}
+.confirm-layer{position:fixed;inset:0;z-index:10001;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+.confirm-box{background:#1e1813;border:1px solid #3a2f25;border-radius:10px;padding:18px 22px;max-width:320px;width:82%;box-shadow:0 8px 32px rgba(0,0,0,.8)}
+.confirm-msg{font-size:12px;color:#ddd;margin-bottom:14px;line-height:1.6;text-align:center}
+.confirm-btns{display:flex;gap:8px}
+.confirm-btns .btn{flex:1;padding:9px}
+/* ===== end rev152 ===== */
+/* ===== rev157: 商人 UI ===== */
+.mrc-wrap{position:absolute;inset:0;padding:8px;box-sizing:border-box;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.mrc-wrap::-webkit-scrollbar{width:4px}
+.mrc-wrap::-webkit-scrollbar-thumb{background:#6a5a30;border-radius:2px}
+.mrc-food{font-size:12px;color:#e8a33d;text-align:center;padding:6px;background:#1a1510;border:1px solid #2a231c;border-radius:5px;flex:0 0 auto}
+.mrc-food b{color:#fff;font-size:14px;margin-left:4px}
+.mrc-card{background:#1a1510;border:1px solid #2a231c;border-radius:5px;padding:8px 10px;flex:0 0 auto}
+.mrc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.mrc-cur-lv{font-size:11px;color:#e8a33d;font-weight:bold;padding:1px 8px;border:1px solid #8a5f18;border-radius:4px;background:#2a1f10}
+.mrc-title{font-size:11px;color:#e8a33d;font-weight:bold}
+.mrc-toggle{font-size:10px;padding:3px 10px;border-radius:4px;background:#241d16;border:1px solid #3a2f25;color:#7a6f60;cursor:pointer;user-select:none}
+.mrc-toggle.on{background:#2a1f10;border-color:#e8a33d;color:#e8a33d}
+.mrc-toggle:active{transform:scale(.95)}
+.mrc-desc{font-size:9px;color:#a89a85;line-height:1.5;margin-bottom:3px}
+.mrc-status{font-size:9px;color:#5a5040}
+/* ===== end rev157 ===== */
+/* ===== rev158: header 食物 + 商人等級 ===== */
+.gp-header .gp-title{flex:0 0 auto}
+.gp-header .gp-food-info{flex:0 0 auto;margin-left:14px;font-size:12px;line-height:1.4;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.gp-header .gp-food-info b{font-size:14px}
+.gp-header .gp-exit{flex:0 0 auto;margin-left:auto}
+.mrc-levels{display:flex;gap:4px;margin:6px 0 6px}
+.mrc-lv{flex:1;padding:5px 2px;font-size:10px;text-align:center;background:#241d16;border:1px solid #3a2f25;border-radius:4px;color:#7a6f60;cursor:pointer;user-select:none;transition:all .15s}
+.mrc-lv.on{background:#2a1f10;border-color:#e8a33d;color:#e8a33d;font-weight:bold}
+.mrc-levels{display:flex;gap:4px;margin:6px 0 6px}
+.mrc-lv{flex:1;padding:5px 2px;font-size:10px;text-align:center;background:#241d16;border:1px solid #3a2f25;border-radius:4px;color:#7a6f60;cursor:pointer;user-select:none;transition:all .15s}
+.mrc-lv.on{background:#2a1f10;border-color:#e8a33d;color:#e8a33d;font-weight:bold}
+.mrc-lv:active{transform:scale(.95)}
+.mrc-cd-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.mrc-cd-bar{flex:1;height:8px;background:#0e0c0a;border-radius:4px;overflow:hidden;border:1px solid #2a231c}
+.mrc-cd-bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,#e8a33d,#ffd680);transition:width .2s linear}
+.mrc-cd-num{font-size:13px;font-weight:bold;color:#e8a33d;min-width:48px;text-align:right;font-family:Menlo,Consolas,monospace;letter-spacing:.5px}
+.mrc-cd-off{font-size:10px;color:#5a5040;justify-content:center;margin:4px 0}
+/* ===== end rev158 ===== */
+/* ===== rev168: 商人訂閱按鈕 + 移除等級列 ===== */
+.mrc-sub-btn{cursor:pointer;user-select:none;transition:background .15s,color .15s}
+.mrc-sub-btn:hover{background:#3a2a15;color:#ffd680}
+.mrc-sub-btn:active{transform:scale(.96)}
+.mrc-levels{display:none !important}
+/* ===== end rev168 ===== */
+.mrc-plan-row{padding:10px 12px;border:1px solid #2a231c;border-radius:6px;background:#1a1510;margin-bottom:6px;cursor:pointer;transition:border-color .15s,background .15s}
+.mrc-plan-row:hover{border-color:#8a5f18}
+.mrc-plan-row:active{transform:scale(.99)}
+.mrc-plan-head{font-size:13px;font-weight:bold;color:#e8a33d;margin-bottom:6px}
+.mrc-plan-line{display:flex;align-items:baseline;gap:10px;margin-top:3px;font-size:11px}
+.mrc-plan-key{flex:0 0 32px;color:#7a6f60;text-align:right}
+.mrc-plan-val{flex:1;color:#ddd;line-height:1.4;word-break:break-word}
+.mrc-cur-lv{font-size:11px;color:#e8a33d;font-weight:bold;padding:0}
+.mrc-sub-btn{cursor:pointer;user-select:none}
+.mrc-sub-btn:hover{text-decoration:underline}
+.mrc-sub-btn:active{opacity:.8}
+/* ===== rev173: 訂閱計劃純文字 ===== */
+.mrc-plan-row{padding:8px 10px;border:1px solid #2a231c;border-radius:6px;background:#1a1510;margin-bottom:5px;cursor:pointer;transition:border-color .15s,background .15s}
+.mrc-plan-row:hover{border-color:#8a5f18}
+.mrc-plan-row:active{transform:scale(.99)}
+.mrc-plan-head{font-size:12px;font-weight:bold;color:#e8a33d;margin-bottom:3px}
+.mrc-plan-line{font-size:11px;line-height:1.5;color:#ddd;word-break:break-word}
+.mrc-plan-line .cost{color:#e8741e}
+.mrc-plan-line .arrow{color:#5a5040;margin:0 6px}
+.mrc-plan-line .gain{color:#7ee07e}
+/* ===== end rev173 ===== */
+/* ===== rev176: 卡片右上 padding + 修復 ===== */
+.mrc-cur-lv{font-size:11px;color:#e8a33d;font-weight:bold;padding:4px 10px;border-radius:5px;background:rgba(232,163,61,.08);transition:background .15s}
+.mrc-sub-btn:hover{background:rgba(232,163,61,.18) !important}
+.mrc-sub-btn:active{transform:scale(.96)}
+/* ===== end rev176 ===== */
+/* ===== rev181: 哨塔配置 ===== */
+.tower-eq-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+.tower-eq{padding:6px 4px;border:1px solid #2a231c;border-radius:5px;background:#1a1510;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;cursor:pointer;user-select:none;transition:border-color .15s,background .15s}
+.tower-eq:hover{border-color:#8a5f18}
+.tower-eq:active{transform:scale(.96)}
+.tower-eq.filled{border-color:#8a5f18;background:#241d16}
+.tower-eq.empty{border-style:dashed}
+.tower-eq-icon{font-size:14px;color:#7a6f60;line-height:1;font-weight:bold}
+.tower-eq-name{font-size:9px;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;width:100%}
+/* ===== end rev181 ===== */
+/* ===== rev183: 防禦戰動畫 ===== */
+.raid-head{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:#e8a33d;font-weight:bold;margin-bottom:8px}
+.raid-region{font-size:10px;color:#7a6f60;font-weight:normal}
+.raid-lineup{display:flex;gap:8px;align-items:stretch;margin-bottom:10px}
+.raid-side{flex:1;background:#151210;border:1px solid #2a231c;border-radius:5px;padding:6px;min-height:60px}
+.raid-side-title{font-size:10px;color:#7a6f60;margin-bottom:4px;font-weight:bold}
+.raid-units{display:flex;flex-direction:column;gap:2px}
+.raid-unit{font-size:10px;color:#ddd}
+.raid-hp{color:#4caf50}
+.raid-hp.enemy{color:#e05252}
+.raid-vs{display:flex;align-items:center;color:#8a5f18;font-weight:bold;font-size:12px;padding:0 2px}
+.raid-log{background:#0e0c0a;border:1px solid #2a231c;border-radius:5px;padding:6px 8px;max-height:240px;overflow-y:auto;font-family:Menlo,Consolas,monospace;font-size:10px;line-height:1.5}
+.raid-log::-webkit-scrollbar{width:3px}
+.raid-log::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:2px}
+.raid-log-line{padding:1px 0;color:#bfb3a0;animation:raidLineIn .22s ease-out}
+@keyframes raidLineIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+.raid-log-line.round{color:#8a5f18;font-weight:bold;text-align:center;padding:4px 0;letter-spacing:1px;border-top:1px dashed #2a231c;margin-top:3px}
+.raid-log-line.ally b{color:#e8a33d}
+.raid-log-line.ally b.crit{color:#ffd680;font-size:11px}
+.raid-log-line.enemy b{color:#e05252}
+.raid-log-line.miss{color:#5a5040;font-style:italic}
+.raid-log-line.kill{color:#4caf50;font-weight:bold}
+.raid-log-line.down{color:#e05252;font-weight:bold}
+/* ===== end rev183 ===== */
+/* ===== rev185: 地格保險已移除（rev186） ===== */
+
+.tower-eq-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px}
+.tower-eq{padding:8px 6px;border:1px solid #2a231c;border-radius:5px;background:#1a1510;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:58px;cursor:pointer;user-select:none;transition:border-color .15s,background .15s}
+.tower-eq:hover:not(.locked){border-color:#8a5f18}
+.tower-eq:active:not(.locked){transform:scale(.96)}
+.tower-eq.filled{border-color:#8a5f18;background:#241d16}
+.tower-eq.empty{border-style:dashed}
+.tower-eq.locked{opacity:.35;cursor:not-allowed;background:#151210}
+.tower-eq-thumb{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#7a6f60;line-height:1}
+.tower-eq-thumb img{width:100%;height:100%;object-fit:contain;display:block}
+.tower-eq-name{font-size:9px;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;width:100%}
+/* ===== end rev185 ===== */
+/* ===== rev186: 彈藥色標 ===== */
+.tower-ammo-pick{padding:6px 10px;border:1px solid #3a2f25;border-radius:5px;font-size:11px;cursor:pointer;user-select:none;text-align:center;transition:border-color .15s,background .15s}
+.tower-ammo-pick.empty{border-style:dashed;color:#7a6f60}
+.tower-ammo-pick:hover{border-color:#e8a33d}
+/* ===== end rev186 ===== */
+/* ===== rev187: 測試入侵按鈕 ===== */
+.gp-test-raid{font-size:11px;color:#e05252;background:#241010;border:1px solid #5a2a2a;padding:6px 10px;border-radius:6px;cursor:pointer;user-select:none;margin-right:6px}
+.gp-test-raid:hover{background:#3a1a1a;color:#ff6060}
+.gp-test-raid:active{transform:scale(.95)}
+/* ===== end rev187 ===== */
+/* ===== rev190: 後院網格戰鬥 ===== */
+.raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:visible}
+.raid-overlay-report{display:flex;flex-direction:column;background:#17140f}
+.raid-topbar{position:absolute;top:0;left:0;right:0;padding:6px 10px;background:rgba(20,16,12,.94);border-bottom:1px solid #2a231c;display:flex;justify-content:space-between;align-items:center;z-index:30;pointer-events:auto}
+.raid-topbar-title{color:#e8a33d;font-weight:bold;font-size:11px;letter-spacing:1px}
+.raid-topbar-btns{display:flex;gap:4px}
+.raid-top-btn{padding:4px 10px;border-radius:4px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;font-size:10px;font-weight:bold;cursor:pointer;user-select:none}
+.raid-top-btn:hover{background:#3a2f25;color:#e8a33d}
+.raid-top-btn.primary{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.raid-enemy-zone{position:absolute;right:2px;top:40px;bottom:2px;width:80px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;z-index:10;transition:transform 1.6s ease-in}
+.raid-enemy{width:68px;padding:3px;background:rgba(30,15,15,.9);border:1px solid #5a2a2a;border-radius:5px;display:flex;flex-direction:column;align-items:center;gap:1px;transition:filter .15s,opacity .3s,transform .2s}
+.raid-enemy.flash{filter:brightness(1.7);transform:scale(1.08)}
+.raid-enemy.hit{background:rgba(90,20,20,.95)}
+.raid-enemy.dead{opacity:.2;filter:grayscale(1);transform:scale(.9)}
+.raid-enemy .raid-sprite{font-size:22px}
+.raid-sprite{font-size:22px;line-height:1}
+.raid-hp-wrap{width:100%;height:4px;background:#1a1010;border-radius:2px;overflow:hidden}
+.raid-hp{height:100%;transition:width .25s linear}
+.raid-hp.guard{background:linear-gradient(90deg,#2e7a2e,#4caf50)}
+.raid-hp.enemy{background:linear-gradient(90deg,#8a2a2a,#e05252)}
+.raid-name{font-size:8px;color:#a89a85;text-align:center;line-height:1.1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.raid-guard{position:absolute;width:38px;padding:2px;background:rgba(20,30,20,.9);border:1px solid #2e7a2e;border-radius:5px;display:flex;flex-direction:column;align-items:center;gap:1px;transform:translate(-50%,-50%);z-index:12;transition:filter .15s,opacity .3s,transform .2s;pointer-events:none}
+.raid-guard.flash{filter:brightness(1.7)}
+.raid-guard.hit{background:rgba(80,20,20,.9)}
+.raid-guard.dead{opacity:.2;filter:grayscale(1)}
+.raid-guard.flee{opacity:.25;transition:opacity .8s}
+.raid-guard .raid-sprite{font-size:18px}
+.raid-fx-layer{position:absolute;inset:0;pointer-events:none;z-index:25;overflow:visible}
+.raid-proj{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none}
+.raid-proj.ally{background:#ffd680;box-shadow:0 0 6px #ffb300,0 0 12px #ff8800}
+.raid-proj.enemy{background:#ff6060;box-shadow:0 0 6px #e05252}
+.raid-proj.miss{background:#a89a85;box-shadow:0 0 6px #7a6f60;opacity:.7}
+.raid-dmg{position:absolute;transform:translate(-50%,-50%);font-size:13px;font-weight:bold;color:#ffd680;text-shadow:0 0 3px #000,0 0 6px #000;pointer-events:none;animation:raidDmgFloat .9s ease-out forwards;z-index:26}
+.raid-dmg.crit{color:#ff5050;font-size:17px;-webkit-text-stroke:1px #000}
+@keyframes raidDmgFloat{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}15%{opacity:1;transform:translate(-50%,-80%) scale(1.3)}100%{opacity:0;transform:translate(-50%,-180%) scale(1)}}
+.raid-float{position:absolute;transform:translate(-50%,-50%);font-size:13px;font-weight:bold;pointer-events:none;animation:raidFloatFade 1s ease-out forwards;z-index:26}
+.raid-float.kill{color:#e05252;font-size:18px}
+.raid-float.miss{color:#7a6f60;font-size:10px}
+@keyframes raidFloatFade{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}20%{opacity:1;transform:translate(-50%,-70%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-120%) scale(1)}}
+.raid-report{flex:1;overflow-y:auto;padding:14px 18px}
+.raid-report-title{font-size:17px;font-weight:bold;margin-bottom:4px}
+.raid-report-ft{flex:0 0 auto;padding:10px 14px;border-top:1px solid #2a231c;background:#17140f;display:flex}
+.raid-report-ft .btn{flex:1}
+/* ===== end rev190 ===== */
+/* ===== rev191: Canvas 戰鬥 ===== */
+.raid-canvas{position:absolute;left:0;top:0;pointer-events:none;z-index:11;display:block}
+.raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:visible}
+.raid-topbar{position:absolute;top:0;left:0;right:0;padding:6px 10px;background:rgba(20,16,12,.94);border-bottom:1px solid #2a231c;display:flex;justify-content:space-between;align-items:center;z-index:30;pointer-events:auto}
+.raid-topbar-title{color:#e8a33d;font-weight:bold;font-size:11px;letter-spacing:1px}
+.raid-topbar-btns{display:flex;gap:4px}
+.raid-top-btn{padding:4px 10px;border-radius:4px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;font-size:10px;font-weight:bold;cursor:pointer;user-select:none}
+.raid-top-btn:hover{background:#3a2f25;color:#e8a33d}
+.raid-top-btn.primary{background:#8a5f18;color:#fff;border-color:#e8a33d}
+/* 舊元素停用 */
+.raid-banner-win,.raid-banner-lose{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);font-size:20px;font-weight:bold;text-shadow:0 0 14px #000,0 0 4px #000;padding:10px 24px;border-radius:10px;animation:raidBannerIn .5s ease-out;z-index:32;pointer-events:none;letter-spacing:2px}
+.raid-banner-win{color:#4caf50;background:rgba(20,40,20,.92);border:2px solid #4caf50}
+.raid-banner-lose{color:#e05252;background:rgba(40,10,10,.92);border:2px solid #e05252}
+@keyframes raidBannerIn{from{opacity:0;transform:translateX(-50%) scale(.7)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+/* 舊風格移除（若殘留） */
+.raid-enemy-zone,.raid-guard,.raid-proj,.raid-dmg,.raid-float,.raid-enemy{display:none !important}
+/* ===== end rev191 ===== */
+/* ===== rev193: Canvas 戰鬥重寫 ===== */
+.raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:hidden}
+.raid-topbar{position:absolute;top:0;left:0;right:0;padding:6px 10px;background:rgba(20,16,12,.94);border-bottom:1px solid #2a231c;display:flex;justify-content:space-between;align-items:center;z-index:30;pointer-events:auto}
+.raid-topbar-title{color:#e8a33d;font-weight:bold;font-size:11px;letter-spacing:1px}
+.raid-topbar-btns{display:flex;gap:4px}
+.raid-top-btn{padding:4px 10px;border-radius:4px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;font-size:10px;font-weight:bold;cursor:pointer;user-select:none}
+.raid-top-btn:hover{background:#3a2f25;color:#e8a33d}
+.raid-top-btn.primary{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.raid-canvas{position:absolute;left:0;top:0;z-index:11;display:block;pointer-events:none}
+/* 舊元素徹底禁用 */
+.raid-side,.raid-unit,.raid-unit-sprite,.raid-enemy-zone,.raid-enemy,.raid-guard,.raid-proj,.raid-dmg,.raid-float,.raid-banner-win,.raid-banner-lose{display:none !important;visibility:hidden !important}
+/* ===== end rev193 ===== */
+/* ===== rev194: 人偶復用 + 徹底禁舊元素 ===== */
+.raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:hidden}
+.raid-topbar{position:absolute;top:0;left:0;right:0;padding:6px 10px;background:rgba(20,16,12,.94);border-bottom:1px solid #2a231c;display:flex;justify-content:space-between;align-items:center;z-index:30;pointer-events:auto}
+.raid-topbar-title{color:#e8a33d;font-weight:bold;font-size:11px;letter-spacing:1px}
+.raid-topbar-btns{display:flex;gap:4px}
+.raid-top-btn{padding:4px 10px;border-radius:4px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;font-size:10px;font-weight:bold;cursor:pointer;user-select:none}
+.raid-top-btn:hover{background:#3a2f25;color:#e8a33d}
+.raid-top-btn.primary{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.raid-canvas{position:absolute;left:0;top:0;z-index:11;display:block;pointer-events:none}
+/* 舊 raid-* 全禁 */
+.raid-side, .raid-unit, .raid-unit-sprite, .raid-unit-hpwrap, .raid-unit-name, .raid-unit-hp, .raid-enemy-zone, .raid-enemy, .raid-guard, .raid-proj, .raid-dmg, .raid-float, .raid-banner-win, .raid-banner-lose, .raid-hp-wrap, .raid-name, .raid-hp{display:none !important;visibility:hidden !important;pointer-events:none !important}
+/* ===== end rev194 ===== */
+/* ===== rev195: 戰鬥 canvas ===== */
+.raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:hidden}
+.raid-topbar{position:absolute;top:0;left:0;right:0;padding:6px 10px;background:rgba(20,16,12,.94);border-bottom:1px solid #2a231c;display:flex;justify-content:space-between;align-items:center;z-index:30;pointer-events:auto}
+.raid-topbar-title{color:#e8a33d;font-weight:bold;font-size:11px;letter-spacing:1px}
+.raid-topbar-btns{display:flex;gap:4px}
+.raid-top-btn{padding:4px 10px;border-radius:4px;background:#241d16;border:1px solid #3a2f25;color:#a89a85;font-size:10px;font-weight:bold;cursor:pointer;user-select:none}
+.raid-top-btn:hover{background:#3a2f25;color:#e8a33d}
+.raid-top-btn.primary{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.raid-canvas{position:absolute;left:0;top:0;z-index:11;display:block;pointer-events:none}
+/* 舊元素徹底禁用 */
+.raid-side,.raid-unit,.raid-sprite,.raid-enemy-zone,.raid-enemy,.raid-guard,.raid-proj,.raid-dmg,.raid-float,.raid-banner-win,.raid-banner-lose,.raid-unit-sprite,.raid-unit-hpwrap,.raid-unit-name,.raid-hp-wrap,.raid-name,.raid-hp{display:none !important;visibility:hidden !important;pointer-events:none !important}
+/* ===== end rev195 ===== */
+/* ===== rev196: 僕人 canvas ===== */
+.gp-actor-canvas{position:absolute;left:0;top:0;pointer-events:none;z-index:15;display:block}
+.gp-actor-layer{display:none !important}
+/* ===== end rev196 ===== */
+/* ===== rev197: 全面清 raid-banner 及 emoji ===== */
+.raid-banner-win, .raid-banner-lose, .raid-side, .raid-unit, .raid-sprite, .raid-enemy-zone, .raid-enemy, .raid-guard, .raid-proj, .raid-dmg, .raid-float, .raid-unit-sprite, .raid-unit-hpwrap, .raid-unit-name, .raid-hp-wrap, .raid-name, .raid-hp, #gp-actor-layer{display:none !important;visibility:hidden !important;pointer-events:none !important}
+/* ===== end rev197 ===== */
+/* ===== rev199: 戰鬥日誌 + 徹底禁 banner ===== */
+.raid-banner-win, .raid-banner-lose{display:none !important;visibility:hidden !important}
+.battle-log-list{display:flex;flex-direction:column;gap:6px;padding:2px}
+.battle-log-item{padding:8px 10px;border-radius:6px;background:#151210;border:1px solid #2a231c;font-size:11px}
+.battle-log-item.win{border-left:3px solid #4caf50}
+.battle-log-item.lose{border-left:3px solid #e05252}
+.bl-head{display:flex;justify-content:space-between;margin-bottom:4px}
+.bl-title{font-weight:bold}
+.battle-log-item.win .bl-title{color:#4caf50}
+.battle-log-item.lose .bl-title{color:#e05252}
+.bl-time{color:#7a6f60;font-size:10px}
+.bl-sub{color:#a89a85;font-size:10px;margin-bottom:3px}
+.bl-line{color:#ddd;font-size:10px;line-height:1.5}
+.bl-line.lose{color:#e05252}
+.bl-line.win{color:#4caf50}
+/* ===== end rev199 ===== */
+/* ===== rev200: 浮動按鈕，無頂欄 ===== */
+.raid-float-btns{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:30;pointer-events:auto}
+.raid-float-btns .raid-top-btn{padding:5px 12px;border-radius:5px;background:rgba(36,29,22,.85);border:1px solid #3a2f25;color:#a89a85;font-size:11px;font-weight:bold;cursor:pointer;user-select:none}
+.raid-float-btns .raid-top-btn:hover{background:#3a2f25;color:#e8a33d}
+.raid-float-btns .raid-top-btn.primary{background:#8a5f18;color:#fff;border-color:#e8a33d}
+.raid-topbar{display:none !important}
+.gp-actor-canvas{position:absolute;left:0;top:0;pointer-events:none;z-index:15;display:block}
+/* ===== end rev200 ===== */
+/* ===== rev201: 戰鬥日誌詳情 ===== */
+.battle-log-item.win .bl-title{color:#4caf50}
+.battle-log-item.lose .bl-title{color:#e05252}
+.bl-detail{padding-left:12px;color:#a89a85}
+/* ===== end rev201 ===== */
+/* ===== rev203: 實時戰鬥日誌 + 槍口 ===== */
+.raid-live-log{position:absolute;left:6px;bottom:6px;width:200px;max-height:60%;background:rgba(10,8,6,.9);border:1px solid #2a231c;border-radius:6px;z-index:20;display:flex;flex-direction:column;pointer-events:auto;overflow:hidden}
+.raid-live-log-head{flex:0 0 auto;padding:5px 8px;font-size:10px;color:#e8a33d;font-weight:bold;background:#17140f;border-bottom:1px solid #2a231c;letter-spacing:1px}
+.raid-live-log-body{flex:1;min-height:0;overflow-y:auto;padding:4px 6px;font-size:10px;line-height:1.45;font-family:Menlo,Consolas,monospace}
+.raid-live-log-body::-webkit-scrollbar{width:3px}
+.raid-live-log-body::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:2px}
+.raid-live-log-line{padding:1px 0;color:#bfb3a0;word-break:break-all}
+.raid-live-log-line.round{color:#e8a33d;font-weight:bold;text-align:center;padding:4px 0;letter-spacing:1px;border-top:1px dashed #2a231c;margin-top:4px}
+.raid-live-log-line.ally{color:#7ee07e}
+.raid-live-log-line.enemy{color:#e05252}
+.raid-live-log-line.miss{color:#7a6f60;font-style:italic}
+.raid-live-log-line.kill{color:#ffd680;font-weight:bold}
+.raid-live-log-line.down{color:#e05252;font-weight:bold}
+.raid-live-log-line.win{color:#4caf50;font-weight:bold;text-align:center;padding:3px;margin-top:4px;border-top:1px solid #2a5a2a}
+.raid-live-log-line.lose{color:#e05252;font-weight:bold;text-align:center;padding:3px;margin-top:4px;border-top:1px solid #5a2a2a}
+/* ===== end rev203 ===== */
+/* ===== rev204: 實時戰鬥日誌 ===== */
+.raid-live-log{position:absolute;left:6px;bottom:6px;width:220px;max-height:65%;background:rgba(10,8,6,.92);border:1px solid #2a231c;border-radius:6px;z-index:20;display:flex;flex-direction:column;pointer-events:auto;overflow:hidden}
+.raid-live-log-head{flex:0 0 auto;padding:5px 8px;font-size:10px;color:#e8a33d;font-weight:bold;background:#17140f;border-bottom:1px solid #2a231c;letter-spacing:1px}
+.raid-live-log-body{flex:1;min-height:0;overflow-y:auto;padding:4px 6px;font-size:10px;line-height:1.45;font-family:Menlo,Consolas,monospace}
+.raid-live-log-body::-webkit-scrollbar{width:3px}
+.raid-live-log-body::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:2px}
+.raid-live-log-line{padding:1px 0;color:#bfb3a0;word-break:break-all}
+.raid-live-log-line.round{color:#e8a33d;font-weight:bold;text-align:center;padding:4px 0;letter-spacing:1px;border-top:1px dashed #2a231c;margin-top:4px}
+.raid-live-log-line.ally{color:#7ee07e}
+.raid-live-log-line.enemy{color:#e05252}
+.raid-live-log-line.miss{color:#7a6f60;font-style:italic}
+.raid-live-log-line.kill{color:#ffd680;font-weight:bold}
+.raid-live-log-line.down{color:#e05252;font-weight:bold}
+.raid-live-log-line.win{color:#4caf50;font-weight:bold;text-align:center;padding:3px;margin-top:4px;border-top:1px solid #2a5a2a}
+.raid-live-log-line.lose{color:#e05252;font-weight:bold;text-align:center;padding:3px;margin-top:4px;border-top:1px solid #5a2a2a}
+/* ===== end rev204 ===== */
+/* ===== rev205: live log 在底部 ===== */
+.raid-live-log{display:none !important}
+#gp-content .raid-live-log-line{padding:1px 0;font-family:Menlo,Consolas,monospace;font-size:11px;line-height:1.5;word-break:break-all;color:#bfb3a0}
+#gp-content .raid-live-log-line.round{color:#e8a33d;font-weight:bold;text-align:center;padding:4px 0;letter-spacing:1px;border-top:1px dashed #2a231c;margin-top:4px}
+#gp-content .raid-live-log-line.ally{color:#7ee07e}
+#gp-content .raid-live-log-line.enemy{color:#e05252}
+#gp-content .raid-live-log-line.miss{color:#7a6f60;font-style:italic}
+#gp-content .raid-live-log-line.kill{color:#ffd680;font-weight:bold}
+#gp-content .raid-live-log-line.down{color:#e05252;font-weight:bold}
+#gp-content .raid-live-log-line.win{color:#4caf50;font-weight:bold;text-align:center;padding:3px;margin-top:4px;border-top:1px solid #2a5a2a}
+#gp-content .raid-live-log-line.lose{color:#e05252;font-weight:bold;text-align:center;padding:3px;margin-top:4px;border-top:1px solid #5a2a2a}
+/* ===== end rev205 ===== */
+/* ===== rev206: 可滾動日誌 ===== */
+#gp-content{overflow-y:auto !important}
+#gp-content .battle-log-list{display:flex;flex-direction:column}
+#gp-content .raid-live-log-line{flex:0 0 auto}
+/* ===== end rev206 ===== */
+/* ===== rev210: 緊湊戰鬥日誌 ===== */
+.battle-log-list{display:flex;flex-direction:column;gap:4px;padding:2px}
+.battle-log-item{padding:6px 8px;border-radius:5px;background:#151210;border:1px solid #2a231c;font-size:11px;line-height:1.35}
+.battle-log-item.win{border-left:3px solid #4caf50}
+.battle-log-item.lose{border-left:3px solid #e05252}
+.bl-head{display:flex;justify-content:space-between;margin-bottom:3px}
+.bl-title{font-weight:bold}
+.battle-log-item.win .bl-title{color:#4caf50}
+.battle-log-item.lose .bl-title{color:#e05252}
+.bl-time{color:#7a6f60;font-size:10px}
+.bl-row{color:#ddd;font-size:10px;margin:1px 0;word-break:break-all}
+.bl-row.bl-sub{color:#a89a85}
+/* ===== end rev210 ===== */
+/* ===== rev211: 證件照 + 色 ===== */
+/* removed by rev218 */
+.gs-cell.filled.srv{padding-bottom:12px}
+.gs-cell.filled.srv .gs-cell-cnt{font-size:8px;padding:0 2px}
+/* ===== end rev211 ===== */
+/* ===== rev212: 證件照新 ===== */
+/* removed by rev218 */
+/* ===== end rev212 ===== */
+/* ===== rev213: 證件照 SVG ===== */
+/* removed by rev218 */
+.gs-cell.filled.srv{padding-bottom:12px}
+.gs-cell.filled.srv .gs-cell-cnt{font-size:8px;padding:0 2px}
+/* ===== end rev213 ===== */
+/* ===== rev215 ===== */
+.tower-guards-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.tower-guard-btn{width:44px;padding:4px 2px;border-radius:6px;border:1.5px solid #3a2f25;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none;transition:transform .1s,border-color .15s}
+.tower-guard-btn:hover{border-color:#e8a33d}
+.tower-guard-btn:active{transform:scale(.95)}
+.tower-guard-btn .tg-icon{font-size:22px;line-height:1}
+.tower-guard-btn .tg-name{font-size:9px;color:#fff;font-weight:bold;line-height:1.1;text-shadow:0 0 2px #000}
+.gp-plot.broken .gp-plot-icon{color:#e05252;font-weight:bold;font-size:24px;text-shadow:0 0 3px #000}
+/* ===== end rev215 ===== */
+/* ===== rev217: 隱藏舊證件照 ===== */
+/* removed by rev218 */
+/* ===== end rev217 ===== */
+/* ===== rev220: 方塊證件照 ===== */
+.srv-portrait{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:70%;height:70%;object-fit:contain;pointer-events:none;z-index:1}
+.gs-cell.filled.srv{padding:0 0 12px 0;display:flex;align-items:center;justify-content:center;position:relative}
+.gs-cell.filled.srv .srv-cnt{font-size:10px;padding:0 3px;font-weight:bold;letter-spacing:0;z-index:2}
+/* ===== end rev220 ===== */
+/* ===== rev223: 監工盔 + 塔頭像 PNG ===== */
+.srv-portrait{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:70%;height:70%;object-fit:contain;pointer-events:none;z-index:1}
+.srv-helmet{position:absolute;left:50%;top:8%;transform:translateX(-50%);width:44%;height:44%;object-fit:contain;pointer-events:none;z-index:2;filter:brightness(0) invert(1) drop-shadow(0 0 1px rgba(0,0,0,.75))}
+.gs-cell.filled.srv{padding:0 0 12px 0;display:flex;align-items:center;justify-content:center;position:relative}
+.gs-cell.filled.srv .srv-cnt{font-size:10px;padding:0 3px;font-weight:bold;letter-spacing:0;z-index:3}
+.tower-guard-btn{position:relative}
+.tower-guard-btn .tg-icon{width:26px;height:26px;object-fit:contain;display:block;pointer-events:none}
+.tower-guard-btn .tg-helmet{position:absolute;top:1px;left:50%;transform:translateX(-50%);width:22px;height:22px;object-fit:contain;pointer-events:none;filter:brightness(0) invert(1) drop-shadow(0 0 1px rgba(0,0,0,.75))}
+.tower-guard-btn .tg-name{font-size:9px;color:#fff;font-weight:bold;line-height:1.1;text-shadow:0 0 2px #000;position:relative;z-index:2}
+/* ===== end rev223 ===== */
+/* ===== rev229: 五角星 + 土地背景 ===== */
+.srv-star{position:absolute;top:1px;left:2px;font-size:12px;color:#ffd700;text-shadow:0 0 2px #000,0 0 4px #8a5f18;z-index:4;pointer-events:none;line-height:1}
+/* removed by rev230 */
+/* ===== end rev229 ===== */
+/* ===== rev232: 儲備/僕人 均分 + 滾動條穩定 ===== */
+.gs-row{justify-content:space-between;align-items:stretch}
+.gs-wrap{scrollbar-gutter:stable}
+.gs-wrap::-webkit-scrollbar{width:4px}
+/* ===== end rev232 ===== */
