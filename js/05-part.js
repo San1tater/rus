@@ -576,10 +576,12 @@ function battleLoop(now){
 
   if(BATTLE_ONESHOT_ANIMS.indexOf(battleHeroAnim.name) === -1){
     if(canMove && hasMoveInput){
-      if(battleHeroAnim.name !== 'walk'){
-        battleHeroAnim.name='walk';
-        battleHeroAnim.frame=0;
-        battleHeroAnim.lastUpdate=performance.now();
+      /* rev105: 搖桿推得越深 → run，輕推 → walk */
+      const _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+      if(battleHeroAnim.name !== _wantAnim){
+        battleHeroAnim.name = _wantAnim;
+        battleHeroAnim.frame = 0;
+        battleHeroAnim.lastUpdate = performance.now();
       }
     } else {
       if(battleHeroAnim.name !== 'idle'){

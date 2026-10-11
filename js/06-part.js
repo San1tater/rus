@@ -520,7 +520,22 @@ function _scheduleNextTick(){
 _scheduleNextTick();
 setInterval(()=>{buildingTick();},30000);
 
+let _heroWalkSwitchAt = 0;
+function _tickHeroWalkSwitch(now){
+  if(_heroWalkSwitchAt === 0){
+    _heroWalkSwitchAt = now + 3000 + Math.random() * 3000;
+    return;
+  }
+  if(now < _heroWalkSwitchAt) return;
+  _heroWalkSwitchAt = now + 3000 + Math.random() * 3000;
+  /* 僅在探索、且沒在播放 oneshot 動畫時切換 */
+  if(currentTab !== 'explore') return;
+  if(heroAnim.eqSlot) return;
+  if(heroAnim.name === 'walk'){ heroAnim.name = 'run'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
+  else if(heroAnim.name === 'run'){ heroAnim.name = 'walk'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
+}
 function heroLoop(now){
+  _tickHeroWalkSwitch(now);
   updateHeroAnim(now);
   if(currentTab === 'explore'){ renderExploreHeroCanvas(); }
   requestAnimationFrame(heroLoop);
