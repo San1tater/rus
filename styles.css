@@ -273,7 +273,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .ammo-order-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
 .ammo-order-row .lbl{flex:0 0 48px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:right;writing-mode:vertical-rl;text-orientation:upright} /* v66-vertical */
 .ammo-order-slots{display:flex;gap:5px}
-.ammo-slot{width:40px;height:46px;background:#1a1510;border:1px solid #3a2f25;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;flex:0 0 auto;padding:2px 0}
+.ammo-slot{width:46px;height:46px;background:#1a1510;border:1px solid #3a2f25;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;flex:0 0 auto;padding:2px 0}
 .ammo-slot.filled{border-color:#8a5f18}
 .ammo-slot img{width:26px;height:26px;object-fit:contain;display:block;margin-bottom:1px}
 .ammo-slot .nm{font-size:7px;color:#e8a33d;line-height:1;text-align:center;max-width:38px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:bold}
@@ -304,3 +304,9 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .hit-fx.heal{color:#4caf50;font-size:22px}
 #hero-battle-canvas{position:absolute;left:50%;top:0;width:220px;height:118px;margin-left:-110px;pointer-events:none;z-index:1} /* v78-canvas */
 /* ===== END ===== */
+
+/* ===== rev106 patch: 場景過渡動畫 ===== */
+.scene-enter{animation:sceneEnterFade .28s ease-out}
+@keyframes sceneEnterFade{from{opacity:.25}to{opacity:1}}
+.bg-fade{position:absolute;inset:0;background-size:100% 100%;background-position:center;background-repeat:no-repeat;opacity:0;pointer-events:none;z-index:2;will-change:opacity}
+/* ===== end rev106 ===== */
