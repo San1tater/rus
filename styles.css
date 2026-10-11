@@ -786,3 +786,10 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gs-wrap{scrollbar-gutter:stable}
 .gs-wrap::-webkit-scrollbar{width:4px}
 /* ===== end rev232 ===== */
+/* ===== rev253: 紧凑统计行 ===== */
+.stat-row{display:flex;align-items:center;gap:6px;padding:5px 6px;background:#1a1510;border:1px solid #2a231c;border-radius:4px;margin-bottom:3px;font-size:11px;cursor:pointer;user-select:none}
+.stat-row:active{background:#241d16}
+.stat-label{flex:0 0 48px;color:#a89a85;font-size:10px}
+.stat-value{flex:1;color:#e8a33d;font-size:11px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.stat-status{flex:0 0 auto;font-size:10px;color:#e05252;font-weight:bold;min-width:0}
+/* ===== end rev253 ===== */
