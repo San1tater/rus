@@ -344,7 +344,7 @@ function defaultState(){
     player:{level:1,exp:0,hp:100,maxHp:100,armor:0,maxArmor:0,armorLevel:0,equipped:{head:null,face:null,top:null,pants:null,shoes:null,backpack:'bplarge',primary:null,secondary:null,melee:null,throwable:null},equippedRarity:{backpack:'傳奇'},throwableStock:0},
     inventory:{},logs:[],pendingSalvageEquipped:{},
     proficiency:{primary:0,secondary:0,melee:0,throwable:0,'突擊步槍':0,'機槍':0,'衝鋒槍':0,'狙擊槍':0,'手槍':0,'霰彈槍':0,'刺刀':0,'刀':0,'手榴彈':0,craft:0,salvage:0,drop:0},
-    preferences:{ammoExplore:{priority:'一般',fallback:'desc',exclude:[]},ammoCombat:{priority:'傳奇',fallback:'desc',exclude:[]},consume:{priority:'一般',fallback:'desc',exclude:[]},throwableExplore:{priority:'破舊',fallback:'asc',exclude:['精品','傳奇']},throwableCombat:{priority:'傳奇',fallback:'desc',exclude:[]},autoConsumeThreshold:0.3,actionMode:'attack',regions:['廢棄工廠'],ammoOrder:{primary:[],secondary:[],throwable:[]}},
+    preferences:{ammoExplore:{priority:'一般',fallback:'desc',exclude:[]},ammoCombat:{priority:'傳奇',fallback:'desc',exclude:[]},consume:{priority:'一般',fallback:'desc',exclude:[]},throwableExplore:{priority:'破舊',fallback:'asc',exclude:['精品','傳奇']},throwableCombat:{priority:'傳奇',fallback:'desc',exclude:[]},actionMode:'attack',regions:['廢棄工廠'],ammoOrder:{primary:[],secondary:[],throwable:[]}},
     exploreDelayUntil:0,pendingHealFull:false,
     regionProgress:{},activeRegion:null,stashedWeapons:{},
     base:{slots:new Array(12).fill(null).map((_,i)=>i===0?{id:'control',lv:1}:null)},
@@ -371,6 +371,7 @@ function load(){
     {const _seen={};for(const id of state.preferences.regions){const _b=id.replace(/II$/,'');_seen[_b]=id;}state.preferences.regions=Object.values(_seen);}
     if(!state.unlockedRegions.includes('廢棄工廠'))state.unlockedRegions.push('廢棄工廠');
     delete state.preferences.autoSalvage;
+    delete state.preferences.autoConsumeThreshold;
     if(!state.preferences.ammoOrder || typeof state.preferences.ammoOrder !== 'object'){
       state.preferences.ammoOrder = {primary:[],secondary:[],throwable:[]};
     }
@@ -802,6 +803,25 @@ function consolidateInventoryDuplicates(){
 function invAdd(id,rarity,count){
   if(count<=0)return;
   const cat=itemCat(id);
+  /* rev121: 已有該 baseId 的具名武器 → 原版傳奇直接分解，不入庫 */
+  if(cat === 'weapon' && id.indexOf('named_') !== 0 && rarity === '傳奇'){
+    const _namedPrefix = 'named_' + id + '_';
+    let _hasNamed = false;
+    for(const _k in state.inventory){
+      const _iid = _k.split('@')[0];
+      if(_iid.indexOf(_namedPrefix) === 0){ _hasNamed = true; break; }
+    }
+    if(!_hasNamed){
+      for(const _s in state.player.equipped){
+        const _eid = state.player.equipped[_s];
+        if(_eid && _eid.indexOf(_namedPrefix) === 0){ _hasNamed = true; break; }
+      }
+    }
+    if(_hasNamed){
+      salvageToMaterials(id, rarity, count);
+      return;
+    }
+  }
   if(cat==='weapon'||cat==='armor'){
     const newMult=RARITY_MULT[rarity]||1;
     let maxInvMult=0,maxInvKey=null;
@@ -911,23 +931,24 @@ function updateExploreBg(){
   if(!layers.length)return;
   const bg=getCurrentBg();
   if(bg){
-    const newUrl='url(\'' + bg + '\')';
-    const curRaw=layers[0].style.backgroundImage||'';
-    const curNorm=curRaw.replace(/["']/g,'"');
+    const fadeEl=document.getElementById('explore-bg-fade');
+    const newUrl="url('" + bg + "')";
+    const curRaw=(layers[0].style.backgroundImage||'').replace(/["']/g,'"');
     const newNorm=newUrl.replace(/["']/g,'"');
-    if(curNorm!==newNorm){
-      const fadeEl=document.getElementById('explore-bg-fade');
+    if(curRaw!==newNorm){
       if(fadeEl){
+        /* rev107: 黑幕淡入 —— 快速蓋黑 → 切底圖 → 慢速淡出 */
         fadeEl.style.transition='none';
-        fadeEl.style.backgroundImage=newUrl;
         fadeEl.style.opacity='1';
-        layers.forEach(l=>{l.style.backgroundImage=newUrl;});
-        requestAnimationFrame(()=>{
-          fadeEl.style.transition='opacity .4s ease-out';
-          fadeEl.style.opacity='0';
+        requestAnimationFrame(function(){
+          layers.forEach(function(l){l.style.backgroundImage=newUrl;});
+          requestAnimationFrame(function(){
+            fadeEl.style.transition='opacity 1.2s ease-in';
+            fadeEl.style.opacity='0';
+          });
         });
       } else {
-        layers.forEach(l=>{l.style.backgroundImage=newUrl;});
+        layers.forEach(function(l){l.style.backgroundImage=newUrl;});
       }
     }
   }
@@ -1250,26 +1271,9 @@ function doExploreTick(){
   const finished=advanceNode(region);
   if(finished){state.activeRegion=pick(regions);}
   updateExploreBg();
-  refreshPlayerStats();autoConsumeIfLow();
+  refreshPlayerStats();
 }
-function autoConsumeIfLow(){
-  const thr=state.preferences.autoConsumeThreshold||0.3;
-  if(state.player.hp/state.player.maxHp>=thr)return;
-  let healTotal = 0;
-  while(state.player.hp < state.player.maxHp){
-    const item = findNextConsumable();
-    if(!item) break;
-    const medbayLv=getBuildingLv('medbay');
-    const actualHeal=calcConsumableHeal(item, medbayLv);
-    state.player.hp=Math.min(state.player.maxHp,state.player.hp+actualHeal);
-    invRemove(item.id,item.rarity,1);
-    healTotal += actualHeal;
-  }
-  if(healTotal > 0){
-    spawnExploreHealFx(healTotal);
-    refreshPlayerStats();
-  }
-}
+/* rev112: autoConsumeIfLow 已移除 */
 function buildingTick(){
   const now=Date.now();
   const genLv=getBuildingLv('generator');const genMult=1+genLv*0.2;
@@ -1510,7 +1514,7 @@ function renderExplore(){
   z1.innerHTML=`
     <div class="scene">
       <div class="bg-scroll" style="--spd:${spd}s"><div class="bg-layer" style="background-image:url('${bg}')"></div><div class="bg-layer" style="background-image:url('${bg}')"></div></div>
-      <div class="bg-fade" id="explore-bg-fade" style="background-image:url('${bg}');opacity:0"></div><div class="groundline"></div>
+      <div class="bg-fade" id="explore-bg-fade" style="opacity:0"></div><div class="groundline"></div>
       <div class="explore-fx" id="explore-fx"></div>
       <canvas id="hero-canvas" class="hero-canvas"></canvas>
       <div class="zone-title">🧭 ${_displayRegion} · ${cur.node}</div>

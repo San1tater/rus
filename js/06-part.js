@@ -394,7 +394,7 @@ function openPreference(){
   /* ★ 手雷偏好：探索預設排除高稀有度，避免打 Boss 用的手雷被浪費 */
   body+=rarityPolicyBlockHTML('texp','💣 探索模式手雷',p.throwableExplore, true);
   /* ★ v17.5：移除戰鬥手雷偏好 */
-  body+=`<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:10px 0 6px">🩸 自動使用消耗品血量閾值：${Math.round(p.autoConsumeThreshold*100)}%</div><input type="range" min="5" max="90" value="${Math.round(p.autoConsumeThreshold*100)}" id="thr-slider" style="width:100%">`;
+  /* rev111: 自動治療閾值滑桿已移除 */
   const bd=openModal({title:'⚙️ 偏好設定',body});
   const getCtx=(k)=>{
     if(k==='exp') return state.preferences.ammoExplore;
@@ -446,8 +446,6 @@ function openPreference(){
     cb.dispatchEvent(new Event('change', { bubbles: true }));
   });
   /* v53-dedup: excl-label 的 onclick 已移除，僅保留 bd 委派 */
-  const slider=bd.querySelector('#thr-slider');
-  if(slider)slider.oninput=()=>{state.preferences.autoConsumeThreshold=parseInt(slider.value)/100;slider.previousElementSibling.textContent=`🩸 自動使用消耗品血量閾值：${slider.value}%`;save();};
 }
 
 let currentTab='explore';

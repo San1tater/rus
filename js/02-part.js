@@ -1059,19 +1059,19 @@ const BUILDINGS={
 
 const GAME_LAYERS = [
   { id:'right_leg', name:'右腿', z:18, color:'#2a2a2a', pivot:{x:0.5,y:0.05},
-    x:0.5977, y:0.5984, w:0.1263, h:0.4214 },
-  { id:'torso',     name:'軀幹', z:30, color:'#4a6741', pivot:{x:0.5,y:0.10},
-    x:0.4988, y:0.2718, w:0.3029, h:0.4165 },
-  { id:'head',      name:'頭',   z:45, color:'#c89870', pivot:{x:0.5,y:0.92},
-    x:0.5316, y:0.2161, w:0.2049, h:0.1678 },
-  { id:'face',      name:'面部', z:48, color:'#b88860', pivot:{x:0.5,y:0.92},
-    x:0.5708, y:0.2300, w:0.1449, h:0.1256 },
-  { id:'left_leg',  name:'左腿', z:52, color:'#3a3a3a', pivot:{x:0.5,y:0.05},
-    x:0.4369, y:0.6189, w:0.1422, h:0.4358 },
-  { id:'back_arm',  name:'後臂', z:55, color:'#3d3020', pivot:{x:0.5,y:0.5},
-    x:0.8007, y:0.3625, w:0.1059, h:0.1043 },
+    x:0.6, y:0.6, w:0.13, h:0.42 },
+  { id:'torso', name:'軀幹', z:30, color:'#4a6741', pivot:{x:0.5,y:0.10},
+    x:0.5, y:0.27, w:0.3, h:0.42 },
+  { id:'head', name:'頭', z:45, color:'#c89870', pivot:{x:0.5,y:0.92},
+    x:0.53, y:0.22, w:0.2, h:0.17 },
+  { id:'face', name:'面部', z:48, color:'#b88860', pivot:{x:0.5,y:0.92},
+    x:0.57, y:0.23, w:0.14, h:0.13 },
+  { id:'left_leg', name:'左腿', z:52, color:'#3a3a3a', pivot:{x:0.5,y:0.05},
+    x:0.44, y:0.62, w:0.14, h:0.44 },
+  { id:'back_arm', name:'後臂', z:55, color:'#3d3020', pivot:{x:0.5,y:0.5},
+    x:0.8, y:0.36, w:0.11, h:0.1 },
   { id:'front_arm', name:'前臂', z:62, color:'#5a4a35', pivot:{x:0.05,y:0.5},
-    x:0.2794, y:0.3737, w:0.3683, h:0.0892 },
+    x:0.27, y:0.38, w:0.4, h:0.08 },
 ];
 
 const GAME_ANIMS = {

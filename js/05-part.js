@@ -438,36 +438,7 @@ function applyBossSkillDamage(sk){
 }
 
 
-/* v54-heal */
-/* v57-autoConsume *//* v57-manualHeal *//* v58-autoConsume */
-function autoConsumeInBattle(){
-  if(!battle) return;
-  if(battle.consuming) return;
-  if(performance.now() < (battle.healDisabledUntil||0)) return;
-  if(battle.playerHp >= battle.playerMaxHp){ battle.autoHealing = false; return; }
-  if(!battle.autoHealing && battle.playerHp/battle.playerMaxHp >= (state.preferences.autoConsumeThreshold||0.3)) return;
-  battle.autoHealing = true;
-  const item = findNextConsumable();
-  if(!item){ battle.autoHealing = false; return; }
-  battle.consuming=true;
-  battle.firing=false;
-  battle._healToken=(battle._healToken||0)+1;
-  const _myHealToken=battle._healToken;
-  if(battle.healTimer) clearTimeout(battle.healTimer);
-  battle.healTimer = setTimeout(function(){
-    if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
-    if(battle._healToken!==_myHealToken)return;
-    const medbayLv=getBuildingLv('medbay');
-    const actualHeal=calcConsumableHeal(item, medbayLv);
-    battle.playerHp=Math.min(battle.playerMaxHp,battle.playerHp+actualHeal);
-    invRemove(item.id,item.rarity,1);
-    battle.consuming=false;
-    battle.healTimer=null;
-    if(typeof spawnHitFx==='function'){ spawnHitFx(battle.px, battle.py, '+' + actualHeal, 'heal'); }
-    pushLog('<span class="pl">玩家</span> 使用 ' + itemDef(item.id).name + '，恢復 ' + actualHeal + ' HP。',[],'combat');
-    if(battle.playerHp < battle.playerMaxHp){ autoConsumeInBattle(); } else { battle.autoHealing = false; }
-  },1200);
-}
+/* rev111: autoConsumeInBattle 已移除 */
 /* v58-manualHeal */
 function manualHeal(){
   if(!battle||!battle.active)return;
@@ -482,7 +453,7 @@ function manualHeal(){
   battle.firing=false;
   battle._healToken=(battle._healToken||0)+1;
   const _myHealToken=battle._healToken;
-  battle.autoHealing = false;
+  /* rev112 removed */
   if(battle.healTimer) clearTimeout(battle.healTimer);
   battle.healTimer = setTimeout(function(){
     if(!battle||!battle.active){ battle.consuming=false; battle.healTimer=null; return; }
@@ -511,6 +482,14 @@ function battleLoop(now){
         refreshBattleControlsLive();
       }
     }
+  }
+
+  /* rev108: 打空彈匣且非換彈中且有備彈 → 自動觸發換彈，不需額外點擊射擊 */
+  if(battle && !battle.settling && !battle.reloading && !battle.consuming
+     && battle.weapon && battle.weapon.def && battle.weapon.def.cal
+     && battle.ammoInMag <= 0
+     && battle.ammoRef && battle.ammoRef.count > 0){
+    triggerReload();
   }
 
   if(!battle||!battle.active)return;
@@ -556,16 +535,14 @@ function battleLoop(now){
     }
   }
 
-  /* rev94: 搖桿輸入優先級最高，有輸入時打斷裝填/消耗/開火 */
+  /* rev108: 搖桿輸入僅打斷治療；不再打斷換彈/射擊（射擊優先級最高，換彈允許移動）。
+     射擊期間搖桿輸入被「暫時忽略」（canMove=false），但 moveDir 保留，
+     鬆開射擊後若 moveDir !== 0 立即恢復移動。 */
   const hasMoveInput = (battle.moveDir !== 0);
-  if(hasMoveInput){
-    if(battle.firing){ battle.fireHeld = false; battle.burstLeft = 0; }
-    if(battle.reloading) interruptReload();
-    if(battle.consuming) interruptHeal();
-    battle.firing = !battle.settling && !battle.reloading && !battle.consuming &&
-                    ((battle.fireHeld && battle.fireMode==='掃射') || battle.burstLeft>0);
+  if(hasMoveInput && battle.consuming){
+    interruptHeal();
   }
-  const canMove = !battle.firing && !battle.reloading && !battle.consuming;
+  const canMove = !battle.firing && !battle.consuming;
 
   if(canMove && hasMoveInput){
     let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
@@ -614,7 +591,7 @@ function battleLoop(now){
   if(bossHp)bossHp.style.width=Math.max(0,battle.bossHp/battle.bossMaxHp*100)+'%';
   if(bossAp)bossAp.style.width=Math.max(0,battle.bossArmor/battle.bossMaxArmor*100)+'%';
   if(bossShield && battle.shieldMaxHp>0)bossShield.style.width=Math.max(0,battle.shieldHp/battle.shieldMaxHp*100)+'%';
-  if(!battle.settling&&!battle.consuming&&battle.playerHp/battle.playerMaxHp<(state.preferences.autoConsumeThreshold||0.3))autoConsumeInBattle();
+  /* rev111: 自動治療已移除 */
   requestAnimationFrame(battleLoop);
 }function fireInterval(mode,weapon){
   const def=weapon?weapon.def:null;
@@ -649,7 +626,7 @@ function startPlayerFire(){
   if(now - (battle.lastManualClick || 0) < cdMs) return;
   battle.lastManualClick = now;
 
-  stopBattleMovement();
+  /* rev108: 不再重置搖桿 —— 射擊期間由 canMove 暫停移動，鬆手後恢復 */
 
   if(battle.fireMode === '掃射'){
     battle.fireHeld = true;
@@ -792,11 +769,45 @@ function autoSwitchOnNoAmmo(){
   }
   return false;
 }
+function triggerReload(){
+  if(!battle || !battle.active) return;
+  if(battle.reloading) return;
+  const w = battle.weapon;
+  if(!w || !w.def || !w.def.cal) return;
+  const def = w.def;
+  if(!battle.ammoRef || battle.ammoRef.count <= 0) return;
+  if(battle.ammoInMag >= (def.mag||30)) return;
+  battle.reloading = true;
+  battle.firing = false;
+  battle.burstLeft = 0;
+  battle._reloadToken = (battle._reloadToken || 0) + 1;
+  const _myReloadToken = battle._reloadToken;
+  refreshBattleControlsLive();
+  battleHeroAnim.name = 'reload';
+  battleHeroAnim.frame = 0;
+  battleHeroAnim.lastUpdate = performance.now();
+  battleHeroAnim.forcedEnd = performance.now() + 1700;
+  const currentSlot = battle.weaponSlot;
+  setTimeout(function(){
+    if(!battle || !battle.active) return;
+    if(battle._reloadToken !== _myReloadToken) return;
+    if(battle.weaponSlot !== currentSlot) return;
+    const need = def.mag || 30;
+    const take = Math.min(need, battle.ammoRef.count);
+    invRemove(battle.ammoRef.id, battle.ammoRef.rarity, take);
+    battle.ammoInMag = take;
+    battle.ammoRef.count -= take;
+    battle.weaponStates[battle.weaponSlot] = {ammoInMag: battle.ammoInMag, ammoRef: battle.ammoRef};
+    battle.reloading = false;
+    if(battleHeroAnim.name === 'reload'){ battleHeroAnim.name = 'idle'; battleHeroAnim.frame = 0; }
+    refreshBattleControlsLive();
+  }, 1700);
+}
 function playerShoot(){
   if(battle.settling)return false;
   let w=battle.weapon;
   if(!w||battle.reloading||battle.consuming)return false;
-  if(battle.moveDir!==0)return false;
+  /* rev108: 允許移動中射擊（射擊時搖桿暫停由 canMove 控制） */
   let def=w.def;
   const playerRightPx=battle.px+battle.playerWeaponRange;
   const bossLeftPx=getBossLeftBoundaryN();
@@ -845,27 +856,8 @@ function playerShoot(){
   const isWeak = isWeakPointHit();
   if(def.cal){
     if(battle.ammoInMag<=0){
-      battle.reloading=true;battle.firing=false;battle.burstLeft=0;
-      battle._reloadToken=(battle._reloadToken||0)+1;
-      const _myReloadToken=battle._reloadToken;
-      refreshBattleControlsLive();
-      battleHeroAnim.name='reload';
-      battleHeroAnim.frame=0;
-      battleHeroAnim.lastUpdate=performance.now();
-      battleHeroAnim.forcedEnd=performance.now()+1700;
-      const currentSlot=battle.weaponSlot;
-      setTimeout(()=>{
-        if(!battle||!battle.active)return;
-        if(battle._reloadToken!==_myReloadToken)return;
-        if(battle.weaponSlot!==currentSlot)return;
-        const need=def.mag||30;const take=Math.min(need,battle.ammoRef.count);
-        invRemove(battle.ammoRef.id,battle.ammoRef.rarity,take);
-        battle.ammoInMag=take;battle.ammoRef.count-=take;
-        battle.weaponStates[battle.weaponSlot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};
-        battle.reloading=false;
-        if(battleHeroAnim.name==='reload'){battleHeroAnim.name='idle';battleHeroAnim.frame=0;}
-        refreshBattleControlsLive();
-      },1700);
+      /* rev108: 換彈邏輯已抽出為 triggerReload() */
+      triggerReload();
       return false;
     }
     battle.ammoInMag--;

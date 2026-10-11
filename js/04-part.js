@@ -302,6 +302,7 @@ function renderCombatInfoPanel(z3){
     el.onclick = () => { openAmmoPicker(el.dataset.slot, parseInt(el.dataset.idx, 10)); };
   });
 }
+
 function getEquippedCal(slot){
   const id = state.player.equipped[slot];
   if(!id) return null;
@@ -351,25 +352,23 @@ function getAmmoShortName(id, slot){
 function renderAmmoOrderRow(slot, label){
   const equipped = state.player.equipped[slot];
   const order = getAmmoOrder(slot);
-  let html = '<div class="ammo-order-row" style="display:flex;align-items:flex-start;gap:3px;margin-bottom:4px">';
+  /* rev120: 标签与 3 个格子一起参与 space-between，均分 3 个间距 */
+  let html = '<div class="ammo-order-row" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">';
   html += '<div class="lbl" style="flex:0 0 18px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:center;writing-mode:vertical-rl;text-orientation:upright;line-height:1;letter-spacing:1px">' + label + '</div>';
-  html += '<div class="ammo-order-slots" style="display:flex;gap:3px;flex:1;min-width:0">';
   for(let i = 0; i < 3; i++){
     const aid = order[i];
-    let inner = '<span class="empty-lbl">空</span>';
-    let cls = 'ammo-slot';
-    let style = '';
+    let inner = '<span class="empty-lbl" style="font-size:10px;color:#5a5040">空</span>';
+    let bgStyle = 'background:#1a1510;border-color:#3a2f25;';
     if(aid){
       const rar = _getAmmoDefRarity(aid, slot);
-      style = 'background:' + rarityBg(rar) + ';';
+      bgStyle = 'background:' + rarityBg(rar) + ';border-color:#8a5f18;';
       const nm = getAmmoShortName(aid, slot);
-      inner = itemIcon(aid, 26) + '<div class="nm">' + nm + '</div>';
-      cls += ' filled';
+      inner = itemIcon(aid, 26) + '<div class="nm" style="font-size:7px;color:#e8a33d;line-height:1;text-align:center;max-width:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:bold;margin-top:1px">' + nm + '</div>';
     }
     const dis = !equipped ? 'opacity:.35;pointer-events:none;' : '';
-    html += '<div class="' + cls + '" data-slot="' + slot + '" data-idx="' + i + '" style="width:36px;height:46px;' + style + dis + '">' + inner + '</div>';
+    html += '<div class="ammo-slot" data-slot="' + slot + '" data-idx="' + i + '" style="box-sizing:border-box;width:46px;height:46px;min-width:46px;max-width:46px;min-height:46px;max-height:46px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #3a2f25;border-radius:4px;overflow:hidden;position:relative;cursor:pointer;padding:0;' + bgStyle + dis + '">' + inner + '</div>';
   }
-  html += '</div></div>';
+  html += '</div>';
   return html;
 }
 function openAmmoPicker(slot, idx){
@@ -492,9 +491,7 @@ function renderBattleJoystick(z2){
     battle._joystickCancel = function(){ touchId = null; };
   }
   function start(e){
-    if(battle){
-      if(battle.firing){ battle.fireHeld=false; battle.burstLeft=0; }
-    }
+    /* rev108: 搖桿輸入不再打斷射擊（射擊優先級最高） */
     const r=joy.getBoundingClientRect();
     cx=r.left+r.width/2; cy=r.top+r.height/2; radius=r.width/2;
     const t=e.changedTouches?e.changedTouches[0]:e;
@@ -505,10 +502,8 @@ function renderBattleJoystick(z2){
     if(!battle||!battle.active)return;
     /* rev93: 外部已取消會話 → 忽略後續 touchmove（直到重新按下） */
     if(e.changedTouches && touchId===null) return;
-    /* rev94: 搖桿輸入優先級最高，主動打斷裝填/消耗/開火 */
-    if(battle.reloading) interruptReload();
+    /* rev108: 搖桿輸入僅打斷治療；不再打斷換彈/射擊（射擊優先級最高） */
     if(battle.consuming) interruptHeal();
-    if(battle.firing){ battle.fireHeld=false; battle.burstLeft=0; }
     let t=e;if(e.changedTouches)t=Array.from(e.changedTouches).find(x=>x.identifier===touchId)||e.changedTouches[0];
     let dx=t.clientX-cx;let dy=t.clientY-cy;
     const dist=Math.sqrt(dx*dx+dy*dy);
@@ -593,7 +588,8 @@ function renderBattleControls(z3){
       <div class="ammo-info" id="battle-dmg-status" style="color:#7a6f60">對 Boss 傷害：${Math.round(battle.damageDealt)} ｜ ${battle.engaged?'⚔️ 已交戰':'⏸️ 準備中'}</div>
     </div>`;
   $$('.fm-btn',z3).forEach(b=>{b.onclick=()=>{
-    stopBattleMovement(); battle.fireMode=b.dataset.mode;
+    /* rev108: 允許移動中換射擊模式 —— 不再重置搖桿 */
+    battle.fireMode=b.dataset.mode;
     battle.fireHeld=false;
     battle.burstLeft=0;
     renderBattleControls(z3);
@@ -615,7 +611,8 @@ function renderBattleControls(z3){
   }
   refreshBattleControlsLive();
 }
-function switchBattleWeapon(slot){ stopBattleMovement();
+function switchBattleWeapon(slot){
+  /* rev108: 允許移動中換武器 —— 不再重置搖桿 */
   /* ★ v17.5 更換武器時清空該槽位的彈藥準備 */
   /* v39: 不再清空，改為按武器分開存 */
   if(slot==='throwable'&&getThrowableCount()<=0){ensureThrowableFromBackpack();}
