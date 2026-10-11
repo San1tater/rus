@@ -1054,8 +1054,7 @@ const BUILDINGS={
   medbay:{name:'醫療站',desc:'加強消耗品恢復',cost:{wood:15,cloth:10,metal:5}},
   radio:{name:'無線電',desc:'定期資源補給',cost:{electronics:5,metal:10,gears:3}},
   armory:{name:'軍械庫',desc:'產出主副彈藥',cost:{metal:25,gears:8,screws:10}},
-  forge:{name:'護甲車間',desc:'護甲值加成',cost:{metal:250,gears:80,screws:100}},
-};
+  forge:{name:'護甲車間',desc:'護甲值加成',cost:{metal:250,gears:80,screws:100}}};
 
 const GAME_LAYERS = [
   { id:'right_leg', name:'右腿', z:18, color:'#2a2a2a', pivot:{x:0.5,y:0.05},

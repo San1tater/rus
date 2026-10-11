@@ -20,7 +20,7 @@ const REGION_AMMO_WEIGHTS = {
   '廢土核心II':{'破舊':2,'一般':8,'庫存':15,'精品':38,'傳奇':37}
 };
 function rollAmmoRarity(region){const w=REGION_AMMO_WEIGHTS[region];if(!w)return null;const total=Object.values(w).reduce((a,b)=>a+b,0);let r=Math.random()*total;for(const rar in w){r-=w[rar];if(r<=0)return rar;}return '一般';}
-function rollRegionDrop(region){const R=REGIONS[region];if(!R)return null;const lid=pick(R.loot);const def=itemDef(lid);if(!def)return null;if(AMMO[lid]){const pool=R.loot.filter(id=>AMMO[id]);const rar=rollAmmoRarity(region);if(rar){const filtered=pool.filter(id=>AMMO[id].rarity===rar);if(filtered.length)return{id:pick(filtered),rarity:rar};}return{id:lid,rarity:AMMO[lid].rarity};}const rar=hasVariableRarity(lid)?rollRarity():def.rarity;return{id:lid,rarity:rar};}
+function rollRegionDrop(region){const R=REGIONS[region];if(!R)return null;const lid=pick(R.loot);if(SEEDS[lid]){return {id:lid,rarity:rollRarity()};}const def=itemDef(lid);if(!def)return null;if(AMMO[lid]){const pool=R.loot.filter(id=>AMMO[id]);const rar=rollAmmoRarity(region);if(rar){const filtered=pool.filter(id=>AMMO[id].rarity===rar);if(filtered.length)return{id:pick(filtered),rarity:rar};}return{id:lid,rarity:AMMO[lid].rarity};}const rar=hasVariableRarity(lid)?rollRarity():def.rarity;return{id:lid,rarity:rar};}
 
 const RARITY_ORDER=['破舊','一般','庫存','精品','傳奇','具名'];
 const UI_RARITY_LIST=['破舊','一般','庫存','精品','傳奇'];
@@ -190,6 +190,34 @@ function calcConsumableHeal(item, medbayLv){
   const medbayMult = 1 + (medbayLv || 0) * 0.15;
   return Math.round(base * rarityMult * medbayMult);
 }
+/* ===== rev130: 後院種子與作物 ===== */
+const SEEDS = {
+  seed_potato: { name:'馬鈴薯種子', cropId:'crop_potato', growMs:1200000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 },
+  seed_carrot: { name:'胡蘿蔔種子', cropId:'crop_carrot', growMs:2100000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 },
+  seed_cabbage:{ name:'捲心菜種子', cropId:'crop_cabbage',growMs:1500000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 },
+  seed_beet:   { name:'甜菜種子',   cropId:'crop_beet',   growMs:1800000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 },
+  seed_wheat:  { name:'小麥種子',   cropId:'crop_wheat',  growMs:2700000, baseYield:4, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 }
+};
+const CROP_BASE_FOOD = {
+  crop_potato: 2,
+  crop_carrot: 3,
+  crop_cabbage: 3,
+  crop_beet: 4,
+  crop_wheat: 5
+};
+function cropFoodValue(cropId, rarity){
+  const base = CROP_BASE_FOOD[cropId] || 1;
+  const mult = RARITY_MULT[rarity] || 1;
+  return Math.max(1, Math.round(base * mult));
+}
+const CROPS = {
+  crop_potato: { name:'馬鈴薯', icon:'🥔' },
+  crop_carrot: { name:'胡蘿蔔', icon:'🥕' },
+  crop_cabbage:{ name:'捲心菜', icon:'🥬' },
+  crop_beet:   { name:'甜菜',   icon:'🍠' },
+  crop_wheat:  { name:'小麥',   icon:'🌾' }
+};
+/* ===== end rev130 ===== */
 const MATERIALS={wood:{name:'木材'},metal:{name:'金屬廢料'},screws:{name:'螺絲'},cloth:{name:'布料'},gears:{name:'齒輪'},electronics:{name:'電子零件'}};
 
 const MATERIAL_EMOJI = {wood:'🪵', metal:'🔩', screws:'🔧', cloth:'🧵', gears:'⚙️', electronics:'💡'};
@@ -248,7 +276,63 @@ const WEAPON_MOD_RULES={
 const SCOPE_BONUS={'1P87':5,'PSO-1':8,'EKP-8-02':4,'PK-06':6,'1P59':12};
 const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-02 紅點','PK-06':'PK-06 紅點','1P59':'1P59 Hyperion 高倍鏡'};
 
+/* ===== rev145: 僕人定義 ===== */
+const SERVANT_TYPES = {
+  farmer:  { name:'農民', icon:'👨‍🌾', targetPlot:'soil',  desc:'自動種植與收穫' },
+  guard:   { name:'守衛', icon:'🛡️',  targetPlot:'tower', desc:'自動防禦後院' },
+  foreman: { name:'監工', icon:'🔧', targetPlot:'shed',  desc:'加速其他僕人' }
+};
+const SERVANT_RARITY_SLOTS = { '破舊':1, '一般':2, '庫存':4, '精品':6, '傳奇':10, '具名':10 };
+const SERVANT_MAX_LV = 50;
+function servantMaxStamina(srv){
+  if(!srv) return 100;
+  const mult = RARITY_MULT[srv.rarity] || 1;
+  const lvBonus = 1 + ((srv.lv || 1) - 1) * 0.1;
+  return Math.round(100 * mult * lvBonus);
+}
+const FOOD_POLICY_MULT = {
+  full: 1.2,
+  normal: 0.9,
+  half: 0.5,
+  lick: 0.3,
+  starve: 0.0
+};
+function servantMaxHp(srv){
+  if(!srv) return 100;
+  const base = 1 + 0.10883;
+  return Math.round(100 * Math.pow(base, (srv.lv || 1) - 1));
+}
+function servantHitRate(srv, mode, scopeBonus){
+  if(!srv) return 5;
+  const base = 10;
+  const p = (srv.lv || 1) - 1;
+  const acc = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[mode]) ? MODE_ACCURACY[mode] : 1;
+  return Math.max(5, Math.min(95, Math.round((base + p) * acc + (scopeBonus || 0))));
+}
+function servantCritRate(wRarity, aRarity){
+  const wr = (RARITY_MULT && RARITY_MULT[wRarity]) || 1;
+  const ar = (RARITY_MULT && RARITY_MULT[aRarity]) || 1;
+  return Math.max(0, Math.min(0.85, Math.round(10 * wr * ar) / 100));
+}
+function servantCritMult(wRarity, aRarity){
+  const wr = (RARITY_MULT && RARITY_MULT[wRarity]) || 1;
+  const ar = (RARITY_MULT && RARITY_MULT[aRarity]) || 1;
+  return 1.5 * wr * ar;
+}
+function servantEffectiveMaxStamina(srv){
+  if(!srv) return 100;
+  if(srv._starve) return 0;
+  const base = servantMaxStamina(srv);
+  const mult = FOOD_POLICY_MULT[srv.foodPolicy || 'normal'];
+  if(mult == null) return base;
+  return Math.round(base * mult);
+}
+function servantDef(type){ return SERVANT_TYPES[type] || null; }
+function servantSlots(rarity, type){ if(type === 'guard') return 1; return SERVANT_RARITY_SLOTS[rarity] || 1; }
+/* ===== end rev145 ===== */
 const ALL_ITEMS={};Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS);
+if(typeof SEEDS!=='undefined')Object.assign(ALL_ITEMS,SEEDS);
+if(typeof CROPS!=='undefined')Object.assign(ALL_ITEMS,CROPS);
 function itemDef(id){return ALL_ITEMS[id]||null;}
 function resolveIconId(id){if(!id) return '';if(id.startsWith('named_')){const parts=id.split('_');if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];}return id;}
 
@@ -258,6 +342,8 @@ function itemIcon(id,size){
   const s=size||24;
   if(!id) return '';
   const v=assetSuffix();
+  if(typeof SEEDS!=='undefined' && SEEDS[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">🌰</span>`;
+  if(typeof CROPS!=='undefined' && CROPS[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${CROPS[id].icon}</span>`;
   if(MATERIAL_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${MATERIAL_EMOJI[id]}</span>`;
   if(PANTS_SHOES_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${PANTS_SHOES_EMOJI[id]}</span>`;
   const ammoDef=AMMO[id];
@@ -295,7 +381,7 @@ async function probeAssetVersion(){
   }
 }
 
-function itemCat(id){if(ARMOR[id])return 'armor';if(WEAPONS[id])return 'weapon';if(AMMO[id])return 'ammo';if(CONSUMABLES[id])return 'consume';if(MATERIALS[id])return 'material';const d=ALL_ITEMS[id];if(d&&d.named)return 'weapon';return 'misc';}
+function itemCat(id){if(typeof SEEDS!=='undefined'&&SEEDS[id])return 'seed';if(typeof CROPS!=='undefined'&&CROPS[id])return 'crop';if(ARMOR[id])return 'armor';if(WEAPONS[id])return 'weapon';if(AMMO[id])return 'ammo';if(CONSUMABLES[id])return 'consume';if(MATERIALS[id])return 'material';const d=ALL_ITEMS[id];if(d&&d.named)return 'weapon';return 'misc';}
 function hasVariableRarity(id){const d=ALL_ITEMS[id];if(d&&d.named)return false;const c=itemCat(id);return c==='armor'||c==='weapon'||c==='consume'||c==='material';}
 function rollRarity(){const r=Math.random();if(r<0.35)return '破舊';if(r<0.65)return '一般';if(r<0.85)return '庫存';if(r<0.97)return '精品';return '傳奇';}
 function isFixedItem(id){const d=ARMOR[id];return d&&d.fixed===true;}
@@ -412,3 +498,27 @@ const ROUTES={
 };
 for(const _rk of ['廢棄工廠','廢棄實驗室','郊區公路','輻射沼澤','廢土核心']){if(ROUTES[_rk])ROUTES[_rk+'II']=ROUTES[_rk];}
 
+
+/* ===== rev130: 各地區補充種子掉落 ===== */
+(function(){
+  const _SEED_DROPS = {
+    '廢棄工廠': ['seed_potato','seed_carrot'],
+    '廢棄實驗室': ['seed_cabbage','seed_wheat'],
+    '郊區公路': ['seed_potato','seed_beet','seed_wheat'],
+    '輻射沼澤': ['seed_beet','seed_cabbage'],
+    '廢土核心': ['seed_wheat','seed_beet'],
+    '廢棄工廠II': ['seed_potato','seed_carrot','seed_cabbage'],
+    '廢棄實驗室II': ['seed_cabbage','seed_wheat','seed_beet'],
+    '郊區公路II': ['seed_potato','seed_beet','seed_wheat'],
+    '輻射沼澤II': ['seed_beet','seed_cabbage','seed_wheat'],
+    '廢土核心II': ['seed_wheat','seed_beet','seed_cabbage']
+  };
+  for(const _r in _SEED_DROPS){
+    if(REGIONS[_r] && Array.isArray(REGIONS[_r].loot)){
+      for(const _s of _SEED_DROPS[_r]){
+        for(let _i = 0; _i < 6; _i++) REGIONS[_r].loot.push(_s);
+      }
+    }
+  }
+})();
+/* ===== end rev130 ===== */

@@ -353,7 +353,7 @@ function renderAmmoOrderRow(slot, label){
   const equipped = state.player.equipped[slot];
   const order = getAmmoOrder(slot);
   /* rev120: 标签与 3 个格子一起参与 space-between，均分 3 个间距 */
-  let html = '<div class="ammo-order-row" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">';
+  let html = '<div class="ammo-order-row" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;padding-right:18px">';
   html += '<div class="lbl" style="flex:0 0 18px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:center;writing-mode:vertical-rl;text-orientation:upright;line-height:1;letter-spacing:1px">' + label + '</div>';
   for(let i = 0; i < 3; i++){
     const aid = order[i];

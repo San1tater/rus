@@ -1323,6 +1323,7 @@ function endBattle(victory){
     if(bossDef.unlock){const nextName=bossDef.tier===2?bossDef.unlock+'II':bossDef.unlock;if(!state.unlockedRegions.includes(nextName)){state.unlockedRegions.push(nextName);pushLog(`<span class="win">解鎖新地區：${nextName}</span>`,[],'combat');}}
     if(bossDef.unlockTier2){const nextName=bossDef.unlockTier2+'II';if(!state.unlockedRegions.includes(nextName)){state.unlockedRegions.push(nextName);pushLog(`<span class="win">解鎖二級入口：${nextName}</span>`,[],'combat');}}
     const drops=pickN(bossDef.drops,Math.min(2,bossDef.drops.length));
+    if(Math.random() < 0.25){ const _srv = grantRandomServant(); if(_srv){ const _sdef = SERVANT_TYPES[_srv.type]; pushLog('<span class="pl">玩家</span> 獲得僕人：<b class="r-' + _srv.rarity + '">' + _sdef.name + '</b>（' + _srv.rarity + '）。',[],'combat'); } }
     for(const did of drops){const dd=itemDef(did);if(!dd)continue;const rar=rollRarity();invAdd(did,rar,1);loot.push({id:did,rarity:rar,count:1});}
     addExp(50);
     resultHtml=`<span class="win">勝利！</span> 擊敗 <b>${bossDef.name}</b>。對 Boss 傷害：${Math.round(b.damageDealt)}`;
@@ -1367,7 +1368,7 @@ function showBattleResult(bossDef, b, victory, loot){
     <div class="stat-line"><span class="k">剩餘 HP</span><span class="v">${Math.max(0,Math.round(b.playerHp))}</span></div>
     <div class="divider"></div>
     <div style="font-size:11px;color:#e8a33d;margin-bottom:6px">戰利品</div>
-    ${loot.length?loot.map(l=>`<div class="item-row" data-iid="${l.id}" data-irar="${l.rarity}"><div class="icon" style="background:${rarityBg(l.rarity)}">${itemIcon(l.id,30)}</div><div class="info"><div class="nm ${rarityClass(l.rarity)}">${itemDef(l.id).name}</div><div class="sub">${l.rarity}</div></div><div class="cnt">*${l.count}</div></div>`).join(''):'<div class="empty-hint">無</div>'}`;
+    ${loot.length?loot.map(l=>`<div class="item-row" data-iid="${l.id}" data-irar="${l.rarity}"><div class="icon" style="background:${rarityBg(l.rarity)}">${itemIcon(l.id,30)}</div><div class="info"><div class="nm ${rarityClass(l.rarity)}">${(itemDef(l.id)||{name:l.id}).name}</div><div class="sub">${l.rarity}</div></div><div class="cnt">*${l.count}</div></div>`).join(''):'<div class="empty-hint">無</div>'}`;
   const ft=el('div','modal-ft');ft.innerHTML=`<button class="btn primary" id="m-ok">確認</button>`;
   const bd=openModal({title:'戰鬥結算',body,footer:ft});
   ft.querySelector('#m-ok').onclick=()=>{closeModal();battle=null;save();renderCombat();};

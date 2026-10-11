@@ -348,6 +348,9 @@ function defaultState(){
     exploreDelayUntil:0,pendingHealFull:false,
     regionProgress:{},activeRegion:null,stashedWeapons:{},
     base:{slots:new Array(12).fill(null).map((_,i)=>i===0?{id:'control',lv:1}:null)},
+    garden:{plots:new Array(20).fill(null),storage:{}},
+    servants:[],
+    unlockedEquip:{},
     seals:{},defeatedBosses:[],unlockedRegions:['廢棄工廠','廢棄實驗室'],
     lastSeen:Date.now(),radioLastTick:0,armoryLastTick:0,crafting:[],
     stats:{kills:0,deaths:0,bossKills:0},
@@ -378,6 +381,47 @@ function load(){
     state.exploreDelayUntil = parseInt(state.exploreDelayUntil||0,10);
     state.pendingHealFull = !!state.pendingHealFull;
     state.base=Object.assign(d.base,s.base||{});
+    /* rev126: 後院資料遷移 */
+    if(!state.garden || typeof state.garden !== 'object') state.garden = {plots:new Array(20).fill(null)};
+    if(!Array.isArray(state.garden.plots)) state.garden.plots = new Array(20).fill(null);
+    if(!Array.isArray(state.garden.battleLog)) state.garden.battleLog = [];
+    for(let _pi = 0; _pi < state.garden.plots.length; _pi++){ const _p = state.garden.plots[_pi]; if(_p){ if(typeof _p.broken !== 'boolean') _p.broken = false; if(_p.type === 'tower' && (!_p.towerConfig || typeof _p.towerConfig !== 'object')) _p.towerConfig = { eq:{ head:null, face:null, top:null, pants:null, shoes:null, primary:null, secondary:null, melee:null }, eqRarity:{}, ammoId:null, ammoMax:0 }; } }
+    while(state.garden.plots.length < 20) state.garden.plots.push(null);
+    if(state.garden.plots.length > 20) state.garden.plots.length = 20;
+    if(!state.garden.storage || typeof state.garden.storage !== 'object') state.garden.storage = {};
+    if(typeof _cleanGardenStorageRarity === 'function') _cleanGardenStorageRarity();
+    if(typeof state.garden.food !== 'number') state.garden.food = 0;
+    if(!state.garden.merchant || typeof state.garden.merchant !== 'object') state.garden.merchant = { foodLv:0, seedLv:0, throwLv:0, lastFood:0, lastSeed:0, lastThrow:0, lastFeed:0 };
+    { const _m = state.garden.merchant; if(typeof _m.foodLv !== 'number') _m.foodLv = 0; if(typeof _m.seedLv !== 'number') _m.seedLv = 0; if(typeof _m.throwLv !== 'number') _m.throwLv = 0; delete _m.foodLine; delete _m.seedLine; delete _m.throwLine; }
+    if(!Array.isArray(state.servants)) state.servants = [];
+    if(!state.unlockedEquip || typeof state.unlockedEquip !== 'object') state.unlockedEquip = {};
+    if(typeof _initUnlockedFrom === 'function') _initUnlockedFrom();
+    for(const _srv of state.servants){
+      if(_srv.autoPlant !== 'off' && _srv.autoPlant !== 'any' && _srv.autoPlant !== 'follow'){
+        _srv.autoPlant = (_srv.autoPlant && _srv.autoPlant !== 'off') ? 'follow' : 'off';
+      }
+      if(typeof _srv.stamina !== 'number'){
+        _srv.stamina = (typeof servantEffectiveMaxStamina === 'function') ? servantEffectiveMaxStamina(_srv) : 100;
+      }
+      if(!_srv.foodPolicy) _srv.foodPolicy = 'normal';
+      if(typeof _srv.resting !== 'boolean') _srv.resting = false;
+      if(typeof _srv._starve !== 'boolean') _srv._starve = false;
+    }
+    for(const _srv of state.servants){
+      if(!Array.isArray(_srv.assignedPlots)){
+        if(typeof _srv.assignedPlot === 'number' && _srv.assignedPlot >= 0) _srv.assignedPlots = [_srv.assignedPlot];
+        else _srv.assignedPlots = [];
+      }
+      delete _srv.assignedPlot;
+    }
+    /* rev125: 清理舊存檔中的 merchant / garden（不再是建築） */
+    if(!Array.isArray(state.base.slots)) state.base.slots=[];
+    while(state.base.slots.length<12) state.base.slots.push(null);
+    if(!state.base.slots[0]||state.base.slots[0].id!=='control') state.base.slots[0]={id:'control',lv:1};
+    for(let _i=1;_i<12;_i++){
+      const _s=state.base.slots[_i];
+      if(_s&&(_s.id==='merchant'||_s.id==='garden')) state.base.slots[_i]=null;
+    }
     state.regionProgress=Object.assign({},s.regionProgress||{});
     state.pendingSalvageEquipped=s.pendingSalvageEquipped||{};
     state.stashedWeapons=s.stashedWeapons||{};
@@ -424,9 +468,83 @@ function rndInt(a,b){return Math.floor(rnd(a,b+1));}
 function fmtTime(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');}
 function rarityClass(r){return 'r-'+r;}
 function invKey(id,r){return id+'@'+r;}
-function invAddRaw(id,r,c){if(c<=0)return;const k=invKey(id,r);state.inventory[k]=(state.inventory[k]||0)+c;}
-function invRemove(id,r,c){const k=invKey(id,r);if(!state.inventory[k]||state.inventory[k]<c)return false;state.inventory[k]-=c;if(state.inventory[k]<=0)delete state.inventory[k];return true;}
+function _initUnlockedFrom(){
+  if(!state.unlockedEquip || typeof state.unlockedEquip !== 'object') state.unlockedEquip = {};
+  for(const k in state.inventory){
+    const p = k.split('@');
+    if(p.length !== 2) continue;
+    const d = ALL_ITEMS[p[0]];
+    if(d && d.slot) state.unlockedEquip[k] = true;
+  }
+  for(const slot in state.player.equipped){
+    const id = state.player.equipped[slot];
+    if(!id) continue;
+    const rar = state.player.equippedRarity[slot] || '一般';
+    const d = ALL_ITEMS[id];
+    if(d && d.slot) state.unlockedEquip[id + '@' + rar] = true;
+  }
+}
+function invAddRaw(id,r,c){if(c<=0)return;const k=invKey(id,r);state.inventory[k]=(state.inventory[k]||0)+c;if(ALL_ITEMS[id]&&ALL_ITEMS[id].slot){if(!state.unlockedEquip)state.unlockedEquip={};state.unlockedEquip[id+'@'+r]=true;}}
+function invRemove(id,r,c){if(typeof SEEDS !== 'undefined' && SEEDS[id]){ return gardenStorageRemove(id, r, c); } const k=invKey(id,r);if(!state.inventory[k]||state.inventory[k]<c)return false;state.inventory[k]-=c;if(state.inventory[k]<=0)delete state.inventory[k];return true;}
 function invCount(id,r){return state.inventory[invKey(id,r)]||0;}
+/* ===== rev130: 後院儲備 helper ===== */
+function _gardenStorageInit(){
+  if(!state.garden || typeof state.garden !== 'object') state.garden = {plots:new Array(20).fill(null), storage:{}};
+  if(!Array.isArray(state.garden.plots)) state.garden.plots = new Array(20).fill(null);
+  if(!state.garden.storage || typeof state.garden.storage !== 'object') state.garden.storage = {};
+  return state.garden.storage;
+}
+function _cleanGardenStorageRarity(){
+  if(typeof state === 'undefined' || !state.garden || !state.garden.storage) return;
+  const validRar = ['破舊','一般','庫存','精品','傳奇'];
+  const toDel = [];
+  const stor = state.garden.storage;
+  for(const k in stor){
+    const idx = k.lastIndexOf('@');
+    if(idx < 0){ toDel.push(k); continue; }
+    const id = k.slice(0, idx);
+    const rar = k.slice(idx + 1);
+    const validId = (typeof SEEDS !== 'undefined' && SEEDS[id]) || (typeof CROPS !== 'undefined' && CROPS[id]);
+    if(!validId){ toDel.push(k); continue; }
+    if(validRar.indexOf(rar) === -1){ toDel.push(k); continue; }
+  }
+  for(const k of toDel){ delete stor[k]; }
+  if(toDel.length) console.log('[garden clean] 移除', toDel.length, '筆非法儲備：', toDel);
+}
+function gardenStorageAdd(id, rarity, count){
+  if(count <= 0) return;
+  const _validRar = ['破舊','一般','庫存','精品','傳奇'];
+  if(_validRar.indexOf(rarity) === -1){ console.warn('[gardenStorageAdd] 非法稀有度：', id, rarity); return; }
+  const s = _gardenStorageInit();
+  const k = id + '@' + rarity;
+  s[k] = (s[k] || 0) + count;
+  if(!state.garden.storageBatches || typeof state.garden.storageBatches !== 'object') state.garden.storageBatches = {};
+  if(!Array.isArray(state.garden.storageBatches[k])) state.garden.storageBatches[k] = [];
+  state.garden.storageBatches[k].push({ count: count, addedAt: Date.now() });
+}
+function gardenStorageRemove(id, rarity, count){
+  const s = _gardenStorageInit();
+  const k = id + '@' + rarity;
+  if(!s[k] || s[k] < count) return false;
+  s[k] -= count;
+  if(s[k] <= 0) delete s[k];
+  if(state.garden && state.garden.storageBatches && Array.isArray(state.garden.storageBatches[k])){
+    const batches = state.garden.storageBatches[k];
+    let remain = count;
+    while(remain > 0 && batches.length){
+      const b = batches[0];
+      if(b.count <= remain){ remain -= b.count; batches.shift(); }
+      else { b.count -= remain; remain = 0; }
+    }
+    if(!batches.length) delete state.garden.storageBatches[k];
+  }
+  return true;
+}
+function gardenStorageCount(id, rarity){
+  const s = _gardenStorageInit();
+  return s[id + '@' + rarity] || 0;
+}
+/* ===== end rev130 ===== */
 function invList(){const l=[];for(const k in state.inventory){const [id,r]=k.split('@');l.push({id,rarity:r,count:state.inventory[k],def:itemDef(id)});}return l;}
 function getAmmoByCal(cal){const l=[];for(const k in state.inventory){const p=k.split('@');if(p.length!==2)continue;const id=p[0],r=p[1];const d=AMMO[id];if(!d||d.cal!==cal)continue;const cnt=state.inventory[k];if(!cnt||cnt<=0)continue;l.push({id,rarity:r,count:cnt,def:d});}return l;}
 function _ammoOrderKey(slot){
@@ -710,7 +828,26 @@ function applyDamage(target,rawDmg,penetration,armorLevel){
 }
 
 const toastSlotSet = new Set();
+function _safeMsgText(msg){
+  try {
+    if(msg == null) return '';
+    if(typeof msg === 'string') return msg;
+    if(typeof msg === 'number' || typeof msg === 'boolean') return String(msg);
+    if(typeof msg === 'object'){
+      if(typeof msg.nodeType === 'number') return msg.textContent != null ? String(msg.textContent) : '';
+      if(typeof msg.message === 'string') return msg.message;
+      return '';
+    }
+    return String(msg);
+  } catch(e){ return ''; }
+}
+
 function notify(msg,type){
+  msg = _safeMsgText(msg);
+  if(typeof msg !== 'string'){
+    if(msg && msg.nodeType === 1) msg = msg.textContent || '';
+    else msg = String(msg);
+  }
   if(battle && battle.active) return;
   const n=el('div','toast'+(type?' '+type:''),msg);
   let slot=0;
@@ -720,7 +857,34 @@ function notify(msg,type){
   document.body.appendChild(n);
   setTimeout(()=>{toastSlotSet.delete(slot);n.remove();},2300);
 }
-function pushLog(html,items,type){state.logs.push({t:Date.now(),html,items:items||[],type:type||'explore'});if(state.logs.length>500)state.logs.splice(0,state.logs.length-500);if(currentTab==='explore')renderZone3Log();}
+function hasGardenPlotType(type){
+  if(!state.garden || !Array.isArray(state.garden.plots)) return false;
+  for(const p of state.garden.plots){ if(p && p.type === type) return true; }
+  return false;
+}
+
+function grantRandomServant(){
+  const allTypes = Object.keys(SERVANT_TYPES);
+  const types = allTypes.filter(function(t){
+    if(t === 'foreman') return hasGardenPlotType('shed');
+    return true;
+  });
+  if(!types.length) return null;
+  const type = pick(types);
+  const rarity = rollRarity();
+  const id = 's_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+  const srv = {
+    id: id, type: type, rarity: rarity, lv: 1, exp: 0,
+    assignedPlots: [], autoPlant: 'off',
+    foodPolicy: 'normal', resting: false
+  };
+  srv.stamina = (typeof servantEffectiveMaxStamina === 'function') ? servantEffectiveMaxStamina(srv) : 100;
+  state.servants = state.servants || [];
+  state.servants.push(srv);
+  return srv;
+}
+function pushLog(html,items,type){
+  html = _safeMsgText(html);if(typeof html !== 'string'){ if(html && html.nodeType === 1) html = html.textContent || ''; else html = String(html); }state.logs.push({t:Date.now(),html,items:items||[],type:type||'explore'});if(state.logs.length>500)state.logs.splice(0,state.logs.length-500);if(currentTab==='explore')renderZone3Log();}
 function renderZone3Log(){
   const box=$('#logbox');if(!box)return;box.innerHTML='';
   const logs=state.logs.filter(l=>l.type!=='combat').slice(-60);
@@ -802,6 +966,7 @@ function consolidateInventoryDuplicates(){
 }
 function invAdd(id,rarity,count){
   if(count<=0)return;
+  if(typeof SEEDS !== 'undefined' && SEEDS[id]){ gardenStorageAdd(id, rarity, count); return; }
   const cat=itemCat(id);
   /* rev121: 已有該 baseId 的具名武器 → 原版傳奇直接分解，不入庫 */
   if(cat === 'weapon' && id.indexOf('named_') !== 0 && rarity === '傳奇'){
@@ -1011,7 +1176,7 @@ function chooseFireMode(weapon,ec,ac){
   return m.includes('點射')?m[0]:m[0];
 }
 function modeBulletsPerTarget(mode){return{'點射':1,'短點射':3,'長點射':7,'掃射':99,'近戰':1,'投擲':1}[mode]||1;}
-function fmtItemSpan(id,r,c){return `<span class="${rarityClass(r)} itm" data-iid="${id}" data-irar="${r}">${itemDef(id).name}*${c}</span>`;}
+function fmtItemSpan(id,r,c){const d=itemDef(id);const nm=d?d.name:id;return `<span class="${rarityClass(r)} itm" data-iid="${id}" data-irar="${r}">${nm}*${c}</span>`;}
 function fmtEnemies(enemies){const map={};for(const e of enemies){const k=e.id;if(!map[k])map[k]={...e,count:0};map[k].count++;}return Object.values(map).map(g=>`${g.name}*${g.count}(HP:${g.maxHp}*${g.count})`).join('、');}
 function checkThrowableUnequip(){const tid=state.player.equipped.throwable;if(!tid)return;if(getThrowableCount()<=0){const def=itemDef(tid);state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;state.player.throwableStock=0;refreshPlayerStats();notify(`${def?def.name:tid} 已用盡，自動卸下`,'error');}}
 function applyDropBonus(count){const sl=getBuildingLv('storage');return Math.max(1,Math.round(count*(1+sl*0.1)));}
@@ -1162,6 +1327,7 @@ function autoCombat(region,node,enemies){
       const dropN=rndInt(1,2);
       for(let i=0;i<dropN;i++){const drop=rollRegionDrop(region);if(!drop)continue;const lid=drop.id,rar=drop.rarity;let cnt=(itemCat(lid)==='ammo')?rndInt(3,8):(itemCat(lid)==='material'?rndInt(1,4):1);cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);loot.push({id:lid,rarity:rar,count:cnt});}
       addExp(enemies.length*3);
+      if(Math.random() < 0.03){ const _srv = grantRandomServant(); if(_srv){ const _sdef = SERVANT_TYPES[_srv.type]; pushLog('<span class="pl">玩家</span> 獲得僕人：<b class="r-' + _srv.rarity + '">' + _sdef.name + '</b>（' + _srv.rarity + '）。',[],'explore'); } }
       if(REGIONS[region].seal&&Math.random()<REGIONS[region].sealRate){state.seals[REGIONS[region].seal]=parseInt(state.seals[REGIONS[region].seal]||0,10)+1;pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 撿到了 <b>Boss 信物</b>！`,[],'explore');}
     } else {
       resultTxt=`<span class="run">逃跑</span>`;
@@ -1235,12 +1401,13 @@ function searchEvent(region,node){
     if(lid){const ldef=itemDef(lid);const rar=rollRarity();invAdd(lid,rar,1);pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 開啓了 武器櫃，獲得 ${fmtItemSpan(lid,rar,1)}。`,[{id:lid,rarity:rar,count:1}],'explore');addProf('drop',1);addExp(2);return;}
   }
   if(roll<0.75){
-    const pool=r.loot.filter(id=>AMMO[id]||MATERIALS[id]||CONSUMABLES[id]);
+    const pool=r.loot.filter(id=>AMMO[id]||MATERIALS[id]||CONSUMABLES[id]||SEEDS[id]);
     let lid=pick(pool);
     let rar=null;
     if(lid&&AMMO[lid]){const ammoPool=r.loot.filter(id=>AMMO[id]);const selRar=rollAmmoRarity(region);if(selRar){const filtered=ammoPool.filter(id=>AMMO[id].rarity===selRar);if(filtered.length)lid=pick(filtered);}rar=AMMO[lid].rarity;}
+    else if(lid&&SEEDS[lid]){rar=rollRarity();}
     else if(lid){const ldef=itemDef(lid);rar=hasVariableRarity(lid)?rollRarity():ldef.rarity;}
-    if(lid){let cnt=AMMO[lid]?rndInt(5,15):(MATERIALS[lid]?rndInt(1,5):1);cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 發現了 補給箱，獲得 ${fmtItemSpan(lid,rar,cnt)}。`,[{id:lid,rarity:rar,count:cnt}],'explore');addProf('drop',1);addExp(1);return;}
+    if(lid){let cnt=AMMO[lid]?rndInt(5,15):(MATERIALS[lid]?rndInt(1,5):(SEEDS[lid]?rndInt(1,2):1));cnt=applyDropBonus(cnt);invAdd(lid,rar,cnt);pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 發現了 補給箱，獲得 ${fmtItemSpan(lid,rar,cnt)}。`,[{id:lid,rarity:rar,count:cnt}],'explore');addProf('drop',1);addExp(1);return;}
   }
   pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 沒有發現任何東西。`,[],'explore');
 }
@@ -1280,7 +1447,7 @@ function buildingTick(){
   const radioLv=getBuildingLv('radio');
   if(radioLv>0){
     const last=state.radioLastTick||0;const interval=5*60*1000/genMult;
-    if(now-last>interval){state.radioLastTick=now;const mats=['wood','metal','screws','cloth','gears','electronics'];const m=pick(mats);const cnt=rndInt(3,8)*radioLv;invAdd(m,'一般',cnt);notify(`📡 無線電補給：${MATERIALS[m].name}*${cnt}`,'ok');}
+    if(now-last>interval){state.radioLastTick=now;const mats=['wood','metal','screws','cloth','gears','electronics'];const m=pick(mats);const cnt=rndInt(3,8)*radioLv;invAdd(m,'一般',cnt);/* rev249: notify removed */}
   }
   const armoryLv=getBuildingLv('armory');
   if(armoryLv>0){
@@ -1310,7 +1477,7 @@ function buildingTick(){
         if(_cands.length){
           const chosen=_cands[0];
           const cnt=rndInt(5,10)*Math.max(1,Math.ceil(armoryLv/5));          invAdd(chosen,AMMO[chosen].rarity,cnt);
-          notify(`🔫 軍械庫產出：${AMMO[chosen].name}*${cnt}`,'ok');
+          /* rev249: notify removed */
         }
       }
     }
@@ -1442,6 +1609,9 @@ function _offlineBuildingSettle(now, baseTime){
 
   // ── 改造隊列：直接用 Date.now() 結算（startTime 是真實時間） ──
   processCrafting();
+
+  // ── 商人產線：離線期間補算 ──
+  if(typeof _gardenMerchantTick === 'function'){ try{ _gardenMerchantTick(); }catch(e){} }
 
   return { radioCount, armoryCount };
 }
@@ -1593,7 +1763,14 @@ const modalLayer=$('#modal-layer');
 const modalEl=$('.modal',modalLayer);
 function openModal({title,body,footer,full}){
   modalEl.className='modal'+(full?' full':'');modalEl.innerHTML='';
-  if(title!==false){const hd=el('div','modal-hd');hd.innerHTML=`<div>${title||''}</div><div class="x">✕</div>`;hd.querySelector('.x').onclick=closeModal;modalEl.appendChild(hd);}
+  if(title!==false){
+    if(typeof title !== 'string'){
+      if(title && title.nodeType === 1) title = title.textContent || '';
+      else if(title == null) title = '';
+      else title = String(title);
+    }
+    const hd=el('div','modal-hd');hd.innerHTML=`<div>${title}</div><div class="x">✕</div>`;hd.querySelector('.x').onclick=closeModal;modalEl.appendChild(hd);
+  }
   const bd=el('div','modal-bd-inner');
   if(typeof body==='string')bd.innerHTML=body;else if(body)bd.appendChild(body);
   modalEl.appendChild(bd);
@@ -1920,3 +2097,5 @@ function openLogHistory(){
     e.onclick=()=>{ const l=logs[parseInt(e.dataset.offlineIdx,10)]; if(l) openOfflineDetail(l); };
   });
 }
+
+
