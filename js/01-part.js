@@ -516,7 +516,7 @@ for(const _rk of ['廢棄工廠','廢棄實驗室','郊區公路','輻射沼澤'
   for(const _r in _SEED_DROPS){
     if(REGIONS[_r] && Array.isArray(REGIONS[_r].loot)){
       for(const _s of _SEED_DROPS[_r]){
-        for(let _i = 0; _i < 6; _i++) REGIONS[_r].loot.push(_s);
+        REGIONS[_r].loot.push(_s);
       }
     }
   }

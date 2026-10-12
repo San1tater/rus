@@ -4741,3 +4741,173 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
   }, 500);
 })();
 /* ===== end rev250 ===== */
+
+/* ===== rev255: 五修合一 ===== */
+(function(){
+  if(window._rev255Installed) return;
+  window._rev255Installed = true;
+
+  /* ── ① 收获 ── */
+  window.gardenHarvest = function(idx){
+    try {
+      const plots = _gardenGetPlots();
+      const plot = plots[idx];
+      if(!plot || !plot.crop){ console.warn('[harvest] 无作物', idx); return; }
+      const c = plot.crop;
+      const seed = SEEDS[c.seedId];
+      if(!seed){ console.warn('[harvest] 无效种子', c.seedId); return; }
+      const now = Date.now();
+      if(now < c.matureAt){ console.warn('[harvest] 未成熟'); return; }
+      const rottenAt = c.matureAt + seed.rotMs;
+      if(now >= rottenAt){ console.warn('[harvest] 已腐烂'); return; }
+      const baseYield = seed.baseYield;
+      const mult = RARITY_MULT[c.rarity] || 1;
+      const expected = baseYield * mult;
+      const jitter = 0.8 + Math.random() * 0.4;
+      const count = Math.max(1, Math.round(expected * jitter));
+      const cropDef = CROPS[seed.cropId];
+      gardenStorageAdd(seed.cropId, c.rarity, count);
+      plot.crop = null;
+      save();
+      try { closeModal(); } catch(e){}
+      notify('收穫：' + (cropDef ? cropDef.name : '作物') + ' ×' + count, 'ok');
+      console.log('[harvest] 成功', cropDef ? cropDef.name : seed.cropId, c.rarity, '×' + count);
+      renderGardenGrid();
+      renderGardenContent();
+    } catch(err){
+      console.error('[harvest] 异常', err);
+    }
+  };
+
+  /* ── ②③ 指派立即生效 + 僕人列表立即重排 ── */
+  window._refreshServantListNow = function(){
+    try {
+      const p = document.getElementById('garden-page');
+      if(!p) return;
+      if(typeof _gardenActiveTab === 'undefined' || _gardenActiveTab !== 'servant') return;
+      const box = p.querySelector('#gp-content');
+      if(!box) return;
+      if(typeof renderGardenServants === 'function') renderGardenServants(box);
+    } catch(e){ console.warn('[refresh servants] err', e); }
+  };
+
+  window.openServantAssign = function(srvId){
+    const srv = (state.servants || []).find(function(s){ return s.id === srvId; });
+    if(!srv) return;
+    const def = SERVANT_TYPES[srv.type];
+    if(!def) return;
+    const maxSlots = servantSlots(srv.rarity, srv.type);
+    const plots = _gardenGetPlots();
+    const selected = {};
+    for(const i of (srv.assignedPlots || [])) selected[i] = true;
+    function countSel(){ let n = 0; for(const k in selected) if(selected[k]) n++; return n; }
+    function renderGridHtml(){
+      let html = '<div class="srv-sa-info">已選 <span id="srv-sel-cnt">' + countSel() + '</span> / ' + maxSlots + ' 格</div>';
+      html += '<div class="srv-sa-grid">';
+      for(let i = 0; i < 20; i++){
+        const plot = plots[i];
+        let cls = 'srv-sa-cell';
+        let inner = '';
+        let disabled = false;
+        if(!plot || !plot.type){
+          cls += ' empty'; inner = '<div class="srv-sa-icon">＋</div>'; disabled = true;
+        } else if(plot.type !== def.targetPlot){
+          cls += ' mismatch';
+          const t = GARDEN_PLOT_TYPES[plot.type] || {icon:'?'};
+          inner = '<div class="srv-sa-icon">' + t.icon + '</div>'; disabled = true;
+        } else {
+          const t = GARDEN_PLOT_TYPES[plot.type];
+          const owner = plot.assignedServant;
+          if(selected[i]) cls += ' selected';
+          if(owner && owner !== srvId) cls += ' occupied';
+          inner = '<div class="srv-sa-icon">' + t.icon + '</div>';
+          if(owner && owner !== srvId){
+            const otherSrv = (state.servants || []).find(function(s){ return s.id === owner; });
+            if(otherSrv){
+              const oDef = SERVANT_TYPES[otherSrv.type] || {};
+              inner += '<div class="srv-sa-owner">' + (oDef.icon || '?') + '</div>';
+            }
+          }
+        }
+        html += '<div class="' + cls + '" data-idx="' + i + '"' + (disabled ? ' data-disabled="1"' : '') + '>' + inner + '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+    function applyAndSave(){
+      const newList = [];
+      for(const k in selected) if(selected[k]) newList.push(parseInt(k, 10));
+      for(const other of (state.servants || [])){
+        if(other.id === srvId) continue;
+        if(!Array.isArray(other.assignedPlots)) continue;
+        other.assignedPlots = other.assignedPlots.filter(function(x){ return newList.indexOf(x) === -1; });
+      }
+      const oldList = srv.assignedPlots || [];
+      for(const oldIdx of oldList){
+        if(newList.indexOf(oldIdx) === -1){
+          const p2 = plots[oldIdx];
+          if(p2 && p2.assignedServant === srvId) delete p2.assignedServant;
+        }
+      }
+      for(const newIdx of newList){
+        if(plots[newIdx]) plots[newIdx].assignedServant = srvId;
+      }
+      srv.assignedPlots = newList;
+      save();
+      renderGardenGrid();
+      if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
+    }
+    const ft = document.createElement('div');
+    ft.className = 'modal-ft';
+    ft.innerHTML = '<button class="btn ghost" id="srv-assign-close">關閉</button>';
+    const bd = openModal({ title: '指派 ' + def.name, body: renderGridHtml(), footer: ft });
+    function bindCells(){
+      const cells = bd.querySelectorAll('.srv-sa-cell');
+      for(let i = 0; i < cells.length; i++){
+        (function(el){
+          el.onclick = function(){
+            if(el.getAttribute('data-disabled') === '1') return;
+            const idx = parseInt(el.getAttribute('data-idx'), 10);
+            const plot = plots[idx];
+            if(!plot) return;
+            if(selected[idx]){ delete selected[idx]; refresh(); return; }
+            if(countSel() >= maxSlots){ notify('已達上限 ' + maxSlots + ' 格', 'error'); return; }
+            const owner = plot.assignedServant;
+            if(owner && owner !== srvId){
+              openConfirm('此格已被其他僕人指派，是否取代？', function(){
+                selected[idx] = true;
+                applyAndSave();
+                refresh();
+              });
+              return;
+            }
+            selected[idx] = true;
+            applyAndSave();
+            refresh();
+          };
+        })(cells[i]);
+      }
+    }
+    function refresh(){
+      bd.innerHTML = renderGridHtml();
+      bindCells();
+    }
+    bindCells();
+    ft.querySelector('#srv-assign-close').onclick = closeModal;
+  };
+
+  /* ── ④ 产线进度实时刷新 ── */
+  window._startMerchantLiveTimer = function(){
+    if(window._merchantLiveTimer) return;
+    window._merchantLiveTimer = setInterval(function(){
+      if(typeof _gardenActiveTab === 'undefined' || _gardenActiveTab !== 'merchant') return;
+      const p = document.getElementById('garden-page');
+      if(!p || !p.classList.contains('on')) return;
+      if(typeof _gardenMerchantRefreshUI === 'function') _gardenMerchantRefreshUI();
+    }, 1000);
+  };
+  window._startMerchantLiveTimer();
+
+  console.log('[rev255] 收获 / 指派立即 / 重排 / 进度实时 已安装');
+})();
+/* ===== end rev255 ===== */
