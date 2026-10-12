@@ -187,7 +187,7 @@ function calcConsumableHeal(item, medbayLv){
   const rarityMult = RARITY_MULT[item.rarity] || 1;
   const maxHp = state.player.maxHp || 100;
   const base = (c.heal || 0) + (c.healPct || 0) * maxHp;
-  const medbayMult = 1 + (medbayLv || 0) * 0.15;
+  const medbayMult = 1 + (medbayLv || 0) * 0.03;
   return Math.round(base * rarityMult * medbayMult);
 }
 /* ===== rev130: 後院種子與作物 ===== */

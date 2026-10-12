@@ -818,52 +818,56 @@ function _gardenMerchantLineProcess(lineKey){
   if(lv <= 0) return false;
   const last = m[L.lastKey] || 0;
   if(now - last < MERCHANT_INTERVAL_MS) return false;
-  const times = Math.floor((now - last) / MERCHANT_INTERVAL_MS);
+  const times = Math.min(Math.floor((now - last) / MERCHANT_INTERVAL_MS), 200);
   if(times <= 0) return false;
-  m[L.lastKey] = last + times * MERCHANT_INTERVAL_MS;
   const cfg = L.table[lv];
-  if(lineKey === 'food'){
-    const matCosts = {};
-    if(cfg.gears) matCosts.gears = cfg.gears;
-    if(cfg.electronics) matCosts.electronics = cfg.electronics;
-    const poolBefore = m.foodPool || 0;
-    const cropVal = _gardenTotalCropValue();
-    if(poolBefore + cropVal + 0.001 < cfg.food) return true;
-    if(!_gardenMerchantCanPay(matCosts)) return true;
-    _gardenMerchantTryPay(matCosts);
-    _gardenMerchantFoodPoolFill(cfg.food);
-    m.foodPool -= cfg.food;
-    g.food += cfg.food;
-    return true;
-  }
-  if(lineKey === 'seed'){
-    const matCosts = { metal: cfg.metal };
-    if(cfg.gears) matCosts.gears = cfg.gears;
-    if(cfg.electronics) matCosts.electronics = cfg.electronics;
-    if(!_gardenMerchantTryPay(matCosts)) return true;
-    const seedIds = Object.keys(SEEDS);
-    for(let i = 0; i < cfg.count; i++){
-      const sid = seedIds[Math.floor(Math.random() * seedIds.length)];
-      const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
-      gardenStorageAdd(sid, rar, 1);
+  let did = 0;
+  for(let _i = 0; _i < times; _i++){
+    let ok = false;
+    if(lineKey === 'food'){
+      const matCosts = {};
+      if(cfg.gears) matCosts.gears = cfg.gears;
+      if(cfg.electronics) matCosts.electronics = cfg.electronics;
+      const poolBefore = m.foodPool || 0;
+      const cropVal = _gardenTotalCropValue();
+      if(poolBefore + cropVal + 0.001 < cfg.food) break;
+      if(!_gardenMerchantCanPay(matCosts)) break;
+      _gardenMerchantTryPay(matCosts);
+      _gardenMerchantFoodPoolFill(cfg.food);
+      m.foodPool -= cfg.food;
+      g.food += cfg.food;
+      ok = true;
+    } else if(lineKey === 'seed'){
+      const matCosts = { metal: cfg.metal };
+      if(cfg.gears) matCosts.gears = cfg.gears;
+      if(cfg.electronics) matCosts.electronics = cfg.electronics;
+      if(!_gardenMerchantTryPay(matCosts)) break;
+      const seedIds = Object.keys(SEEDS);
+      for(let _k = 0; _k < cfg.count; _k++){
+        const sid = seedIds[Math.floor(Math.random() * seedIds.length)];
+        const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
+        gardenStorageAdd(sid, rar, 1);
+      }
+      ok = true;
+    } else if(lineKey === 'throw'){
+      const matCosts = { metal: cfg.metal };
+      if(cfg.gears) matCosts.gears = cfg.gears;
+      if(cfg.cloth) matCosts.cloth = cfg.cloth;
+      if(cfg.electronics) matCosts.electronics = cfg.electronics;
+      if(!_gardenMerchantTryPay(matCosts)) break;
+      const tIds = ['f1','rgd5','rgo','rgn','vog17','vog25'];
+      for(let _k = 0; _k < cfg.count; _k++){
+        const tid = tIds[Math.floor(Math.random() * tIds.length)];
+        const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
+        invAdd(tid, rar, 1);
+      }
+      ok = true;
     }
-    return true;
+    if(!ok) break;
+    did++;
   }
-  if(lineKey === 'throw'){
-    const matCosts = { metal: cfg.metal };
-    if(cfg.gears) matCosts.gears = cfg.gears;
-    if(cfg.cloth) matCosts.cloth = cfg.cloth;
-    if(cfg.electronics) matCosts.electronics = cfg.electronics;
-    if(!_gardenMerchantTryPay(matCosts)) return true;
-    const tIds = ['f1','rgd5','rgo','rgn','vog17','vog25'];
-    for(let i = 0; i < cfg.count; i++){
-      const tid = tIds[Math.floor(Math.random() * tIds.length)];
-      const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
-      invAdd(tid, rar, 1);
-    }
-    return true;
-  }
-  return false;
+  m[L.lastKey] = last + did * MERCHANT_INTERVAL_MS;
+  return did > 0;
 }
 
 function _gardenMerchantRefreshUI(){
@@ -1647,6 +1651,17 @@ function _gardenStorageRotCheck(){
   const seedsToAdd = [];
   const report = { rotted: 0, composted: 0, seeds: 0, accelSec: 0 };
   let changed = false;
+  // 補全 storage 中沒有 batch 記錄的 key（視為最舊，addedAt=0）
+  for(const _sk in storage){
+    if(storage[_sk] <= 0) continue;
+    const _sp = _sk.split('@');
+    if(!CROPS[_sp[0]]) continue;
+    const _cur = state.garden.storageBatches[_sk];
+    if(!Array.isArray(_cur) || !_cur.length){
+      state.garden.storageBatches[_sk] = [{ count: storage[_sk], addedAt: 0 }];
+      changed = true;
+    }
+  }
   for(const k in state.garden.storageBatches){
     const batches = state.garden.storageBatches[k];
     if(!Array.isArray(batches) || !batches.length){ delete state.garden.storageBatches[k]; continue; }
@@ -3491,7 +3506,7 @@ function _getArmoryProduction(){
   const armoryLv = getBuildingLv('armory');
   if(armoryLv <= 0) return null;
   const genLv = getBuildingLv('generator');
-  const genMult = 1 + genLv * 0.2;
+  const genMult = 1 + genLv * 0.04;
   const intervalMs = 3 * 60 * 1000 / genMult;
   let targetRarity = '一般';
   if(armoryLv <= 5) targetRarity = '破舊';
@@ -3611,10 +3626,10 @@ function _getArmorySummary(){
 function renderBaseStats(){
   const rows = [];
   const genLv = getBuildingLv('generator');
-  const genMult = 1 + genLv * 0.2;
+  const genMult = 1 + genLv * 0.04;
   const radioLv = getBuildingLv('radio');
   if(radioLv > 0){
-    const mh = Math.round(12 * genMult * 5.5 * radioLv);
+    const mh = Math.round(12 * genMult * 5.5  * Math.max(1,Math.round(1+radioLv*0.3)));
     rows.push({ key: 'radio', label: '無線電', value: '+' + mh + '/h' });
   }
   const armoryLv = getBuildingLv('armory');
@@ -3683,7 +3698,7 @@ function _openRadioDetail(){
   const lv = getBuildingLv('radio');
   if(lv <= 0){ notify('尚未建造無線電', 'error'); return; }
   const genLv = getBuildingLv('generator');
-  const genMult = 1 + genLv * 0.2;
+  const genMult = 1 + genLv * 0.04;
   const intervalMs = 5 * 60 * 1000 / genMult;
   const perHour = Math.round(3600000 / intervalMs);
   let body = '';
@@ -3933,19 +3948,21 @@ function onBuildCell(i){
     const upCost=(slot.id==='forge')?{metal:150*slot.lv,screws:50*slot.lv}:{wood:15*slot.lv,metal:15*slot.lv,screws:5*slot.lv};
     const curBonus=buildingBonusText(slot.id,slot.lv);
     const nextBonus=buildingBonusText(slot.id,slot.lv+1);
-    let body=`<div class="detail-title">${buildingIcon(slot.id)} ${b.name} Lv.${slot.lv}</div>
+    const _isMax = b.maxLv && slot.lv >= b.maxLv;
+    let body=`<div class="detail-title">${buildingIcon(slot.id)} ${b.name} Lv.${slot.lv}${_isMax ? ' (MAX)' : ''}</div>
       <div class="detail-sub">${b.desc}</div>
       <div class="stat-line"><span class="k">當前效果</span><span class="v">${curBonus}</span></div>
-      <div class="stat-line"><span class="k">升級後</span><span class="v">${nextBonus}</span></div>
+      ${_isMax ? '' : `<div class="stat-line"><span class="k">升級後</span><span class="v">${nextBonus}</span></div>`}
       <div class="divider"></div>
       <div style="font-size:11px;color:#e8a33d;margin-bottom:4px">升級需求（等值一般）</div>`;
     for(const [k,v] of Object.entries(upCost)){const have=materialEquivalent(k);const ok=have>=v;body+=`<div class="stat-line"><span class="k">${MATERIALS[k].name}</span><span class="v" style="color:${ok?'#4caf50':'#e05252'}">${have}/${v}</span></div>`;}
     const ft=el('div','modal-ft');
     const isWorkbench=slot.id==='workbench';
-    ft.innerHTML=`<button class="btn primary" id="m-up">升級</button>${isWorkbench?'<button class="btn" id="m-craft">改造</button>':''}<button class="btn ghost" id="m-close">關閉</button>`;
+    ft.innerHTML=`<button class="btn primary" id="m-up" ${_isMax ? 'disabled' : ''}>${_isMax ? '已滿級' : '升級'}</button>${isWorkbench?'<button class="btn" id="m-craft">改造</button>':''}<button class="btn ghost" id="m-close">關閉</button>`;
     openModal({title:b.name,body,footer:ft});
     ft.querySelector('#m-close').onclick=closeModal;
     ft.querySelector('#m-up').onclick=()=>{
+      if(b.maxLv && slot.lv >= b.maxLv){notify(`已達最高等級 Lv.${b.maxLv}`,'error');return;}
       for(const [k,v] of Object.entries(upCost))if(materialEquivalent(k)<v){notify('材料不足，無法升級','error');return;}
       for(const [k,v] of Object.entries(upCost))consumeMaterial(k,v);
       slot.lv++;refreshPlayerStats();save();renderBase();
@@ -3985,7 +4002,7 @@ function onBuildCell(i){
 function renderModQueueHtml(workbenchLv){
   if(!state.crafting||!state.crafting.length)return '';
   const now=Date.now();
-  const genLv=getBuildingLv('generator');const sm=1+genLv*0.2;
+  const genLv=getBuildingLv('generator');const sm=1 + genLv * 0.04;
   let html=`<div style="font-size:11px;color:#4caf50;font-weight:bold;margin:8px 0 6px">📋 改造隊列（${state.crafting.filter(c=>c.type==='mod').length}/${workbenchLv}）</div>`;
   for(const c of state.crafting){
     if(c.type!=='mod')continue;

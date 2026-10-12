@@ -668,20 +668,20 @@ function pickThrowableByPreference(context){
 }
 function findNextConsumable(){const ctx=state.preferences.consume||{priority:'一般',fallback:'desc',exclude:[]};const ex=ctx.exclude||[];const items=[];for(const k in state.inventory){const [id,r]=k.split('@');if(!CONSUMABLES[id])continue;if(ex.includes(r))continue;items.push({id,rarity:r,count:state.inventory[k]});}if(!items.length)return null;const pri=ctx.priority;if(!ex.includes(pri)){const p=items.filter(a=>a.rarity===pri);if(p.length)return p[0];}const fb=ctx.fallback||'desc';const order=(fb==='asc')?['破舊','一般','庫存','精品','傳奇']:['傳奇','精品','庫存','一般','破舊'];for(const r of order){const s=items.filter(a=>a.rarity===r);if(s.length)return s[0];}return items[0];}
 function equippedWeapon(slot){const id=state.player.equipped[slot];if(!id)return null;const rar=state.player.equippedRarity[slot]||'一般';const def=itemDef(id);if(!def)return null;return{id,rarity:rar,def,slot};}
-function getBuildingLv(id){for(const s of state.base.slots)if(s&&s.id===id)return s.lv||1;return 0;}
+function getBuildingLv(id){for(const s of state.base.slots){if(s&&s.id===id){const _raw=s.lv||1;const _mx=(BUILDINGS[id]&&BUILDINGS[id].maxLv)||999;return Math.min(_raw,_mx);}}return 0;}
 function buildingBonusText(bid,lv){
-  switch(bid){case 'workbench':{const _c=Math.min(50,Math.max(1,lv));const _s=Math.round(86400*Math.pow(300/86400,(_c-1)/49));const _m=Math.round(_s/60);const _t=_m<60?(_m+' 分鐘'):(Math.round(_m/60)+' 小時');return `改造所需：${_t}/件`;}case 'storage':return `掉落數量 +${lv*10}%`;
-  case 'toilet':return `熟練度獲取 +${lv*10}%`;case 'rest':return `生命成長率 ${(0.03*Math.pow(1.02,lv)*100).toFixed(2)}%`;
-  case 'generator':return `製造/冷卻加速 +${lv*20}%`;case 'medbay':return `消耗品恢復 +${lv*15}%`;
+  switch(bid){case 'workbench':{const _c=Math.min(50,Math.max(1,lv));const _s=Math.round(86400*Math.pow(300/86400,(_c-1)/49));const _m=Math.round(_s/60);const _t=_m<60?(_m+' 分鐘'):(Math.round(_m/60)+' 小時');return `改造所需：${_t}/件`;}case 'storage':return `掉落數量 +${lv*2}%`;
+  case 'toilet':return `熟練度獲取 +${lv*2}%`;case 'rest':return `生命成長率 ${(0.1*Math.pow(1.02,lv)*100).toFixed(2)}%`;
+  case 'generator':return `製造/冷卻加速 +${lv*4}%`;case 'medbay':return `消耗品恢復 +${lv*3}%`;
   case 'forge':return `護甲值 +${lv*3}%`;
-  case 'radio':return `補給量 ×${lv}`;
+  case 'radio':return `補給量 ×${(1+lv*0.3).toFixed(1)}`;
   case 'armory':{
     let targetRarity='一般';
     if(lv<=5)targetRarity='破舊';else if(lv<=10)targetRarity='一般';else if(lv<=15)targetRarity='庫存';else if(lv<=20)targetRarity='精品';else targetRarity='傳奇';
     return `產出主副彈藥（當前稀有度：${targetRarity}）`;
   }default:return '';}
 }
-function calcMaxHp(){const rl=getBuildingLv('rest');const base=1+0.10883*Math.pow(1.02,rl);return Math.round(100*Math.pow(base,state.player.level-1));}
+function calcMaxHp(){const rl=getBuildingLv('rest');const base=1+0.1*Math.pow(1.02,rl);return Math.round(100*Math.pow(base,state.player.level-1));}
 function equipArmorValue(id,rarity){
   const def=ARMOR[id];
   if(!def)return 0;
@@ -784,7 +784,7 @@ function addExp(n){
   state.player.exp+=n;let need=Math.round(50*Math.pow(1.15,state.player.level-1));
   while(state.player.exp>=need){state.player.exp-=need;state.player.level++;refreshPlayerStats();state.player.hp=state.player.maxHp;notify(`🎉 升級至 Lv.${state.player.level}（HP ${state.player.maxHp}）`,'ok');pushLog(`<span class="pl">玩家</span> 升級至 <b>Lv.${state.player.level}</b>，最大生命 ${state.player.maxHp}。`,[],'explore');need=Math.round(50*Math.pow(1.15,state.player.level-1));}
 }
-function addProf(cat,n){const tl=getBuildingLv('toilet');const m=1+tl*0.1;state.proficiency[cat]=Math.min(MAX_PROF_RAW,(state.proficiency[cat]||0)+n*m);}
+function addProf(cat,n){const tl=getBuildingLv('toilet');const m=1+tl*0.02;state.proficiency[cat]=Math.min(MAX_PROF_RAW,(state.proficiency[cat]||0)+n*m);}
 function getHitRate(weaponType,mode,scopeBonus){
   let base=10,p=0;
   /* v51: 改用 itemDef 支援具名武器 */
@@ -1194,7 +1194,7 @@ function modeBulletsPerTarget(mode){return{'點射':1,'短點射':3,'長點射':
 function fmtItemSpan(id,r,c){const d=itemDef(id);const nm=d?d.name:id;return `<span class="${rarityClass(r)} itm" data-iid="${id}" data-irar="${r}">${nm}*${c}</span>`;}
 function fmtEnemies(enemies){const map={};for(const e of enemies){const k=e.id;if(!map[k])map[k]={...e,count:0};map[k].count++;}return Object.values(map).map(g=>`${g.name}*${g.count}(HP:${g.maxHp}*${g.count})`).join('、');}
 function checkThrowableUnequip(){const tid=state.player.equipped.throwable;if(!tid)return;if(getThrowableCount()<=0){const def=itemDef(tid);state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;state.player.throwableStock=0;refreshPlayerStats();notify(`${def?def.name:tid} 已用盡，自動卸下`,'error');}}
-function applyDropBonus(count){const sl=getBuildingLv('storage');return Math.max(1,Math.round(count*(1+sl*0.1)));}
+function applyDropBonus(count){const sl=getBuildingLv('storage');return Math.max(1,Math.round(count*(1+sl*0.02)));}
 
 function autoCombat(region,node,enemies){
   try{
