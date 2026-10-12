@@ -385,6 +385,8 @@ function load(){
     if(!state.garden || typeof state.garden !== 'object') state.garden = {plots:new Array(20).fill(null)};
     if(!Array.isArray(state.garden.plots)) state.garden.plots = new Array(20).fill(null);
     if(!Array.isArray(state.garden.battleLog)) state.garden.battleLog = [];
+    if(!Array.isArray(state.garden.log)) state.garden.log = [];
+    if(typeof state.garden.lastMealAt !== 'number') state.garden.lastMealAt = Math.floor(Date.now() / 3600000) * 3600000;
     for(let _pi = 0; _pi < state.garden.plots.length; _pi++){ const _p = state.garden.plots[_pi]; if(_p){ if(typeof _p.broken !== 'boolean') _p.broken = false; if(_p.type === 'tower' && (!_p.towerConfig || typeof _p.towerConfig !== 'object')) _p.towerConfig = { eq:{ head:null, face:null, top:null, pants:null, shoes:null, primary:null, secondary:null, melee:null }, eqRarity:{}, ammoId:null, ammoMax:0 }; } }
     while(state.garden.plots.length < 20) state.garden.plots.push(null);
     if(state.garden.plots.length > 20) state.garden.plots.length = 20;
@@ -406,6 +408,13 @@ function load(){
       if(!_srv.foodPolicy) _srv.foodPolicy = 'normal';
       if(typeof _srv.resting !== 'boolean') _srv.resting = false;
       if(typeof _srv._starve !== 'boolean') _srv._starve = false;
+    }
+    if(!state.garden) state.garden = {};
+    if(typeof state.garden.nextServantTag !== 'number') state.garden.nextServantTag = 1;
+    for(const _srv of state.servants){
+      if(typeof _srv.obtainedAt !== 'number') _srv.obtainedAt = Date.now();
+      if(typeof _srv.tag !== 'number') _srv.tag = state.garden.nextServantTag++;
+      if(typeof _srv.customName !== 'string') _srv.customName = '';
     }
     for(const _srv of state.servants){
       if(!Array.isArray(_srv.assignedPlots)){
@@ -873,10 +882,16 @@ function grantRandomServant(){
   const type = pick(types);
   const rarity = rollRarity();
   const id = 's_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+  if(!state.garden) state.garden = {};
+  if(typeof state.garden.nextServantTag !== 'number') state.garden.nextServantTag = 1;
+  const _tag = state.garden.nextServantTag++;
   const srv = {
     id: id, type: type, rarity: rarity, lv: 1, exp: 0,
     assignedPlots: [], autoPlant: 'off',
-    foodPolicy: 'normal', resting: false
+    foodPolicy: 'normal', resting: false,
+    obtainedAt: Date.now(),
+    tag: _tag,
+    customName: ''
   };
   srv.stamina = (typeof servantEffectiveMaxStamina === 'function') ? servantEffectiveMaxStamina(srv) : 100;
   state.servants = state.servants || [];
@@ -1483,6 +1498,7 @@ function buildingTick(){
     }
   }
   processCrafting();
+  if(typeof _gardenMealTick === 'function'){ try{ _gardenMealTick(now); }catch(e){} }
 }
 function processCrafting(){
   if(!state.crafting||!state.crafting.length)return;
@@ -1640,6 +1656,9 @@ function offlineSettle(){
   }
   /* ★ 新增：離線期間建築產出補算（無線電、軍械庫、改造隊列）★ */
   const buildingResults = _offlineBuildingSettle(now, baseTime);
+  if(typeof _gardenOfflineSettle === 'function'){
+    try{ _gardenOfflineSettle(now, baseTime); }catch(e){ console.warn('[garden offline] err', e); }
+  }
   _offlineMode = false;
   const loot = _offlineDiffInv(beforeInv);
   const lootList = [];

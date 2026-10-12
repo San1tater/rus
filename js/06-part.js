@@ -110,7 +110,7 @@ function openMerchant(){
 }
 /* ===== rev130: 後院全屏分頁 ===== */
 const GARDEN_PLOT_TYPES = {
-  soil:    { name: '土地',   icon: '🟫', desc: '種植作物' },
+  soil:    { name: '土地',   icon: '', desc: '種植作物' },
   tower:   { name: '哨塔',   icon: '<span style="color:#e05252;font-weight:bold">✖</span>', desc: '自動防禦' },
   shed:    { name: '工棚',   icon: '🛖', desc: '放置工具與僕人' },
   compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物' }
@@ -120,7 +120,7 @@ const GARDEN_TABS = [
   { id: 'storage',  label: '📦 儲備' },
   { id: 'merchant', label: '💰 商人' },
   { id: 'servant',  label: '👤 僕人' },
-  { id: 'log',      label: '📜 戰鬥日誌' }
+  { id: 'log',      label: '📜 日誌' }
 ];
 let _gardenActiveTab = 'storage';
 let _gardenTickTimer = null;
@@ -239,8 +239,6 @@ function _gardenCropStatus(plot, now){
   }
   return Object.assign({}, base, { status: 'rotten' });
 }
-
-function _gpApplyCellSize(){ /* rev184: no-op 兜底 */ }
 function renderGardenGrid(){
   const p = document.getElementById('garden-page');
   if(!p) return;
@@ -253,7 +251,7 @@ function renderGardenGrid(){
   for(let i = 0; i < 20; i++){
     const plot = plots[i];
     if(plot && plot.broken){
-      html += '<div class="gp-plot broken" data-idx="' + i + '"><div class="gp-plot-icon" style="color:#e05252;font-weight:bold;font-size:22px">✖</div><div class="gp-plot-lbl">損壞</div></div>';
+      html += '<div class="gp-plot broken" data-type="broken" data-idx="' + i + '"><div class="gp-plot-icon" style="color:#e05252;font-weight:bold;font-size:22px">✖</div><div class="gp-plot-lbl">損壞</div></div>';
       continue;
     }
     if(plot && plot.type){
@@ -266,15 +264,31 @@ function renderGardenGrid(){
           else if(st.status === 'mature'){ icon = st.cropIcon; lbl = '成熟'; extraCls = ' mature'; }
           else if(st.status === 'rotten'){ icon = '🥀'; lbl = '腐爛'; extraCls = ' rotten'; }
           else if(st.status === 'cleaning'){ icon = '🧹'; lbl = st.remaining + 's'; extraCls = ' cleaning'; }
-          html += '<div class="gp-plot built' + extraCls + '" data-idx="' + i + '"><div class="gp-plot-icon">' + icon + '</div><div class="gp-plot-lbl">' + lbl + '</div></div>';
+          html += '<div class="gp-plot built' + extraCls + '" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-icon">' + icon + '</div><div class="gp-plot-lbl">' + lbl + '</div></div>';
         } else {
-          html += '<div class="gp-plot built" data-idx="' + i + '"><div class="gp-plot-icon">' + t.icon + '</div><div class="gp-plot-lbl">' + t.name + '</div></div>';
+          if(plot.type === 'soil'){
+          html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
+        } else {
+          if(plot.type === 'soil'){
+          html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
+        } else {
+          if(plot.type === 'soil'){
+            html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
+          } else {
+            html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-icon">' + t.icon + '</div><div class="gp-plot-lbl">' + t.name + '</div></div>';
+          }
+        }
+        }
         }
       } else {
-        html += '<div class="gp-plot built" data-idx="' + i + '"><div class="gp-plot-icon">' + t.icon + '</div><div class="gp-plot-lbl">' + t.name + '</div></div>';
+        if(plot.type === 'soil'){
+          html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
+        } else {
+          html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-icon">' + t.icon + '</div><div class="gp-plot-lbl">' + t.name + '</div></div>';
+        }
       }
     } else {
-      html += '<div class="gp-plot empty" data-idx="' + i + '"><div class="gp-plot-icon">＋</div></div>';
+      html += '<div class="gp-plot empty" data-idx="' + i + '"></div>';
     }
   }
   grid.innerHTML = html;
@@ -307,7 +321,9 @@ function openGardenPlotPicker(idx){
     const row = document.createElement('div');
     row.className = 'item-row';
     row.setAttribute('data-type', key);
-    row.innerHTML = '<div class="icon" style="font-size:20px">' + t.icon + '</div><div class="info"><div class="nm">' + t.name + '</div><div class="sub">' + t.desc + '</div></div>';
+    const _plotImg = { soil: 'icons/garden/soil.png' };
+    const _iconHtml = _plotImg[key] ? ('<img src="' + _plotImg[key] + assetSuffix() + '" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="">') : t.icon;
+    row.innerHTML = '<div class="icon" style="font-size:20px">' + _iconHtml + '</div><div class="info"><div class="nm">' + t.name + '</div><div class="sub">' + t.desc + '</div></div>';
     body.appendChild(row);
   }
   const bd = openModal({ title: '第 ' + (idx + 1) + ' 格 · 建造', body: body });
@@ -381,6 +397,7 @@ function openGardenSeedPickerWithRemove(idx){
   ft.querySelector('#soil-close').onclick = closeModal;
   ft.querySelector('#soil-del').onclick = function(){
     plots[idx] = null;
+    _clearPlotAssignments(idx);
     save(); closeModal();
     notify('已拆除土地', 'ok');
     renderGardenGrid();
@@ -466,6 +483,7 @@ function openGardenCropDetailWithRemove(idx, st){
   if(clnBtn) clnBtn.onclick = function(){ gardenCleanup(idx); };
   const rmvBtn = ft.querySelector('#gp-act-remove');
   if(rmvBtn) rmvBtn.onclick = function(){ plots[idx] = null; save(); closeModal(); notify('已拆除土地', 'ok'); renderGardenGrid(); };
+  _clearPlotAssignments(idx);
 }
 function openGardenPlotDetail(idx){
   const plots = _gardenGetPlots();
@@ -482,6 +500,7 @@ function openGardenPlotDetail(idx){
   ft.querySelector('#gp-close').onclick = closeModal;
   ft.querySelector('#gp-del').onclick = function(){
     plots[idx] = null;
+    _clearPlotAssignments(idx);
     save(); closeModal();
     notify('已拆除：' + t.name, 'ok');
     renderGardenGrid();
@@ -507,23 +526,7 @@ function renderGardenContent(){
   if(_gardenActiveTab === 'storage'){ renderGardenStorage(box); }
   else if(_gardenActiveTab === 'merchant'){ renderGardenMerchant(box); }
   else if(_gardenActiveTab === 'servant'){ renderGardenServants(box); }
-  else if(_gardenActiveTab === 'log'){ renderGardenBattleLog(box); }
-}
-
-function _gsApplyCellSize(){ /* rev230: 尺寸已內聯，這裡保留為 no-op 兜底 */ }
-
-function _gsSizeRows(area, cellSize, gap){
-  const rows = area.querySelectorAll('.gs-row');
-  for(let i = 0; i < rows.length; i++){
-    rows[i].style.gap = gap + 'px';
-    const cells = rows[i].querySelectorAll('.gs-cell');
-    for(let k = 0; k < cells.length; k++){
-      cells[k].style.width = cellSize + 'px';
-      cells[k].style.height = cellSize + 'px';
-      cells[k].style.fontSize = Math.floor(cellSize * 0.5) + 'px';
-      cells[k].style.setProperty('--cell-size', cellSize + 'px');
-    }
-  }
+  else if(_gardenActiveTab === 'log'){ renderGardenLog(box); }
 }
 
 function _gardenComputeCellSize(box, cols){
@@ -632,21 +635,21 @@ function renderGardenStorage(box){
 const MERCHANT_INTERVAL_MS = 300000;
 const MERCHANT_FOOD_TABLE = {
   0: { food: 0 },
-  1: { gears: 20, food: 20 },
-  2: { gears: 60, food: 80 },
-  3: { gears: 160, electronics: 100, food: 200 }
+  1: { gears: 1, food: 25 },
+  2: { gears: 2, electronics: 1, food: 70 },
+  3: { gears: 3, electronics: 2, food: 125 }
 };
 const MERCHANT_SEED_TABLE = {
   0: { metal: 0, count: 0, rarities: [] },
-  1: { metal: 160, count: 4, rarities: ['一般'] },
-  2: { metal: 400, gears: 60, count: 10, rarities: ['一般','庫存'] },
-  3: { metal: 1000, gears: 160, electronics: 100, count: 24, rarities: ['一般','庫存','精品'] }
+  1: { metal: 2, count: 4, rarities: ['一般'] },
+  2: { metal: 4, gears: 2, count: 10, rarities: ['一般','庫存'] },
+  3: { metal: 6, gears: 3, electronics: 3, count: 24, rarities: ['一般','庫存','精品'] }
 };
 const MERCHANT_THROW_TABLE = {
   0: { metal: 0, count: 0, rarities: [] },
-  1: { metal: 160, count: 1, rarities: ['一般'] },
-  2: { metal: 400, gears: 60, cloth: 40, count: 2, rarities: ['一般','庫存'] },
-  3: { metal: 1000, gears: 160, cloth: 100, electronics: 100, count: 2, rarities: ['一般','庫存','精品'] }
+  1: { metal: 2, count: 1, rarities: ['一般'] },
+  2: { metal: 4, gears: 2, cloth: 2, count: 2, rarities: ['一般','庫存'] },
+  3: { metal: 6, gears: 3, cloth: 5, electronics: 3, count: 2, rarities: ['一般','庫存','精品'] }
 };
 
 function _gardenMerchantInit(){
@@ -735,61 +738,11 @@ function _gardenTotalCropValue(){
   }
   return total;
 }
-function _gardenMaterialSpend(id, n){
-  if(typeof consumeMaterial === 'function') return consumeMaterial(id, n);
-  const storage = _gardenStorageInit();
-  let remain = n;
-  const order = ['破舊','一般','庫存','精品','傳奇'];
-  for(const rar of order){
-    if(remain <= 0) break;
-    const k = id + '@' + rar;
-    const have = storage[k] || 0;
-    if(have <= 0) continue;
-    const use = Math.min(have, remain);
-    storage[k] -= use;
-    if(storage[k] <= 0) delete storage[k];
-    remain -= use;
-  }
-  return remain <= 0;
-}
-function _gardenCropSpend(n){
-  const storage = _gardenStorageInit();
-  let remain = n;
-  const order = ['破舊','一般','庫存','精品','傳奇'];
-  for(const rar of order){
-    if(remain <= 0) break;
-    for(const k in storage){
-      if(remain <= 0) break;
-      const parts = k.split('@');
-      if(parts[1] !== rar) continue;
-      if(!CROPS[parts[0]]) continue;
-      const have = storage[k] || 0;
-      if(have <= 0) continue;
-      const use = Math.min(have, remain);
-      storage[k] -= use;
-      if(storage[k] <= 0) delete storage[k];
-      remain -= use;
-    }
-  }
-  return remain <= 0;
-}
 function _gardenTotalCropCount(){
   const storage = _gardenStorageInit();
   let total = 0;
   for(const k in storage){ if(CROPS[k.split('@')[0]]) total += storage[k]; }
   return total;
-}
-
-function _gardenMerchantCheckMissing(cfg, lineKey){
-  const missing = [];
-  if(lineKey === 'food'){
-    if(cfg.crop && _gardenTotalCropCount() < cfg.crop) missing.push('作物');
-  }
-  if(cfg.metal && _gardenMaterialCount('metal') < cfg.metal) missing.push('金屬');
-  if(cfg.gears && _gardenMaterialCount('gears') < cfg.gears) missing.push('齒輪');
-  if(cfg.electronics && _gardenMaterialCount('electronics') < cfg.electronics) missing.push('電子');
-  if(cfg.cloth && _gardenMaterialCount('cloth') < cfg.cloth) missing.push('布料');
-  return missing;
 }
 
 function _gardenMerchantFoodPoolFill(target){
@@ -798,32 +751,53 @@ function _gardenMerchantFoodPoolFill(target){
   if(!m.foodPool) m.foodPool = 0;
   if(m.foodPool >= target) return true;
   const storage = _gardenStorageInit();
-  const cropList = [];
+  const batches = (state.garden && state.garden.storageBatches) || {};
+  const allBatches = [];
   for(const k in storage){
     if(storage[k] <= 0) continue;
     const parts = k.split('@');
     if(!CROPS[parts[0]]) continue;
-    cropList.push({
-      k: k, id: parts[0], rarity: parts[1],
-      val: cropFoodValue(parts[0], parts[1]),
-      count: storage[k]
-    });
+    const bs = batches[k];
+    if(Array.isArray(bs) && bs.length){
+      let listed = 0;
+      for(const b of bs){
+        allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: b.count, addedAt: b.addedAt || 0, val: cropFoodValue(parts[0], parts[1]) });
+        listed += b.count;
+      }
+      const missing = storage[k] - listed;
+      if(missing > 0){
+        allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: missing, addedAt: 0, val: cropFoodValue(parts[0], parts[1]) });
+      }
+    } else {
+      allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: storage[k], addedAt: 0, val: cropFoodValue(parts[0], parts[1]) });
+    }
   }
-  cropList.sort(function(a, b){ return a.val - b.val; });
+  allBatches.sort(function(a, b){ return a.addedAt - b.addedAt; });
   const toConsume = {};
   let gained = 0;
-  for(const c of cropList){
+  for(const b of allBatches){
     if(m.foodPool + gained >= target) break;
-    for(let i = 0; i < c.count; i++){
+    for(let i = 0; i < b.count; i++){
       if(m.foodPool + gained >= target) break;
-      gained += c.val;
-      toConsume[c.k] = (toConsume[c.k] || 0) + 1;
+      gained += b.val;
+      toConsume[b.k] = (toConsume[b.k] || 0) + 1;
     }
   }
   if(m.foodPool + gained < target) return false;
   for(const k in toConsume){
     storage[k] -= toConsume[k];
     if(storage[k] <= 0) delete storage[k];
+    if(batches[k]){
+      let remain = toConsume[k];
+      const nb = [];
+      for(const b of batches[k]){
+        if(remain <= 0){ nb.push(b); continue; }
+        if(b.count <= remain){ remain -= b.count; }
+        else { b.count -= remain; remain = 0; nb.push(b); }
+      }
+      if(nb.length) batches[k] = nb;
+      else delete batches[k];
+    }
   }
   m.foodPool += gained;
   return true;
@@ -931,24 +905,9 @@ function _gardenMerchantTick(){
   if(_gardenMerchantLineProcess('seed')) changed = true;
   if(_gardenMerchantLineProcess('throw')) changed = true;
 
-  if(now - m.lastFeed >= 60000){
-    m.lastFeed = now;
-    const FOOD_COST = { full:4, normal:3, half:2, lick:1, starve:0 };
-    const ORDER = ['full', 'normal', 'half', 'lick', 'starve'];
-    const servants = state.servants || [];
-    for(const s of servants){
-      if(!s.assignedPlots || !s.assignedPlots.length) continue;
-      const policy = s.foodPolicy || 'normal';
-      const cost = FOOD_COST[policy] || 0;
-      if(cost <= 0){ if(s._starve){ s._starve = false; changed = true; } continue; }
-      if(g.food >= cost){
-        g.food -= cost;
-        if(s._starve){ s._starve = false; }
-        changed = true;
-      } else {
-        if(!s._starve){ s._starve = true; changed = true; }
-      }
-    }
+  // 每小時整點吃飯（舊每分鐘邏輯已停用）
+  if(typeof _gardenMealTick === 'function'){
+    try{ if(_gardenMealTick(now)) changed = true; }catch(e){ console.warn('[meal] err', e); }
   }
 
   if(changed) save();
@@ -960,7 +919,7 @@ function _gardenFoodStats(){
   let food = Number(g.food);
   if(!isFinite(food)) food = 0;
   let consume = 0;
-  const FOOD_COST = { full:4, normal:3, half:2, lick:1, starve:0 };
+  const FOOD_COST = { full:3, normal:2, half:1, lick:0.5, starve:0 };
   const servants = state.servants || [];
   for(const s of servants){
     if(!s.assignedPlots || !s.assignedPlots.length) continue;
@@ -980,7 +939,7 @@ function _gardenMerchantLineMeta(lineKey){
 
 function _gardenMerchantCostStr(cfg, lineKey){
   const parts = [];
-  if(lineKey === 'food' && cfg.food) parts.push('🌾' + cfg.food);
+  if(lineKey === 'food' && cfg.food) parts.push('🍲' + cfg.food);
   if(cfg.metal) parts.push('🔩' + cfg.metal);
   if(cfg.gears) parts.push('⚙️' + cfg.gears);
   if(cfg.electronics) parts.push('💡' + cfg.electronics);
@@ -1098,7 +1057,7 @@ function renderGardenMerchant(box){
       const _pools = m.matPools || {};
       if(lineKey === 'food'){
         const _fp = m.foodPool || 0;
-        _parts.push('🌾' + (Math.round(_fp * 10) / 10));
+        _parts.push('🍲' + (Math.round(_fp * 10) / 10));
       }
       for(const _mid in _EMO){
         if(!_cfg[_mid]) continue;
@@ -1419,6 +1378,7 @@ function _gardenTowerDemolish(idx){
   const plot = plots[idx];
   if(!plot || plot.type !== 'tower') return;
   plots[idx] = null;
+  _clearPlotAssignments(idx);
   save();
   closeModal();
   notify('已拆除哨塔', 'ok');
@@ -1507,129 +1467,6 @@ function _gardenRaidGenEnemies(){
   return { enemies: enemies, region: region };
 }
 
-function _gardenRaidSimulate(guards, enemies){
-  const log = [];
-  const gs = guards.map(function(g){
-    const s = g.srv;
-    const maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(s) : (100 + s.lv * 20);
-    let armor = 0, armorLevel = 0;
-    const cfg = g.towerCfg;
-    for(const slot of ['head','top']){
-      const id = cfg.eq[slot];
-      if(!id) continue;
-      const rar = cfg.eqRarity[slot] || '一般';
-      armor += (typeof equipArmorValue === 'function') ? equipArmorValue(id, rar) : 0;
-      const d = ARMOR[id];
-      if(d && d.level) armorLevel = Math.max(armorLevel, d.level);
-    }
-    const scopeBonus = g.weaponDef.scopeBonus || 0;
-    const hitRate = (typeof servantHitRate === 'function') ? servantHitRate(s, '點射', scopeBonus) : 20;
-    const ammoId = cfg.ammoId;
-    const ammoRarity = ammoId ? ((AMMO[ammoId] && AMMO[ammoId].rarity) || '一般') : '一般';
-    const critRate = (typeof servantCritRate === 'function') ? servantCritRate(g.weaponRarity, ammoRarity) : 0.1;
-    const critMult = (typeof servantCritMult === 'function') ? servantCritMult(g.weaponRarity, ammoRarity) : 1.5;
-    const magCap = g.weaponDef.mag || 30;
-    const stock = ammoId ? invCount(ammoId, ammoRarity) : 0;
-    const ms = cfg.maxShots || 'inf';
-    let budget;
-    if(ms === 'skip') budget = 0;
-    else if(ms === 'mag') budget = Math.min(stock, magCap);
-    else budget = stock;
-    return {
-      name: (SERVANT_TYPES[s.type] || {}).icon + ' 守衛 Lv.' + s.lv,
-      srv: s,
-      hp: maxHp, maxHp: maxHp,
-      armor: armor, maxArmor: armor,
-      armorLevel: armorLevel,
-      weaponDef: g.weaponDef,
-      weaponRarity: g.weaponRarity,
-      towerCfg: g.towerCfg,
-      towerIdx: g.towerIdx,
-      ammoId: ammoId,
-      ammoRarity: ammoRarity,
-      ammoStock: stock,
-      ammoBudget: budget,
-      ammoUsed: 0,
-      magCap: magCap,
-      hitRate: hitRate,
-      critRate: critRate,
-      critMult: critMult,
-      alive: true
-    };
-  });
-  const es = enemies.map(function(e){
-    return Object.assign({}, e, { alive: true });
-  });
-  function pickMode(g, aliveE, remain){
-    const def = g.weaponDef;
-    if(!def || !def.modes) return '點射';
-    if(typeof isSemiAutoOnly === 'function' && isSemiAutoOnly(def)) return '點射';
-    if(aliveE >= 3 && def.modes.indexOf('掃射') !== -1) return '掃射';
-    if(aliveE >= 2 && def.modes.indexOf('短點射') !== -1) return '短點射';
-    return '點射';
-  }
-  const MODE_CAP = { '點射': 1, '短點射': 3, '長點射': 7, '掃射': 99, '近戰': 1, '投擲': 1 };
-  let round = 0;
-  const maxRounds = 30;
-  while(gs.some(function(g){ return g.alive; }) && es.some(function(e){ return e.alive; }) && round < maxRounds){
-    round++;
-    log.push({ type: 'round', n: round });
-    for(const g of gs){
-      if(!g.alive) continue;
-      const remain = g.ammoBudget - g.ammoUsed;
-      if(g.ammoId && remain <= 0) continue;
-      const aliveE = es.filter(function(e){ return e.alive; }).length;
-      if(!aliveE) break;
-      const mode = pickMode(g, aliveE, remain);
-      let shots = MODE_CAP[mode] || 1;
-      shots = Math.min(shots, g.magCap);
-      if(g.ammoId) shots = Math.min(shots, remain);
-      if(shots <= 0) continue;
-      for(let i = 0; i < shots; i++){
-        const targets = es.filter(function(e){ return e.alive; });
-        if(!targets.length) break;
-        if(g.ammoId){
-          if(g.ammoUsed >= g.ammoBudget) break;
-          g.ammoUsed++;
-        }
-        const target = pick(targets);
-        const hit = Math.random() * 100 < g.hitRate;
-        if(!hit){
-          log.push({ type: 'miss', from: g.name, to: target.name, fromRef: g, toRef: target });
-          continue;
-        }
-        const ammo = g.ammoId ? AMMO[g.ammoId] : null;
-        const baseDmg = ammo ? Math.round(ammo.dmg * (RARITY_MULT[g.ammoRarity] || 1)) : Math.round((g.weaponDef.dmg || 20) * (RARITY_MULT[g.weaponRarity] || 1));
-        let dmg = baseDmg, crit = false;
-        if(Math.random() < g.critRate){ dmg = Math.round(dmg * g.critMult); crit = true; }
-        const tgt = { hp: target.hp, armor: target.armor };
-        const res = (typeof applyDamage === 'function') ? applyDamage(tgt, dmg, ammo ? (ammo.pen || 0) : (g.weaponDef.pen || 0), target.armorLevel) : { hpLost: dmg, armorLost: 0 };
-        target.hp = tgt.hp; target.armor = tgt.armor;
-        const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
-        log.push({ type: 'hit', from: g.name, to: target.name, dmg: shown, crit: crit, fromRef: g, toRef: target });
-        if(target.hp <= 0){ target.alive = false; log.push({ type: 'kill', from: g.name, to: target.name, fromRef: g, toRef: target }); }
-      }
-    }
-    if(!es.some(function(e){ return e.alive; })) break;
-    for(const e of es){
-      if(!e.alive) continue;
-      const targets = gs.filter(function(g){ return g.alive; });
-      if(!targets.length) break;
-      const target = pick(targets);
-      const hit = Math.random() * 100 < 75;
-      if(!hit){ log.push({ type: 'miss', from: e.name, to: target.name, fromRef: e, toRef: target }); continue; }
-      const tgt = { hp: target.hp, armor: target.armor };
-      const res = applyDamage(tgt, e.dmg, e.pen || 0, target.armorLevel || 0);
-      target.hp = tgt.hp; target.armor = tgt.armor;
-      const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
-      log.push({ type: 'hit', from: e.name, to: target.name, dmg: shown, crit: false, enemy: true, fromRef: e, toRef: target });
-      if(target.hp <= 0){ target.alive = false; log.push({ type: 'down', from: e.name, to: target.name, fromRef: e, toRef: target }); }
-    }
-  }
-  const win = !es.some(function(e){ return e.alive; }) && gs.some(function(g){ return g.alive; });
-  return { log: log, guards: gs, enemies: es, win: win, rounds: round };
-}
-
 function _raidCleanupAll(){
   const sels = ['.raid-overlay','.raid-guard','.raid-enemy','.raid-enemy-zone','.raid-side','.raid-unit','.raid-sprite','.raid-proj','.raid-dmg','.raid-float','.raid-banner-win','.raid-banner-lose','.raid-unit-sprite','.raid-unit-hpwrap','.raid-unit-name','.raid-hp-wrap','.raid-name','.raid-hp'];
   for(const sel of sels){
@@ -1667,7 +1504,7 @@ function _raidDrawWorkerHelmet(ctx, B, anim, fi, color){
   ctx.stroke();
   ctx.restore();
 }
-function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType){
+function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType, flipX){
   const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
   const B = { x: 30, y: 30, w: 340, h: 460 };
@@ -1688,7 +1525,7 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
   }
   ctx.save();
   ctx.translate(px, py);
-  ctx.scale(scale, scale);
+  ctx.scale(flipX ? -scale : scale, scale);
   ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
   const units = [];
   for(const L of GAME_LAYERS) units.push({ z: L.z, kind: 'layer', layer: L });
@@ -2018,31 +1855,12 @@ function _raidLiveLogPush(text, cls){
     else if(text == null) text = '';
     else text = String(text);
   }
-  // 後備：把 [object ...] 字串直接吞掉（避免源頭漏掉）
-  if(/^\[object /.test(text)){
-    if(window.console) console.warn('[raid] 攔截非字串日誌：', text);
-    return;
-  }
+  if(/^\[object /.test(text)) return;
   if(!window._raidLiveLog) window._raidLiveLog = [];
   window._raidLiveLog.push({ text: text, cls: cls || '' });
   if(window._raidLiveLog.length > 300) window._raidLiveLog.shift();
   if(!window._raidLiveActive) return;
-  const p = document.getElementById('garden-page');
-  if(!p) return;
-  if(typeof _gardenActiveTab === 'undefined' || _gardenActiveTab !== 'log') return;
-  const box = p.querySelector('#gp-content');
-  if(!box) return;
-  let list = box.querySelector('.battle-log-list');
-  if(!list){
-    box.innerHTML = '<div class="battle-log-list"></div>';
-    list = box.querySelector('.battle-log-list');
-  }
-  const atBottom = (box.scrollTop + box.clientHeight) >= (box.scrollHeight - 30);
-  const el = document.createElement('div');
-  el.className = 'raid-live-log-line ' + (cls || '');
-  el.textContent = text;
-  list.appendChild(el);
-  if(atBottom) box.scrollTop = box.scrollHeight;
+  if(typeof _gardenUpdateBattleCol === 'function') _gardenUpdateBattleCol();
 }
 function _esc(s){ return String(s).replace(/[&<>]/g, function(c){ return c === '&' ? '&amp;' : (c === '<' ? '&lt;' : '&gt;'); }); }
 /* ===== end rev205 ===== */
@@ -2082,6 +1900,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
   wrap.style.position = 'relative';
   window._raidLiveLog = [];
   window._raidLiveActive = true;
+  if(typeof _gardenUpdateBattleCol === 'function') setTimeout(_gardenUpdateBattleCol, 50);
   // 保险：如果页面里已经有 [object HTMLDivElement] 文本节点，先清掉
   try {
     const _txtNodes = [];
@@ -2101,11 +1920,6 @@ function _gardenRaidShowBattle(guards, enemies, region){
   } catch(e){}
   _gardenActiveTab = 'log';
   if(typeof renderGardenTabs === 'function') renderGardenTabs();
-  // 強制清空內容區，避免舊歷史殘留
-  {
-    const _box = page.querySelector('#gp-content');
-    if(_box) _box.innerHTML = '<div class="battle-log-list"></div>';
-  }
   if(typeof renderGardenContent === 'function') renderGardenContent();
 
   requestAnimationFrame(function(){
@@ -2261,7 +2075,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
       ctx.save();
       if(!u.alive) ctx.globalAlpha = 0.22;
       if(u.isGuard){
-        _raidDrawHuman(ctx, u.x + ox, u.y, SCALE, u.equipped, u.equippedRarity, u.animName, u.animFrame, u.weaponSlot);
+        _raidDrawHuman(ctx, u.x + ox, u.y, SCALE, u.equipped, u.equippedRarity, u.animName, u.animFrame, u.weaponSlot, false);
       } else {
         _raidDrawEnemy(ctx, u.x + ox, u.y, SCALE, u.animName, u.animFrame, u.weaponId || 'ak74');
       }
@@ -2550,75 +2364,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
   });
 }
 
-function _gardenRaidShowReport(sim, region){
-  const page = document.getElementById('garden-page');
-  if(page){
-    const ov = page.querySelector('#raid-overlay');
-    if(ov) ov.remove();
-  }
-  _gardenActiveTab = 'log';
-  if(typeof renderGardenTabs === 'function') renderGardenTabs();
-  if(typeof renderGardenContent === 'function') renderGardenContent();
-  if(typeof renderGardenGrid === 'function') renderGardenGrid();
-}
 
-function renderGardenBattleLog(box){
-  if(window._raidLiveActive){
-    let list = box.querySelector('.battle-log-list');
-    if(!list){
-      box.innerHTML = '<div class="battle-log-list"></div>';
-      list = box.querySelector('.battle-log-list');
-      for(const e of (window._raidLiveLog || [])){
-        const el = document.createElement('div');
-        el.className = 'raid-live-log-line ' + (e.cls || '');
-        el.textContent = e.text;
-        list.appendChild(el);
-      }
-      box.scrollTop = box.scrollHeight;
-    }
-    return;
-  }
-  const g = _gardenMerchantInit();
-  const log = g.battleLog || [];
-  if(!log.length){
-    box.innerHTML = '<div class="gs-empty" style="position:static;padding:30px 0">暫無戰鬥日誌</div>';
-    return;
-  }
-  let html = '<div class="battle-log-list">';
-  for(let i = log.length - 1; i >= 0; i--){
-    const e = log[i];
-    const win = e.win;
-    const t = new Date(e.t);
-    const ts = ('0' + (t.getMonth()+1)).slice(-2) + '/' + ('0' + t.getDate()).slice(-2) + ' ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
-    html += '<div class="battle-log-item ' + (win ? 'win' : 'lose') + '">';
-    html += '<div class="bl-head"><span class="bl-title">' + (win ? '⚔️' : '💀') + ' ' + e.region + '</span><span class="bl-time">' + ts + '</span></div>';
-    html += '<div class="bl-row">' + e.rounds + '回合 · 守衛' + e.guardAlive + '/' + e.guardTotal + ' · 敵' + e.enemyCount + ' · 彈藥' + e.ammoUsed + '發 · 傷害' + e.totalDmg + '</div>';
-    if(e.guardAmmoList && e.guardAmmoList.length){
-      for(const ga of e.guardAmmoList){
-        const _rar = ga.ammoRarity || '一般';
-        const _col = _RARITY_COLOR[_rar] || '#ddd';
-        const _coord = ga.coord ? ga.coord + ' ' : '';
-        const _dead = ga.alive ? '' : '<span style="color:#e05252">✖</span>';
-        const _ammoCol = _RARITY_COLOR[_rar] || '#a89a85';
-        html += '<div class="bl-row bl-sub">' + _dead + _coord + ga.name + ' <span style="color:' + _ammoCol + '">' + ga.ammoName + '</span>×' + ga.count + ' · 傷' + ga.dmg + '</div>';
-      }
-    }
-    if(!win && e.broken && e.broken.length) html += '<div class="bl-row bl-sub" style="color:#e05252">損壞 ' + e.broken.join(' ') + '</div>';
-    if(!win && e.stolen && e.stolen.length) html += '<div class="bl-row bl-sub">掠奪 ' + _lootHtml(e.stolen, '#e05252') + '</div>';
-    if(win && e.loot && e.loot.length) html += '<div class="bl-row bl-sub">獲得 ' + _lootHtml(e.loot, '#4caf50') + '</div>';
-    html += '</div>';
-  }
-  html += '</div>';
-  box.innerHTML = html;
-}
-
-function _isServantWorking(s){
-  return !!(s && s.assignedPlots && s.assignedPlots.length > 0);
-}
-
-function _isServantWorking(s){
-  return !!(s && s.assignedPlots && s.assignedPlots.length > 0);
-}
 
 function _isServantWorking(s){
   return !!(s && s.assignedPlots && s.assignedPlots.length > 0);
@@ -2650,12 +2396,15 @@ function renderGardenServants(box){
         const idx = r * 4 + j;
         if(idx < servants.length){
           const s = servants[idx];
-          const tDef = SERVANT_TYPES[s.type] || {icon:'?', name:'?'};
+          const tDef = SERVANT_TYPES[s.type] || {name:'?'};
           const _img = 'icons/servants/' + s.type + '.png' + assetSuffix();
           const _star = _isServantWorking(s) ? '<div class="srv-star">★</div>' : '';
+          const _label = servantLabel(s);
+          const _labelEsc = _servantEscHtml(_label);
           rowHtml += '<div class="gs-cell filled srv" data-srv-id="' + s.id + '" style="background:' + rarityBg(s.rarity) + ';' + cellStyle + '">' +
             '<img class="srv-portrait" src="' + _img + '" alt="">' +
             _star +
+            '<div class="srv-tag">' + _labelEsc + '</div>' +
             '<div class="gs-cell-cnt srv-cnt">Lv.' + s.lv + ' ' + tDef.name + '</div>' +
             '</div>';
         } else {
@@ -2713,16 +2462,27 @@ function openServantDetail(srvId){
   if(srv.stamina <= 0 && !srv.resting){
     ftHtml += '<button class="btn primary" id="srv-wake">叫醒</button>';
   }
-  ftHtml += '<button class="btn primary" id="srv-assign">指派</button><button class="btn ghost" id="srv-close">關閉</button>';
+  ftHtml += '<button class="btn primary" id="srv-assign">指派</button>';
+  if((srv.assignedPlots||[]).length > 0) ftHtml += '<button class="btn" id="srv-withdraw">撤回</button>';
+  ftHtml += '<button class="btn ghost" id="srv-close">關閉</button>';
   ft.innerHTML = ftHtml;
   let body = '';
   body += '<div style="font-size:15px;color:#e8a33d;font-weight:bold;display:flex;align-items:center;gap:8px">';
   body += '<img style="width:34px;height:34px;object-fit:contain" src="icons/servants/' + srv.type + '.png' + assetSuffix() + '" alt="">';
-  body += '<span class="' + rarityClass(srv.rarity) + '">' + def.name + '</span>';
-  body += '<span style="margin-left:auto;font-size:10px;color:#7a6f60;font-weight:normal;text-align:right">' + (def.desc || '') + '</span>';
+  body += '<span class="' + rarityClass(srv.rarity) + '">' + _servantEscHtml(servantLabel(srv)) + '</span>';
+  body += '<span class="srv-rename-btn" style="font-size:11px;color:#e8a33d;cursor:pointer;padding:4px 10px;border:1px solid #3a2f25;border-radius:4px;margin-left:6px">改名</span>';
+{
+  const _fcP = srv.foodPolicy || 'normal';
+  const _fcB = (typeof FOOD_COST_BASE !== 'undefined' ? FOOD_COST_BASE[_fcP] : 0) || 0;
+  const _fcM = (typeof RARITY_FOOD_MULT !== 'undefined' ? RARITY_FOOD_MULT[srv.rarity] : 1) || 1;
+  const _fcC = Math.round(_fcB * _fcM * 10) / 10;
+  body += '<span class="srv-food-rate" style="font-size:11px;color:#e05252;font-weight:bold">🍲 -' + _fcC + '/hr</span>';
+}
+body += '<button class="btn danger" id="srv-dismiss" style="margin-left:auto;padding:4px 12px;font-size:11px;flex:0 0 auto">解僱</button>';
+
   body += '</div>';
-  body += '<div class="detail-sub">' + srv.rarity + ' · Lv.' + srv.lv + (srv.resting ? ' · <span style="color:#7a6f60">休息中</span>' : (srv.stamina <= 0 ? ' · <span style="color:#e05252">偷懶中</span>' : '')) + '</div>';
-  body += '<div class="stat-line"><span class="k">當前效果</span><span class="v">' + servantLevelEffectText(srv) + '</span></div>';
+  body += '<div class="detail-sub">' + srv.rarity + ' · Lv.' + srv.lv + ' · ' + def.name + (srv.resting ? ' · <span style="color:#7a6f60">休息中</span>' : (srv.stamina <= 0 ? ' · <span style="color:#e05252">偷懶中</span>' : '')) + '</div>';
+  body += '<div class="stat-line"><span class="k">當前效果</span><span class="v" style="color:#4caf50;font-weight:bold">' + servantLevelEffectText(srv) + '</span></div>';
   body += '<div style="margin:8px 0 4px">';
   body += '<div style="font-size:10px;color:#7a6f60;margin-bottom:3px;display:flex;justify-content:space-between"><span>體力</span><span>' + stam + ' / ' + maxStam + '（' + stamPct + '%）</span></div>';
   body += '<div style="height:6px;background:#1a1510;border-radius:3px;overflow:hidden;border:1px solid #2a231c"><div style="height:100%;width:' + stamPct + '%;background:' + stamColor + '"></div></div>';
@@ -2738,7 +2498,6 @@ function openServantDetail(srvId){
   } else {
     body += '<div style="font-size:10px;color:#4caf50;margin:6px 0 4px;text-align:center;font-weight:bold">✦ 已滿級 Lv.' + SERVANT_MAX_LV + '</div>';
   }
-  body += '<div class="stat-line"><span class="k">可管地塊</span><span class="v">' + slots + ' 格</span></div>';
   body += '<div class="stat-line"><span class="k">已指派</span><span class="v">' + plots.length + ' / ' + slots + '</span></div>';
   if(plots.length){
     body += '<div class="stat-line"><span class="k">地塊</span><span class="v">' + plots.map(function(i){ return plotCoordName(i); }).join('、') + '</span></div>';
@@ -2756,13 +2515,57 @@ function openServantDetail(srvId){
   body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:6px">🍖 食物策略</div>';
   body += '<select id="srv-food-policy" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:6px;font-size:11px">';
   body += '<option value="full">吃到撐（120%）</option>';
-  body += '<option value="normal">吃飽（90%）</option>';
+  body += '<option value="normal">吃飽（70%）</option>';
   body += '<option value="half">半飽（50%）</option>';
   body += '<option value="lick">舔舔（30%）</option>';
   body += '<option value="starve">餓著（0%）</option>';
   body += '</select>';
   body += '<div style="font-size:9px;color:#5a5040;margin-top:4px;line-height:1.5">需與商人訂閱食物生產線後生效</div>';
   const bd = openModal({ title: '僕人詳情', body: body, footer: ft });
+  const _wdBtn = ft.querySelector('#srv-withdraw');
+  if(_wdBtn) _wdBtn.onclick = function(){
+    const _list = srv.assignedPlots || [];
+    const _plots = _gardenGetPlots();
+    for(const _idx of _list){
+      const _p2 = _plots[_idx];
+      if(_p2 && _p2.assignedServant === srv.id) delete _p2.assignedServant;
+    }
+    srv.assignedPlots = [];
+    save();
+    closeModal();
+    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 已撤回', 'clean');
+    renderGardenGrid();
+    if(typeof _gardenSyncActors === 'function') _gardenSyncActors();
+    if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
+  };
+  const _dsBtn = bd.querySelector('#srv-dismiss');
+  if(_dsBtn) _dsBtn.onclick = function(){
+    openConfirm('確定解僱 ' + (SERVANT_TYPES[srv.type]||{}).name + '？', function(){
+      const _list = srv.assignedPlots || [];
+      const _plots = _gardenGetPlots();
+      for(const _idx of _list){
+        const _p2 = _plots[_idx];
+        if(_p2 && _p2.assignedServant === srv.id) delete _p2.assignedServant;
+      }
+      state.servants = (state.servants || []).filter(function(s){ return s.id !== srv.id; });
+      const _rw = { '破舊':{s:[0,1],m:[1,2]}, '一般':{s:[1,1],m:[2,3]}, '庫存':{s:[1,2],m:[3,4]}, '精品':{s:[2,3],m:[4,6]}, '傳奇':{s:[3,5],m:[6,10]} };
+      const _r = _rw[srv.rarity] || _rw['一般'];
+      const _sn = Object.keys(SEEDS);
+      const _mn = ['wood','metal','screws','cloth','gears','electronics'];
+      const _parts = [];
+      const _sc = rndInt(_r.s[0], _r.s[1]);
+      for(let _i = 0; _i < _sc; _i++){ const _sid = pick(_sn); gardenStorageAdd(_sid, srv.rarity, 1); _parts.push('🌰' + (SEEDS[_sid]?SEEDS[_sid].name:_sid)); }
+      const _mc = rndInt(_r.m[0], _r.m[1]);
+      for(let _i = 0; _i < _mc; _i++){ const _mid = pick(_mn); invAdd(_mid, '一般', 1); _parts.push((MATERIAL_EMOJI[_mid]||'') + (MATERIALS[_mid]?MATERIALS[_mid].name:_mid)); }
+      save();
+      closeModal();
+      _gardenLog('解僱 <span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span>', 'leave');
+      renderGardenGrid();
+      if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
+    });
+  };
+  const _rnBtn = bd.querySelector('.srv-rename-btn');
+  if(_rnBtn) _rnBtn.onclick = function(){ closeModal(); openServantRename(srvId); };
   ft.querySelector('#srv-close').onclick = closeModal;
   ft.querySelector('#srv-assign').onclick = function(){ closeModal(); openServantAssign(srvId); };
   const wakeBtn = ft.querySelector('#srv-wake');
@@ -2781,7 +2584,6 @@ function openServantDetail(srvId){
     apSel.onchange = function(){
       srv.autoPlant = apSel.value;
       save();
-      notify('自動種植：' + (apSel.options[apSel.selectedIndex] || {}).text, 'ok');
     };
   }
   const fpSel = bd.querySelector('#srv-food-policy');
@@ -2792,9 +2594,15 @@ function openServantDetail(srvId){
       const _eff = servantEffectiveMaxStamina(srv);
       if((srv.stamina || 0) > _eff) srv.stamina = _eff;
       save();
-      notify('食物策略：' + (fpSel.options[fpSel.selectedIndex] || {}).text + '（上限 ' + _eff + '）', 'ok');
-      closeModal();
-      openServantDetail(srvId);
+      const _rateEl = bd.querySelector('.srv-food-rate');
+      if(_rateEl){
+        const _fcB = (typeof FOOD_COST_BASE !== 'undefined' ? FOOD_COST_BASE[srv.foodPolicy] : 0) || 0;
+        const _fcM = (typeof RARITY_FOOD_MULT !== 'undefined' ? RARITY_FOOD_MULT[srv.rarity] : 1) || 1;
+        const _fcC = Math.round(_fcB * _fcM * 10) / 10;
+        _rateEl.textContent = '🍲 -' + _fcC + '/hr';
+        _rateEl.style.color = '#e05252';
+        _rateEl.style.fontWeight = 'bold';
+      }
     };
   }
 }
@@ -2806,131 +2614,6 @@ function openConfirm(msg, onOk, onCancel){
   document.body.appendChild(el);
   el.querySelector('#cf-ok').onclick = function(){ el.remove(); if(onOk) onOk(); };
   el.querySelector('#cf-cancel').onclick = function(){ el.remove(); if(onCancel) onCancel(); };
-}
-function openServantAssign(srvId){
-  const srv = (state.servants || []).find(function(s){ return s.id === srvId; });
-  if(!srv) return;
-  const def = SERVANT_TYPES[srv.type];
-  if(!def) return;
-  const maxSlots = servantSlots(srv.rarity, srv.type);
-  const selected = {};
-  for(const i of (srv.assignedPlots || [])) selected[i] = true;
-
-  function countSelected(){
-    let n = 0;
-    for(const k in selected) if(selected[k]) n++;
-    return n;
-  }
-  function renderGridHtml(){
-    const plots = _gardenGetPlots();
-    let html = '<div class="srv-sa-info">已選 <span id="srv-sel-cnt">' + countSelected() + '</span> / ' + maxSlots + ' 格</div>';
-    html += '<div class="srv-sa-grid">';
-    for(let i = 0; i < 20; i++){
-      const plot = plots[i];
-      let cls = 'srv-sa-cell';
-      let inner = '';
-      let disabled = false;
-      if(!plot || !plot.type){
-        cls += ' empty';
-        inner = '<div class="srv-sa-icon">＋</div>';
-        disabled = true;
-      } else if(plot.type !== def.targetPlot){
-        cls += ' mismatch';
-        const t = GARDEN_PLOT_TYPES[plot.type] || {icon:'?'};
-        inner = '<div class="srv-sa-icon">' + t.icon + '</div>';
-        disabled = true;
-      } else {
-        const t = GARDEN_PLOT_TYPES[plot.type];
-        const owner = plot.assignedServant;
-        if(selected[i]) cls += ' selected';
-        if(owner && owner !== srvId) cls += ' occupied';
-        inner = '<div class="srv-sa-icon">' + t.icon + '</div>';
-        if(owner && owner !== srvId){
-          const otherSrv = (state.servants || []).find(function(s){ return s.id === owner; });
-          if(otherSrv){
-            const oDef = SERVANT_TYPES[otherSrv.type] || {};
-            inner += '<div class="srv-sa-owner">' + (oDef.icon || '?') + '</div>';
-          }
-        }
-      }
-      html += '<div class="' + cls + '" data-idx="' + i + '"' + (disabled ? ' data-disabled="1"' : '') + '>' + inner + '</div>';
-    }
-    html += '</div>';
-    return html;
-  }
-
-  const ft = document.createElement('div');
-  ft.className = 'modal-ft';
-  ft.innerHTML = '<button class="btn primary" id="srv-assign-ok">確定</button><button class="btn ghost" id="srv-assign-cancel">取消</button>';
-  const bd = openModal({ title: '指派 ' + def.name, body: renderGridHtml(), footer: ft });
-
-  function bindCells(){
-    const cells = bd.querySelectorAll('.srv-sa-cell');
-    for(let i = 0; i < cells.length; i++){
-      (function(el){
-        el.onclick = function(){
-          if(el.getAttribute('data-disabled') === '1') return;
-          const idx = parseInt(el.getAttribute('data-idx'), 10);
-          const plots = _gardenGetPlots();
-          const plot = plots[idx];
-          if(!plot) return;
-          if(selected[idx]){
-            delete selected[idx];
-            refresh();
-            return;
-          }
-          if(countSelected() >= maxSlots){
-            notify('已達上限 ' + maxSlots + ' 格', 'error');
-            return;
-          }
-          const owner = plot.assignedServant;
-          if(owner && owner !== srvId){
-            openConfirm('此格已被其他僕人指派，是否取代？', function(){
-              selected[idx] = true;
-              refresh();
-            });
-            return;
-          }
-          selected[idx] = true;
-          refresh();
-        };
-      })(cells[i]);
-    }
-  }
-  function refresh(){
-    bd.innerHTML = renderGridHtml();
-    bindCells();
-  }
-  bindCells();
-
-  ft.querySelector('#srv-assign-cancel').onclick = closeModal;
-  ft.querySelector('#srv-assign-ok').onclick = function(){
-    const plots = _gardenGetPlots();
-    const newList = [];
-    for(const k in selected) if(selected[k]) newList.push(parseInt(k, 10));
-    for(const other of (state.servants || [])){
-      if(other.id === srvId) continue;
-      if(!Array.isArray(other.assignedPlots)) continue;
-      other.assignedPlots = other.assignedPlots.filter(function(x){ return newList.indexOf(x) === -1; });
-    }
-    const oldList = srv.assignedPlots || [];
-    for(const oldIdx of oldList){
-      if(newList.indexOf(oldIdx) === -1){
-        const p = plots[oldIdx];
-        if(p && p.assignedServant === srvId) delete p.assignedServant;
-      }
-    }
-    for(const newIdx of newList){
-      if(plots[newIdx]) plots[newIdx].assignedServant = srvId;
-    }
-    srv.assignedPlots = newList;
-    save();
-    closeModal();
-    notify(def.name + ' 已指派至 ' + newList.length + ' 格', 'ok');
-    renderGardenGrid();
-    _gardenSyncActors();
-    _gardenRenderActors(Date.now());
-  };
 }
 
 /* ===== rev155: 僕人任務系統（體力 + 叫醒） ===== */
@@ -2972,11 +2655,11 @@ function servantLevelEffectText(srv){
   }
   if(srv.type === 'foreman'){
     const pct = Math.round(lv * 10);
-    return '加速農民 +' + pct + '%';
+    return '叫醒效率 +' + pct + '%';
   }
   if(srv.type === 'guard'){
     const pct = Math.round((lv - 1) * 5);
-    return '命中 +' + pct + '%（防禦戰開發中）';
+    return '命中 +' + pct + '%';
   }
   return '—';
 }
@@ -3029,7 +2712,6 @@ function _gardenSyncActors(){
     _gardenActors.push({
       id: s.id,
       type: s.type,
-      icon: (SERVANT_TYPES[s.type] || {}).icon || '?',
       assignedPlots: (s.assignedPlots || []).slice(),
       x: 0, y: 0,
       task: null,
@@ -3091,7 +2773,8 @@ function _gardenFarmerFindTask(a, srv){
       return { type: 'cleanup', plotIdx: idx };
     }
   }
-  // 次：收穫
+  // 次：收穫（按剩餘腐爛時間升序）
+  const _harvestCands = [];
   for(const idx of a.assignedPlots){
     const plot = plots[idx];
     if(!plot || plot.type !== 'soil' || !plot.crop) continue;
@@ -3101,7 +2784,11 @@ function _gardenFarmerFindTask(a, srv){
     if(now < c.matureAt) continue;
     const rottenAt = c.matureAt + seed.rotMs;
     if(now >= rottenAt) continue;
-    return { type: 'harvest', plotIdx: idx };
+    _harvestCands.push({ idx: idx, rottenAt: rottenAt });
+  }
+  _harvestCands.sort(function(x, y){ return x.rottenAt - y.rottenAt; });
+  if(_harvestCands.length){
+    return { type: 'harvest', plotIdx: _harvestCands[0].idx };
   }
   const autoPlant = srv.autoPlant || 'off';
   if(autoPlant !== 'off'){
@@ -3154,7 +2841,8 @@ function _gardenActorAssignTask(a, task, grid, wrapRect, now){
     arriveAt: now + walkMs,
     workMs: workMs,
     workUntil: 0,
-    startedAt: 0
+    startedAt: 0,
+    createdAt: now
   };
   a.state = 'walk';
   return true;
@@ -3182,12 +2870,12 @@ function _gardenActorExecuteTask(a){
     gardenStorageAdd(seed.cropId, c.rarity, count);
     plot.crop = null;
     const cropDef = CROPS[seed.cropId];
-    notify('僕人收穫：' + (cropDef ? cropDef.name : '作物') + ' ×' + count, 'ok');
+    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 收穫 <span class="r-' + c.rarity + '">' + (cropDef ? cropDef.name : '作物') + '×' + count + '</span>', 'harvest');
     servantAddExp(srv, 5);
   } else if(a.task.type === 'cleanup'){
     if(!plot.crop) return;
     plot.crop = null;
-    notify('農民完成清理', 'ok');
+    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 清理腐爛作物', 'clean');
     servantAddExp(srv, 3);
   } else if(a.task.type === 'plant'){
     if(plot.crop) return;
@@ -3201,7 +2889,7 @@ function _gardenActorExecuteTask(a){
     plot.crop = { seedId: seedId, rarity: rarity, plantedAt: now, matureAt: now + seed.growMs, cleanupUntil: 0 };
     plot.lastSeed = seedId;
     plot.lastRarity = rarity;
-    notify('僕人種植：' + seed.name, 'ok');
+    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 種植 <span class="r-' + rarity + '">' + seed.name + '</span>', 'plant');
     servantAddExp(srv, 2);
   }
   srv.stamina = Math.max(0, (srv.stamina || 0) - GARDEN_STAMINA_PER_WORK);
@@ -3209,7 +2897,7 @@ function _gardenActorExecuteTask(a){
     srv.stamina = 0;
     srv.resting = false;
     const def = SERVANT_TYPES[srv.type] || {name:'僕人'};
-    notify(def.name + ' 體力耗盡，正在偷懶', 'error');
+    _gardenLog(def.name + ' 體力耗盡', 'tired');
   }
   save();
   renderGardenGrid();
@@ -3267,7 +2955,8 @@ function _gardenActorTick(){
         arriveAt: now + walkMs,
         workMs: 1000,
         workUntil: 0,
-        startedAt: 0
+        startedAt: 0,
+        createdAt: now
       };
       a.state = 'walk';
     }
@@ -3360,6 +3049,18 @@ function _gardenActorTick(){
     }
 
     if(a.stamina <= 0){
+      if(a.type === 'foreman' && a.assignedPlots && a.assignedPlots.length){
+        const _shedIdx = a.assignedPlots[0];
+        const _shedEl = grid.querySelector('.gp-plot[data-idx="' + _shedIdx + '"]');
+        if(_shedEl){
+          const _sr = _shedEl.getBoundingClientRect();
+          a.tx = _sr.left - wrapRect.left + _sr.width / 2;
+          a.ty = _sr.top - wrapRect.top + _sr.height - 4;
+          a.state = 'rest';
+          a.task = null;
+          continue;
+        }
+      }
       if(!a.restPos){
         const gridRect = grid.getBoundingClientRect();
         a.restPos = { x: Math.max(6, gridRect.left - wrapRect.left - 18), y: gridRect.top - wrapRect.top + 30 + Math.random() * Math.max(10, gridRect.height - 60) };
@@ -3372,6 +3073,12 @@ function _gardenActorTick(){
     if(a.stamina > 0 && a.restPos){ a.restPos = null; }
 
     if(a.task){
+      if(a.task.createdAt && now - a.task.createdAt > 300000){
+        a.task = null;
+        a.state = 'idle';
+        a.idleUntil = now + 500;
+        continue;
+      }
       if(a.task.phase === 'walk'){
         if(now >= a.task.arriveAt){
           a.task.phase = 'work';
@@ -3391,8 +3098,9 @@ function _gardenActorTick(){
                 const _eff = servantEffectiveMaxStamina(tsrv);
                 if(_eff >= 1){
                   tsrv.stamina = Math.max(1, Math.round(_eff * GARDEN_WAKEUP_RECOVER));
-                  const def = SERVANT_TYPES[tsrv.type] || {name:'僕人'};
-                  notify(def.name + ' 被監工叫醒', 'ok');
+                  if(a._srv) a._srv.stamina = Math.max(0, (a._srv.stamina || 0) - 20);
+                  if(a._srv) a._srv.stamina = Math.max(0, (a._srv.stamina || 0) - 20);
+                  _gardenLog('<span class="r-' + tsrv.rarity + '">' + servantLabel(tsrv) + '</span> 被監工叫醒', 'work');
                   save();
                 }
               }
@@ -3441,6 +3149,25 @@ function _gardenActorTick(){
       }
     }
 
+    if(a.type === 'foreman'){
+      const _fp = _gardenGetFarmerPlots();
+      if(_fp.length){
+        const _pick = _fp[Math.floor(Math.random() * _fp.length)];
+        const _pEl = grid.querySelector('.gp-plot[data-idx="' + _pick + '"]');
+        if(_pEl){
+          const _pr = _pEl.getBoundingClientRect();
+          a.tx = _pr.left - wrapRect.left + _pr.width / 2 + (Math.random() - 0.5) * 12;
+          a.ty = _pr.top - wrapRect.top + _pr.height - 2 + (Math.random() - 0.5) * 10;
+          const _d = Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2));
+          if(_d < 4){ a.idleUntil = now + 6000 + Math.random() * 6000; continue; }
+          const _wm = Math.max(900, Math.min(2600, _d * 4));
+          a.walkMs = _wm;
+          a.state = 'walk';
+          a.idleUntil = now + _wm + 6000 + Math.random() * 6000;
+          continue;
+        }
+      }
+    }
     const idleIdx = a.assignedPlots[Math.floor(Math.random() * a.assignedPlots.length)];
     const plotEl = grid.querySelector('.gp-plot[data-idx="' + idleIdx + '"]');
     if(plotEl){
@@ -3457,58 +3184,7 @@ function _gardenActorTick(){
   }
 }
 
-function _gardenGetActorCanvas(){
-  const p = document.getElementById('garden-page');
-  if(!p) return null;
-  const wrap = p.querySelector('.gp-grid-wrap');
-  if(!wrap) return null;
-  const oldLayer = wrap.querySelector('#gp-actor-layer');
-  if(oldLayer) oldLayer.remove();
-  let canvas = wrap.querySelector('#gp-actor-canvas');
-  if(!canvas){
-    canvas = document.createElement('canvas');
-    canvas.id = 'gp-actor-canvas';
-    canvas.className = 'gp-actor-canvas';
-    wrap.appendChild(canvas);
-  }
-  return canvas;
-}
 
-
-function _gardenGetActorCanvas(){
-  const p = document.getElementById('garden-page');
-  if(!p) return null;
-  const wrap = p.querySelector('.gp-grid-wrap');
-  if(!wrap) return null;
-  const oldLayer = wrap.querySelector('#gp-actor-layer');
-  if(oldLayer) oldLayer.remove();
-  let canvas = wrap.querySelector('#gp-actor-canvas');
-  if(!canvas){
-    canvas = document.createElement('canvas');
-    canvas.id = 'gp-actor-canvas';
-    canvas.className = 'gp-actor-canvas';
-    wrap.appendChild(canvas);
-  }
-  return canvas;
-}
-
-
-function _gardenGetActorCanvas(){
-  const p = document.getElementById('garden-page');
-  if(!p) return null;
-  const wrap = p.querySelector('.gp-grid-wrap');
-  if(!wrap) return null;
-  const oldLayer = wrap.querySelector('#gp-actor-layer');
-  if(oldLayer) oldLayer.remove();
-  let canvas = wrap.querySelector('#gp-actor-canvas');
-  if(!canvas){
-    canvas = document.createElement('canvas');
-    canvas.id = 'gp-actor-canvas';
-    canvas.className = 'gp-actor-canvas';
-    wrap.appendChild(canvas);
-  }
-  return canvas;
-}
 
 let _gardenActorCanvasRAF = null;
 
@@ -3603,7 +3279,21 @@ function _gardenRenderActors(now){
       }
     }
     const wpSlot = equipped.primary ? 'primary' : (equipped.secondary ? 'secondary' : null);
-    _raidDrawHuman(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type);
+    _raidDrawHuman(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, (a.tx - a.x) < -0.5);
+    if(a._srv){
+      const _lbl = servantLabel(a._srv);
+      ctx.save();
+      ctx.font = 'bold 9px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      const _tw = ctx.measureText(_lbl).width;
+      const _by = a.y - CHAR_PX - 14;
+      ctx.fillStyle = 'rgba(0,0,0,0.72)';
+      ctx.fillRect(a.x - _tw/2 - 3, _by - 11, _tw + 6, 12);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(_lbl, a.x, _by);
+      ctx.restore();
+    }
     ctx.restore();
     if(a.state === 'lazy' || a.state === 'rest'){
       ctx.save();
@@ -3616,63 +3306,6 @@ function _gardenRenderActors(now){
       ctx.fillText('💤', a.x + CHAR_PX * 0.40, a.y - CHAR_PX * 1.15);
       ctx.restore();
     }
-  }
-}
-
-function _gardenStartActorCanvasLoop(){
-  if(_gardenActorCanvasRAF) return;
-  const tick = function(){
-    const p = document.getElementById('garden-page');
-    if(!p || !p.classList.contains('on')){ _gardenActorCanvasRAF = null; return; }
-    _gardenRenderActors(Date.now());
-    _gardenActorCanvasRAF = requestAnimationFrame(tick);
-  };
-  _gardenActorCanvasRAF = requestAnimationFrame(tick);
-}
-
-function _gardenStopActorCanvasLoop(){
-  if(_gardenActorCanvasRAF){ cancelAnimationFrame(_gardenActorCanvasRAF); _gardenActorCanvasRAF = null; }
-}
-
-function _gardenStartActorCanvasLoop(){
-  if(_gardenActorCanvasRAF) return;
-  const tick = function(){
-    const p = document.getElementById('garden-page');
-    if(!p || !p.classList.contains('on')){
-      _gardenActorCanvasRAF = null;
-      return;
-    }
-    _gardenRenderActors(Date.now());
-    _gardenActorCanvasRAF = requestAnimationFrame(tick);
-  };
-  _gardenActorCanvasRAF = requestAnimationFrame(tick);
-}
-
-function _gardenStopActorCanvasLoop(){
-  if(_gardenActorCanvasRAF){
-    cancelAnimationFrame(_gardenActorCanvasRAF);
-    _gardenActorCanvasRAF = null;
-  }
-}
-
-function _gardenStartActorCanvasLoop(){
-  if(_gardenActorCanvasRAF) return;
-  const tick = function(){
-    const p = document.getElementById('garden-page');
-    if(!p || !p.classList.contains('on')){
-      _gardenActorCanvasRAF = null;
-      return;
-    }
-    _gardenRenderActors(Date.now());
-    _gardenActorCanvasRAF = requestAnimationFrame(tick);
-  };
-  _gardenActorCanvasRAF = requestAnimationFrame(tick);
-}
-
-function _gardenStopActorCanvasLoop(){
-  if(_gardenActorCanvasRAF){
-    cancelAnimationFrame(_gardenActorCanvasRAF);
-    _gardenActorCanvasRAF = null;
   }
 }
 
@@ -3991,7 +3624,7 @@ function renderBaseStats(){
   }
   const g = _gardenMerchantInit();
   const m = g.merchant;
-  const FOOD_COST = { full:4, normal:3, half:2, lick:1, starve:0 };
+  const FOOD_COST = { full:3, normal:2, half:1, lick:0.5, starve:0 };
   let consumePerHour = 0;
   for(const s of (state.servants || [])){
     if(!s.assignedPlots || !s.assignedPlots.length) continue;
@@ -4089,7 +3722,7 @@ function _openMerchantLineDetail(lineKey){
   body += '<div class="stat-line"><span class="k">消耗</span><span class="v" style="color:#e05252">' + _gardenMerchantCostStr(cfg, lineKey) + '</span></div>';
   body += '<div class="stat-line"><span class="k">產出</span><span class="v" style="color:#4caf50">' + _gardenMerchantProduceStr(cfg, lineKey) + '</span></div>';
   if(lineKey === 'food'){
-    body += '<div class="stat-line"><span class="k">預付</span><span class="v">🌾' + (m.foodPool || 0) + '</span></div>';
+    body += '<div class="stat-line"><span class="k">預付</span><span class="v">🍲' + (m.foodPool || 0) + '</span></div>';
   }
   body += '<div class="divider"></div>';
   if(st && st.paused){
@@ -4814,18 +4447,18 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
         } else if(plot.type !== def.targetPlot){
           cls += ' mismatch';
           const t = GARDEN_PLOT_TYPES[plot.type] || {icon:'?'};
-          inner = '<div class="srv-sa-icon">' + t.icon + '</div>'; disabled = true;
+          inner = '<div class="srv-sa-icon">' + ((plot.type === 'soil') ? '🌱' : t.icon) + '</div>'; disabled = true;
         } else {
           const t = GARDEN_PLOT_TYPES[plot.type];
           const owner = plot.assignedServant;
           if(selected[i]) cls += ' selected';
           if(owner && owner !== srvId) cls += ' occupied';
-          inner = '<div class="srv-sa-icon">' + t.icon + '</div>';
+          inner = '<div class="srv-sa-icon">' + ((plot.type === 'soil') ? '🌱' : t.icon) + '</div>';
           if(owner && owner !== srvId){
             const otherSrv = (state.servants || []).find(function(s){ return s.id === owner; });
             if(otherSrv){
               const oDef = SERVANT_TYPES[otherSrv.type] || {};
-              inner += '<div class="srv-sa-owner">' + (oDef.icon || '?') + '</div>';
+              inner += '<div class="srv-sa-owner">' + servantLabel(otherSrv) + '</div>';
             }
           }
         }
@@ -4870,7 +4503,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
             const idx = parseInt(el.getAttribute('data-idx'), 10);
             const plot = plots[idx];
             if(!plot) return;
-            if(selected[idx]){ delete selected[idx]; refresh(); return; }
+            if(selected[idx]){ delete selected[idx]; applyAndSave(); refresh(); return; }
             if(countSel() >= maxSlots){ notify('已達上限 ' + maxSlots + ' 格', 'error'); return; }
             const owner = plot.assignedServant;
             if(owner && owner !== srvId){
@@ -4911,3 +4544,542 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
   console.log('[rev255] 收获 / 指派立即 / 重排 / 进度实时 已安装');
 })();
 /* ===== end rev255 ===== */
+
+/* ===== rev256: 後院系統整合 ===== */
+function _gardenLog(text, cls, rarity, detail){
+  if(!state.garden || typeof state.garden !== 'object') state.garden = {};
+  if(!Array.isArray(state.garden.log)) state.garden.log = [];
+  state.garden.log.push({ t: Date.now(), text: String(text), cls: cls || '', rarity: rarity || '', detail: detail || null });
+  if(state.garden.log.length > 100) state.garden.log.splice(0, state.garden.log.length - 100);
+}
+
+const SERVANT_LEAVE_GRACE = {
+  '破舊': 12 * 3600 * 1000,
+  '一般': 24 * 3600 * 1000,
+  '庫存': 36 * 3600 * 1000,
+  '精品': 72 * 3600 * 1000,
+  '傳奇': 7 * 24 * 3600 * 1000
+};
+const SERVANT_LEAVE_REWARD = {
+  '破舊': { seedMin: 0, seedMax: 1, matMin: 1, matMax: 2 },
+  '一般': { seedMin: 1, seedMax: 1, matMin: 2, matMax: 3 },
+  '庫存': { seedMin: 1, seedMax: 2, matMin: 3, matMax: 4 },
+  '精品': { seedMin: 2, seedMax: 3, matMin: 4, matMax: 6 },
+  '傳奇': { seedMin: 3, seedMax: 5, matMin: 6, matMax: 10 }
+};
+const GARDEN_MEAL_INTERVAL_MS = 3600000;
+const FOOD_COST_BASE = { full: 20, normal: 15, half: 10, lick: 5, starve: 0 };
+const RARITY_FOOD_MULT = { '破舊': 0.8, '一般': 1, '庫存': 1.5, '精品': 2.5, '傳奇': 5 };
+
+function _gardenServantLeaveCheck(silent){
+  const now = Date.now();
+  const leaving = [];
+  state.servants = (state.servants || []).filter(function(s){
+    if(s.lv > 1) return true;
+    if((s.exp || 0) > 0) return true;
+    if(s.assignedPlots && s.assignedPlots.length > 0) return true;
+    const grace = SERVANT_LEAVE_GRACE[s.rarity] || 24 * 3600 * 1000;
+    const obtained = s.obtainedAt || now;
+    if(now - obtained < grace) return true;
+    leaving.push(s);
+    return false;
+  });
+  const seedReward = {}, matReward = {};
+  if(!leaving.length) return { count: 0, seeds: seedReward, mats: matReward };
+  const seedNames = Object.keys(SEEDS);
+  const matNames = ['wood','metal','screws','cloth','gears','electronics'];
+  for(const s of leaving){
+    const r = SERVANT_LEAVE_REWARD[s.rarity] || SERVANT_LEAVE_REWARD['一般'];
+    const sc = rndInt(r.seedMin, r.seedMax);
+    for(let i = 0; i < sc; i++){
+      const sid = pick(seedNames);
+      gardenStorageAdd(sid, s.rarity, 1);
+      const k = sid + '@' + s.rarity;
+      seedReward[k] = (seedReward[k] || 0) + 1;
+    }
+    const mc = rndInt(r.matMin, r.matMax);
+    for(let i = 0; i < mc; i++){
+      const mid = pick(matNames);
+      invAdd(mid, '一般', 1);
+      matReward[mid] = (matReward[mid] || 0) + 1;
+    }
+  }
+  if(!silent){
+    _gardenLog(leaving.length + ' 僕人離開', 'leave');
+  }
+  return { count: leaving.length, seeds: seedReward, mats: matReward };
+}
+
+function _gardenMealTick(now){
+  const g = _gardenMerchantInit();
+  if(typeof g.lastMealAt !== 'number'){
+    g.lastMealAt = Math.floor(now / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
+    return false;
+  }
+  const curHour = Math.floor(now / GARDEN_MEAL_INTERVAL_MS);
+  const lastHour = Math.floor(g.lastMealAt / GARDEN_MEAL_INTERVAL_MS);
+  if(curHour <= lastHour) return false;
+  const meals = Math.min(curHour - lastHour, 24);
+  let changed = false;
+  for(let m = 0; m < meals; m++){
+    if(_gardenDoOneMeal(g)) changed = true;
+  }
+  g.lastMealAt = curHour * GARDEN_MEAL_INTERVAL_MS;
+  return changed;
+}
+
+function _gardenDoOneMeal(g){
+  const servants = (state.servants || []).filter(function(s){
+    return s.assignedPlots && s.assignedPlots.length > 0;
+  });
+  if(!servants.length) return false;
+  let totalCost = 0;
+  const costs = [];
+  for(const s of servants){
+    const policy = s.foodPolicy || 'normal';
+    const base = FOOD_COST_BASE[policy] || 0;
+    if(base === 0){ costs.push(0); continue; }
+    const mult = RARITY_FOOD_MULT[s.rarity] || 1;
+    const c = Math.round(base * mult * 10) / 10;
+    costs.push(c);
+    totalCost += c;
+  }
+  if(totalCost > 0 && g.food + 0.001 < totalCost) return false;
+  let changed = false;
+  for(let i = 0; i < servants.length; i++){
+    const s = servants[i];
+    const cost = costs[i];
+    const effMax = servantEffectiveMaxStamina(s);
+    if(cost === 0){
+      if(s.stamina !== 0){ s.stamina = 0; changed = true; }
+      s._starve = false;
+      continue;
+    }
+    g.food -= cost;
+    if(s.stamina !== effMax){ s.stamina = effMax; changed = true; }
+    s._starve = false;
+    changed = true;
+  }
+  return changed;
+}
+
+function _offlineFindFarmerTask(srv, t){
+  const plots = _gardenGetPlots();
+  const cleanCands = [];
+  for(const idx of (srv.assignedPlots || [])){
+    const plot = plots[idx];
+    if(!plot || plot.type !== 'soil' || !plot.crop) continue;
+    const c = plot.crop;
+    const seed = SEEDS[c.seedId];
+    if(!seed) continue;
+    const rottenAt = c.matureAt + seed.rotMs;
+    if(t >= rottenAt) cleanCands.push(idx);
+  }
+  if(cleanCands.length) return { type: 'cleanup', plotIdx: cleanCands[0] };
+  const harvestCands = [];
+  for(const idx of (srv.assignedPlots || [])){
+    const plot = plots[idx];
+    if(!plot || plot.type !== 'soil' || !plot.crop) continue;
+    const c = plot.crop;
+    const seed = SEEDS[c.seedId];
+    if(!seed) continue;
+    if(t < c.matureAt) continue;
+    const rottenAt = c.matureAt + seed.rotMs;
+    if(t >= rottenAt) continue;
+    harvestCands.push({ idx: idx, rottenAt: rottenAt });
+  }
+  harvestCands.sort(function(a, b){ return a.rottenAt - b.rottenAt; });
+  if(harvestCands.length) return { type: 'harvest', plotIdx: harvestCands[0].idx };
+  const autoPlant = srv.autoPlant || 'off';
+  if(autoPlant !== 'off'){
+    for(const idx of (srv.assignedPlots || [])){
+      const plot = plots[idx];
+      if(!plot || plot.type !== 'soil') continue;
+      if(plot.crop) continue;
+      if(autoPlant === 'follow' && plot.lastSeed && plot.lastRarity && SEEDS[plot.lastSeed]){
+        if(gardenStorageCount(plot.lastSeed, plot.lastRarity) > 0){
+          return { type: 'plant', plotIdx: idx, seedId: plot.lastSeed, rarity: plot.lastRarity };
+        }
+      } else if(autoPlant === 'any'){
+        const seedInfo = _gardenFindSeedToPlant('any');
+        if(seedInfo){
+          return { type: 'plant', plotIdx: idx, seedId: seedInfo.id, rarity: seedInfo.rarity };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function _offlineDoFarmerTask(srv, task, t){
+  const plots = _gardenGetPlots();
+  const plot = plots[task.plotIdx];
+  if(!plot) return { ok: false };
+  if(task.type === 'cleanup'){
+    if(!plot.crop) return { ok: false };
+    plot.crop = null;
+    return { ok: true, clean: true };
+  }
+  if(task.type === 'harvest'){
+    if(!plot.crop) return { ok: false };
+    const c = plot.crop;
+    const seed = SEEDS[c.seedId];
+    if(!seed) return { ok: false };
+    if(t < c.matureAt) return { ok: false };
+    const rottenAt = c.matureAt + seed.rotMs;
+    if(t >= rottenAt) return { ok: false };
+    const mult = RARITY_MULT[c.rarity] || 1;
+    const _fB = 1 + ((srv.lv || 1) - 1) * 0.05;
+    const _foB = 1 + gardenGetForemanBonus();
+    const count = Math.max(1, Math.round(seed.baseYield * mult * _fB * _foB));
+    gardenStorageAdd(seed.cropId, c.rarity, count);
+    plot.crop = null;
+    servantAddExp(srv, 5);
+    return { ok: true, harvest: true };
+  }
+  if(task.type === 'plant'){
+    if(plot.crop) return { ok: false };
+    if(!gardenStorageRemove(task.seedId, task.rarity, 1)) return { ok: false };
+    const seed = SEEDS[task.seedId];
+    if(!seed) return { ok: false };
+    let growMs = seed.growMs;
+    if(state.garden && typeof state.garden.compostAccelSec === 'number' && state.garden.compostAccelSec > 0){
+      const maxUse = Math.min(state.garden.compostAccelSec, (growMs / 1000) * 0.5);
+      if(maxUse > 0){
+        growMs = Math.max(1000, Math.round(growMs - maxUse * 1000));
+        state.garden.compostAccelSec -= maxUse;
+      }
+    }
+    plot.crop = { seedId: task.seedId, rarity: task.rarity, plantedAt: t, matureAt: t + growMs, cleanupUntil: 0 };
+    plot.lastSeed = task.seedId;
+    plot.lastRarity = task.rarity;
+    servantAddExp(srv, 2);
+    return { ok: true, plant: true };
+  }
+  return { ok: false };
+}
+
+function _gardenOfflineSettle(now, baseTime){
+  const g = _gardenMerchantInit();
+  const baseHour = Math.floor(baseTime / GARDEN_MEAL_INTERVAL_MS);
+  const nowHour = Math.floor(now / GARDEN_MEAL_INTERVAL_MS);
+  const hours = Math.min(Math.max(0, nowHour - baseHour), 24);
+  if(hours <= 0) return;
+  let totalHarvest = 0, totalPlant = 0, totalClean = 0, totalLeaves = 0;
+  const seedRewardOut = {};
+  const matRewardOut = {};
+  for(let h = 1; h <= hours; h++){
+    const t = (baseHour + h) * GARDEN_MEAL_INTERVAL_MS;
+    _gardenDoOneMeal(g);
+    const farmers = (state.servants || []).filter(function(s){
+      return s.type === 'farmer' && s.assignedPlots && s.assignedPlots.length > 0;
+    });
+    for(const srv of farmers){
+      const effMax = servantEffectiveMaxStamina(srv);
+      if((srv.stamina || 0) < 10){
+        const foremen = (state.servants || []).filter(function(f){
+          return f.type === 'foreman' && f.assignedPlots && f.assignedPlots.length > 0 && (f.stamina || 0) >= 20;
+        });
+        if(foremen.length){
+          foremen[0].stamina = Math.max(0, (foremen[0].stamina || 0) - 20);
+          srv.stamina = effMax * 0.3;
+        }
+      }
+      let stam = Math.min(srv.stamina || 0, effMax);
+      srv.stamina = stam;
+      let tasks = Math.floor(stam / 5);
+      while(tasks > 0 && srv.stamina >= 5){
+        const task = _offlineFindFarmerTask(srv, t);
+        if(!task) break;
+        const r = _offlineDoFarmerTask(srv, task, t);
+        if(!r.ok) break;
+        if(r.harvest) totalHarvest++;
+        if(r.plant) totalPlant++;
+        if(r.clean) totalClean++;
+        srv.stamina -= 5;
+        tasks--;
+      }
+    }
+    const lr = _gardenServantLeaveCheck(true);
+    totalLeaves += lr.count || 0;
+    for(const k in lr.seeds) seedRewardOut[k] = (seedRewardOut[k] || 0) + lr.seeds[k];
+    for(const k in lr.mats) matRewardOut[k] = (matRewardOut[k] || 0) + lr.mats[k];
+  }
+  g.lastMealAt = nowHour * GARDEN_MEAL_INTERVAL_MS;
+  if(totalHarvest + totalPlant + totalClean + totalLeaves > 0){
+    const _detail = {
+      type: 'offline_garden',
+      hours: hours,
+      harvest: totalHarvest,
+      plant: totalPlant,
+      clean: totalClean,
+      leaves: totalLeaves,
+      seeds: seedRewardOut,
+      mats: matRewardOut
+    };
+    _gardenLog('離線：收' + totalHarvest + ' 種' + totalPlant + ' 清' + totalClean, 'offline', '', _detail);
+  }
+}
+
+
+
+function gardenCleanup(idx){
+  const plots = _gardenGetPlots();
+  const plot = plots[idx];
+  if(!plot || !plot.crop) return;
+  plot.crop = null;
+  save();
+  try{ closeModal(); }catch(e){}
+  _gardenLog('手動清理腐爛作物（' + plotCoordName(idx) + '）', 'clean');
+  renderGardenGrid();
+  renderGardenContent();
+}
+
+function _clearPlotAssignments(idx){
+  for(const s of (state.servants || [])){
+    if(!Array.isArray(s.assignedPlots)) continue;
+    s.assignedPlots = s.assignedPlots.filter(function(x){ return x !== idx; });
+  }
+}
+/* ===== end rev256 ===== */
+
+/* ===== rev257: renderGardenLog 重寫 ===== */
+function _openGardenLogDetail(entry){
+  if(!entry || !entry.detail) return;
+  const d = entry.detail;
+  let body = '';
+  if(d.type === 'offline_garden'){
+    body += '<div class="detail-sub">時長：' + d.hours + ' 小時</div>';
+    body += '<div class="stat-line"><span class="k">收穫</span><span class="v">' + d.harvest + '</span></div>';
+    body += '<div class="stat-line"><span class="k">種植</span><span class="v">' + d.plant + '</span></div>';
+    body += '<div class="stat-line"><span class="k">清理</span><span class="v">' + d.clean + '</span></div>';
+    if(d.leaves) body += '<div class="stat-line"><span class="k">離開</span><span class="v">' + d.leaves + '</span></div>';
+    if(d.seeds && Object.keys(d.seeds).length){
+      body += '<div class="divider"></div><div style="font-size:11px;color:#e8a33d;margin-bottom:4px">獲得種子</div>';
+      for(const k in d.seeds){
+        const sp = k.split('@');
+        const def = SEEDS[sp[0]];
+        body += '<div class="stat-line"><span class="k ' + rarityClass(sp[1]) + '">' + (def ? def.name : sp[0]) + '</span><span class="v">×' + d.seeds[k] + '</span></div>';
+      }
+    }
+    if(d.mats && Object.keys(d.mats).length){
+      body += '<div class="divider"></div><div style="font-size:11px;color:#e8a33d;margin-bottom:4px">獲得材料</div>';
+      for(const mid in d.mats){
+        body += '<div class="stat-line"><span class="k">' + (MATERIALS[mid] ? MATERIALS[mid].name : mid) + '</span><span class="v">×' + d.mats[mid] + '</span></div>';
+      }
+    }
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn ghost" id="gl-close">關閉</button>';
+  openModal({ title: '📜 離線後院', body: body, footer: ft });
+  ft.querySelector('#gl-close').onclick = closeModal;
+}
+
+function _openBattleLogDetail(entry){
+  if(!entry) return;
+  const win = entry.win;
+  let body = '<div class="detail-title ' + (win?'r-傳奇':'r-破舊') + '">' + (win?'⚔️ 勝利':'💀 失敗') + '</div>';
+  body += '<div class="detail-sub">' + _esc(entry.region || '') + '</div>';
+  body += '<div class="stat-line"><span class="k">回合</span><span class="v">' + entry.rounds + '</span></div>';
+  body += '<div class="stat-line"><span class="k">守衛</span><span class="v">' + entry.guardAlive + ' / ' + entry.guardTotal + '</span></div>';
+  body += '<div class="stat-line"><span class="k">敵人</span><span class="v">' + entry.enemyCount + '</span></div>';
+  body += '<div class="stat-line"><span class="k">彈藥</span><span class="v">' + entry.ammoUsed + ' 發</span></div>';
+  body += '<div class="stat-line"><span class="k">總傷害</span><span class="v">' + entry.totalDmg + '</span></div>';
+  if(entry.guardAmmoList && entry.guardAmmoList.length){
+    body += '<div class="divider"></div><div style="font-size:11px;color:#e8a33d;margin-bottom:4px">守衛表現</div>';
+    for(const ga of entry.guardAmmoList){
+      body += '<div class="stat-line"><span class="k">' + _esc((ga.coord||'') + ' ' + ga.name) + '</span><span class="v">' + ga.ammoName + '×' + ga.count + ' 傷' + ga.dmg + '</span></div>';
+    }
+  }
+  if(!win && entry.broken && entry.broken.length){
+    body += '<div class="divider"></div><div style="color:#e05252;font-size:11px">損壞：' + entry.broken.join(' ') + '</div>';
+  }
+  if(!win && entry.stolen && entry.stolen.length){
+    body += '<div style="color:#e05252;font-size:11px">掠奪：' + _lootHtml(entry.stolen, '#e05252') + '</div>';
+  }
+  if(win && entry.loot && entry.loot.length){
+    body += '<div class="divider"></div><div style="color:#4caf50;font-size:11px">獲得：' + _lootHtml(entry.loot, '#4caf50') + '</div>';
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn ghost" id="bl-close">關閉</button>';
+  openModal({ title: '⚔️ 戰鬥詳情', body: body, footer: ft });
+  ft.querySelector('#bl-close').onclick = closeModal;
+}
+
+function _gardenUpdateBattleCol(){
+  const p = document.getElementById('garden-page');
+  if(!p) return;
+  if(typeof _gardenActiveTab === 'undefined' || _gardenActiveTab !== 'log') return;
+  const box = p.querySelector('#gp-content');
+  if(!box) return;
+  const _rw = box.querySelector('.gs-wrap[data-col="battle"]');
+  if(!_rw) return;
+  const live = window._raidLiveLog || [];
+  let html = '';
+  for(let i = 0; i < live.length; i++){
+    const e = live[i];
+    html += '<div class="raid-live-log-line ' + (e.cls || '') + '">' + _esc(e.text) + '</div>';
+  }
+  if(!html) html = '<div class="gs-empty" style="position:static;padding:20px 0">戰鬥開始…</div>';
+  _rw.innerHTML = html;
+  _rw.scrollTop = _rw.scrollHeight;
+}
+
+function renderGardenLog(box){
+  if(!box) return;
+  const log = (state.garden && state.garden.log) || [];
+  const battleLog = (state.garden && state.garden.battleLog) || [];
+  const liveActive = !!window._raidLiveActive;
+  const live = window._raidLiveLog || [];
+  function tsStr(t){
+    const d = new Date(t);
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function tsFull(t){
+    const d = new Date(t);
+    return ('0' + (d.getMonth()+1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  let left = '<div class="gs-title">🌱 生產</div>';
+  left += '<div class="gs-wrap" data-col="prod">';
+  if(!log.length){
+    left += '<div class="gs-empty" style="position:static;padding:20px 0">暫無記錄</div>';
+  } else {
+    for(let i = 0; i < log.length; i++){
+      const e = log[i];
+      const clickAttr = e.detail ? ' data-log-idx="' + i + '" style="cursor:pointer"' : '';
+      left += '<div class="garden-log-line ' + (e.cls||'') + '"' + clickAttr + '><span class="gl-time">' + tsStr(e.t) + '</span> ' + e.text + '</div>';
+    }
+  }
+  left += '</div>';
+  let right = '<div class="gs-title">⚔️ 戰鬥</div>';
+  right += '<div class="gs-wrap" data-col="battle">';
+  if(liveActive){
+    if(!live.length){
+      right += '<div class="gs-empty" style="position:static;padding:20px 0">戰鬥開始…</div>';
+    } else {
+      for(let i = 0; i < live.length; i++){
+        const e = live[i];
+        right += '<div class="raid-live-log-line ' + (e.cls||'') + '">' + _esc(e.text) + '</div>';
+      }
+    }
+  } else {
+    if(!battleLog.length){
+      right += '<div class="gs-empty" style="position:static;padding:20px 0">暫無戰鬥</div>';
+    } else {
+      for(let i = 0; i < battleLog.length; i++){
+        const e = battleLog[i];
+        const win = e.win;
+        right += '<div class="battle-log-item ' + (win?'win':'lose') + '" data-battle-idx="' + i + '" style="cursor:pointer">';
+        right += '<div class="bl-head"><span class="bl-title">' + (win?'⚔️勝':'💀敗') + ' ' + _esc(e.region||'') + '</span><span class="bl-time">' + tsFull(e.t) + '</span></div>';
+        right += '<div class="bl-row">' + e.rounds + '回 · 守' + e.guardAlive + '/' + e.guardTotal + ' · 敵' + e.enemyCount + ' · 彈' + e.ammoUsed + ' · 傷' + e.totalDmg + '</div>';
+        right += '</div>';
+      }
+    }
+  }
+  right += '</div>';
+  box.innerHTML = '<div class="gs-cols">' +
+    '<div class="gs-col" style="padding:0 6px;border-left:none">' + left + '</div>' +
+    '<div class="gs-col" style="padding:0 6px;border-left:1px solid #e8a33d">' + right + '</div>' +
+    '</div>';
+  const _lw = box.querySelector('.gs-wrap[data-col="prod"]');
+  if(_lw) _lw.scrollTop = _lw.scrollHeight;
+  const _rw = box.querySelector('.gs-wrap[data-col="battle"]');
+  if(_rw) _rw.scrollTop = _rw.scrollHeight;
+  const _logLines = box.querySelectorAll('.garden-log-line[data-log-idx]');
+  for(const el of _logLines){
+    el.onclick = function(){
+      const idx = parseInt(el.getAttribute('data-log-idx'), 10);
+      const entry = log[idx];
+      if(entry && entry.detail) _openGardenLogDetail(entry);
+    };
+  }
+  const _bl = box.querySelectorAll('.battle-log-item[data-battle-idx]');
+  for(const el of _bl){
+    el.onclick = function(){
+      const idx = parseInt(el.getAttribute('data-battle-idx'), 10);
+      const entry = battleLog[idx];
+      if(entry) _openBattleLogDetail(entry);
+    };
+  }
+}
+/* ===== end rev257 ===== */
+
+/* ===== rev259: 僕人編號 + 改名 ===== */
+function servantLabel(srv){
+  if(!srv) return '?';
+  if(srv.customName) return srv.customName;
+  return '#' + (srv.tag || '?');
+}
+
+function _truncateServantName(s){
+  if(!s) return '';
+  let n = 0;
+  let out = '';
+  for(const c of s){
+    const w = c.codePointAt(0) > 0x7F ? 2 : 1;
+    if(n + w > 8) break;
+    out += c;
+    n += w;
+  }
+  return out;
+}
+
+function _servantEscHtml(s){
+  if(s == null) return '';
+  return String(s).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;');
+}
+
+function openServantRename(srvId){
+  const srv = (state.servants || []).find(function(s){ return s.id === srvId; });
+  if(!srv) return;
+  const cur = srv.customName || '';
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn primary" id="rn-ok">確定</button><button class="btn" id="rn-clear">清除</button><button class="btn ghost" id="rn-cancel">取消</button>';
+  const _escaped = _servantEscHtml(cur);
+  let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:6px">留空則使用編號（#' + (srv.tag || '?') + '）</div>';
+  body += '<input id="rn-input" type="text" value="' + _escaped + '" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:8px;font-size:13px;font-family:inherit;box-sizing:border-box">';
+  const bd = openModal({ title: '✏️ 改名', body: body, footer: ft });
+  const inp = bd.querySelector('#rn-input');
+  if(inp){
+    setTimeout(function(){ inp.focus(); inp.select(); }, 100);
+    inp.oninput = function(){
+      const t = _truncateServantName(inp.value);
+      if(t !== inp.value) inp.value = t;
+    };
+  }
+  ft.querySelector('#rn-ok').onclick = function(){
+    const v = (inp.value || '').trim();
+    srv.customName = _truncateServantName(v);
+    save();
+    if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
+    closeModal();
+    openServantDetail(srvId);
+  };
+  ft.querySelector('#rn-clear').onclick = function(){
+    srv.customName = '';
+    save();
+    if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
+    closeModal();
+    openServantDetail(srvId);
+  };
+  ft.querySelector('#rn-cancel').onclick = closeModal;
+}
+/* ===== end rev259 ===== */
+
+/* ===== rev264: 監工巡邏 ===== */
+function _gardenGetFarmerPlots(){
+  const seen = {};
+  const out = [];
+  for(const s of (state.servants || [])){
+    if(s.type !== 'farmer') continue;
+    if(!s.assignedPlots || !s.assignedPlots.length) continue;
+    for(const idx of s.assignedPlots){
+      if(!seen[idx]){ seen[idx] = true; out.push(idx); }
+    }
+  }
+  return out;
+}
+/* ===== end rev264 ===== */

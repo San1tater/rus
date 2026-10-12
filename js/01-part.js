@@ -192,11 +192,11 @@ function calcConsumableHeal(item, medbayLv){
 }
 /* ===== rev130: 後院種子與作物 ===== */
 const SEEDS = {
-  seed_potato: { name:'馬鈴薯種子', cropId:'crop_potato', growMs:1200000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 },
-  seed_carrot: { name:'胡蘿蔔種子', cropId:'crop_carrot', growMs:2100000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 },
-  seed_cabbage:{ name:'捲心菜種子', cropId:'crop_cabbage',growMs:1500000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 },
-  seed_beet:   { name:'甜菜種子',   cropId:'crop_beet',   growMs:1800000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 },
-  seed_wheat:  { name:'小麥種子',   cropId:'crop_wheat',  growMs:2700000, baseYield:4, rotMs:1800000, autoCleanMs:600000, cleanupMs:900000 }
+  seed_potato: { name:'馬鈴薯種子', cropId:'crop_potato', growMs:1200000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 },
+  seed_carrot: { name:'胡蘿蔔種子', cropId:'crop_carrot', growMs:2100000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 },
+  seed_cabbage:{ name:'捲心菜種子', cropId:'crop_cabbage',growMs:1500000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 },
+  seed_beet:   { name:'甜菜種子',   cropId:'crop_beet',   growMs:1800000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 },
+  seed_wheat:  { name:'小麥種子',   cropId:'crop_wheat',  growMs:2700000, baseYield:4, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 }
 };
 const CROP_BASE_FOOD = {
   crop_potato: 2,
@@ -278,9 +278,9 @@ const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-
 
 /* ===== rev145: 僕人定義 ===== */
 const SERVANT_TYPES = {
-  farmer:  { name:'農民', icon:'👨‍🌾', targetPlot:'soil',  desc:'自動種植與收穫' },
-  guard:   { name:'守衛', icon:'🛡️',  targetPlot:'tower', desc:'自動防禦後院' },
-  foreman: { name:'監工', icon:'🔧', targetPlot:'shed',  desc:'加速其他僕人' }
+  farmer:  { name:'農民', targetPlot:'soil' },
+  guard:   { name:'守衛', targetPlot:'tower' },
+  foreman: { name:'監工', targetPlot:'shed' }
 };
 const SERVANT_RARITY_SLOTS = { '破舊':1, '一般':2, '庫存':4, '精品':6, '傳奇':10, '具名':10 };
 const SERVANT_MAX_LV = 50;
@@ -292,7 +292,7 @@ function servantMaxStamina(srv){
 }
 const FOOD_POLICY_MULT = {
   full: 1.2,
-  normal: 0.9,
+  normal: 0.7,
   half: 0.5,
   lick: 0.3,
   starve: 0.0
@@ -328,7 +328,7 @@ function servantEffectiveMaxStamina(srv){
   return Math.round(base * mult);
 }
 function servantDef(type){ return SERVANT_TYPES[type] || null; }
-function servantSlots(rarity, type){ if(type === 'guard') return 1; return SERVANT_RARITY_SLOTS[rarity] || 1; }
+function servantSlots(rarity, type){ if(type === 'guard' || type === 'foreman') return 1; return SERVANT_RARITY_SLOTS[rarity] || 1; }
 /* ===== end rev145 ===== */
 const ALL_ITEMS={};Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS);
 if(typeof SEEDS!=='undefined')Object.assign(ALL_ITEMS,SEEDS);
