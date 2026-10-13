@@ -438,7 +438,8 @@ function renderBattleScene(z1){
     renderBossBattleCanvas();
   });
   const bs=$('#boss-sprite');
-  if(bs)bs.onclick=(e)=>{
+  if(bs) _bindBattleTap(bs, function(e){
+
     const bossSprite = document.getElementById('boss-sprite');
     if(!bossSprite) return;
     const def = BOSS_LAYERS[battle.bossId];
@@ -468,7 +469,8 @@ function renderBattleScene(z1){
         setTimeout(()=>{ if(m.parentNode) m.remove(); }, 1000);
       }
     }
-  };
+  
+  });
 }
 function updateFighterPos(){
   if(!battle)return;
@@ -555,6 +557,21 @@ function refreshBattleControlsLive(){
   const ds=document.getElementById('battle-dmg-status');
   if(ds) ds.textContent=`對 Boss 傷害：${Math.round(battle.damageDealt)} ｜ ${battle.engaged?'⚔️ 已交戰':'⏸️ 準備中'}`;
 }
+/* rev271: 戰鬥按鈕 touchstart（避免搖桿 preventDefault 鎖死 click） */
+function _bindBattleTap(el, handler){
+  let _lastTouch = 0;
+  el.addEventListener("touchstart", function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    _lastTouch = Date.now();
+    handler(e);
+  }, {passive: false});
+  el.addEventListener("click", function(e){
+    if(Date.now() - _lastTouch < 500) return;
+    handler(e);
+  });
+}
+
 function renderBattleControls(z3){
   const w=battle.weapon;
   const wdef=w?w.def:null;
@@ -587,14 +604,18 @@ function renderBattleControls(z3){
       </div>
       <div class="ammo-info" id="battle-dmg-status" style="color:#7a6f60">對 Boss 傷害：${Math.round(battle.damageDealt)} ｜ ${battle.engaged?'⚔️ 已交戰':'⏸️ 準備中'}</div>
     </div>`;
-  $$('.fm-btn',z3).forEach(b=>{b.onclick=()=>{
-    /* rev108: 允許移動中換射擊模式 —— 不再重置搖桿 */
-    battle.fireMode=b.dataset.mode;
-    battle.fireHeld=false;
-    battle.burstLeft=0;
-    renderBattleControls(z3);
-  };});
-  $$('.weapon-slot-btn',z3).forEach(b=>{b.onclick=()=>switchBattleWeapon(b.dataset.slot);});
+  $$('.fm-btn',z3).forEach(b=>{
+    _bindBattleTap(b, function(){
+      if(!battle) return;
+      battle.fireMode = b.dataset.mode;
+      battle.fireHeld = false;
+      battle.burstLeft = 0;
+      renderBattleControls(document.getElementById('zone3'));
+    });
+  });
+  $('.weapon-slot-btn',z3).forEach(b=>{
+    _bindBattleTap(b, function(){ switchBattleWeapon(b.dataset.slot); });
+  });
   const fb=$('#fire-btn');
   if(fb){
     fb.addEventListener('touchstart',e=>{e.preventDefault();startPlayerFire();},{passive:false});

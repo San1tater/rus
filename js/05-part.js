@@ -1194,7 +1194,13 @@ function applyHydraDamage(dmg, isCrit, pen){
     battle.damageDealt += share;
     const pos = getHeadScreenPos(headId);
     if(pos) spawnHitFx(pos.x, pos.y, '-' + share + (isCrit ? '!' : ''), isCrit ? 'crit' : 'weak');
-    if(head.hp <= 0){ head.alive = false; playHeadBreakFx(headId); }
+    if(head.hp <= 0){
+      head.alive = false;
+      playHeadBreakFx(headId);
+      if(battle.aimPart === headId){
+        battle.aimPart = (typeof defaultAimPartForBoss === 'function') ? defaultAimPartForBoss(battle.bossId) : null;
+      }
+    }
   }
   battle.bossHp = HYDRA_HEAD_IDS.reduce((s, id) => s + (battle.heads[id].alive ? battle.heads[id].hp : 0), 0);
   if(HYDRA_HEAD_IDS.every(id => !battle.heads[id].alive)){ battle.bossHp = 0; endBattle(true); return; }

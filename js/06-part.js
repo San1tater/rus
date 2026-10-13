@@ -117,10 +117,10 @@ const GARDEN_PLOT_TYPES = {
 ,
   fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h' }};
 const GARDEN_TABS = [
+  { id: 'log',      label: '📜 日誌' },
   { id: 'storage',  label: '📦 儲備' },
-  { id: 'merchant', label: '💰 商人' },
   { id: 'servant',  label: '👤 僕人' },
-  { id: 'log',      label: '📜 日誌' }
+  { id: 'merchant', label: '💰 商人' }
 ];
 let _gardenActiveTab = 'storage';
 let _gardenTickTimer = null;
@@ -2634,7 +2634,7 @@ function openConfirm(msg, onOk, onCancel){
 /* ===== rev155: 僕人任務系統（體力 + 叫醒） ===== */
 let _gardenActors = [];
 let _gardenActorTimer = null;
-const GARDEN_WORK_MS = 2000;
+const GARDEN_WORK_MS = 4000;
 const GARDEN_STAMINA_PER_WORK = 5;
 const GARDEN_WAKEUP_RECOVER = 0.30;
 
@@ -3095,7 +3095,10 @@ function _gardenActorTick(){
         continue;
       }
       if(a.task.phase === 'walk'){
-        if(now >= a.task.arriveAt){
+        const _dx = a.tx - a.x;
+        const _dy = a.ty - a.y;
+        const _d2 = _dx * _dx + _dy * _dy;
+        if(_d2 < 9){
           a.task.phase = 'work';
           a.task.startedAt = now;
           a.task.workUntil = now + a.task.workMs;
@@ -3413,7 +3416,7 @@ function openGarden(){
   _ensureGardenPage();
   const p = document.getElementById('garden-page');
   if(!p) return;
-  _gardenActiveTab = 'storage';
+  _gardenActiveTab = 'log';
   _gardenSweep(Date.now());
   renderGardenGrid();
   renderGardenTabs();
@@ -3509,11 +3512,10 @@ function _getArmoryProduction(){
   const genMult = 1 + genLv * 0.04;
   const intervalMs = 3 * 60 * 1000 / genMult;
   let targetRarity = '一般';
-  if(armoryLv <= 5) targetRarity = '破舊';
-  else if(armoryLv <= 10) targetRarity = '一般';
-  else if(armoryLv <= 15) targetRarity = '庫存';
-  else if(armoryLv <= 20) targetRarity = '精品';
-  else targetRarity = '傳奇';
+  if(armoryLv <= 10) targetRarity = '破舊';
+  else if(armoryLv <= 20) targetRarity = '一般';
+  else if(armoryLv <= 35) targetRarity = '庫存';
+  else targetRarity = '精品';
   const _targetIdx = RARITY_ORDER.indexOf(targetRarity);
   const pw = equippedWeapon('primary');
   const sw = equippedWeapon('secondary');
@@ -3521,7 +3523,7 @@ function _getArmoryProduction(){
   if(pw && pw.def.cal) cals.push(pw.def.cal);
   if(sw && sw.def.cal && (!pw || sw.def.cal !== pw.def.cal)) cals.push(sw.def.cal);
   if(!cals.length) cals.push('9x19');
-  const cntMult = Math.max(1, Math.ceil(armoryLv / 5));
+  const cntMult = Math.max(1, Math.ceil(armoryLv / 8));
   const items = [];
   for(const cal of cals){
     const ammos = Object.keys(AMMO).filter(function(k){ return AMMO[k].cal === cal; });
@@ -3537,8 +3539,8 @@ function _getArmoryProduction(){
     }
     if(_cands.length){
       const chosen = _cands[0];
-      const perPeriodMin = 5 * cntMult;
-      const perPeriodMax = 10 * cntMult;
+      const perPeriodMin = 3 * cntMult;
+      const perPeriodMax = 6 * cntMult;
       const perHourMin = Math.round(3600000 / intervalMs * perPeriodMin);
       const perHourMax = Math.round(3600000 / intervalMs * perPeriodMax);
       items.push({
@@ -4752,7 +4754,7 @@ function _offlineDoFarmerTask(srv, task, t){
     gardenStorageAdd(seed.cropId, c.rarity, count);
     plot.crop = null;
     servantAddExp(srv, 5);
-    return { ok: true, harvest: true };
+    return { ok: true, harvest: true, cropKey: seed.cropId + '@' + c.rarity, cropCount: count };
   }
   if(task.type === 'plant'){
     if(plot.crop) return { ok: false };
@@ -4778,63 +4780,100 @@ function _offlineDoFarmerTask(srv, task, t){
 
 function _gardenOfflineSettle(now, baseTime){
   const g = _gardenMerchantInit();
-  const baseHour = Math.floor(baseTime / GARDEN_MEAL_INTERVAL_MS);
-  const nowHour = Math.floor(now / GARDEN_MEAL_INTERVAL_MS);
-  const hours = Math.min(Math.max(0, nowHour - baseHour), 24);
-  if(hours <= 0) return;
+  if(now <= baseTime) return;
+  const WORK_MS = 6000;
+  const MAX_ITER = 8000;
+  let cursor = baseTime;
   let totalHarvest = 0, totalPlant = 0, totalClean = 0, totalLeaves = 0;
-  const seedRewardOut = {};
-  const matRewardOut = {};
-  for(let h = 1; h <= hours; h++){
-    const t = (baseHour + h) * GARDEN_MEAL_INTERVAL_MS;
-    _gardenDoOneMeal(g);
-    const farmers = (state.servants || []).filter(function(s){
-      return s.type === 'farmer' && s.assignedPlots && s.assignedPlots.length > 0;
-    });
-    for(const srv of farmers){
-      const effMax = servantEffectiveMaxStamina(srv);
-      if((srv.stamina || 0) < 10){
+  const cropsOut = {};
+  const seedsOut = {};
+  const matsOut = {};
+  let lastMealHour = Math.floor(baseTime / GARDEN_MEAL_INTERVAL_MS);
+  const actors = [];
+  for(const sv of (state.servants || [])){
+    if(sv.type !== 'farmer') continue;
+    if(!sv.assignedPlots || !sv.assignedPlots.length) continue;
+    actors.push({ srv: sv, task: null });
+  }
+  let iter = 0;
+  while(cursor < now && iter < MAX_ITER){
+    iter++;
+    let nextT = now;
+    const nextHour = (Math.floor(cursor / GARDEN_MEAL_INTERVAL_MS) + 1) * GARDEN_MEAL_INTERVAL_MS;
+    if(nextHour < nextT) nextT = nextHour;
+    for(const a of actors){
+      if(a.task && a.task.workUntil < nextT) nextT = a.task.workUntil;
+    }
+    const plots = _gardenGetPlots();
+    for(const p of plots){
+      if(p && p.type === 'soil' && p.crop && p.crop.matureAt > cursor && p.crop.matureAt < nextT){
+        nextT = p.crop.matureAt;
+      }
+    }
+    if(nextT <= cursor){ cursor += 1000; continue; }
+    if(nextT > now) nextT = now;
+    cursor = nextT;
+    const curHour = Math.floor(cursor / GARDEN_MEAL_INTERVAL_MS);
+    while(lastMealHour < curHour){
+      _gardenDoOneMeal(g);
+      lastMealHour++;
+      const lr0 = _gardenServantLeaveCheck(true);
+      totalLeaves += lr0.count || 0;
+      for(const k in lr0.seeds) seedsOut[k] = (seedsOut[k] || 0) + lr0.seeds[k];
+      for(const k in lr0.mats) matsOut[k] = (matsOut[k] || 0) + lr0.mats[k];
+    }
+    for(const a of actors){
+      if(a.task && cursor >= a.task.workUntil){
+        const r = _offlineDoFarmerTask(a.srv, a.task, cursor);
+        if(r.ok){
+          if(r.harvest){
+            totalHarvest++;
+            if(r.cropKey) cropsOut[r.cropKey] = (cropsOut[r.cropKey] || 0) + (r.cropCount || 1);
+          }
+          if(r.plant) totalPlant++;
+          if(r.clean) totalClean++;
+          a.srv.stamina = Math.max(0, (a.srv.stamina || 0) - 5);
+        }
+        a.task = null;
+      }
+    }
+    for(const a of actors){
+      if(a.task) continue;
+      if((a.srv.stamina || 0) < 20){
         const foremen = (state.servants || []).filter(function(f){
           return f.type === 'foreman' && f.assignedPlots && f.assignedPlots.length > 0 && (f.stamina || 0) >= 20;
         });
         if(foremen.length){
+          const effMax = servantEffectiveMaxStamina(a.srv);
           foremen[0].stamina = Math.max(0, (foremen[0].stamina || 0) - 20);
-          srv.stamina = effMax * 0.3;
+          a.srv.stamina = Math.max(a.srv.stamina || 0, Math.round(effMax * 0.3));
         }
       }
-      let stam = Math.min(srv.stamina || 0, effMax);
-      srv.stamina = stam;
-      let tasks = Math.floor(stam / 5);
-      while(tasks > 0 && srv.stamina >= 5){
-        const task = _offlineFindFarmerTask(srv, t);
-        if(!task) break;
-        const r = _offlineDoFarmerTask(srv, task, t);
-        if(!r.ok) break;
-        if(r.harvest) totalHarvest++;
-        if(r.plant) totalPlant++;
-        if(r.clean) totalClean++;
-        srv.stamina -= 5;
-        tasks--;
+      if((a.srv.stamina || 0) < 5) continue;
+      const task = _offlineFindFarmerTask(a.srv, cursor);
+      if(task){
+        a.task = Object.assign({}, task, {
+          phase: 'work',
+          workUntil: cursor + WORK_MS
+        });
       }
     }
-    const lr = _gardenServantLeaveCheck(true);
-    totalLeaves += lr.count || 0;
-    for(const k in lr.seeds) seedRewardOut[k] = (seedRewardOut[k] || 0) + lr.seeds[k];
-    for(const k in lr.mats) matRewardOut[k] = (matRewardOut[k] || 0) + lr.mats[k];
   }
-  g.lastMealAt = nowHour * GARDEN_MEAL_INTERVAL_MS;
+  g.lastMealAt = Math.floor(now / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
   if(totalHarvest + totalPlant + totalClean + totalLeaves > 0){
-    const _detail = {
+    const hours = ((now - baseTime) / 3600000).toFixed(1);
+    const detail = {
       type: 'offline_garden',
       hours: hours,
       harvest: totalHarvest,
       plant: totalPlant,
       clean: totalClean,
       leaves: totalLeaves,
-      seeds: seedRewardOut,
-      mats: matRewardOut
+      crops: cropsOut,
+      seeds: seedsOut,
+      mats: matsOut
     };
-    _gardenLog('離線：收' + totalHarvest + ' 種' + totalPlant + ' 清' + totalClean, 'offline', '', _detail);
+    _gardenLog('[離線摘要] 後院 ' + hours + ' 小時：收穫 ' + totalHarvest + '、種植 ' + totalPlant + '、清理 ' + totalClean + (totalLeaves ? '、' + totalLeaves + ' 僕人離開' : ''), 'offline', '', detail);
   }
 }
 
@@ -4866,31 +4905,60 @@ function _openGardenLogDetail(entry){
   const d = entry.detail;
   let body = '';
   if(d.type === 'offline_garden'){
-    body += '<div class="detail-sub">時長：' + d.hours + ' 小時</div>';
+    body += '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + _esc(entry.text) + '</div>';
+    body += '<div class="stat-line"><span class="k">時長</span><span class="v">' + d.hours + ' 小時</span></div>';
     body += '<div class="stat-line"><span class="k">收穫</span><span class="v">' + d.harvest + '</span></div>';
     body += '<div class="stat-line"><span class="k">種植</span><span class="v">' + d.plant + '</span></div>';
     body += '<div class="stat-line"><span class="k">清理</span><span class="v">' + d.clean + '</span></div>';
     if(d.leaves) body += '<div class="stat-line"><span class="k">離開</span><span class="v">' + d.leaves + '</span></div>';
-    if(d.seeds && Object.keys(d.seeds).length){
-      body += '<div class="divider"></div><div style="font-size:11px;color:#e8a33d;margin-bottom:4px">獲得種子</div>';
-      for(const k in d.seeds){
-        const sp = k.split('@');
-        const def = SEEDS[sp[0]];
-        body += '<div class="stat-line"><span class="k ' + rarityClass(sp[1]) + '">' + (def ? def.name : sp[0]) + '</span><span class="v">×' + d.seeds[k] + '</span></div>';
+    const _cArr = [], _sArr = [], _mArr = [];
+    if(d.crops){ for(const k in d.crops){ const sp = k.split('@'); _cArr.push({ id: sp[0], rarity: sp[1], count: d.crops[k] }); } }
+    if(d.seeds){ for(const k in d.seeds){ const sp = k.split('@'); _sArr.push({ id: sp[0], rarity: sp[1], count: d.seeds[k] }); } }
+    if(d.mats){ for(const k in d.mats){ _mArr.push({ id: k, rarity: '一般', count: d.mats[k] }); } }
+    if(!window._gLogCollapsed) window._gLogCollapsed = {};
+    function _catHtml(title, items){
+      if(!items.length) return '';
+      const col = window._gLogCollapsed[title];
+      let h = '<div class="cat-header" data-gcat="' + title + '" style="cursor:pointer"><span>' + title + ' (' + items.length + ')</span><span>' + (col ? '▶' : '▼') + '</span></div>';
+      if(!col){
+        for(const it of items){
+          const def = itemDef(it.id) || { name: it.id };
+          h += '<div class="item-row" data-iid="' + it.id + '" data-irar="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + def.name + '</div><div class="sub">' + it.rarity + '</div></div><div class="cnt">×' + it.count + '</div></div>';
+        }
       }
+      return h;
     }
-    if(d.mats && Object.keys(d.mats).length){
-      body += '<div class="divider"></div><div style="font-size:11px;color:#e8a33d;margin-bottom:4px">獲得材料</div>';
-      for(const mid in d.mats){
-        body += '<div class="stat-line"><span class="k">' + (MATERIALS[mid] ? MATERIALS[mid].name : mid) + '</span><span class="v">×' + d.mats[mid] + '</span></div>';
-      }
-    }
+    body += _catHtml('🌾 作物', _cArr);
+    body += _catHtml('🌰 種子', _sArr);
+    body += _catHtml('🔩 材料', _mArr);
   }
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '<button class="btn ghost" id="gl-close">關閉</button>';
-  openModal({ title: '📜 離線後院', body: body, footer: ft });
+  const bd = openModal({ title: '📦 離線後院', body: body, footer: ft });
   ft.querySelector('#gl-close').onclick = closeModal;
+  const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
+  for(let _i = 0; _i < _hds.length; _i++){
+    (function(h){
+      h.onclick = function(){
+        if(!window._gLogCollapsed) window._gLogCollapsed = {};
+        window._gLogCollapsed[h.getAttribute('data-gcat')] = !window._gLogCollapsed[h.getAttribute('data-gcat')];
+        closeModal();
+        _openGardenLogDetail(entry);
+      };
+    })(_hds[_i]);
+  }
+  const _rows = bd.querySelectorAll('.item-row[data-iid]');
+  for(let _i = 0; _i < _rows.length; _i++){
+    (function(row){
+      row.onclick = function(){
+        const iid = row.getAttribute('data-iid');
+        const irar = row.getAttribute('data-irar');
+        closeModal();
+        openItemDetail(iid, irar, function(){ _openGardenLogDetail(entry); });
+      };
+    })(_rows[_i]);
+  }
 }
 
 function _openBattleLogDetail(entry){
@@ -4965,8 +5033,9 @@ function renderGardenLog(box){
   } else {
     for(let i = 0; i < log.length; i++){
       const e = log[i];
-      const clickAttr = e.detail ? ' data-log-idx="' + i + '" style="cursor:pointer"' : '';
-      left += '<div class="garden-log-line ' + (e.cls||'') + '"' + clickAttr + '><span class="gl-time">' + tsStr(e.t) + '</span> ' + e.text + '</div>';
+      const clickAttr = e.detail ? ' data-log-idx="' + i + '"' : '';
+      const _suffix = e.detail ? ' <span style="color:#4a90d9">點擊查看 →</span>' : '';
+      left += '<div class="garden-log-line ' + (e.cls||'') + '"' + clickAttr + '><span class="gl-time">' + tsStr(e.t) + '</span> ' + e.text + _suffix + '</div>';
     }
   }
   left += '</div>';

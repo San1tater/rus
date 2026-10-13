@@ -2086,17 +2086,28 @@ function openOfflineDetail(log){
       else groups.misc.push(it);
     }
     const names = {weapon:'⚔️ 武器',armor:'🛡️ 裝備',ammo:'🔫 彈藥',consume:'💊 消耗品',material:'🔧 材料',misc:'📦 其他'};
+    if(!window._offlineCollapsed) window._offlineCollapsed = {};
     for(const g in groups){
       if(!groups[g].length) continue;
-      body += `<div class="cat-header" style="cursor:default"><span>${names[g]} (${groups[g].length})</span><span></span></div>`;
-      for(const it of groups[g]){
-        const def = itemDef(it.id);
-        if(!def) continue;
-        body += `<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon" style="background:${rarityBg(it.rarity)}">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${def.name}</div><div class="sub">${it.rarity}${def.type?' · '+def.type:''}</div></div><div class="cnt">×${it.count}</div></div>`;
+      const col = window._offlineCollapsed[g];
+      body += `<div class="cat-header" data-ocat="${g}" style="cursor:pointer"><span>${names[g]} (${groups[g].length})</span><span>${col ? '▶' : '▼'}</span></div>`;
+      if(!col){
+        for(const it of groups[g]){
+          const def = itemDef(it.id);
+          if(!def) continue;
+          body += `<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon" style="background:${rarityBg(it.rarity)}">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${def.name}</div><div class="sub">${it.rarity}${def.type?' · '+def.type:''}</div></div><div class="cnt">×${it.count}</div></div>`;
+        }
       }
     }
   }
   const bd = openModal({title:'📦 離線獲得物資', body});
+  $$('.cat-header[data-ocat]', bd).forEach(h => {
+    h.onclick = () => {
+      window._offlineCollapsed[h.dataset.ocat] = !window._offlineCollapsed[h.dataset.ocat];
+      closeModal();
+      openOfflineDetail(log);
+    };
+  });
   $$('.item-row', bd).forEach(r => {
     r.onclick = () => { closeModal(); openItemDetail(r.dataset.iid, r.dataset.irar, () => openOfflineDetail(log)); };
   });

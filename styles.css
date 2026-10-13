@@ -741,7 +741,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 /* ===== rev258: 後院日誌樣式 ===== */
 .garden-log-line{padding:2px 0;font-size:10px;line-height:1.35;word-break:break-word;border-bottom:1px dashed #241d16;color:#bfb3a0}
 .garden-log-line .gl-time{color:#6a5f4d;font-size:9px;margin-right:2px}
-.garden-log-line.offline{cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+.garden-log-line.offline{cursor:pointer;color:#4a90d9;text-decoration:underline;text-decoration-style:dotted}
 /* ===== end rev258 ===== */
 
 /* ===== rev259: 僕人編號樣式 ===== */
