@@ -802,10 +802,10 @@ function _gardenMerchantFoodPoolFill(target){
   m.foodPool += gained;
   return true;
 }
-function _gardenMerchantLineProcess(lineKey){
+function _gardenMerchantLineProcess(lineKey, atTime){
   const g = _gardenMerchantInit();
   const m = g.merchant;
-  const now = Date.now();
+  const now = (typeof atTime === 'number') ? atTime : Date.now();
   function lineCfg(){
     if(lineKey === 'food') return { lvKey:'foodLv', lastKey:'lastFood', table:MERCHANT_FOOD_TABLE };
     if(lineKey === 'seed') return { lvKey:'seedLv', lastKey:'lastSeed', table:MERCHANT_SEED_TABLE };
@@ -818,7 +818,7 @@ function _gardenMerchantLineProcess(lineKey){
   if(lv <= 0) return false;
   const last = m[L.lastKey] || 0;
   if(now - last < MERCHANT_INTERVAL_MS) return false;
-  const times = Math.min(Math.floor((now - last) / MERCHANT_INTERVAL_MS), 200);
+  const times = Math.min(Math.floor((now - last) / MERCHANT_INTERVAL_MS), 500);
   if(times <= 0) return false;
   const cfg = L.table[lv];
   let did = 0;
@@ -4781,19 +4781,26 @@ function _offlineDoFarmerTask(srv, task, t){
 function _gardenOfflineSettle(now, baseTime){
   const g = _gardenMerchantInit();
   if(now <= baseTime) return;
-  const WORK_MS = 6000;
-  const MAX_ITER = 8000;
+  const WORK_MS = (typeof GARDEN_WORK_MS === 'number') ? GARDEN_WORK_MS : 4000;
+  const MAX_ITER = 5000;
   let cursor = baseTime;
   let totalHarvest = 0, totalPlant = 0, totalClean = 0, totalLeaves = 0;
   const cropsOut = {};
   const seedsOut = {};
   const matsOut = {};
   let lastMealHour = Math.floor(baseTime / GARDEN_MEAL_INTERVAL_MS);
-  const actors = [];
-  for(const sv of (state.servants || [])){
-    if(sv.type !== 'farmer') continue;
-    if(!sv.assignedPlots || !sv.assignedPlots.length) continue;
-    actors.push({ srv: sv, task: null });
+  const farmers = (state.servants || []).filter(function(s){
+    return s.type === 'farmer' && s.assignedPlots && s.assignedPlots.length > 0;
+  });
+  const actorMap = {};
+  for(const f of farmers){
+    const effMax = servantEffectiveMaxStamina(f);
+    actorMap[f.id] = {
+      srv: f,
+      stamina: Math.min(f.stamina || 0, effMax),
+      task: null,
+      taskEnd: 0
+    };
   }
   let iter = 0;
   while(cursor < now && iter < MAX_ITER){
@@ -4801,8 +4808,20 @@ function _gardenOfflineSettle(now, baseTime){
     let nextT = now;
     const nextHour = (Math.floor(cursor / GARDEN_MEAL_INTERVAL_MS) + 1) * GARDEN_MEAL_INTERVAL_MS;
     if(nextHour < nextT) nextT = nextHour;
-    for(const a of actors){
-      if(a.task && a.task.workUntil < nextT) nextT = a.task.workUntil;
+    const m = g.merchant;
+    for(const lk of ['food','seed','throw']){
+      const meta = _gardenMerchantLineMeta(lk);
+      if(!meta) continue;
+      const lv = m[meta.lvKey] || 0;
+      if(lv <= 0) continue;
+      const last = m[meta.lastKey] || 0;
+      if(last === 0) continue;
+      const nextTick = last + MERCHANT_INTERVAL_MS;
+      if(nextTick > cursor && nextTick < nextT) nextT = nextTick;
+    }
+    for(const id in actorMap){
+      const a = actorMap[id];
+      if(a.task && a.taskEnd > cursor && a.taskEnd < nextT) nextT = a.taskEnd;
     }
     const plots = _gardenGetPlots();
     for(const p of plots){
@@ -4817,13 +4836,15 @@ function _gardenOfflineSettle(now, baseTime){
     while(lastMealHour < curHour){
       _gardenDoOneMeal(g);
       lastMealHour++;
-      const lr0 = _gardenServantLeaveCheck(true);
-      totalLeaves += lr0.count || 0;
-      for(const k in lr0.seeds) seedsOut[k] = (seedsOut[k] || 0) + lr0.seeds[k];
-      for(const k in lr0.mats) matsOut[k] = (matsOut[k] || 0) + lr0.mats[k];
     }
-    for(const a of actors){
-      if(a.task && cursor >= a.task.workUntil){
+    if(typeof _gardenMerchantLineProcess === 'function'){
+      _gardenMerchantLineProcess('food', cursor);
+      _gardenMerchantLineProcess('seed', cursor);
+      _gardenMerchantLineProcess('throw', cursor);
+    }
+    for(const id in actorMap){
+      const a = actorMap[id];
+      if(a.task && cursor >= a.taskEnd){
         const r = _offlineDoFarmerTask(a.srv, a.task, cursor);
         if(r.ok){
           if(r.harvest){
@@ -4832,31 +4853,38 @@ function _gardenOfflineSettle(now, baseTime){
           }
           if(r.plant) totalPlant++;
           if(r.clean) totalClean++;
-          a.srv.stamina = Math.max(0, (a.srv.stamina || 0) - 5);
+          a.stamina = Math.max(0, a.stamina - 5);
+          a.srv.stamina = a.stamina;
         }
         a.task = null;
       }
     }
-    for(const a of actors){
+    for(const id in actorMap){
+      const a = actorMap[id];
       if(a.task) continue;
-      if((a.srv.stamina || 0) < 20){
-        const foremen = (state.servants || []).filter(function(f){
-          return f.type === 'foreman' && f.assignedPlots && f.assignedPlots.length > 0 && (f.stamina || 0) >= 20;
+      if(a.stamina < 20){
+        const foremen = (state.servants || []).filter(function(s){
+          return s.type === 'foreman' && s.assignedPlots && s.assignedPlots.length > 0 && (s.stamina || 0) >= 20;
         });
         if(foremen.length){
           const effMax = servantEffectiveMaxStamina(a.srv);
           foremen[0].stamina = Math.max(0, (foremen[0].stamina || 0) - 20);
-          a.srv.stamina = Math.max(a.srv.stamina || 0, Math.round(effMax * 0.3));
+          a.stamina = Math.max(a.stamina, Math.round(effMax * 0.3));
+          a.srv.stamina = a.stamina;
         }
       }
-      if((a.srv.stamina || 0) < 5) continue;
+      if(a.stamina < 5) continue;
       const task = _offlineFindFarmerTask(a.srv, cursor);
       if(task){
-        a.task = Object.assign({}, task, {
-          phase: 'work',
-          workUntil: cursor + WORK_MS
-        });
+        a.task = task;
+        a.taskEnd = cursor + WORK_MS;
       }
+    }
+    if(cursor % GARDEN_MEAL_INTERVAL_MS < 5000){
+      const lr = _gardenServantLeaveCheck(true);
+      totalLeaves += lr.count || 0;
+      for(const k in lr.seeds) seedsOut[k] = (seedsOut[k] || 0) + lr.seeds[k];
+      for(const k in lr.mats) matsOut[k] = (matsOut[k] || 0) + lr.mats[k];
     }
   }
   g.lastMealAt = Math.floor(now / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
@@ -4873,7 +4901,15 @@ function _gardenOfflineSettle(now, baseTime){
       seeds: seedsOut,
       mats: matsOut
     };
-    _gardenLog('[離線摘要] 後院 ' + hours + ' 小時：收穫 ' + totalHarvest + '、種植 ' + totalPlant + '、清理 ' + totalClean + (totalLeaves ? '、' + totalLeaves + ' 僕人離開' : ''), 'offline', '', detail);
+    const parts = [];
+    if(totalHarvest) parts.push('收穫 ' + totalHarvest + ' 次');
+    if(totalPlant) parts.push('種植 ' + totalPlant + ' 次');
+    if(totalClean) parts.push('清理 ' + totalClean + ' 次');
+    if(totalLeaves) parts.push(totalLeaves + ' 名僕人離開');
+    const summary = '離線 ' + hours + ' 小時，後院：' + parts.join('、') + '。 點擊查看 →';
+    if(!state.garden.log) state.garden.log = [];
+    state.garden.log.push({ t: Date.now(), text: summary, cls: 'offline', detail: detail });
+    if(state.garden.log.length > 100) state.garden.log.splice(0, state.garden.log.length - 100);
   }
 }
 
@@ -4907,10 +4943,10 @@ function _openGardenLogDetail(entry){
   if(d.type === 'offline_garden'){
     body += '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + _esc(entry.text) + '</div>';
     body += '<div class="stat-line"><span class="k">時長</span><span class="v">' + d.hours + ' 小時</span></div>';
-    body += '<div class="stat-line"><span class="k">收穫</span><span class="v">' + d.harvest + '</span></div>';
-    body += '<div class="stat-line"><span class="k">種植</span><span class="v">' + d.plant + '</span></div>';
-    body += '<div class="stat-line"><span class="k">清理</span><span class="v">' + d.clean + '</span></div>';
-    if(d.leaves) body += '<div class="stat-line"><span class="k">離開</span><span class="v">' + d.leaves + '</span></div>';
+    body += '<div class="stat-line"><span class="k">收穫</span><span class="v">' + d.harvest + ' 次</span></div>';
+    body += '<div class="stat-line"><span class="k">種植</span><span class="v">' + d.plant + ' 次</span></div>';
+    body += '<div class="stat-line"><span class="k">清理</span><span class="v">' + d.clean + ' 次</span></div>';
+    if(d.leaves) body += '<div class="stat-line"><span class="k">離開</span><span class="v">' + d.leaves + ' 名</span></div>';
     const _cArr = [], _sArr = [], _mArr = [];
     if(d.crops){ for(const k in d.crops){ const sp = k.split('@'); _cArr.push({ id: sp[0], rarity: sp[1], count: d.crops[k] }); } }
     if(d.seeds){ for(const k in d.seeds){ const sp = k.split('@'); _sArr.push({ id: sp[0], rarity: sp[1], count: d.seeds[k] }); } }
@@ -5034,8 +5070,7 @@ function renderGardenLog(box){
     for(let i = 0; i < log.length; i++){
       const e = log[i];
       const clickAttr = e.detail ? ' data-log-idx="' + i + '"' : '';
-      const _suffix = e.detail ? ' <span style="color:#4a90d9">點擊查看 →</span>' : '';
-      left += '<div class="garden-log-line ' + (e.cls||'') + '"' + clickAttr + '><span class="gl-time">' + tsStr(e.t) + '</span> ' + e.text + _suffix + '</div>';
+      left += '<div class="garden-log-line ' + (e.cls||'') + '"' + clickAttr + '><span class="gl-time">' + tsStr(e.t) + '</span> ' + e.text + '</div>';
     }
   }
   left += '</div>';

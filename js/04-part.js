@@ -557,7 +557,7 @@ function refreshBattleControlsLive(){
   const ds=document.getElementById('battle-dmg-status');
   if(ds) ds.textContent=`對 Boss 傷害：${Math.round(battle.damageDealt)} ｜ ${battle.engaged?'⚔️ 已交戰':'⏸️ 準備中'}`;
 }
-/* rev271: 戰鬥按鈕 touchstart（避免搖桿 preventDefault 鎖死 click） */
+/* rev273: 戰鬥按鈕 touchstart（避免搖桿 preventDefault 鎖死 click） */
 function _bindBattleTap(el, handler){
   let _lastTouch = 0;
   el.addEventListener("touchstart", function(e){
@@ -612,7 +612,7 @@ function renderBattleControls(z3){
       battle.burstLeft = 0;
       renderBattleControls(document.getElementById('zone3'));
     });
-  });
+  });;
   $('.weapon-slot-btn',z3).forEach(b=>{
     _bindBattleTap(b, function(){ switchBattleWeapon(b.dataset.slot); });
   });
