@@ -618,7 +618,7 @@ function renderBattleControls(z3){
       renderBattleControls(document.getElementById('zone3'));
     });
   });
-  $('.weapon-slot-btn',z3).forEach(b=>{
+  $$('.weapon-slot-btn',z3).forEach(b=>{
     _bindBattleTap(b, function(){ switchBattleWeapon(b.dataset.slot); });
   });
   const fb=$('#fire-btn');
