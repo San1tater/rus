@@ -4942,11 +4942,7 @@ function _openGardenLogDetail(entry){
   let body = '';
   if(d.type === 'offline_garden'){
     body += '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + _esc(entry.text) + '</div>';
-    body += '<div class="stat-line"><span class="k">時長</span><span class="v">' + d.hours + ' 小時</span></div>';
-    body += '<div class="stat-line"><span class="k">收穫</span><span class="v">' + d.harvest + ' 次</span></div>';
-    body += '<div class="stat-line"><span class="k">種植</span><span class="v">' + d.plant + ' 次</span></div>';
-    body += '<div class="stat-line"><span class="k">清理</span><span class="v">' + d.clean + ' 次</span></div>';
-    if(d.leaves) body += '<div class="stat-line"><span class="k">離開</span><span class="v">' + d.leaves + ' 名</span></div>';
+
     const _cArr = [], _sArr = [], _mArr = [];
     if(d.crops){ for(const k in d.crops){ const sp = k.split('@'); _cArr.push({ id: sp[0], rarity: sp[1], count: d.crops[k] }); } }
     if(d.seeds){ for(const k in d.seeds){ const sp = k.split('@'); _sArr.push({ id: sp[0], rarity: sp[1], count: d.seeds[k] }); } }
@@ -5204,3 +5200,40 @@ function _gardenGetFarmerPlots(){
   return out;
 }
 /* ===== end rev264 ===== */
+
+/* ===== rev274: 農場後台推進 ===== */
+function _gardenFarmBackgroundTick(now){
+  if(!state.garden || typeof state.garden !== 'object') return;
+  const p = document.getElementById('garden-page');
+  if(p && p.classList.contains('on')) return;
+  const farmers = (state.servants || []).filter(function(s){
+    return s.type === 'farmer' && s.assignedPlots && s.assignedPlots.length > 0;
+  });
+  if(!farmers.length) return;
+  let acted = 0;
+  const foremen = (state.servants || []).filter(function(f){
+    return f.type === 'foreman' && f.assignedPlots && f.assignedPlots.length > 0;
+  });
+  for(const srv of farmers){
+    if((srv.stamina || 0) < 20){
+      for(const fm of foremen){
+        if((fm.stamina || 0) < 20) continue;
+        const effMax = servantEffectiveMaxStamina(srv);
+        if(effMax < 1) break;
+        fm.stamina = Math.max(0, (fm.stamina || 0) - 20);
+        srv.stamina = Math.max(srv.stamina || 0, Math.round(effMax * 0.3));
+        break;
+      }
+    }
+    if((srv.stamina || 0) < 5) continue;
+    const task = _offlineFindFarmerTask(srv, now);
+    if(!task) continue;
+    const r = _offlineDoFarmerTask(srv, task, now);
+    if(r.ok){
+      srv.stamina = Math.max(0, (srv.stamina || 0) - 5);
+      acted++;
+    }
+  }
+  if(acted > 0) save();
+}
+/* ===== end rev274 ===== */

@@ -244,7 +244,12 @@ if(!state.preferences.bossTier) state.preferences.bossTier = {};
 let _bossSelectedTier = state.preferences.bossTier;
 function renderCombat(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
-  if(battle&&battle.active){renderBattleScene(z1);renderBattleJoystick(z2);renderBattleControls(z3);return;}
+  if(battle&&battle.active){
+    try { renderBattleScene(z1); } catch(e){ console.error('[combat] scene:', e); if(z1) z1.innerHTML = '<div style="padding:20px;color:#e05252;font-size:12px">⚔️ Scene: ' + e.message + '</div>'; }
+    try { renderBattleJoystick(z2); } catch(e){ console.error('[combat] joystick:', e); if(z2) z2.innerHTML = '<div style="padding:20px;color:#e05252;font-size:12px">🕹️ Joystick: ' + e.message + '</div>'; }
+    try { renderBattleControls(z3); } catch(e){ console.error('[combat] controls:', e); if(z3) z3.innerHTML = '<div style="padding:20px;color:#e05252;font-size:12px">🎮 Controls: ' + e.message + '</div>'; }
+    return;
+  }
   const _BOSS_GROUPS=[{baseKey:'factory_king',regionName:'廢棄工廠'},{baseKey:'lab_queen',regionName:'廢棄實驗室'},{baseKey:'road_tyrant',regionName:'郊區公路'},{baseKey:'swamp_hydra',regionName:'輻射沼澤'},{baseKey:'core_omega',regionName:'廢土核心'}];
   let listHtml='<div class="boss-list">';
   for(const _g of _BOSS_GROUPS){

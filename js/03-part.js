@@ -677,7 +677,7 @@ function buildingBonusText(bid,lv){
   case 'radio':return `補給量 ×${(1+lv*0.3).toFixed(1)}`;
   case 'armory':{
     let targetRarity='一般';
-    if(lv<=5)targetRarity='破舊';else if(lv<=10)targetRarity='一般';else if(lv<=15)targetRarity='庫存';else if(lv<=20)targetRarity='精品';else targetRarity='傳奇';
+    if(lv<=10)targetRarity='破舊';else if(lv<=20)targetRarity='一般';else if(lv<=35)targetRarity='庫存';else targetRarity='精品';
     return `產出主副彈藥（當前稀有度：${targetRarity}）`;
   }default:return '';}
 }
@@ -1499,6 +1499,7 @@ function buildingTick(){
   }
   processCrafting();
   if(typeof _gardenMealTick === 'function'){ try{ _gardenMealTick(now); }catch(e){} }
+  if(typeof _gardenFarmBackgroundTick === 'function'){ try{ _gardenFarmBackgroundTick(now); }catch(e){} }
 }
 function processCrafting(){
   if(!state.crafting||!state.crafting.length)return;
