@@ -1046,15 +1046,15 @@ const BOSS_SKILLS = {
 (function(){const pairs=[['factory_king_ii','factory_king'],['lab_queen_ii','lab_queen'],['road_tyrant_ii','road_tyrant'],['swamp_hydra_ii','swamp_hydra'],['core_omega_ii','core_omega']];for(const p of pairs){const ii=p[0],base=p[1];if(BOSS_LAYERS[base])BOSS_LAYERS[ii]=BOSS_LAYERS[base];if(BOSS_ANIMS[base])BOSS_ANIMS[ii]=BOSS_ANIMS[base];if(BOSS_SKILLS[base])BOSS_SKILLS[ii]=BOSS_SKILLS[base];if(BOSS_WEAKPOINTS[base])BOSS_WEAKPOINTS[ii]=BOSS_WEAKPOINTS[base];if(BOSS_PHASES[base])BOSS_PHASES[ii]=BOSS_PHASES[base];}})();
 
 const BUILDINGS={
-  workbench:{name:'工作台',desc:'改造傳奇武器',cost:{wood:20,metal:10,screws:5,maxLv:50}},
-  storage:{name:'倉庫',desc:'掉落物數量加成',cost:{wood:15,metal:5,maxLv:50},maxLv:50},
-  toilet:{name:'厠所',desc:'熟練度加成',cost:{wood:10,cloth:5,maxLv:50},maxLv:50},
-  rest:{name:'休息室',desc:'生命值成長加成',cost:{wood:20,cloth:10,maxLv:50},maxLv:50},
-  generator:{name:'發電機',desc:'加速製造與冷卻',cost:{metal:20,gears:5,electronics:3,maxLv:50},maxLv:50},
-  medbay:{name:'醫療站',desc:'加強消耗品恢復',cost:{wood:15,cloth:10,metal:5,maxLv:50},maxLv:50},
-  radio:{name:'無線電',desc:'定期資源補給',cost:{electronics:5,metal:10,gears:3,maxLv:50},maxLv:50},
-  armory:{name:'軍械庫',desc:'產出主副彈藥',cost:{metal:25,gears:8,screws:10,maxLv:50},maxLv:50},
-  forge:{name:'護甲車間',desc:'護甲值加成',cost:{metal:250,gears:80,screws:100,maxLv:50},maxLv:50}};
+  workbench:{name:'工作台',desc:'改造傳奇武器',cost:{wood:20,metal:10,screws:5},maxLv:50},
+  storage:{name:'倉庫',desc:'掉落物數量加成',cost:{wood:15,metal:5},maxLv:50},
+  toilet:{name:'厠所',desc:'熟練度加成',cost:{wood:10,cloth:5},maxLv:50},
+  rest:{name:'休息室',desc:'生命值成長加成',cost:{wood:20,cloth:10},maxLv:50},
+  generator:{name:'發電機',desc:'加速製造與冷卻',cost:{metal:20,gears:5,electronics:3},maxLv:50},
+  medbay:{name:'醫療站',desc:'加強消耗品恢復',cost:{wood:15,cloth:10,metal:5},maxLv:50},
+  radio:{name:'無線電',desc:'定期資源補給',cost:{electronics:5,metal:10,gears:3},maxLv:50},
+  armory:{name:'軍械庫',desc:'產出主副彈藥',cost:{metal:25,gears:8,screws:10},maxLv:50},
+  forge:{name:'護甲車間',desc:'護甲值加成',cost:{metal:250,gears:80,screws:100},maxLv:50}};
 
 const GAME_LAYERS = [
   { id:'right_leg', name:'右腿', z:18, color:'#2a2a2a', pivot:{x:0.5,y:0.05},

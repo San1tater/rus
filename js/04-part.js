@@ -617,7 +617,7 @@ function renderBattleControls(z3){
       battle.burstLeft = 0;
       renderBattleControls(document.getElementById('zone3'));
     });
-  });;
+  });
   $('.weapon-slot-btn',z3).forEach(b=>{
     _bindBattleTap(b, function(){ switchBattleWeapon(b.dataset.slot); });
   });

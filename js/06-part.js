@@ -5101,9 +5101,11 @@ function renderGardenLog(box){
     '<div class="gs-col" style="padding:0 6px;border-left:1px solid #e8a33d">' + right + '</div>' +
     '</div>';
   const _lw = box.querySelector('.gs-wrap[data-col="prod"]');
-  if(_lw) _lw.scrollTop = _lw.scrollHeight;
   const _rw = box.querySelector('.gs-wrap[data-col="battle"]');
-  if(_rw) _rw.scrollTop = _rw.scrollHeight;
+  requestAnimationFrame(function(){
+    if(_lw) _lw.scrollTop = _lw.scrollHeight;
+    if(_rw) _rw.scrollTop = _rw.scrollHeight;
+  });
   const _logLines = box.querySelectorAll('.garden-log-line[data-log-idx]');
   for(const el of _logLines){
     el.onclick = function(){
