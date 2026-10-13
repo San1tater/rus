@@ -751,3 +751,48 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 /* rev260: garden bg */
 .gp-grid-wrap{background-image:url('images/garden/bg.png');background-size:cover;background-position:center;background-repeat:no-repeat}
 /* end rev260 */
+
+/* ===== rev277: modal header 右側 / 隱藏關閉 ===== */
+.modal-hd-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-hd-right{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-right:4px}
+.modal-hd-right .btn{padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto}
+.modal-close-hidden{display:none !important}
+/* ===== end rev277 ===== */
+
+/* ===== rev287: 責任人 + 體力條 ===== */
+.owner-row{display:flex;align-items:center;gap:10px;padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin-bottom:4px}
+.owner-row .tower-guard-btn{position:relative;flex:0 0 auto}
+.owner-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.owner-line{font-size:11px;font-weight:bold;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.owner-stam-bar{height:5px;background:#0e0c0a;border-radius:3px;overflow:hidden;border:1px solid #2a231c}
+.owner-stam-fill{height:100%;transition:width .2s linear}
+.owner-stam-text{font-size:9px;color:#a89a85;line-height:1.1;text-align:right}
+/* ===== end rev287 ===== */
+
+/* ===== rev288: 指派空狀態 ===== */
+.owner-empty{display:flex;align-items:center;gap:6px;padding:10px 12px;background:#1a1510;border:1px dashed #3a2f25;border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:11px;color:#7a6f60;transition:border-color .15s,color .15s}
+.owner-empty:hover{border-color:#e8a33d;color:#e8a33d}
+.owner-empty:active{transform:scale(.98)}
+/* ===== end rev288 ===== */
+
+/* rev291: 後院食物資訊可點擊 */
+.gp-header .gp-food-info{cursor:pointer;user-select:none;transition:opacity .15s}
+.gp-header .gp-food-info:hover{opacity:.8}
+.gp-header .gp-food-info:active{opacity:.6}
+/* end rev291 */
+
+/* rev293: 堆肥施肥标记 */
+.gp-fert-mark{position:absolute;top:1px;right:2px;font-size:10px;line-height:1;z-index:4;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,.8))}
+/* end rev293 */
+
+/* rev301: 商人 subnav */
+.mrc-subnav{display:flex;border-bottom:1px solid #2a231c;background:#17140f;flex:0 0 auto}
+.mrc-subtab{flex:1;padding:8px 4px;text-align:center;font-size:11px;color:#7a6f60;cursor:pointer;border-bottom:2px solid transparent;user-select:none;transition:color .15s,border-color .15s,background .15s}
+.mrc-subtab.on{color:#e8a33d;border-bottom-color:#e8a33d;background:#1a1510}
+.mrc-subtab:hover{color:#e8a33d}
+/* end rev301 */
+
+/* rev301: 商人 subnav */
+.mrc-page{position:absolute;inset:0;display:flex;flex-direction:column}
+.mrc-page .mrc-wrap{position:relative;inset:auto;flex:1 1 0;min-height:0}
+/* end rev301 */

@@ -518,7 +518,6 @@ function _cleanGardenStorageRarity(){
     if(validRar.indexOf(rar) === -1){ toDel.push(k); continue; }
   }
   for(const k of toDel){ delete stor[k]; }
-  if(toDel.length) console.log('[garden clean] 移除', toDel.length, '筆非法儲備：', toDel);
 }
 function gardenStorageAdd(id, rarity, count){
   if(count <= 0) return;
@@ -1117,16 +1116,16 @@ function updateExploreBg(){
     const newNorm=newUrl.replace(/["']/g,'"');
     if(curRaw!==newNorm){
       if(fadeEl){
-        /* rev107: 黑幕淡入 —— 快速蓋黑 → 切底圖 → 慢速淡出 */
-        fadeEl.style.transition='none';
+        /* rev279: 平滑淡入淡出（0.35s 漸黑 → 換圖 → 0.9s 漸顯）*/
+        fadeEl.style.transition='opacity 0.35s ease-out';
         fadeEl.style.opacity='1';
-        requestAnimationFrame(function(){
+        setTimeout(function(){
           layers.forEach(function(l){l.style.backgroundImage=newUrl;});
-          requestAnimationFrame(function(){
-            fadeEl.style.transition='opacity 1.2s ease-in';
+          setTimeout(function(){
+            fadeEl.style.transition='opacity 0.9s ease-in';
             fadeEl.style.opacity='0';
-          });
-        });
+          }, 80);
+        }, 380);
       } else {
         layers.forEach(function(l){l.style.backgroundImage=newUrl;});
       }
@@ -1789,12 +1788,12 @@ function openModal({title,body,footer,full}){
       else if(title == null) title = '';
       else title = String(title);
     }
-    const hd=el('div','modal-hd');hd.innerHTML=`<div>${title}</div><div class="x">✕</div>`;hd.querySelector('.x').onclick=closeModal;modalEl.appendChild(hd);
+    const hd=el('div','modal-hd');hd.innerHTML=`<div>${title}</div><div class="x">✕</div>`;hd.querySelector('.x').onclick=function(){var _cb=window._modalOnCloseOverride;window._modalOnCloseOverride=null;if(typeof _cb==='function'){try{_cb();}catch(e){console.warn('[onClose]',e);closeModal();}}else{closeModal();}};modalEl.appendChild(hd);
   }
   const bd=el('div','modal-bd-inner');
   if(typeof body==='string')bd.innerHTML=body;else if(body)bd.appendChild(body);
   modalEl.appendChild(bd);
-  if(footer){const ft=el('div','modal-ft');if(typeof footer==='string')ft.innerHTML=footer;else ft.appendChild(footer);modalEl.appendChild(ft);}
+  if(footer){var _hasFt=(typeof footer==='string')?(footer.trim().length>0):((footer.innerHTML||'').trim().length>0);if(_hasFt){const ft=el('div','modal-ft');if(typeof footer==='string')ft.innerHTML=footer;else ft.appendChild(footer);modalEl.appendChild(ft);}}
   modalLayer.classList.add('on');return bd;
 }
 let modQueueTimer=null;
@@ -1833,14 +1832,14 @@ function openSlotDetail(slot){
   }
   const ft=el('div','modal-ft');
   if(slot==='backpack'||isFixedItem(id)){
-    ft.innerHTML=`<button class="btn primary" id="m-open">打開</button><button class="btn" id="m-tidy">整理</button><button class="btn ghost" id="m-exit">退出</button>`;
+    ft.innerHTML=`<button class="btn primary" id="m-open">打開</button><button class="btn" id="m-tidy">整理</button>`;
   } else if(def){
-    ft.innerHTML=`<button class="btn" id="m-change">更換</button><button class="btn danger" id="m-unequip">卸下</button><button class="btn ghost" id="m-exit">退出</button>`;
+    ft.innerHTML=`<button class="btn" id="m-change">更換</button><button class="btn danger" id="m-unequip">卸下</button>`;
   } else {
-    ft.innerHTML=`<button class="btn primary" id="m-change">裝備</button><button class="btn ghost" id="m-exit">退出</button>`;
+    ft.innerHTML=`<button class="btn primary" id="m-change">裝備</button>`;
   }
   openModal({title:`${labels[slot]} 詳情`,body,footer:ft});
-  ft.querySelector('#m-exit').onclick=closeModal;
+  window._modalOnCloseOverride = closeModal;
   const op=ft.querySelector('#m-open');if(op)op.onclick=()=>{closeModal();openInventory();};
   const tidy=ft.querySelector('#m-tidy');
   if(tidy)tidy.onclick=()=>{
@@ -1966,9 +1965,9 @@ function openEquipmentCompare(slot,newId,newRarity,onConfirm,onCancel){
     if(newDef.explosive)body+=`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸（群傷）</span></div>`;
   }
   const ft=el('div','modal-ft');
-  ft.innerHTML=`<button class="btn primary" id="m-confirm">確定</button><button class="btn ghost" id="m-exit">退出</button>`;
+  ft.innerHTML=`<button class="btn primary" id="m-confirm">確定</button>`;
   openModal({title:`更換 ${labels[slot]}`,body,footer:ft});
-  ft.querySelector('#m-exit').onclick=()=>{ closeModal(); if(onCancel) onCancel(); else renderCurrentTab(); };
+  window._modalOnCloseOverride = ()=>{ closeModal(); if(onCancel) onCancel(); else renderCurrentTab(); };
   ft.querySelector('#m-confirm').onclick=()=>{
     const oldId2=state.player.equipped[slot];
     if(oldId2){
@@ -2067,10 +2066,10 @@ function openItemDetail(id,rarity,returnFn){
     ${d.scopeBonus?`<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+${d.scopeBonus}% 命中</span></div>`:''}
     ${d.fixed?`<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>`:''}`;
   const ft=el('div','modal-ft');
-  if(d.slot&&!d.fixed)ft.innerHTML=`<button class="btn primary" id="m-equip">裝備</button><button class="btn ghost" id="m-close">關閉</button>`;
-  else ft.innerHTML=`<button class="btn ghost" id="m-close">關閉</button>`;
+  if(d.slot&&!d.fixed)ft.innerHTML=`<button class="btn primary" id="m-equip">裝備</button>`;
+  else ft.innerHTML=``;
   openModal({title:'物品詳情',body,footer:ft});
-  ft.querySelector('#m-close').onclick=()=>{ if(returnFn){ returnFn(); } else { closeModal(); } };
+  window._modalOnCloseOverride = function(){ if(typeof returnFn === 'function'){ returnFn(); } else { closeModal(); } };
   const eqb=ft.querySelector('#m-equip');
   if(eqb)eqb.onclick=()=>{const slot=d.slot;closeModal();openEquipmentCompare(slot,id,rarity, returnFn, () => openItemDetail(id,rarity,returnFn));};
 }

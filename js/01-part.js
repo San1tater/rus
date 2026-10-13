@@ -330,6 +330,15 @@ function servantEffectiveMaxStamina(srv){
 function servantDef(type){ return SERVANT_TYPES[type] || null; }
 function servantSlots(rarity, type){ if(type === 'guard' || type === 'foreman') return 1; return SERVANT_RARITY_SLOTS[rarity] || 1; }
 /* ===== end rev145 ===== */
+
+/* ===== rev301: 传奇池 ===== */
+const LEGEND_AMMO_POOL = [
+  '5.45_7n39','7.62_ma','7.62x54_bs','9x39_sp6','9x18_sp7',
+  '9x19_cci','12ga_magnum','12.7_ps12b','20x70_devastator','23x75_barrikada'
+];
+const LEGEND_THROW_POOL = ["f1","rgd5","rgo","rgn","vog17","vog25"];
+/* ===== end rev301 ===== */
+
 const ALL_ITEMS={};Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS);
 if(typeof SEEDS!=='undefined')Object.assign(ALL_ITEMS,SEEDS);
 if(typeof CROPS!=='undefined')Object.assign(ALL_ITEMS,CROPS);
@@ -338,6 +347,19 @@ function resolveIconId(id){if(!id) return '';if(id.startsWith('named_')){const p
 
 function assetSuffix(){ return ASSET_VERSION ? ('?v=' + ASSET_VERSION) : ''; }
 function rarityBg(rarity){return RARITY_BG[rarity]||'#151210';}
+
+/* ===== rev293: 数字缩写 ===== */
+function fmtNum(n){
+  if(n == null || isNaN(n)) return "0";
+  const v = Math.floor(Math.abs(n));
+  const sign = n < 0 ? "-" : "";
+  if(v < 100000) return sign + v;
+  if(v < 1000000) return sign + Math.round(v / 1000) + "k";
+  if(v < 1000000000) return sign + (v / 1000000).toFixed(1) + "M";
+  return sign + (v / 1000000000).toFixed(1) + "B";
+}
+/* ===== end rev293 ===== */
+
 function itemIcon(id,size){
   const s=size||24;
   if(!id) return '';
@@ -373,7 +395,6 @@ async function probeAssetVersion(){
     ASSET_VERSION = encoded;
     localStorage.setItem(ASSET_CACHE_KEY, encoded);
     if(typeof heroImgCache !== 'undefined') heroImgCache.clear();
-    console.log('[assets] 資源版本更新:', prev || '(無)', '→', encoded);
     return true;
   }catch(e){
     console.warn('[assets] 探測失敗:', e);
