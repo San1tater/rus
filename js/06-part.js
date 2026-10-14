@@ -5405,44 +5405,26 @@ function _clearPlotAssignments(idx){
 /* ===== end rev256 ===== */
 
 /* ===== rev257: renderGardenLog 重寫 ===== */
-function _openGardenLogDetail(entry){
-  if(!entry || !entry.detail) return;
-  const d = entry.detail;
-  let body = '';
-  if(d.type === 'offline_garden'){
-    body += '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + _esc(entry.text) + '</div>';
-
-    const _cArr = [], _sArr = [], _mArr = [];
-    if(d.crops){ for(const k in d.crops){ const sp = k.split('@'); _cArr.push({ id: sp[0], rarity: sp[1], count: d.crops[k] }); } }
-    if(d.seeds){ for(const k in d.seeds){ const sp = k.split('@'); _sArr.push({ id: sp[0], rarity: sp[1], count: d.seeds[k] }); } }
-    if(d.mats){ for(const k in d.mats){ _mArr.push({ id: k, rarity: '一般', count: d.mats[k] }); } }
-    if(!window._gLogCollapsed) window._gLogCollapsed = {};
-    function _catHtml(title, items){
-      if(!items.length) return '';
-      const col = window._gLogCollapsed[title];
-      let h = '<div class="cat-header" data-gcat="' + title + '" style="cursor:pointer"><span>' + title + ' (' + items.length + ')</span><span>' + (col ? '▶' : '▼') + '</span></div>';
-      if(!col){
-        for(const it of items){
-          const def = itemDef(it.id) || { name: it.id };
-          h += '<div class="item-row" data-iid="' + it.id + '" data-irar="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + def.name + '</div><div class="sub">' + it.rarity + '</div></div><div class="cnt">×' + it.count + '</div></div>';
-        }
-      }
-      return h;
-    }
-    body += _catHtml('🌾 作物', _cArr);
-    body += _catHtml('🌰 種子', _sArr);
-    body += _catHtml('🔩 材料', _mArr);
-  }
-  const ft = document.createElement('div');
-  ft.className = 'modal-ft';
-  ft.innerHTML = '';
-  const bd = openModal({ title: '📦 離線後院', body: body, footer: ft });
+/* ===== rev301 log helpers ===== */
+function _logCat(key, title, count, collapsed){
+  return '<div class="cat-header" data-gcat="' + key + '" style="cursor:pointer"><span>' + title + ' (' + count + ')</span><span>' + (collapsed ? '▶' : '▼') + '</span></div>';
+}
+function _logItem(id, rarity, count, isFood){
+  const def = isFood ? { name: '食物' } : (itemDef(id) || { name: id });
+  const icon = isFood ? '🍲' : itemIcon(id, 30);
+  const clickable = !isFood;
+  const attrs = clickable ? (' data-iid="' + id + '" data-irar="' + rarity + '"') : '';
+  const cursor = clickable ? '' : ' style="cursor:default"';
+  return '<div class="item-row"' + attrs + cursor + '><div class="icon" style="background:' + rarityBg(rarity) + '">' + icon + '</div><div class="info"><div class="nm ' + rarityClass(rarity) + '">' + def.name + '</div><div class="sub">' + rarity + '</div></div><div class="cnt">×' + count + '</div></div>';
+}
+function _logBind(bd, entry){
   const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
   for(let _i = 0; _i < _hds.length; _i++){
     (function(h){
       h.onclick = function(){
         if(!window._gLogCollapsed) window._gLogCollapsed = {};
-        window._gLogCollapsed[h.getAttribute('data-gcat')] = !window._gLogCollapsed[h.getAttribute('data-gcat')];
+        const _k = h.getAttribute('data-gcat');
+        window._gLogCollapsed[_k] = !window._gLogCollapsed[_k];
         closeModal();
         _openGardenLogDetail(entry);
       };
@@ -5459,6 +5441,84 @@ function _openGardenLogDetail(entry){
       };
     })(_rows[_i]);
   }
+}
+/* ===== end log helpers ===== */
+
+function _openMerchantBatchDetail(entry){
+  const d = entry.detail;
+  const _keys = ['food','seed','throw','ammo'];
+  if(!window._gLogCollapsed) window._gLogCollapsed = {};
+  let body = '';
+  for(const _k of _keys){
+    const _line = d.lines && d.lines[_k];
+    if(!_line || !_line.items || !_line.items.length) continue;
+    const _meta = _gardenMerchantLineMeta(_k) || { icon: '?', title: _k };
+    const _col = !!window._gLogCollapsed[_k];
+    body += _logCat(_k, _meta.icon + ' ' + _meta.title + ' · ' + _line.batches + ' 批', _line.items.length, _col);
+    if(!_col){
+      for(const _it of _line.items){
+        body += _logItem(_it.id, _it.rarity, _it.count, _it.id === 'food');
+      }
+    }
+  }
+  if(!body){
+    body = '<div class="empty-hint">無產出資料</div>';
+    body += '<div style="font-size:10px;color:#7a6f60;margin-top:8px;word-break:break-all">lines: ' + (d.lines ? Object.keys(d.lines).join(', ') : '(空)') + '</div>';
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '';
+  const bd = openModal({ title: '⏱ 產線結算', body: body, footer: ft });
+  _logBind(bd, entry);
+}
+
+function _openOfflineGardenDetail(entry){
+  const d = entry.detail;
+  let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + _esc(entry.text || '') + '</div>';
+  if(!window._gLogCollapsed) window._gLogCollapsed = {};
+  const _cats = [
+    ['作物', 'crops'],
+    ['種子', 'seeds'],
+    ['材料', 'mats']
+  ];
+  for(const [_title, _key] of _cats){
+    const _src = d[_key];
+    if(!_src) continue;
+    const _items = [];
+    for(const k in _src){
+      if(_key === 'mats'){
+        _items.push({ id: k, rarity: '一般', count: _src[k] });
+      } else {
+        const sp = k.split('@');
+        _items.push({ id: sp[0], rarity: sp[1], count: _src[k] });
+      }
+    }
+    if(!_items.length) continue;
+    const _col = !!window._gLogCollapsed[_title];
+    body += _logCat(_title, _title, _items.length, _col);
+    if(!_col){
+      for(const it of _items) body += _logItem(it.id, it.rarity, it.count, false);
+    }
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '';
+  const bd = openModal({ title: '📦 離線後院', body: body, footer: ft });
+  _logBind(bd, entry);
+}
+
+function _openGardenLogDetail(entry){
+  if(!entry || !entry.detail) return;
+  const t = entry.detail.type;
+  if(t === 'merchant_batch'){ _openMerchantBatchDetail(entry); return; }
+  if(t === 'offline_garden'){ _openOfflineGardenDetail(entry); return; }
+  /* 未知类型：显示 debug */
+  let body = '<div class="empty-hint">未知日誌類型：' + String(t || '?') + '</div>';
+  body += '<div style="font-size:10px;color:#7a6f60;margin-top:8px;word-break:break-all">keys: ' + Object.keys(entry.detail).join(', ') + '</div>';
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '';
+  openModal({ title: '📦 詳情', body: body, footer: ft });
 }
 
 function _openBattleLogDetail(entry){
