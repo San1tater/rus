@@ -159,6 +159,29 @@ function _ensureGardenPage(){
       }
       node = node.parentNode;
     }
+    /* 事件委托：日誌行 / 戰鬥日誌行的點擊
+       gp-content 因 _gardenActorExecuteTask 每秒多次 re-render，
+       內聯 onclick 的 DOM 節點可能在使用者 mousedown→click 之間被移除，
+       導致 click 不派發。委託到 #garden-page 可從根源解決。 */
+    const _et = e.target;
+    if(_et && _et.closest){
+      const _logLine = _et.closest('.garden-log-line[data-log-idx]');
+      if(_logLine){
+        const _idx = parseInt(_logLine.getAttribute('data-log-idx'), 10);
+        const _log = (state.garden && state.garden.log) || [];
+        const _entry = _log[_idx];
+        if(_entry && _entry.detail){ _openGardenLogDetail(_entry); }
+        return;
+      }
+      const _battleItem = _et.closest('.battle-log-item[data-battle-idx]');
+      if(_battleItem){
+        const _idx = parseInt(_battleItem.getAttribute('data-battle-idx'), 10);
+        const _bl = (state.garden && state.garden.battleLog) || [];
+        const _entry = _bl[_idx];
+        if(_entry){ _openBattleLogDetail(_entry); }
+        return;
+      }
+    }
   });
 
   const tabEls = p.querySelectorAll('.gp-tab');
@@ -559,7 +582,7 @@ function gardenPlantSeed(idx, seedId, rarity){
   const seed = SEEDS[seedId];
   if(!seed) return;
   if(!gardenStorageRemove(seedId, rarity, 1)){
-    notify('種子不足', 'error');
+    
     return;
   }
   const now = Date.now();
@@ -569,7 +592,7 @@ function gardenPlantSeed(idx, seedId, rarity){
   plot.lastRarity = rarity;
   save();
   closeModal();
-  notify('已種下：' + seed.name, 'ok');
+  
   renderGardenGrid();
   renderGardenContent();
 }
@@ -1524,14 +1547,14 @@ function _gardenRepairPlot(idx){
   const haveMetal = (typeof materialEquivalent === 'function') ? materialEquivalent('metal') : 0;
   const haveWood = (typeof materialEquivalent === 'function') ? materialEquivalent('wood') : 0;
   if(haveMetal < 20 || haveWood < 10){
-    notify('修理材料不足（🔩20 🪵10）', 'error');
+    
     return;
   }
   consumeMaterial('metal', 20);
   consumeMaterial('wood', 10);
   p.broken = false;
   save();
-  notify('修理完成', 'ok');
+  
   renderGardenGrid();
 }
 function _gardenTowerOpen(idx){
@@ -1679,7 +1702,7 @@ function _gardenTowerPickEquip(idx, slot){
       delete cfg.eqRarity[slot];
       save();
       closeModal();
-      notify('已卸下', 'ok');
+      
       _gardenTowerOpen(idx);
     };
   }
@@ -1696,7 +1719,7 @@ function _gardenTowerPickEquip(idx, slot){
         if(slot === 'primary' || slot === 'secondary'){ cfg.ammoId = null; cfg.maxShots = 'inf'; }
         save();
         closeModal();
-        notify('已裝備：' + (itemDef(eid) || {name:eid}).name, 'ok');
+        
         _gardenTowerOpen(idx);
       };
     })(rows[i]);
@@ -1740,7 +1763,7 @@ function _gardenTowerDemolish(idx){
   _clearPlotAssignments(idx);
   save();
   closeModal();
-  notify('已拆除哨塔', 'ok');
+  
   renderGardenGrid();
 }
 
@@ -1764,6 +1787,158 @@ function _gardenRaidCheck(){
   if(!guards.length){ console.log('[raid] 無守衛參戰，跳過'); return; }
   _gardenRaidStart(guards);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   離線防禦戰：純數值模擬，不繪製 canvas
+   ═══════════════════════════════════════════════════════════ */
+function _gardenRaidSimulateOffline(guards, region, enemies){
+  const guardUnits = [];
+  for(const g of guards){
+    const s = g.srv;
+    const maxHp = servantMaxHp(s);
+    let armor = 0, armorLevel = 0;
+    const eqCfg = (g.towerCfg && g.towerCfg.eq) || {};
+    const eqRar = (g.towerCfg && g.towerCfg.eqRarity) || {};
+    for(const slot of ['head','top']){
+      const id = eqCfg[slot];
+      if(!id) continue;
+      const rar = eqRar[slot] || '一般';
+      armor += equipArmorValue(id, rar);
+      const d = ARMOR[id];
+      if(d && d.level) armorLevel = Math.max(armorLevel, d.level);
+    }
+    const scopeBonus = (g.weaponDef && g.weaponDef.scopeBonus) || 0;
+    const hitRate = servantHitRate(s, '點射', scopeBonus);
+    const ammoId = g.ammoId;
+    const ammoRarity = g.ammoRarity || '一般';
+    const critRate = servantCritRate(g.weaponRarity, ammoRarity);
+    const critMult = servantCritMult(g.weaponRarity, ammoRarity);
+    const magCap = (g.weaponDef && g.weaponDef.mag) || 30;
+    const stock = ammoId ? invCount(ammoId, ammoRarity) : 0;
+    const ms = (g.towerCfg && g.towerCfg.maxShots) || 'inf';
+    let budget;
+    if(ms === 'skip') budget = 0;
+    else if(ms === 'mag') budget = Math.min(stock, magCap);
+    else budget = stock;
+    guardUnits.push({
+      srv: s, name: servantLabel(s) + ' Lv.' + s.lv,
+      rpm: (g.weaponDef && g.weaponDef.rpm) || 600,
+      hp: maxHp, maxHp: maxHp,
+      armor: armor, maxArmor: armor, armorLevel: armorLevel,
+      alive: true, isGuard: true,
+      weaponDef: g.weaponDef, weaponRarity: g.weaponRarity,
+      towerIdx: g.towerIdx, towerCfg: g.towerCfg,
+      ammoId: ammoId, ammoRarity: ammoRarity, ammoStock: stock,
+      ammoBudget: budget, ammoUsed: 0, magCap: magCap,
+      hitRate: hitRate, critRate: critRate, critMult: critMult,
+      dmgDone: 0
+    });
+  }
+  const enemyUnits = enemies.map(function(e){
+    return {
+      id: e.id, name: e.name,
+      dmg: e.dmg || 10, pen: e.pen || 0, armorLevel: e.armorLevel || 1,
+      rpm: 300, hp: e.maxHp, maxHp: e.maxHp,
+      armor: 0, maxArmor: 0, alive: true, isGuard: false
+    };
+  });
+  const MODE_CAP = { '點射': 1, '短點射': 3, '長點射': 7, '掃射': 99, '近戰': 1, '投擲': 1 };
+  function pickFireMode(g, aliveE){
+    const def = g.weaponDef;
+    if(!def || !def.modes) return '點射';
+    if(typeof isSemiAutoOnly === 'function' && isSemiAutoOnly(def)) return '點射';
+    if(aliveE >= 3 && def.modes.indexOf('掃射') !== -1) return '掃射';
+    if(aliveE >= 2 && def.modes.indexOf('短點射') !== -1) return '短點射';
+    return '點射';
+  }
+  function guardsAlive(){ return guardUnits.some(function(u){ return u.alive; }); }
+  function enemiesAlive(){ return enemyUnits.some(function(u){ return u.alive; }); }
+  function executeShot(fromU, toU, isEnemy){
+    if(!toU.alive) return;
+    const hit = Math.random() * 100 < (fromU.isGuard ? fromU.hitRate : 75);
+    if(!hit) return;
+    let dmg;
+    if(fromU.isGuard){
+      const ammo = fromU.ammoId ? AMMO[fromU.ammoId] : null;
+      dmg = ammo ? Math.round(ammo.dmg * (RARITY_MULT[fromU.ammoRarity] || 1)) : Math.round((fromU.weaponDef.dmg || 20) * (RARITY_MULT[fromU.weaponRarity] || 1));
+      if(Math.random() < fromU.critRate) dmg = Math.round(dmg * fromU.critMult);
+    } else {
+      dmg = fromU.dmg || 10;
+    }
+    const tgt = { hp: toU.hp, armor: toU.armor };
+    const pen = fromU.isGuard ? (fromU.ammoId && AMMO[fromU.ammoId] ? (AMMO[fromU.ammoId].pen || 0) : (fromU.weaponDef.pen || 0)) : (fromU.pen || 0);
+    const res = applyDamage(tgt, dmg, pen, toU.armorLevel || 0);
+    toU.hp = tgt.hp; toU.armor = tgt.armor;
+    const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
+    fromU.dmgDone = (fromU.dmgDone || 0) + shown;
+    if(fromU.isGuard && fromU.srv) servantAddExp(fromU.srv, 2);
+    if(toU.hp <= 0) toU.alive = false;
+  }
+  let round = 0;
+  const maxRounds = 30;
+  while(guardsAlive() && enemiesAlive() && round < maxRounds){
+    round++;
+    for(const g of guardUnits){
+      if(!g.alive) continue;
+      if(!enemiesAlive()) break;
+      if(g.ammoId && (g.ammoBudget - g.ammoUsed) <= 0) continue;
+      const aliveE = enemyUnits.filter(function(e){ return e.alive; }).length;
+      const mode = pickFireMode(g, aliveE);
+      let shots = MODE_CAP[mode] || 1;
+      shots = Math.min(shots, g.magCap);
+      if(g.ammoId) shots = Math.min(shots, g.ammoBudget - g.ammoUsed);
+      for(let i = 0; i < shots; i++){
+        const aliveTargets = enemyUnits.filter(function(e){ return e.alive; });
+        if(!aliveTargets.length) break;
+        if(g.ammoId){ if(g.ammoUsed >= g.ammoBudget) break; g.ammoUsed++; }
+        const target = aliveTargets[Math.floor(Math.random() * aliveTargets.length)];
+        executeShot(g, target, false);
+      }
+    }
+    if(!enemiesAlive()) break;
+    if(!guardsAlive()) break;
+    for(const e of enemyUnits){
+      if(!e.alive) continue;
+      const aliveTargets = guardUnits.filter(function(g){ return g.alive; });
+      if(!aliveTargets.length) break;
+      const target = aliveTargets[Math.floor(Math.random() * aliveTargets.length)];
+      executeShot(e, target, true);
+    }
+  }
+  return { guards: guardUnits, enemies: enemyUnits, win: !enemiesAlive() && guardsAlive(), rounds: round };
+}
+
+function _offlineGardenRaidSettle(baseTime, now){
+  const raid = _gardenRaidInit();
+  if(raid.lastAt === 0){ raid.lastAt = now; return 0; }
+  let curLast = raid.lastAt;
+  if(curLast < baseTime) curLast = baseTime;
+  if(now - curLast < GARDEN_RAID_INTERVAL_MS) return 0;
+  let count = 0;
+  let maxIter = 24;
+  while(now - curLast >= GARDEN_RAID_INTERVAL_MS && maxIter > 0){
+    maxIter--;
+    curLast += GARDEN_RAID_INTERVAL_MS;
+    count++;
+  }
+  if(count === 0) return 0;
+  raid.lastAt = curLast;
+  raid.count += count;
+  for(let i = 0; i < count; i++){
+    const guards = _gardenRaidCollectGuards();
+    if(!guards.length) continue;
+    const gen = _gardenRaidGenEnemies();
+    if(!gen.enemies.length) continue;
+    const sim = _gardenRaidSimulateOffline(guards, gen.region, gen.enemies);
+    try {
+      _gardenRaidApplyResult(sim, gen.region);
+    } catch(e){
+      console.warn('[offline raid]', e);
+    }
+  }
+  return count;
+}
+
 
 function _gardenRaidCollectGuards(){
   const plots = _gardenGetPlots();
@@ -2213,7 +2388,9 @@ function _gardenRaidLogBattle(sim, region){
     stolen: sim.stolen ? sim.stolen.map(function(x){ return { id: x.id, rarity: x.rarity || '一般', name: (CROPS[x.id] ? CROPS[x.id].name : x.id), count: x.count }; }) : [],
     loot: sim.loot ? sim.loot.map(function(x){ const d = itemDef(x.id); return { id: x.id, rarity: x.rarity || '一般', name: d ? d.name : x.id, count: x.count }; }) : []
   };
-  g.battleLog = [entry];
+  if(!Array.isArray(g.battleLog)) g.battleLog = [];
+  g.battleLog.push(entry);
+  if(g.battleLog.length > 30) g.battleLog.splice(0, g.battleLog.length - 30);
 }
 
 /* ===== rev205: 即時戰鬥日誌（底部頁簽） ===== */
@@ -2984,7 +3161,7 @@ function servantAddExp(srv, n){
     srv.exp -= servantExpNeed(srv.lv);
     srv.lv++;
     const def = SERVANT_TYPES[srv.type] || {name:'僕人'};
-    notify(def.name + ' 升級至 Lv.' + srv.lv, 'ok');
+    
   }
   if(srv.lv >= SERVANT_MAX_LV) srv.exp = 0;
 }
@@ -3220,6 +3397,8 @@ function _gardenActorExecuteTask(a){
     a._hasCompost = true;
     _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 取堆肥', 'compost');
     save();
+    renderGardenGrid();
+    renderGardenContent();
     return;
   }
   if(a.task.type === 'fertilize'){
@@ -3237,6 +3416,8 @@ function _gardenActorExecuteTask(a){
     a._hasCompost = false;
     _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 施肥 ' + plotCoordName(_idx), 'fertilize');
     save();
+    renderGardenGrid();
+    renderGardenContent();
     return;
   }
   const plot = plots[a.task.plotIdx];
@@ -3763,7 +3944,7 @@ function openGardenStorageDetail(id, rarity){
   const isCrop = !!CROPS[id];
   if(!isSeed && !isCrop) return;
   const count = gardenStorageCount(id, rarity);
-  if(count <= 0){ notify('物品已耗盡', 'error'); return; }
+  if(count <= 0){  return; }
   const def = isSeed ? SEEDS[id] : CROPS[id];
   const icon = isSeed ? '🌰' : def.icon;
   const nm = def.name || id;
@@ -3818,7 +3999,7 @@ function openGarden(){
         if(rep.composted > 0) msg += '（堆肥 +' + rep.accelSec + 's 加速';
         if(rep.seeds > 0) msg += (rep.composted > 0 ? '，' : '（') + '種子 +' + rep.seeds;
         if(rep.composted > 0 || rep.seeds > 0) msg += '）';
-        notify(msg, 'ok');
+        
         if(typeof renderGardenContent === 'function') renderGardenContent();
       }
     }catch(e){ console.warn('[rot] err', e); }
@@ -3956,7 +4137,7 @@ function _getArmoryProduction(){
 
 function openArmoryInfo(){
   const p = _getArmoryProduction();
-  if(!p){ notify('尚未建造軍械庫', 'error'); return; }
+  if(!p){  return; }
   let body = '';
   body += '<div class="detail-sub">Lv.' + p.armoryLv + ' · 目標稀有度：' + p.targetRarity + '</div>';
   body += '<div class="divider"></div>';
@@ -4092,7 +4273,7 @@ function openStatsDetail(key){
 
 function _openRadioDetail(){
   const lv = getBuildingLv('radio');
-  if(lv <= 0){ notify('尚未建造無線電', 'error'); return; }
+  if(lv <= 0){  return; }
   const genLv = getBuildingLv('generator');
   const genMult = 1 + genLv * 0.04;
   const intervalMs = 5 * 60 * 1000 / genMult;
@@ -4116,7 +4297,7 @@ function _openMerchantLineDetail(lineKey){
   const g = _gardenMerchantInit();
   const m = g.merchant;
   const lv = m[meta.lvKey] || 0;
-  if(lv <= 0){ notify('尚未訂閱', 'error'); return; }
+  if(lv <= 0){  return; }
   const cfg = meta.table[lv];
   const st = _gardenMerchantLineStatus(lineKey);
   const last = m[meta.lastKey] || 0;
@@ -4219,7 +4400,7 @@ function renderBase(){
       } else if(_tid==='garden'){
         openGarden();
       } else if(_tid==='room'){
-        notify('聯機功能開發中','error');
+        
       }
     };
   });
@@ -4295,7 +4476,7 @@ function renderRegionArea(z3){
       e.stopPropagation();
       const key=btn.dataset.key;
       const tier=parseInt(btn.dataset.tier,10);
-      if(tier===2&&!state.unlockedRegions.includes(key+'II')){notify('二級區域尚未解鎖','error');return;}
+      if(tier===2&&!state.unlockedRegions.includes(key+'II')){return;}
       const cur=getSelectedRegionTier(key);
       setRegionTier(key,cur===tier?0:tier);
       ensureAtLeastOneRegion();
@@ -4329,7 +4510,7 @@ function setActionMode(mode){
   }
   state.preferences.actionMode=mode;
   refreshPlayerStats();save();renderCurrentTab();
-  notify(mode==='stealth'?'切換至潛行蒐集，主副武器已卸下':'切換至攻擊前進','ok');
+  
 }
 function onBuildCell(i){
   if(i===0){openControlCenter();return;}
@@ -4354,11 +4535,11 @@ function onBuildCell(i){
     ft.innerHTML=`<button class="btn primary" id="m-up" ${_isMax ? 'disabled' : ''}>${_isMax ? '已滿級' : '升級'}</button>${isWorkbench?'<button class="btn" id="m-craft">改造</button>':''}`;
     openModal({title:b.name,body,footer:ft});
     ft.querySelector('#m-up').onclick=()=>{
-      if(b.maxLv && slot.lv >= b.maxLv){notify(`已達最高等級 Lv.${b.maxLv}`,'error');return;}
-      for(const [k,v] of Object.entries(upCost))if(materialEquivalent(k)<v){notify('材料不足，無法升級','error');return;}
+      if(b.maxLv && slot.lv >= b.maxLv){return;}
+      for(const [k,v] of Object.entries(upCost))if(materialEquivalent(k)<v){return;}
       for(const [k,v] of Object.entries(upCost))consumeMaterial(k,v);
       slot.lv++;refreshPlayerStats();save();renderBase();
-      notify(`${b.name} 升級至 Lv.${slot.lv}`,'ok');
+      
       closeModal(); onBuildCell(i);
     };
     const craftBtn=ft.querySelector('#m-craft');
@@ -4384,10 +4565,10 @@ function onBuildCell(i){
   $$('.item-row[data-bid]',bd).forEach(r=>{
     r.onclick=()=>{
       const bid=r.dataset.bid;const b=BUILDINGS[bid];
-      for(const [k,v] of Object.entries(b.cost))if(materialEquivalent(k)<v){notify('材料不足，無法建造','error');return;}
+      for(const [k,v] of Object.entries(b.cost))if(materialEquivalent(k)<v){return;}
       for(const [k,v] of Object.entries(b.cost))consumeMaterial(k,v);
       state.base.slots[i]={id:bid,lv:1};addProf('craft',1);refreshPlayerStats();save();closeModal();renderBase();
-      notify(`建造完成：${b.name}`,'ok');
+      
     };
   });
 }
@@ -4473,7 +4654,7 @@ function openModding(workbenchLv){
       const idx = parseInt(r.dataset.idx);
       const c = candidates[idx];
       const wdef=WEAPONS[c.baseId];
-      if(!isProfMaxed(wdef.type)){notify(`${wdef.type} 熟練度未滿級`,'error');return;}
+      if(!isProfMaxed(wdef.type)){return;}
       closeModal();
       const initMag = (c.mag === wdef.mag) ? null : c.mag;
       const initScope = c.scope || null;
@@ -4545,14 +4726,14 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
   ft.querySelector('#m-exit').onclick=()=>{ closeModal(); if(onCancel) onCancel(); };
   ft.querySelector('#m-confirm').onclick=()=>{
     const r=renderModBody();
-    if(!r.ok){notify('材料不足','error');return;}
+    if(!r.ok){return;}
     const maxQueue=workbenchLv||1;
     if(!state.crafting)state.crafting=[];
-    if(state.crafting.length>=maxQueue){notify(`改造隊列已滿（上限 ${maxQueue}）`,'error');return;}
+    if(state.crafting.length>=maxQueue){return;}
     for(const [k,v] of Object.entries(r.totalCost))consumeMaterial(k,v);
     state.crafting.push({type:'mod',modInfo:{baseId,baseRarity,mag:state_mod.mag,scope:state_mod.scope,fromEquippedSlot:equippedSlot,originalId,originalRarity},time:r.totalTime,startTime:Date.now()});
     save();closeModal();
-    notify('已加入改造隊列','ok');
+    
   };
 }
 function rarityPolicyBlockHTML(prefix, title, ctx, showExclude){
@@ -4786,7 +4967,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
       plot.crop = null;
       save();
       try { closeModal(); } catch(e){}
-      notify('收穫：' + (cropDef ? cropDef.name : '作物') + ' ×' + count, 'ok');
+      
       
       renderGardenGrid();
       renderGardenContent();
@@ -4898,7 +5079,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
             const plot = plots[idx];
             if(!plot) return;
             if(selected[idx]){ delete selected[idx]; applyAndSave(); refresh(); return; }
-            if(countSel() >= maxSlots){ notify('已達上限 ' + maxSlots + ' 格', 'error'); return; }
+            if(countSel() >= maxSlots){  return; }
             const owner = plot.assignedServant;
             if(owner && owner !== srvId){
               openConfirm('此格已被其他僕人指派，是否取代？', function(){
@@ -5285,6 +5466,10 @@ function _gardenOfflineSettle(now, baseTime){
       for(const k in lr.mats) matsOut[k] = (matsOut[k] || 0) + lr.mats[k];
     }
   }
+  /* 離線防禦戰結算（在產線/農業結算之後） */
+  try {
+    if(typeof _offlineGardenRaidSettle === 'function') _offlineGardenRaidSettle(baseTime, now);
+  } catch(e){ console.warn('[offline raid]', e); }
   g.lastMealAt = Math.floor(now / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
   const _mSeed = Object.keys(merchantAccum.seed).reduce(function(s,k){ return s + merchantAccum.seed[k].count; }, 0);
   const _mThrow = Object.keys(merchantAccum.throw).reduce(function(s,k){ return s + merchantAccum.throw[k].count; }, 0);
@@ -5636,22 +5821,8 @@ function renderGardenLog(box){
     if(_lw) _lw.scrollTop = _lw.scrollHeight;
     if(_rw) _rw.scrollTop = _rw.scrollHeight;
   });
-  const _logLines = box.querySelectorAll('.garden-log-line[data-log-idx]');
-  for(const el of _logLines){
-    el.onclick = function(){
-      const idx = parseInt(el.getAttribute('data-log-idx'), 10);
-      const entry = log[idx];
-      if(entry && entry.detail) _openGardenLogDetail(entry);
-    };
-  }
-  const _bl = box.querySelectorAll('.battle-log-item[data-battle-idx]');
-  for(const el of _bl){
-    el.onclick = function(){
-      const idx = parseInt(el.getAttribute('data-battle-idx'), 10);
-      const entry = battleLog[idx];
-      if(entry) _openBattleLogDetail(entry);
-    };
-  }
+  /* 點擊事件已由 _ensureGardenPage 的事件委托處理，無需內聯 onclick
+     （避免 DOM re-render 時 onclick 綁定失效，以及委託+內聯雙重觸發） */
 }
 /* ===== end rev257 ===== */
 

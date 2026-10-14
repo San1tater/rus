@@ -781,7 +781,7 @@ function refreshPlayerStats(){
 }
 function addExp(n){
   state.player.exp+=n;let need=Math.round(50*Math.pow(1.15,state.player.level-1));
-  while(state.player.exp>=need){state.player.exp-=need;state.player.level++;refreshPlayerStats();state.player.hp=state.player.maxHp;notify(`🎉 升級至 Lv.${state.player.level}（HP ${state.player.maxHp}）`,'ok');pushLog(`<span class="pl">玩家</span> 升級至 <b>Lv.${state.player.level}</b>，最大生命 ${state.player.maxHp}。`,[],'explore');need=Math.round(50*Math.pow(1.15,state.player.level-1));}
+  while(state.player.exp>=need){state.player.exp-=need;state.player.level++;refreshPlayerStats();state.player.hp=state.player.maxHp;pushLog(`<span class="pl">玩家</span> 升級至 <b>Lv.${state.player.level}</b>，最大生命 ${state.player.maxHp}。`,[],'explore');need=Math.round(50*Math.pow(1.15,state.player.level-1));}
 }
 function addProf(cat,n){const tl=getBuildingLv('toilet');const m=1+tl*0.02;state.proficiency[cat]=Math.min(MAX_PROF_RAW,(state.proficiency[cat]||0)+n*m);}
 function getHitRate(weaponType,mode,scopeBonus){
@@ -1192,7 +1192,7 @@ function chooseFireMode(weapon,ec,ac){
 function modeBulletsPerTarget(mode){return{'點射':1,'短點射':3,'長點射':7,'掃射':99,'近戰':1,'投擲':1}[mode]||1;}
 function fmtItemSpan(id,r,c){const d=itemDef(id);const nm=d?d.name:id;return `<span class="${rarityClass(r)} itm" data-iid="${id}" data-irar="${r}">${nm}*${c}</span>`;}
 function fmtEnemies(enemies){const map={};for(const e of enemies){const k=e.id;if(!map[k])map[k]={...e,count:0};map[k].count++;}return Object.values(map).map(g=>`${g.name}*${g.count}(HP:${g.maxHp}*${g.count})`).join('、');}
-function checkThrowableUnequip(){const tid=state.player.equipped.throwable;if(!tid)return;if(getThrowableCount()<=0){const def=itemDef(tid);state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;state.player.throwableStock=0;refreshPlayerStats();notify(`${def?def.name:tid} 已用盡，自動卸下`,'error');}}
+function checkThrowableUnequip(){const tid=state.player.equipped.throwable;if(!tid)return;if(getThrowableCount()<=0){const def=itemDef(tid);state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;state.player.throwableStock=0;refreshPlayerStats();}}
 function applyDropBonus(count){const sl=getBuildingLv('storage');return Math.max(1,Math.round(count*(1+sl*0.02)));}
 
 function autoCombat(region,node,enemies){
@@ -1525,7 +1525,7 @@ function processCrafting(){
           }
           invAddRaw(namedId,'具名',1);
         }
-        notify(`✅ 改造完成：${itemDef(namedId).name}`,'ok');
+        
         pushLog(`<span class="pl">玩家</span> 完成改造：<b class="r-具名">${itemDef(namedId).name}</b>。`,[],'explore');
         state.crafting.splice(i,1);addProf('craft',1);refreshPlayerStats();save();
       }
@@ -1871,7 +1871,7 @@ function openSlotDetail(slot){
       if(curId)invAdd(curId,curRar,1);
     }
     refreshPlayerStats();save();closeModal();renderCurrentTab();
-    notify(`已卸下：${def.name}`,'ok');
+    
   };
 }
 function openSlotPicker(slot,returnFn){
@@ -1979,7 +1979,7 @@ function openEquipmentCompare(slot,newId,newRarity,onConfirm,onCancel){
     refreshPlayerStats();save();
     closeModal();
     if(onConfirm) onConfirm(); else renderCurrentTab();
-    notify(`已更換：${itemDef(newId).name}`,'ok');
+    
   };
 }
 const inventoryCollapsed={};

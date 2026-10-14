@@ -26,9 +26,9 @@ function updateBossPhase(){
       if(_shouldHeal && b.healedPhases.indexOf(i) === -1){
         b.bossHp = b.bossMaxHp;
         b.healedPhases.push(i);
-        notify('⚠️ ' + b.bossName + ' 回滿生命！', 'error');
+        
       }
-      notify('⚠️ ' + b.bossName + ' 進入第 ' + (i+1) + ' 階段！', 'error');
+      
       break;
     }
   }
@@ -225,7 +225,7 @@ function startBossDash(sk, now){
     exhaustMs: sk.exhaustMs || 1500
   };
   showBossWarning();
-  notify(`⚠️ ${b.bossName} 準備突進！`, 'error');
+  
 }
 
 function updateBossDash(dt, now){
@@ -445,10 +445,10 @@ function manualHeal(){
   if(battle.settling)return;
   stopBattleMovement();
   if(battle.consuming||battle.reloading)return;
-  if(performance.now() < (battle.healDisabledUntil||0)){ notify('治療冷卻中','error'); return; }
-  if(battle.playerHp >= battle.playerMaxHp){ notify('生命值已滿','error'); return; }
+  if(performance.now() < (battle.healDisabledUntil||0)){  return; }
+  if(battle.playerHp >= battle.playerMaxHp){  return; }
   const item = findNextConsumable();
-  if(!item){ notify('沒有可用的消耗品','error'); return; }
+  if(!item){  return; }
   battle.consuming=true;
   battle.firing=false;
   battle._healToken=(battle._healToken||0)+1;
@@ -790,13 +790,13 @@ function autoSwitchOnNoAmmo(){
     if(nextSlot === 'melee'){
       if(state.player.equipped.melee && equippedWeapon('melee')){
         switchBattleWeapon('melee');
-        notify('彈藥耗盡，切換至近戰武器','error');
+        
         return true;
       }
     } else {
       if(slotCanFire(nextSlot)){
         switchBattleWeapon(nextSlot);
-        notify(`切換至${nextSlot==='primary'?'主武器':'副武器'}`,'error');
+        
         return true;
       }
     }
@@ -851,8 +851,8 @@ function playerShoot(){
   let def=w.def;
   const playerRightPx=battle.px+battle.playerWeaponRange;
   const bossLeftPx=getBossLeftBoundaryN();
-  if(playerRightPx<bossLeftPx){if(Math.random()<0.05)notify('超出武器射程','error');return false;}
-  if(!isAimPartInRange()){if(Math.random()<0.05)notify('瞄準部位超出射程','error');return false;}
+  if(playerRightPx<bossLeftPx){if(Math.random()<0.05)return false;}
+  if(!isAimPartInRange()){if(Math.random()<0.05)return false;}
   const isMelee = def.slot === 'melee';
 
   if(def.cal && battle.ammoInMag <= 0){
@@ -946,7 +946,7 @@ function playerShoot(){
     }
   } else {
     if(def.slot==='throwable'){
-      if(getThrowableCount()<=0){if(!ensureThrowableFromBackpack()){battle.firing=false;battle.burstLeft=0;notify('沒有可用的投擲物','error');return false;}const nw=equippedWeapon('throwable');if(nw){battle.weapon=nw;w=nw;def=nw.def;}}
+      if(getThrowableCount()<=0){if(!ensureThrowableFromBackpack()){battle.firing=false;battle.burstLeft=0;return false;}const nw=equippedWeapon('throwable');if(nw){battle.weapon=nw;w=nw;def=nw.def;}}
       state.player.throwableStock--;
       battle.ammoInMag=getThrowableCount();
       if(battle.weaponStates[battle.weaponSlot])battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;

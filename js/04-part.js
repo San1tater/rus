@@ -378,7 +378,7 @@ function renderAmmoOrderRow(slot, label){
 }
 function openAmmoPicker(slot, idx){
   const equipped = state.player.equipped[slot];
-  if(!equipped){ notify('尚未裝備對應武器', 'error'); return; }
+  if(!equipped){  return; }
   const available = getAvailableAmmoForSlot(slot);
   if(!available.length){ openModal({title: '選擇彈種（優先級 ' + (idx + 1) + '）', body: '<div class="empty-hint">沒有可用的彈藥</div>'}); return; }
   available.sort((a, b) => {
@@ -721,7 +721,7 @@ function defaultAimPartForBoss(bossId){
 function startBossBattle(bid){
   const b=BOSSES[bid];if(!b)return;
   const seals=parseInt(state.seals[b.seal]||0,10);
-  if(seals<=0){notify('沒有對應的 Boss 信物','error');return;}
+  if(seals<=0){return;}
   state.seals[b.seal]=seals-1;
   state.player.hp=state.player.maxHp;
   state.player.armor=state.player.maxArmor;
