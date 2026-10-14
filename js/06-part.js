@@ -267,36 +267,19 @@ function renderGardenGrid(){
     }
     if(plot && plot.type){
       const t = GARDEN_PLOT_TYPES[plot.type] || {name:'?', icon:'?'};
-      if(plot.type === 'soil' && plot.crop){
-        const st = _gardenCropStatus(plot, now);
-        if(st){
-          let icon = t.icon, lbl = t.name, extraCls = '';
-          if(st.status === 'growing'){ icon = '🌱'; lbl = st.remaining + 's'; }
-          else if(st.status === 'mature'){ icon = st.cropIcon; lbl = '成熟'; extraCls = ' mature'; }
-          else if(st.status === 'rotten'){ icon = '🥀'; lbl = '腐爛'; extraCls = ' rotten'; }
-          else if(st.status === 'cleaning'){ icon = '🧹'; lbl = st.remaining + 's'; extraCls = ' cleaning'; }
-          html += '<div class="gp-plot built' + extraCls + '" data-type="' + plot.type + '" data-idx="' + i + '">' + (plot.fertilized ? '<div class="gp-fert-mark">💩</div>' : '') + '<div class="gp-plot-icon">' + icon + '</div><div class="gp-plot-lbl">' + lbl + '</div></div>';
-        } else {
-          if(plot.type === 'soil'){
-          html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
-        } else {
-          if(plot.type === 'soil'){
-          html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
-        } else {
-          if(plot.type === 'soil'){
-            html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
-          } else {
-            html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-icon">' + t.icon + '</div><div class="gp-plot-lbl">' + t.name + '</div></div>';
-          }
-        }
-        }
-        }
+      const isSoil = (plot.type === 'soil');
+      const st = (isSoil && plot.crop) ? _gardenCropStatus(plot, now) : null;
+      if(st){
+        let icon = t.icon, lbl = t.name, extraCls = '';
+        if(st.status === 'growing'){ icon = '🌱'; lbl = st.remaining + 's'; }
+        else if(st.status === 'mature'){ icon = st.cropIcon; lbl = '成熟'; extraCls = ' mature'; }
+        else if(st.status === 'rotten'){ icon = '🥀'; lbl = '腐爛'; extraCls = ' rotten'; }
+        else if(st.status === 'cleaning'){ icon = '🧹'; lbl = st.remaining + 's'; extraCls = ' cleaning'; }
+        html += '<div class="gp-plot built' + extraCls + '" data-type="' + plot.type + '" data-idx="' + i + '">' + (plot.fertilized ? '<div class="gp-fert-mark">💩</div>' : '') + '<div class="gp-plot-icon">' + icon + '</div><div class="gp-plot-lbl">' + lbl + '</div></div>';
+      } else if(isSoil){
+        html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
       } else {
-        if(plot.type === 'soil'){
-          html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
-        } else {
-          html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-icon">' + t.icon + '</div><div class="gp-plot-lbl">' + t.name + '</div></div>';
-        }
+        html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-icon">' + t.icon + '</div><div class="gp-plot-lbl">' + t.name + '</div></div>';
       }
     } else {
       html += '<div class="gp-plot empty" data-idx="' + i + '"></div>';
@@ -997,11 +980,11 @@ function _gardenTotalCropCount(){
   return total;
 }
 
-function _gardenMerchantCropValuePoolFill(target){
+function _gardenMerchantPoolFill(poolKey, target){
   const g = _gardenMerchantInit();
   const m = g.merchant;
-  if(!m.cropValuePool) m.cropValuePool = 0;
-  if(m.cropValuePool >= target) return true;
+  if(!m[poolKey]) m[poolKey] = 0;
+  if(m[poolKey] >= target) return true;
   const storage = _gardenStorageInit();
   const batches = (state.garden && state.garden.storageBatches) || {};
   const allBatches = [];
@@ -1028,14 +1011,14 @@ function _gardenMerchantCropValuePoolFill(target){
   const toConsume = {};
   let gained = 0;
   for(const b of allBatches){
-    if(m.cropValuePool + gained >= target) break;
+    if(m[poolKey] + gained >= target) break;
     for(let i = 0; i < b.count; i++){
-      if(m.cropValuePool + gained >= target) break;
+      if(m[poolKey] + gained >= target) break;
       gained += b.val;
       toConsume[b.k] = (toConsume[b.k] || 0) + 1;
     }
   }
-  if(m.cropValuePool + gained < target) return false;
+  if(m[poolKey] + gained < target) return false;
   for(const k in toConsume){
     storage[k] -= toConsume[k];
     if(storage[k] <= 0) delete storage[k];
@@ -1051,66 +1034,11 @@ function _gardenMerchantCropValuePoolFill(target){
       else delete batches[k];
     }
   }
-  m.cropValuePool += gained;
+  m[poolKey] += gained;
   return true;
 }
-function _gardenMerchantFoodPoolFill(target){
-  const g = _gardenMerchantInit();
-  const m = g.merchant;
-  if(!m.foodPool) m.foodPool = 0;
-  if(m.foodPool >= target) return true;
-  const storage = _gardenStorageInit();
-  const batches = (state.garden && state.garden.storageBatches) || {};
-  const allBatches = [];
-  for(const k in storage){
-    if(storage[k] <= 0) continue;
-    const parts = k.split('@');
-    if(!CROPS[parts[0]]) continue;
-    const bs = batches[k];
-    if(Array.isArray(bs) && bs.length){
-      let listed = 0;
-      for(const b of bs){
-        allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: b.count, addedAt: b.addedAt || 0, val: cropFoodValue(parts[0], parts[1]) });
-        listed += b.count;
-      }
-      const missing = storage[k] - listed;
-      if(missing > 0){
-        allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: missing, addedAt: 0, val: cropFoodValue(parts[0], parts[1]) });
-      }
-    } else {
-      allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: storage[k], addedAt: 0, val: cropFoodValue(parts[0], parts[1]) });
-    }
-  }
-  allBatches.sort(function(a, b){ return a.addedAt - b.addedAt; });
-  const toConsume = {};
-  let gained = 0;
-  for(const b of allBatches){
-    if(m.foodPool + gained >= target) break;
-    for(let i = 0; i < b.count; i++){
-      if(m.foodPool + gained >= target) break;
-      gained += b.val;
-      toConsume[b.k] = (toConsume[b.k] || 0) + 1;
-    }
-  }
-  if(m.foodPool + gained < target) return false;
-  for(const k in toConsume){
-    storage[k] -= toConsume[k];
-    if(storage[k] <= 0) delete storage[k];
-    if(batches[k]){
-      let remain = toConsume[k];
-      const nb = [];
-      for(const b of batches[k]){
-        if(remain <= 0){ nb.push(b); continue; }
-        if(b.count <= remain){ remain -= b.count; }
-        else { b.count -= remain; remain = 0; nb.push(b); }
-      }
-      if(nb.length) batches[k] = nb;
-      else delete batches[k];
-    }
-  }
-  m.foodPool += gained;
-  return true;
-}
+function _gardenMerchantCropValuePoolFill(target){ return _gardenMerchantPoolFill('cropValuePool', target); }
+function _gardenMerchantFoodPoolFill(target){ return _gardenMerchantPoolFill('foodPool', target); }
 
 /* ===== rev301 produce log helpers ===== */
 function _gardenLogMapAdd(map, id, rarity, count){
