@@ -444,6 +444,12 @@ function renderBattleScene(z1){
   });
   const bs=$('#boss-sprite');
   if(bs) _bindBattleTap(bs, function(e){
+    /* rev303: touchstart/click 兼容，正確取座標 */
+    let _cx, _cy;
+    if(e.changedTouches && e.changedTouches[0]){ _cx = e.changedTouches[0].clientX; _cy = e.changedTouches[0].clientY; }
+    else if(e.touches && e.touches[0]){ _cx = e.touches[0].clientX; _cy = e.touches[0].clientY; }
+    else { _cx = e.clientX; _cy = e.clientY; }
+    if(typeof _cx !== 'number' || typeof _cy !== 'number' || isNaN(_cx) || isNaN(_cy)) return;
 
     const bossSprite = document.getElementById('boss-sprite');
     if(!bossSprite) return;
@@ -453,8 +459,8 @@ function renderBattleScene(z1){
     if(!scene) return;
     const sceneRect = scene.getBoundingClientRect();
     const spriteRect = bossSprite.getBoundingClientRect();
-    const spriteX = e.clientX - spriteRect.left;
-    const spriteY = e.clientY - spriteRect.top;
+    const spriteX = _cx - spriteRect.left;
+    const spriteY = _cy - spriteRect.top;
     const _tf = getBossCanvasTransform(def, battle.bossId, spriteRect.width, spriteRect.height);
     const canvasX = (spriteX - _tf.ox) / _tf.sx;
     const canvasY = (spriteY - _tf.oy) / _tf.sy;
@@ -468,8 +474,8 @@ function renderBattleScene(z1){
         const m = document.createElement('div');
         m.className = 'aim-marker';
         m.id = 'aim-marker';
-        m.style.left = ((e.clientX - sceneRect.left) / sceneRect.width * 100) + '%';
-        m.style.top  = ((e.clientY - sceneRect.top)  / sceneRect.height * 100) + '%';
+        m.style.left = ((_cx - sceneRect.left) / sceneRect.width * 100) + '%';
+        m.style.top  = ((_cy - sceneRect.top)  / sceneRect.height * 100) + '%';
         fx.appendChild(m);
         setTimeout(()=>{ if(m.parentNode) m.remove(); }, 1000);
       }

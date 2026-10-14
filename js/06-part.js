@@ -2438,7 +2438,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
       else budget = stock;
       guardUnits.push({
         srv: s,
-        name: (SERVANT_TYPES[s.type] || {}).icon + ' 守衛 Lv.' + s.lv,
+        name: servantLabel(s) + ' Lv.' + s.lv,
         rpm: g.weaponDef.rpm || 600,
         x: pr.left - wrapRect.left + pr.width / 2,
         y: pr.top - wrapRect.top + pr.height - 4,
@@ -3293,6 +3293,7 @@ function _gardenActorExecuteTask(a){
   if(a.task.type === 'fetch_compost'){
     srv.stamina = Math.max(0, (srv.stamina || 0) - 100);
     a._hasCompost = true;
+    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 取堆肥', 'compost');
     save();
     return;
   }
@@ -3309,6 +3310,7 @@ function _gardenActorExecuteTask(a){
     _p.fertExpireAt = Date.now() + 45 * 60 * 1000;
     state.garden.compostNextIdx = (_idx + 1) % plots.length;
     a._hasCompost = false;
+    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 施肥 ' + plotCoordName(_idx), 'fertilize');
     save();
     return;
   }
@@ -3579,7 +3581,9 @@ function _gardenActorTick(){
                   tsrv.stamina = Math.max(1, Math.round(_eff * GARDEN_WAKEUP_RECOVER));
                   if(a._srv) a._srv.stamina = Math.max(0, (a._srv.stamina || 0) - 20);
                   if(a._srv) a._srv.stamina = Math.max(0, (a._srv.stamina || 0) - 20);
-                  _gardenLog('<span class="r-' + tsrv.rarity + '">' + servantLabel(tsrv) + '</span> 被監工叫醒', 'work');
+                  var _fmName = a._srv ? ('<span class="r-' + a._srv.rarity + '">' + servantLabel(a._srv) + '</span>') : '監工';
+                  var _tgName = '<span class="r-' + tsrv.rarity + '">' + servantLabel(tsrv) + '</span>';
+                  _gardenLog(_fmName + ' 叫醒 ' + _tgName, 'work');
                   save();
                 }
               }
@@ -5257,7 +5261,6 @@ function _gardenOfflineSettle(now, baseTime){
   const cropsOut = {};
   const seedsOut = {};
   const matsOut = {};
-  /* ★ 產線產出累積（整個離線期間合併） */
   const merchantAccum = { food: 0, seed: {}, throw: {}, ammo: {} };
   function _mergeLine(acc, key, items){
     if(key === 'food'){
@@ -5318,7 +5321,6 @@ function _gardenOfflineSettle(now, baseTime){
       _gardenDoOneMeal(g);
       lastMealHour++;
     }
-    /* ★ 用 batch 收集器包裝產線調用，讓每次產出都被合併 */
     if(typeof _gardenMerchantLineProcess === 'function'){
       const _oldBatch = window._merchantTickBatch;
       window._merchantTickBatch = { t: cursor, lines: {} };
