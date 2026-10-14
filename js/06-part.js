@@ -1315,8 +1315,8 @@ function _gardenMerchantTick(){
   }
   const batch = window._merchantTickBatch;
   window._merchantTickBatch = null;
-  const _hasProduce = batch && batch.lines && Object.keys(batch.lines).length > 0;
-  if(_hasProduce){
+  /* 需求 4：在線產線播報 */
+  if(batch && batch.lines && Object.keys(batch.lines).length > 0){
     try { _gardenLogMerchantBatch(batch); } catch(e){ console.warn('[tick log]', e); }
     save();
   }
@@ -5240,14 +5240,15 @@ function _gardenOfflineSettle(now, baseTime){
   const cropsOut = {};
   const seedsOut = {};
   const matsOut = {};
-  const merchantAccum = { food: 0, seed: {}, throw: {}, ammo: {} };
-  function _mergeLine(acc, key, items){
+  /* 產線離線產出累積：food 用次數、其他用物品 map */
+  const merchantAccum = { foodBatches: 0, seed: {}, throw: {}, ammo: {} };
+  function _mergeLine(key, items){
     if(key === 'food'){
       let tot = 0;
       for(const it of items) tot += it.count;
-      acc.food += tot;
+      merchantAccum.foodBatches += tot;
     } else {
-      const map = acc[key];
+      const map = merchantAccum[key];
       if(!map) return;
       for(const it of items){
         const k2 = it.id + '@' + it.rarity;
@@ -5296,10 +5297,8 @@ function _gardenOfflineSettle(now, baseTime){
     if(nextT > now) nextT = now;
     cursor = nextT;
     const curHour = Math.floor(cursor / GARDEN_MEAL_INTERVAL_MS);
-    while(lastMealHour < curHour){
-      _gardenDoOneMeal(g);
-      lastMealHour++;
-    }
+    while(lastMealHour < curHour){ _gardenDoOneMeal(g); lastMealHour++; }
+    /* 產線：用 batch 收集器包裝，收集本次 tick 產出 */
     if(typeof _gardenMerchantLineProcess === 'function'){
       const _oldBatch = window._merchantTickBatch;
       window._merchantTickBatch = { t: cursor, lines: {} };
@@ -5312,9 +5311,7 @@ function _gardenOfflineSettle(now, baseTime){
       if(_batch && _batch.lines){
         for(const _k in _batch.lines){
           const _line = _batch.lines[_k];
-          if(_line && _line.items && _line.items.length){
-            _mergeLine(merchantAccum, _k, _line.items);
-          }
+          if(_line && _line.items && _line.items.length){ _mergeLine(_k, _line.items); }
         }
       }
     }
@@ -5323,10 +5320,7 @@ function _gardenOfflineSettle(now, baseTime){
       if(a.task && cursor >= a.taskEnd){
         const r = _offlineDoFarmerTask(a.srv, a.task, cursor);
         if(r.ok){
-          if(r.harvest){
-            totalHarvest++;
-            if(r.cropKey) cropsOut[r.cropKey] = (cropsOut[r.cropKey] || 0) + (r.cropCount || 1);
-          }
+          if(r.harvest){ totalHarvest++; if(r.cropKey) cropsOut[r.cropKey] = (cropsOut[r.cropKey] || 0) + (r.cropCount || 1); }
           if(r.plant) totalPlant++;
           if(r.clean) totalClean++;
           a.stamina = Math.max(0, a.stamina - 5);
@@ -5351,10 +5345,7 @@ function _gardenOfflineSettle(now, baseTime){
       }
       if(a.stamina < 5) continue;
       const task = _offlineFindFarmerTask(a.srv, cursor);
-      if(task){
-        a.task = task;
-        a.taskEnd = cursor + WORK_MS;
-      }
+      if(task){ a.task = task; a.taskEnd = cursor + WORK_MS; }
     }
     if(cursor % GARDEN_MEAL_INTERVAL_MS < 5000){
       const lr = _gardenServantLeaveCheck(true);
@@ -5364,45 +5355,39 @@ function _gardenOfflineSettle(now, baseTime){
     }
   }
   g.lastMealAt = Math.floor(now / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
-  const _merchantHas = merchantAccum.food > 0
-    || Object.keys(merchantAccum.seed).length
-    || Object.keys(merchantAccum.throw).length
-    || Object.keys(merchantAccum.ammo).length;
-  if(totalHarvest + totalPlant + totalClean + totalLeaves > 0 || _merchantHas){
-    const hours = ((now - baseTime) / 3600000).toFixed(1);
-    const detail = {
-      type: 'offline_garden',
-      hours: hours,
-      harvest: totalHarvest,
-      plant: totalPlant,
-      clean: totalClean,
-      leaves: totalLeaves,
-      crops: cropsOut,
-      seeds: seedsOut,
-      mats: matsOut,
-      merchant: merchantAccum
-    };
-    const parts = [];
-    if(totalHarvest) parts.push('收穫 ' + totalHarvest + ' 次');
-    if(totalPlant) parts.push('種植 ' + totalPlant + ' 次');
-    if(totalClean) parts.push('清理 ' + totalClean + ' 次');
-    if(totalLeaves) parts.push(totalLeaves + ' 名僕人離開');
-    if(_merchantHas){
-      const _mParts = [];
-      if(merchantAccum.food > 0) _mParts.push('🍲+' + merchantAccum.food);
-      const _sc = Object.keys(merchantAccum.seed).reduce(function(s,k){ return s + merchantAccum.seed[k].count; }, 0);
-      if(_sc) _mParts.push('🌰+' + _sc);
-      const _tc = Object.keys(merchantAccum.throw).reduce(function(s,k){ return s + merchantAccum.throw[k].count; }, 0);
-      if(_tc) _mParts.push('💣+' + _tc);
-      const _ac = Object.keys(merchantAccum.ammo).reduce(function(s,k){ return s + merchantAccum.ammo[k].count; }, 0);
-      if(_ac) _mParts.push('🎖️+' + _ac);
-      parts.push('產線：' + _mParts.join(' '));
-    }
-    const summary = '離線 ' + hours + ' 小時，後院：' + parts.join('、') + '。 點擊查看 →';
-    if(!state.garden.log) state.garden.log = [];
-    state.garden.log.push({ t: Date.now(), text: summary, cls: 'offline', detail: detail });
-    if(state.garden.log.length > 100) state.garden.log.splice(0, state.garden.log.length - 100);
+  const _mSeed = Object.keys(merchantAccum.seed).reduce(function(s,k){ return s + merchantAccum.seed[k].count; }, 0);
+  const _mThrow = Object.keys(merchantAccum.throw).reduce(function(s,k){ return s + merchantAccum.throw[k].count; }, 0);
+  const _mAmmo = Object.keys(merchantAccum.ammo).reduce(function(s,k){ return s + merchantAccum.ammo[k].count; }, 0);
+  const _merchantHas = (merchantAccum.foodBatches > 0 || _mSeed > 0 || _mThrow > 0 || _mAmmo > 0);
+  const _gardenHas = (totalHarvest + totalPlant + totalClean + totalLeaves > 0);
+  /* 需求 3：離線結算一律寫一條日誌（無活動也寫） */
+  const hours = ((now - baseTime) / 3600000).toFixed(1);
+  const detail = {
+    type: 'offline_garden',
+    hours: hours,
+    harvest: totalHarvest, plant: totalPlant, clean: totalClean, leaves: totalLeaves,
+    crops: cropsOut, seeds: seedsOut, mats: matsOut,
+    merchant: merchantAccum
+  };
+  const parts = [];
+  if(totalHarvest) parts.push('收穫 ' + totalHarvest + ' 次');
+  if(totalPlant) parts.push('種植 ' + totalPlant + ' 次');
+  if(totalClean) parts.push('清理 ' + totalClean + ' 次');
+  if(totalLeaves) parts.push(totalLeaves + ' 名僕人離開');
+  if(_merchantHas){
+    const _mp = [];
+    if(merchantAccum.foodBatches > 0) _mp.push('🍲+' + merchantAccum.foodBatches);
+    if(_mSeed) _mp.push('🌰+' + _mSeed);
+    if(_mThrow) _mp.push('💣+' + _mThrow);
+    if(_mAmmo) _mp.push('🎖️+' + _mAmmo);
+    parts.push('產線 ' + _mp.join(' '));
   }
+  const summary = parts.length
+    ? ('離線 ' + hours + ' 小時，後院：' + parts.join('、') + '。 點擊查看 →')
+    : ('離線 ' + hours + ' 小時，後院無活動。');
+  if(!state.garden.log) state.garden.log = [];
+  state.garden.log.push({ t: Date.now(), text: summary, cls: 'offline', detail: detail });
+  if(state.garden.log.length > 100) state.garden.log.splice(0, state.garden.log.length - 100);
 }
 
 function gardenCleanup(idx){
@@ -5465,132 +5450,142 @@ function _logBind(bd, entry){
 }
 /* ===== end log helpers ===== */
 
-function _openMerchantBatchDetail(entry){
-  try {
-    const d = entry.detail;
-    if(!window._gLogCollapsed) window._gLogCollapsed = {};
-    let body = '';
-    const _lines = d.lines || {};
-    const _lks = Object.keys(_lines);
-    for(const _k of _lks){
-      const _line = _lines[_k];
-      if(!_line) continue;
-      const _items = _line.items || [];
-      const _batches = _line.batches || 0;
-      if(!_items.length && !_batches) continue;
-      const _meta = (typeof _gardenMerchantLineMeta === 'function' ? _gardenMerchantLineMeta(_k) : null) || { icon: '?', title: _k };
-      const _col = !!window._gLogCollapsed[_k];
-      body += _logCat(_k, _meta.icon + ' ' + _meta.title + ' · ' + _batches + ' 批', _items.length, _col);
-      if(!_col){
-        if(!_items.length){
-          body += '<div style="font-size:10px;color:#7a6f60;padding:4px 8px">（無明細）</div>';
-        } else {
-          for(const _it of _items){
-            body += _logItem(_it.id, _it.rarity, _it.count, _it.id === 'food');
-          }
-        }
-      }
-    }
-    if(!body){
-      body = '<div class="empty-hint">無產出資料</div>';
-      let _dump = '(空)';
-      try { _dump = JSON.stringify(d).slice(0, 300); } catch(e){ _dump = String(e); }
-      body += '<div style="font-size:10px;color:#7a6f60;margin-top:8px;word-break:break-all">dump: ' + _dump + '</div>';
-    }
-    const ft = document.createElement('div');
-    ft.className = 'modal-ft';
-    ft.innerHTML = '';
-    const bd = openModal({ title: '⏱ 產線結算', body: body, footer: ft });
-    _logBind(bd, entry);
-  } catch(e){
-    const ft = document.createElement('div');
-    ft.className = 'modal-ft';
-    ft.innerHTML = '';
-    let _stack = '';
-    try { _stack = (e.stack || '').split('\n').slice(0,3).join('<br>'); } catch(_){ _stack = ''; }
-    openModal({ title: '⏱ 產線結算 (err)', body: '<div style="color:#e05252">' + (e.message||String(e)) + '</div><div style="font-size:10px;color:#7a6f60;margin-top:8px">' + _stack + '</div>', footer: ft });
-  }
-}
 
-function _openOfflineGardenDetail(entry){
-  try {
-    const d = entry.detail;
-    let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + _esc(entry.text || '') + '</div>';
-    if(!window._gLogCollapsed) window._gLogCollapsed = {};
-    /* 產線產出 */
-    if(d.merchant){
-      const m = d.merchant;
-      if(m.food > 0){
-        const _col = !!window._gLogCollapsed['acc_food'];
-        body += _logCat('acc_food', '🍲 食物生產線', 1, _col);
-        if(!_col) body += _logItem('food', '一般', m.food, true);
-      }
-      for(const _k of ['seed', 'throw', 'ammo']){
-        const _src = m[_k];
-        if(!_src) continue;
-        const _items = Object.keys(_src).map(function(k){ return _src[k]; });
-        if(!_items.length) continue;
-        const _meta = (typeof _gardenMerchantLineMeta === 'function' ? _gardenMerchantLineMeta(_k) : null) || { icon: '?', title: _k };
-        const _col = !!window._gLogCollapsed['acc_' + _k];
-        body += _logCat('acc_' + _k, _meta.icon + ' ' + _meta.title, _items.length, _col);
-        if(!_col){
-          for(const it of _items) body += _logItem(it.id, it.rarity, it.count, false);
-        }
-      }
-    }
-    /* 後院作物/種子/材料 */
-    const _cats = [
-      ['作物', 'crops'],
-      ['種子', 'seeds'],
-      ['材料', 'mats']
-    ];
-    for(const _pair of _cats){
-      const _title = _pair[0];
-      const _key = _pair[1];
-      const _src = d[_key];
-      if(!_src) continue;
-      const _items = [];
-      for(const k in _src){
-        if(_key === 'mats'){
-          _items.push({ id: k, rarity: '一般', count: _src[k] });
-        } else {
-          const sp = k.split('@');
-          _items.push({ id: sp[0], rarity: sp[1], count: _src[k] });
-        }
-      }
-      if(!_items.length) continue;
-      const _col = !!window._gLogCollapsed[_title];
-      body += _logCat(_title, _title, _items.length, _col);
-      if(!_col){
-        for(const it of _items) body += _logItem(it.id, it.rarity, it.count, false);
-      }
-    }
-    const ft = document.createElement('div');
-    ft.className = 'modal-ft';
-    ft.innerHTML = '';
-    const bd = openModal({ title: '📦 離線後院', body: body, footer: ft });
-    _logBind(bd, entry);
-  } catch(e){
-    const ft = document.createElement('div');
-    ft.className = 'modal-ft';
-    ft.innerHTML = '';
-    openModal({ title: '📦 離線後院 (err)', body: '<div style="color:#e05252">' + (e.message||String(e)) + '</div>', footer: ft });
-  }
-}
+
 
 function _openGardenLogDetail(entry){
   if(!entry || !entry.detail) return;
-  const t = entry.detail.type;
-  if(t === 'merchant_batch'){ _openMerchantBatchDetail(entry); return; }
-  if(t === 'offline_garden'){ _openOfflineGardenDetail(entry); return; }
-  /* 未知類型：顯示診斷 */
   const d = entry.detail;
-  let body = '<div class="empty-hint">未知日誌類型：' + String(t || '?') + '</div>';
+  /* 需求 7：按 type 分派，兩個類型分別走各自的彈窗 */
+  if(d.type === 'merchant_batch'){ _openMerchantBatchDetail(entry); return; }
+  if(d.type === 'offline_garden'){ _openOfflineGardenDetail(entry); return; }
+  /* 未知類型：顯示診斷 */
+  let body = '<div class="empty-hint">未知日誌類型：' + String(d.type || '?') + '</div>';
   body += '<div style="font-size:10px;color:#7a6f60;margin-top:8px;word-break:break-all">keys: ' + Object.keys(d).join(', ') + '</div>';
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '';
   openModal({ title: '📦 詳情', body: body, footer: ft });
+}
+
+/* 產線結算彈窗 */
+function _openMerchantBatchDetail(entry){
+  const d = entry.detail;
+  const _keys = ['food','seed','throw','ammo'];
+  if(!window._gLogCollapsed) window._gLogCollapsed = {};
+  let body = '';
+  for(const _k of _keys){
+    const _line = d.lines && d.lines[_k];
+    if(!_line || !_line.items || !_line.items.length) continue;
+    const _meta = _gardenMerchantLineMeta(_k) || { icon: '?', title: _k };
+    const _col = !!window._gLogCollapsed['mb_' + _k];
+    body += '<div class="cat-header" data-gcat="mb_' + _k + '" style="cursor:pointer"><span>' + _meta.icon + ' ' + _meta.title + ' · ' + (_line.batches||0) + ' 批</span><span>' + (_col ? '▶' : '▼') + '</span></div>';
+    if(!_col){
+      for(const _it of _line.items){
+        if(_it.id === 'food'){
+          body += '<div class="item-row" style="cursor:default"><div class="icon" style="background:' + rarityBg(_it.rarity) + '">🍲</div><div class="info"><div class="nm ' + rarityClass(_it.rarity) + '">食物</div><div class="sub">' + _it.rarity + '</div></div><div class="cnt">×' + _it.count + '</div></div>';
+        } else {
+          const _def = itemDef(_it.id) || { name: _it.id };
+          body += '<div class="item-row" data-iid="' + _it.id + '" data-irar="' + _it.rarity + '"><div class="icon" style="background:' + rarityBg(_it.rarity) + '">' + itemIcon(_it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(_it.rarity) + '">' + _def.name + '</div><div class="sub">' + _it.rarity + '</div></div><div class="cnt">×' + _it.count + '</div></div>';
+        }
+      }
+    }
+  }
+  if(!body){ body = '<div class="empty-hint">無產出資料</div>'; }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '';
+  const bd = openModal({ title: '⏱ 產線結算', body: body, footer: ft });
+  const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
+  for(let _i = 0; _i < _hds.length; _i++){
+    (function(h){
+      h.onclick = function(){
+        if(!window._gLogCollapsed) window._gLogCollapsed = {};
+        const _kk = h.getAttribute('data-gcat');
+        window._gLogCollapsed[_kk] = !window._gLogCollapsed[_kk];
+        closeModal(); _openGardenLogDetail(entry);
+      };
+    })(_hds[_i]);
+  }
+  const _rows = bd.querySelectorAll('.item-row[data-iid]');
+  for(let _i = 0; _i < _rows.length; _i++){
+    (function(row){
+      row.onclick = function(){
+        const iid = row.getAttribute('data-iid');
+        const irar = row.getAttribute('data-irar');
+        closeModal();
+        openItemDetail(iid, irar, function(){ _openGardenLogDetail(entry); });
+      };
+    })(_rows[_i]);
+  }
+}
+
+/* 離線後院彈窗（含產線分類） */
+function _openOfflineGardenDetail(entry){
+  const d = entry.detail;
+  let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + _esc(entry.text || '') + '</div>';
+  if(!window._gLogCollapsed) window._gLogCollapsed = {};
+  function _catHtml(key, title, items){
+    if(!items || !items.length) return '';
+    const col = !!window._gLogCollapsed['og_' + key];
+    let h = '<div class="cat-header" data-gcat="og_' + key + '" style="cursor:pointer"><span>' + title + ' (' + items.length + ')</span><span>' + (col ? '▶' : '▼') + '</span></div>';
+    if(!col){
+      for(const it of items){
+        const def = itemDef(it.id) || { name: it.id };
+        const _isFood = (it.id === 'food');
+        h += '<div class="item-row"' + (_isFood ? ' style="cursor:default"' : (' data-iid="' + it.id + '" data-irar="' + it.rarity + '"')) + '><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + def.name + '</div><div class="sub">' + it.rarity + '</div></div><div class="cnt">×' + it.count + '</div></div>';
+      }
+    }
+    return h;
+  }
+  /* 產線產出 */
+  if(d.merchant){
+    if(d.merchant.foodBatches > 0){
+      body += _catHtml('mfood', '🍲 食物生產線', [{ id:'food', rarity:'一般', count: d.merchant.foodBatches }]);
+    }
+    for(const _k of ['seed','throw','ammo']){
+      const _src = d.merchant[_k];
+      if(!_src) continue;
+      const _items = Object.keys(_src).map(function(kk){ return _src[kk]; });
+      if(!_items.length) continue;
+      const _meta = _gardenMerchantLineMeta(_k) || { icon: '?', title: _k };
+      body += _catHtml(_k, _meta.icon + ' ' + _meta.title, _items);
+    }
+  }
+  /* 後院作物/種子/材料 */
+  const _cArr = [], _sArr = [], _mArr = [];
+  if(d.crops){ for(const k in d.crops){ const sp = k.split('@'); _cArr.push({ id: sp[0], rarity: sp[1], count: d.crops[k] }); } }
+  if(d.seeds){ for(const k in d.seeds){ const sp = k.split('@'); _sArr.push({ id: sp[0], rarity: sp[1], count: d.seeds[k] }); } }
+  if(d.mats){ for(const k in d.mats){ _mArr.push({ id: k, rarity: '一般', count: d.mats[k] }); } }
+  body += _catHtml('crops', '🌾 作物', _cArr);
+  body += _catHtml('seeds', '🌰 種子', _sArr);
+  body += _catHtml('mats', '🔩 材料', _mArr);
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '';
+  const bd = openModal({ title: '📦 離線後院', body: body, footer: ft });
+  const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
+  for(let _i = 0; _i < _hds.length; _i++){
+    (function(h){
+      h.onclick = function(){
+        if(!window._gLogCollapsed) window._gLogCollapsed = {};
+        const _kk = h.getAttribute('data-gcat');
+        window._gLogCollapsed[_kk] = !window._gLogCollapsed[_kk];
+        closeModal(); _openGardenLogDetail(entry);
+      };
+    })(_hds[_i]);
+  }
+  const _rows = bd.querySelectorAll('.item-row[data-iid]');
+  for(let _i = 0; _i < _rows.length; _i++){
+    (function(row){
+      row.onclick = function(){
+        const iid = row.getAttribute('data-iid');
+        const irar = row.getAttribute('data-irar');
+        closeModal();
+        openItemDetail(iid, irar, function(){ _openGardenLogDetail(entry); });
+      };
+    })(_rows[_i]);
+  }
 }
 
 function _openBattleLogDetail(entry){
