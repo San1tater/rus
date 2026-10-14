@@ -819,10 +819,11 @@ function renderGardenStorage(box){
 
 const MERCHANT_INTERVAL_MS = 300000;
 const MERCHANT_FOOD_TABLE = {
-  0: { food: 0 },
-  1: { gears: 1, screws: 2, food: 25 },
-  2: { gears: 2, electronics: 1, screws: 5, food: 70 },
-  3: { gears: 3, electronics: 2, screws: 10, food: 125 }
+  0: { cropValue: 0 },
+  1: { gears: 1, screws: 2, cropValue: 25 },
+  2: { gears: 2, electronics: 1, screws: 5, cropValue: 70 },
+  3: { gears: 3, electronics: 2, screws: 10, cropValue: 125 },
+  4: { gears: 4, electronics: 3, screws: 15, cropValue: 250 }
 };
 const MERCHANT_SEED_TABLE = {
   0: { metal: 0, count: 0, rarities: [] },
@@ -835,14 +836,14 @@ const MERCHANT_THROW_TABLE = {
   1: { metal: 2, screws: 3, count: 1, rarities: ['一般'] },
   2: { metal: 4, gears: 2, cloth: 2, screws: 6, count: 2, rarities: ['一般','庫存'] },
   3: { metal: 6, gears: 3, cloth: 5, electronics: 3, screws: 15, count: 2, rarities: ['一般','庫存','精品'] },
-  4: { food: 500, count: 1, legend: true }
+  4: { foodCost: 40, count: 1, legend: true }
 };
 const MERCHANT_AMMO_TABLE = {
-  0: { food: 0, count: 0 },
-  1: { food: 100, count: 1 },
-  2: { food: 300, count: 3 },
-  3: { food: 700, count: 7 },
-  4: { food: 1500, count: 15 }
+  0: { foodCost: 0, count: 0 },
+  1: { foodCost: 8, count: 1 },
+  2: { foodCost: 24, count: 3 },
+  3: { foodCost: 56, count: 7 },
+  4: { foodCost: 120, count: 15 }
 };
 
 /* ════════════════════════════════════════════════════════════════
@@ -1044,6 +1045,11 @@ function _gardenMerchantLineProcess(lineKey, atTime){
   const lv = m[L.lvKey] || 0;
   if(lv <= 0) return false;
   const last = m[L.lastKey] || 0;
+  /* ★ 首次訂閱保護：last 尚未初始化（=0）時只設為 now，不做追溯生產 */
+  if(last === 0){
+    m[L.lastKey] = now;
+    return false;
+  }
   if(now - last < MERCHANT_INTERVAL_MS) return false;
   const times = Math.min(Math.floor((now - last) / MERCHANT_INTERVAL_MS), 500);
   if(times <= 0) return false;
@@ -1057,14 +1063,14 @@ function _gardenMerchantLineProcess(lineKey, atTime){
       if(cfg.gears) matCosts.gears = cfg.gears;
       if(cfg.electronics) matCosts.electronics = cfg.electronics;
       if(cfg.screws) matCosts.screws = cfg.screws;
-      const poolBefore = m.cropValuePool || 0;
+      const poolBefore = m.foodPool || 0;
       const cropVal = _gardenTotalCropValue();
-      if(poolBefore + cropVal + 0.001 < cfg.food) break;
+      if(poolBefore + cropVal + 0.001 < cfg.cropValue) break;
       if(!_gardenMerchantCanPay(matCosts)) break;
       _gardenMerchantTryPay(matCosts);
-      _gardenMerchantCropValuePoolFill(cfg.food);
-      m.cropValuePool -= cfg.food;
-      g.food += cfg.food;
+      _gardenMerchantFoodPoolFill(cfg.cropValue);
+      m.foodPool -= cfg.cropValue;
+      g.food += cfg.cropValue;
       ok = true;
     } else if(lineKey === 'seed'){
       const matCosts = { metal: cfg.metal };
@@ -1081,8 +1087,8 @@ function _gardenMerchantLineProcess(lineKey, atTime){
       ok = true;
     } else if(lineKey === 'throw'){
       if(cfg.legend){
-        if(g.food + 0.001 < cfg.food) break;
-        g.food -= cfg.food;
+        if(g.food + 0.001 < cfg.foodCost) break;
+        g.food -= cfg.foodCost;
         for(let _k = 0; _k < cfg.count; _k++){
           const tid = LEGEND_THROW_POOL[Math.floor(Math.random() * LEGEND_THROW_POOL.length)];
           invAdd(tid, '傳奇', 1);
@@ -1104,8 +1110,8 @@ function _gardenMerchantLineProcess(lineKey, atTime){
         ok = true;
       }
     } else if(lineKey === 'ammo'){
-      if(g.food + 0.001 < cfg.food) break;
-      g.food -= cfg.food;
+      if(g.food + 0.001 < cfg.foodCost) break;
+      g.food -= cfg.foodCost;
       for(let _k = 0; _k < cfg.count; _k++){
         const aid = LEGEND_AMMO_POOL[Math.floor(Math.random() * LEGEND_AMMO_POOL.length)];
         invAdd(aid, '傳奇', 1);
@@ -1180,7 +1186,7 @@ function _gardenFoodStats(){
     consume += (FOOD_COST[s.foodPolicy || 'normal'] || 0) * 60;
   }
   let produce = 0;
-  if(m.foodLv > 0) produce = MERCHANT_FOOD_TABLE[m.foodLv].food * 12;
+  if(m.foodLv > 0) produce = MERCHANT_FOOD_TABLE[m.foodLv].cropValue * 12;
   return { food: food, consume: consume, produce: produce };
 }
 
@@ -1195,10 +1201,9 @@ function _gardenMerchantLineMeta(lineKey){
 function _gardenMerchantCostStr(cfg, lineKey){
   if(!cfg) return '無';
   const parts = [];
-  /* rev303: 食物生產線的「消耗」= 作物等值（cropValuePool，由作物填充）→ 🌾
-     傳奇投擲 / 傳奇彈藥線的「消耗」= 實際食物（g.food）→ 🍲 */
-  if(lineKey === 'food' && cfg.food) parts.push('🌾' + cfg.food);
-  else if((cfg.legend || lineKey === 'ammo') && cfg.food) parts.push('🍲' + cfg.food);
+  if(lineKey === 'food' && cfg.cropValue) parts.push('🌾' + cfg.cropValue);
+  else if(lineKey === 'ammo' && cfg.foodCost) parts.push('🍲' + cfg.foodCost);
+  else if(lineKey === 'throw' && cfg.legend && cfg.foodCost) parts.push('🍲' + cfg.foodCost);
   if(cfg.metal) parts.push('🔩' + cfg.metal);
   if(cfg.gears) parts.push('⚙️' + cfg.gears);
   if(cfg.electronics) parts.push('💡' + cfg.electronics);
@@ -1210,7 +1215,7 @@ function _gardenMerchantProduceStr(cfg, lineKey){
   if(!cfg) return '無';
   if(cfg.legend) return '💣 傳奇投擲物 ×' + cfg.count;
   if(lineKey === 'ammo') return '🎖️ 傳奇彈藥 ×' + cfg.count;
-  if(cfg.food) return '🍲' + cfg.food;
+  if(lineKey === 'food' && cfg.cropValue) return '🍲' + cfg.cropValue;
   if(cfg.count){
     const _icon = lineKey === 'throw' ? '💣' : '🌰';
     return _icon + (cfg.rarities || []).join('/') + ' ×' + cfg.count;
@@ -1323,7 +1328,7 @@ function renderGardenMerchant(box){
       const _cfg = meta.table[lv];
       const _pools = m.matPools || {};
       if(lineKey === 'food'){
-        const _fp = m.cropValuePool || 0;
+        const _fp = m.foodPool || 0;
         _parts.push('🌾' + (Math.round(_fp * 10) / 10));
       }
       for(const _mid in _EMO){
@@ -3780,11 +3785,11 @@ function _gardenMerchantLineStatus(lineKey){
     const costs = {};
     if(c.gears) costs.gears = c.gears;
     if(c.electronics) costs.electronics = c.electronics;
-    const matMiss = _gardenMerchantMissingList(costs);
-    for(const x of matMiss) missing.push(x);
-    const poolBefore = m.cropValuePool || 0;
+    if(c.screws) costs.screws = c.screws;
+    for(const x of _gardenMerchantMissingList(costs)) missing.push(x);
+    const poolBefore = m.foodPool || 0;
     const cropVal = _gardenTotalCropValue();
-    if(poolBefore + cropVal + 0.001 < c.food) missing.push('作物');
+    if(poolBefore + cropVal + 0.001 < c.cropValue) missing.push('作物');
   } else if(lineKey === 'seed'){
     const costs = { metal: c.metal };
     if(c.gears) costs.gears = c.gears;
@@ -3792,7 +3797,7 @@ function _gardenMerchantLineStatus(lineKey){
     for(const x of _gardenMerchantMissingList(costs)) missing.push(x);
   } else if(lineKey === 'throw'){
     if(c.legend){
-      if((g.food || 0) + 0.001 < c.food) missing.push('食物');
+      if((g.food || 0) + 0.001 < c.foodCost) missing.push('食物');
     } else {
       const costs = { metal: c.metal };
       if(c.gears) costs.gears = c.gears;
@@ -3801,7 +3806,7 @@ function _gardenMerchantLineStatus(lineKey){
       for(const x of _gardenMerchantMissingList(costs)) missing.push(x);
     }
   } else if(lineKey === 'ammo'){
-    if((g.food || 0) + 0.001 < c.food) missing.push('食物');
+    if((g.food || 0) + 0.001 < c.foodCost) missing.push('食物');
   }
   return { active: true, paused: missing.length > 0, missing: missing };
 }
@@ -3948,7 +3953,7 @@ function renderBaseStats(){
     consumePerHour += (FOOD_COST[s.foodPolicy || 'normal'] || 0) * 60;
   }
   if(m.foodLv > 0){
-    const prod = MERCHANT_FOOD_TABLE[m.foodLv].food * 12;
+    const prod = MERCHANT_FOOD_TABLE[m.foodLv].cropValue * 12;
     const net = prod - consumePerHour;
     const st = _gardenMerchantLineStatus('food');
     rows.push({ key: 'food', label: '食物', value: (net >= 0 ? '+' : '') + net + '/h', paused: st && st.paused });
