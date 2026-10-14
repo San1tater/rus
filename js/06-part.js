@@ -971,23 +971,19 @@ function _gardenMerchantInit(){
   if(!state.garden) state.garden = { plots:new Array(20).fill(null), storage:{} };
   if(typeof state.garden.food !== 'number') state.garden.food = 0;
   if(!state.garden.merchant || typeof state.garden.merchant !== 'object'){
-    state.garden.merchant = { foodLv:0, seedLv:0, throwLv:0, lastFood:0, lastSeed:0, lastThrow:0, lastFeed:0 };
+    state.garden.merchant = { foodLv:0, seedLv:0, throwLv:0, ammoLv:0, lastFood:0, lastSeed:0, lastThrow:0, lastAmmo:0, lastFeed:0 };
   }
   const m = state.garden.merchant;
   if(typeof m.foodLv !== 'number') m.foodLv = 0;
   if(typeof m.seedLv !== 'number') m.seedLv = 0;
   if(typeof m.throwLv !== 'number') m.throwLv = 0;
+  if(typeof m.ammoLv !== 'number') m.ammoLv = 0;
   if(typeof m.lastFood !== 'number') m.lastFood = 0;
   if(typeof m.lastSeed !== 'number') m.lastSeed = 0;
   if(typeof m.lastThrow !== 'number') m.lastThrow = 0;
-  if(typeof m.ammoLv !== 'number') m.ammoLv = 0;
   if(typeof m.lastAmmo !== 'number') m.lastAmmo = 0;
   if(typeof m.lastFeed !== 'number' || !m.lastFeed) m.lastFeed = Date.now();
-  /* rev303: foodPool → cropValuePool（語意：作物等值池，非實際食物） */
-  if(typeof m.cropValuePool !== 'number'){
-    m.cropValuePool = (typeof m.foodPool === 'number') ? m.foodPool : 0;
-  }
-  if(typeof m.foodPool !== 'undefined') delete m.foodPool;
+  if(typeof m.foodPool !== 'number') m.foodPool = 0;
   if(typeof state.garden.compostValue !== 'number'){
     state.garden.compostValue = (typeof state.garden.compostAccelSec === 'number') ? state.garden.compostAccelSec : 0;
     if(typeof state.garden.compostAccelSec !== 'undefined') delete state.garden.compostAccelSec;
@@ -1128,6 +1124,64 @@ function _gardenMerchantCropValuePoolFill(target){
   m.cropValuePool += gained;
   return true;
 }
+function _gardenMerchantFoodPoolFill(target){
+  const g = _gardenMerchantInit();
+  const m = g.merchant;
+  if(!m.foodPool) m.foodPool = 0;
+  if(m.foodPool >= target) return true;
+  const storage = _gardenStorageInit();
+  const batches = (state.garden && state.garden.storageBatches) || {};
+  const allBatches = [];
+  for(const k in storage){
+    if(storage[k] <= 0) continue;
+    const parts = k.split('@');
+    if(!CROPS[parts[0]]) continue;
+    const bs = batches[k];
+    if(Array.isArray(bs) && bs.length){
+      let listed = 0;
+      for(const b of bs){
+        allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: b.count, addedAt: b.addedAt || 0, val: cropFoodValue(parts[0], parts[1]) });
+        listed += b.count;
+      }
+      const missing = storage[k] - listed;
+      if(missing > 0){
+        allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: missing, addedAt: 0, val: cropFoodValue(parts[0], parts[1]) });
+      }
+    } else {
+      allBatches.push({ k: k, id: parts[0], rarity: parts[1], count: storage[k], addedAt: 0, val: cropFoodValue(parts[0], parts[1]) });
+    }
+  }
+  allBatches.sort(function(a, b){ return a.addedAt - b.addedAt; });
+  const toConsume = {};
+  let gained = 0;
+  for(const b of allBatches){
+    if(m.foodPool + gained >= target) break;
+    for(let i = 0; i < b.count; i++){
+      if(m.foodPool + gained >= target) break;
+      gained += b.val;
+      toConsume[b.k] = (toConsume[b.k] || 0) + 1;
+    }
+  }
+  if(m.foodPool + gained < target) return false;
+  for(const k in toConsume){
+    storage[k] -= toConsume[k];
+    if(storage[k] <= 0) delete storage[k];
+    if(batches[k]){
+      let remain = toConsume[k];
+      const nb = [];
+      for(const b of batches[k]){
+        if(remain <= 0){ nb.push(b); continue; }
+        if(b.count <= remain){ remain -= b.count; }
+        else { b.count -= remain; remain = 0; nb.push(b); }
+      }
+      if(nb.length) batches[k] = nb;
+      else delete batches[k];
+    }
+  }
+  m.foodPool += gained;
+  return true;
+}
+
 function _gardenMerchantLineProcess(lineKey, atTime){
   const g = _gardenMerchantInit();
   const m = g.merchant;
