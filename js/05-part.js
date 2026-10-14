@@ -551,20 +551,24 @@ function battleLoop(now){
     battle.px = newPx;
   }
 
-  if(BATTLE_ONESHOT_ANIMS.indexOf(battleHeroAnim.name) === -1){
-    if(canMove && hasMoveInput){
-      /* rev105: 搖桿推得越深 → run，輕推 → walk */
-      const _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+  if(BATTLE_ONESHOT_ANIMS.indexOf(battleHeroAnim.name) === -1)  {
+    const _HARD_LOCK = ['reload','switch_secondary','switch_melee','hurt'];
+    const _isHardLocked = _HARD_LOCK.indexOf(battleHeroAnim.name) !== -1 && battleHeroAnim.forcedEnd > now;
+    if(!_isHardLocked){
+      let _wantAnim;
+      if(canMove && hasMoveInput){
+        _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+      } else if(battle.firing || (battleHeroAnim.forcedEnd > now && (battleHeroAnim.name === 'fire_primary' || battleHeroAnim.name === 'fire_secondary' || battleHeroAnim.name === 'attack_melee'))){
+        if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
+        else if(battle.weaponSlot === 'melee') _wantAnim = 'attack_melee';
+        else _wantAnim = 'fire_primary';
+      } else {
+        _wantAnim = 'idle';
+      }
       if(battleHeroAnim.name !== _wantAnim){
         battleHeroAnim.name = _wantAnim;
         battleHeroAnim.frame = 0;
-        battleHeroAnim.lastUpdate = performance.now();
-      }
-    } else {
-      if(battleHeroAnim.name !== 'idle'){
-        battleHeroAnim.name='idle';
-        battleHeroAnim.frame=0;
-        battleHeroAnim.lastUpdate=performance.now();
+        battleHeroAnim.lastUpdate = now;
       }
     }
   }

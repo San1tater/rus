@@ -5603,12 +5603,25 @@ function _openOfflineGardenDetail(entry){
 
 function _openGardenLogDetail(entry){
   if(!entry || !entry.detail) return;
-  const t = entry.detail.type;
+  const d = entry.detail;
+  /* 内容判断：看 detail 有什么字段，不靠 type */
+  const _hasLines = d.lines && typeof d.lines === 'object' && Object.keys(d.lines).length > 0;
+  const _hasOffline = (typeof d.hours !== 'undefined')
+    || (typeof d.harvest !== 'undefined')
+    || (typeof d.plant !== 'undefined')
+    || (typeof d.clean !== 'undefined')
+    || (typeof d.leaves !== 'undefined')
+    || (d.merchant && typeof d.merchant === 'object');
+  if(_hasLines && !_hasOffline){ _openMerchantBatchDetail(entry); return; }
+  if(_hasOffline && !_hasLines){ _openOfflineGardenDetail(entry); return; }
+  /* 都有或都无：按 type 分派 */
+  const t = d.type;
   if(t === 'merchant_batch'){ _openMerchantBatchDetail(entry); return; }
   if(t === 'offline_garden'){ _openOfflineGardenDetail(entry); return; }
-  /* 未知类型：显示 debug */
+  /* 未知：显示诊断 */
   let body = '<div class="empty-hint">未知日誌類型：' + String(t || '?') + '</div>';
-  body += '<div style="font-size:10px;color:#7a6f60;margin-top:8px;word-break:break-all">keys: ' + Object.keys(entry.detail).join(', ') + '</div>';
+  body += '<div style="font-size:10px;color:#7a6f60;margin-top:8px;word-break:break-all">keys: ' + Object.keys(d).join(', ') + '</div>';
+  body += '<div style="font-size:10px;color:#7a6f60;margin-top:4px">hasLines=' + _hasLines + ' hasOffline=' + _hasOffline + '</div>';
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '';

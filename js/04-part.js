@@ -2,7 +2,7 @@
    ★★★ BOSS MODULE — 戰鬥邏輯區 ★★★
    ============================================================ */
 let battle=null;
-const BATTLE_ONESHOT_ANIMS=['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
+const BATTLE_ONESHOT_ANIMS=['attack_melee','reload','switch_secondary','switch_melee','hurt'];
 
 /* rev93/rev94: 輸入優先級助手 —— 搖桿、攻擊、切換、治療互相打斷 */
 function stopBattleMovement(){
@@ -575,7 +575,24 @@ function _bindBattleTap(el, handler){
     e.preventDefault();
     e.stopPropagation();
     _lastTouch = Date.now();
-    handler(e);
+    var _t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+    if(_t){
+      var _fake = {
+        clientX: _t.clientX,
+        clientY: _t.clientY,
+        pageX: _t.pageX,
+        pageY: _t.pageY,
+        target: e.target,
+        currentTarget: e.currentTarget,
+        touches: e.touches,
+        changedTouches: e.changedTouches,
+        preventDefault: function(){},
+        stopPropagation: function(){}
+      };
+      handler(_fake);
+    } else {
+      handler(e);
+    }
   }, {passive: false});
   el.addEventListener("click", function(e){
     if(Date.now() - _lastTouch < 500) return;
