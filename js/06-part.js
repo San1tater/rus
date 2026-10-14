@@ -1045,7 +1045,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
   const lv = m[L.lvKey] || 0;
   if(lv <= 0) return false;
   const last = m[L.lastKey] || 0;
-  /* ★ 首次訂閱保護：last 尚未初始化（=0）時只設為 now，不做追溯生產 */
+  /* 首次訂閱保護：last 尚未初始化（=0）時只設為 now，不做追溯生產 */
   if(last === 0){
     m[L.lastKey] = now;
     return false;
@@ -1087,6 +1087,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
       ok = true;
     } else if(lineKey === 'throw'){
       if(cfg.legend){
+        if(typeof LEGEND_THROW_POOL === 'undefined' || !LEGEND_THROW_POOL.length) break;
         if(g.food + 0.001 < cfg.foodCost) break;
         g.food -= cfg.foodCost;
         for(let _k = 0; _k < cfg.count; _k++){
@@ -1110,6 +1111,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
         ok = true;
       }
     } else if(lineKey === 'ammo'){
+      if(typeof LEGEND_AMMO_POOL === 'undefined' || !LEGEND_AMMO_POOL.length) break;
       if(g.food + 0.001 < cfg.foodCost) break;
       g.food -= cfg.foodCost;
       for(let _k = 0; _k < cfg.count; _k++){
@@ -1157,19 +1159,15 @@ function _gardenMerchantRefreshUI(){
 function _gardenMerchantTick(){
   const g = _gardenMerchantInit();
   const m = g.merchant;
-
   const now = Date.now();
   let changed = false;
-  if(_gardenMerchantLineProcess('food')) changed = true;
-  if(_gardenMerchantLineProcess('seed')) changed = true;
-  if(_gardenMerchantLineProcess('throw')) changed = true;
-  if(_gardenMerchantLineProcess('ammo')) changed = true;
-
-  // 每小時整點吃飯（舊每分鐘邏輯已停用）
+  try { if(_gardenMerchantLineProcess('food')) changed = true; } catch(e){ console.warn('[merchant food]', e); }
+  try { if(_gardenMerchantLineProcess('seed')) changed = true; } catch(e){ console.warn('[merchant seed]', e); }
+  try { if(_gardenMerchantLineProcess('throw')) changed = true; } catch(e){ console.warn('[merchant throw]', e); }
+  try { if(_gardenMerchantLineProcess('ammo')) changed = true; } catch(e){ console.warn('[merchant ammo]', e); }
   if(typeof _gardenMealTick === 'function'){
     try{ if(_gardenMealTick(now)) changed = true; }catch(e){ console.warn('[meal] err', e); }
   }
-
   if(changed) save();
 }
 
@@ -1316,7 +1314,7 @@ function renderGardenMerchant(box){
     const elapsed = now - last;
     const remainMs = Math.max(0, MERCHANT_INTERVAL_MS - elapsed);
     const remain = Math.ceil(remainMs / 1000);
-    const ready = (elapsed >= MERCHANT_INTERVAL_MS) || (last === 0);
+    const ready = (last === 0) ? false : (elapsed >= MERCHANT_INTERVAL_MS);
     const pct = Math.min(100, Math.max(0, (elapsed / MERCHANT_INTERVAL_MS) * 100));
     let h = '<div class="mrc-card" data-line="' + lineKey + '">';
     h += '<div class="mrc-head">';
