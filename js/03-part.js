@@ -1469,7 +1469,7 @@ function buildingTick(){
     if(now-last>interval){
       state.armoryLastTick=now;
       let targetRarity='一般';
-      if(armoryLv<=5)targetRarity='破舊';else if(armoryLv<=10)targetRarity='一般';else if(armoryLv<=15)targetRarity='庫存';else if(armoryLv<=20)targetRarity='精品';else targetRarity='傳奇';
+      if(armoryLv<=10)targetRarity='破舊';else if(armoryLv<=20)targetRarity='一般';else if(armoryLv<=35)targetRarity='庫存';else targetRarity='精品';
       const _targetIdx=RARITY_ORDER.indexOf(targetRarity);
       const pw=equippedWeapon('primary'),sw=equippedWeapon('secondary');
       const cals=[];
@@ -1588,11 +1588,7 @@ function _offlineBuildingSettle(now, baseTime){
     if(diff >= interval){
       const times = Math.floor(diff / interval);
       let targetRarity = '一般';
-      if(armoryLv <= 5) targetRarity = '破舊';
-      else if(armoryLv <= 10) targetRarity = '一般';
-      else if(armoryLv <= 15) targetRarity = '庫存';
-      else if(armoryLv <= 20) targetRarity = '精品';
-      else targetRarity = '傳奇';
+      if(armoryLv<=10)targetRarity='破舊';else if(armoryLv<=20)targetRarity='一般';else if(armoryLv<=35)targetRarity='庫存';else targetRarity='精品';
       const _targetIdx = RARITY_ORDER.indexOf(targetRarity);
       const pw = equippedWeapon('primary'), sw = equippedWeapon('secondary');
       const cals = [];

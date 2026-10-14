@@ -1110,6 +1110,42 @@ function _gardenMerchantFoodPoolFill(target){
   return true;
 }
 
+/* ===== rev301 produce log helpers ===== */
+function _gardenLogMapAdd(map, id, rarity, count){
+  const k = id + '@' + rarity;
+  if(!map[k]) map[k] = { id: id, rarity: rarity, count: 0 };
+  map[k].count += count;
+}
+function _gardenLogMapToArray(map){
+  const arr = [];
+  for(const k in map) arr.push(map[k]);
+  arr.sort(function(a, b){
+    const rd = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    if(rd !== 0) return rd;
+    const ad = itemDef(a.id) || { name: a.id };
+    const bd = itemDef(b.id) || { name: b.id };
+    return (ad.name || '').localeCompare(bd.name || '', 'zh-Hant');
+  });
+  return arr;
+}
+function _gardenLogMerchantBatch(batch){
+  if(!batch || !batch.lines) return;
+  const keys = ['food','seed','throw','ammo'];
+  const active = keys.filter(function(k){ return batch.lines[k] && batch.lines[k].items && batch.lines[k].items.length; });
+  if(!active.length) return;
+  const parts = [];
+  for(const k of active){
+    const meta = _gardenMerchantLineMeta(k);
+    const items = batch.lines[k].items;
+    let total = 0;
+    for(const it of items) total += it.count;
+    parts.push(meta.icon + '+' + total);
+  }
+  const text = '⏱ 產線結算：' + parts.join(' ');
+  _gardenLog(text, 'produce', '', { type: 'merchant_batch', lines: batch.lines, time: batch.t });
+}
+/* ===== end produce log helpers ===== */
+
 function _gardenMerchantLineProcess(lineKey, atTime){
   const g = _gardenMerchantInit();
   const m = g.merchant;
@@ -1137,7 +1173,6 @@ function _gardenMerchantLineProcess(lineKey, atTime){
     && last >= _MIN_VALID_TS
     && last % INTERVAL === 0);
   if(!isValidLast){
-    /* firstTick = 第一个 >= now + INTERVAL 的 INTERVAL 倍数 */
     const firstTick = Math.ceil((now + INTERVAL) / INTERVAL) * INTERVAL;
     m[L.lastKey] = firstTick - INTERVAL;
     return false;
@@ -1147,6 +1182,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
   const times = Math.min(Math.floor((now - nextTick) / INTERVAL) + 1, 500);
   if(times <= 0) return false;
   let did = 0;
+  const _itemsMap = {};
   for(let _i = 0; _i < times; _i++){
     let ok = false;
     try {
@@ -1163,6 +1199,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
         _gardenMerchantFoodPoolFill(cfg.cropValue);
         m.foodPool -= cfg.cropValue;
         g.food += cfg.cropValue;
+        _gardenLogMapAdd(_itemsMap, 'food', '一般', cfg.cropValue);
         ok = true;
       } else if(lineKey === 'seed'){
         const matCosts = { metal: cfg.metal };
@@ -1175,6 +1212,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
           const sid = seedIds[Math.floor(Math.random() * seedIds.length)];
           const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
           gardenStorageAdd(sid, rar, 1);
+          _gardenLogMapAdd(_itemsMap, sid, rar, 1);
         }
         ok = true;
       } else if(lineKey === 'throw'){
@@ -1185,6 +1223,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
           for(let _k = 0; _k < cfg.count; _k++){
             const tid = LEGEND_THROW_POOL[Math.floor(Math.random() * LEGEND_THROW_POOL.length)];
             invAdd(tid, '傳奇', 1);
+            _gardenLogMapAdd(_itemsMap, tid, '傳奇', 1);
           }
           ok = true;
         } else {
@@ -1199,6 +1238,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
             const tid = tIds[Math.floor(Math.random() * tIds.length)];
             const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
             invAdd(tid, rar, 1);
+            _gardenLogMapAdd(_itemsMap, tid, rar, 1);
           }
           ok = true;
         }
@@ -1209,6 +1249,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
         for(let _k = 0; _k < cfg.count; _k++){
           const aid = LEGEND_AMMO_POOL[Math.floor(Math.random() * LEGEND_AMMO_POOL.length)];
           invAdd(aid, '傳奇', 1);
+          _gardenLogMapAdd(_itemsMap, aid, '傳奇', 1);
         }
         ok = true;
       }
@@ -1220,6 +1261,12 @@ function _gardenMerchantLineProcess(lineKey, atTime){
     did++;
   }
   m[L.lastKey] = last + did * INTERVAL;
+  if(did > 0 && window._merchantTickBatch && window._merchantTickBatch.lines){
+    window._merchantTickBatch.lines[lineKey] = {
+      batches: did,
+      items: _gardenLogMapToArray(_itemsMap)
+    };
+  }
   return did > 0;
 }
 
@@ -1256,15 +1303,21 @@ function _gardenMerchantTick(){
   const g = _gardenMerchantInit();
   const m = g.merchant;
   const now = Date.now();
-  let changed = false;
-  try { if(_gardenMerchantLineProcess('food')) changed = true; } catch(e){ console.warn('[tick food]', e); }
-  try { if(_gardenMerchantLineProcess('seed')) changed = true; } catch(e){ console.warn('[tick seed]', e); }
-  try { if(_gardenMerchantLineProcess('throw')) changed = true; } catch(e){ console.warn('[tick throw]', e); }
-  try { if(_gardenMerchantLineProcess('ammo')) changed = true; } catch(e){ console.warn('[tick ammo]', e); }
+  window._merchantTickBatch = { t: now, lines: {} };
+  try { _gardenMerchantLineProcess('food'); } catch(e){ console.warn('[tick food]', e); }
+  try { _gardenMerchantLineProcess('seed'); } catch(e){ console.warn('[tick seed]', e); }
+  try { _gardenMerchantLineProcess('throw'); } catch(e){ console.warn('[tick throw]', e); }
+  try { _gardenMerchantLineProcess('ammo'); } catch(e){ console.warn('[tick ammo]', e); }
   if(typeof _gardenMealTick === 'function'){
-    try{ if(_gardenMealTick(now)) changed = true; }catch(e){ console.warn('[tick meal]', e); }
+    try{ _gardenMealTick(now); }catch(e){ console.warn('[tick meal]', e); }
   }
-  if(changed) save();
+  const batch = window._merchantTickBatch;
+  window._merchantTickBatch = null;
+  const _hasProduce = batch && batch.lines && Object.keys(batch.lines).length > 0;
+  if(_hasProduce){
+    try { _gardenLogMerchantBatch(batch); } catch(e){ console.warn('[tick log]', e); }
+    save();
+  }
 }
 
 function _gardenFoodStats(){
