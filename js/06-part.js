@@ -1,102 +1,3 @@
-/* ===== rev301 debug panel ===== */
-(function(){
-  if(window.__dbgInstalled) return;
-  window.__dbgInstalled = true;
-  const logs = [];
-  const MAX = 300;
-  function ts(){
-    const d = new Date();
-    return ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2) + ':' + ('0'+d.getSeconds()).slice(-2) + '.' + String(d.getMilliseconds()).padStart(3,'0');
-  }
-  window._dbg = function(){
-    try {
-      const args = Array.prototype.slice.call(arguments);
-      const parts = args.map(function(a){
-        if(a === undefined) return 'undefined';
-        if(a === null) return 'null';
-        if(typeof a === 'string') return a;
-        if(typeof a === 'number' || typeof a === 'boolean') return String(a);
-        try { return JSON.stringify(a); } catch(e){ return String(a); }
-      });
-      const line = '[' + ts() + '] ' + parts.join(' ');
-      logs.push(line);
-      if(logs.length > MAX) logs.shift();
-      try { console.log('[dbg] ' + line); } catch(e){}
-      _render();
-    } catch(e){}
-  };
-  window.addEventListener('error', function(e){
-    try{
-      window._dbg('!!! onerror: ' + (e.message||'') + ' @' + ((e.filename||'').split('/').pop()) + ':' + (e.lineno||0));
-      if(e.error && e.error.stack) window._dbg('  stack: ' + String(e.error.stack).split('\n').slice(0,3).join(' / '));
-    }catch(_){}
-  });
-  window.addEventListener('unhandledrejection', function(e){
-    try{
-      const r = e.reason;
-      window._dbg('!!! unhandled: ' + ((r && r.message) || String(r)));
-      if(r && r.stack) window._dbg('  stack: ' + String(r.stack).split('\n').slice(0,3).join(' / '));
-    }catch(_){}
-  });
-  let panelEl = null, fabEl = null;
-  function _fallbackCopy(txt){
-    const ta = document.createElement('textarea');
-    ta.value = txt;
-    ta.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px';
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    ta.setSelectionRange(0, ta.value.length);
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch(e){}
-    ta.remove();
-    if(ok){ alert('已複製 ' + logs.length + ' 條'); }
-    else { prompt('長按選擇全部 → 複製', txt); }
-  }
-  function _render(){
-    if(!panelEl) return;
-    const el = document.getElementById('__dbg_content');
-    if(el) el.textContent = logs.join('\n') || '(暫無日誌)';
-  }
-  function _destroy(){
-    if(panelEl){ try{ panelEl.remove(); }catch(e){} panelEl = null; }
-  }
-  function _toggle(){
-    if(panelEl){ _destroy(); return; }
-    panelEl = document.createElement('div');
-    panelEl.id = '__dbg_panel';
-    panelEl.style.cssText = 'position:fixed;left:8px;right:8px;top:40px;bottom:120px;background:rgba(0,0,0,.95);color:#ddd;font-size:10px;font-family:Menlo,Consolas,monospace;z-index:99998;border:1px solid #e8a33d;border-radius:6px;padding:8px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 20px rgba(0,0,0,.7)';
-    panelEl.innerHTML = '<div style="flex:0 0 auto;display:flex;gap:6px;margin-bottom:6px">' +
-      '<button id="__dbg_copy" style="flex:1;background:#8a5f18;color:#fff;border:none;padding:8px;border-radius:4px;font-size:11px;font-weight:bold">📋 複製全部</button>' +
-      '<button id="__dbg_clear" style="flex:0 0 auto;background:#2c2419;color:#e8a33d;border:1px solid #3a2f25;padding:8px 12px;border-radius:4px;font-size:11px">清除</button>' +
-      '<button id="__dbg_close" style="flex:0 0 auto;background:#6a2a2a;color:#fff;border:none;padding:8px 12px;border-radius:4px;font-size:11px">關閉</button>' +
-      '</div>' +
-      '<pre id="__dbg_content" style="flex:1;min-height:0;overflow:auto;margin:0;white-space:pre-wrap;word-break:break-all;color:#bfb3a0;-webkit-user-select:text;user-select:text;font-size:10px;line-height:1.4">(暫無日誌)</pre>';
-    document.body.appendChild(panelEl);
-    document.getElementById('__dbg_copy').onclick = function(){
-      const txt = logs.join('\n');
-      if(navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(txt).then(function(){ alert('已複製 ' + logs.length + ' 條'); }).catch(function(){ _fallbackCopy(txt); });
-      } else { _fallbackCopy(txt); }
-    };
-    document.getElementById('__dbg_clear').onclick = function(){ logs.length = 0; _render(); };
-    document.getElementById('__dbg_close').onclick = _destroy;
-    _render();
-  }
-  function _ensure(){
-    if(fabEl) return;
-    fabEl = document.createElement('div');
-    fabEl.id = '__dbg_fab';
-    fabEl.textContent = '🛠';
-    fabEl.style.cssText = 'position:fixed;right:8px;bottom:80px;width:44px;height:44px;border-radius:50%;background:rgba(200,60,60,.85);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:99999;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.5);touch-action:manipulation';
-    fabEl.onclick = _toggle;
-    document.body.appendChild(fabEl);
-  }
-  if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', _ensure); }
-  else { setTimeout(_ensure, 500); }
-  window._dbg('debug panel installed');
-})();
-/* ===== end debug panel ===== */
 /* ============================================================
    基地
    ============================================================ */
@@ -967,30 +868,57 @@ const MERCHANT_AMMO_TABLE = {
  *     🌾 = 作物等值（m.cropValuePool）
  *     🌰 = 種子　💣 = 投擲物　🎖️ = 傳奇彈藥
  * ════════════════════════════════════════════════════════════════ */
+/* ===== rev301 validate helper ===== */
+const _MIN_VALID_TS = 1577836800000;
+function _gardenMerchantLineValidate(lineKey, L, m, now){
+  if(!L || !L.lvKey || !L.lastKey || !L.table) return null;
+  let lv = m[L.lvKey];
+  if(typeof lv !== 'number' || !Number.isFinite(lv) || lv < 0 || Math.floor(lv) !== lv){
+    m[L.lvKey] = 0;
+    return null;
+  }
+  if(lv === 0) return null;
+  const cfg = L.table[lv];
+  if(!cfg){
+    m[L.lvKey] = 0;
+    return null;
+  }
+  const last = m[L.lastKey];
+  if(typeof last !== 'number' || !Number.isFinite(last) || last < _MIN_VALID_TS || last > now + 60000){
+    m[L.lastKey] = now;
+    return null;
+  }
+  return { lv: lv, last: last, cfg: cfg };
+}
+/* ===== end validate helper ===== */
+
 function _gardenMerchantInit(){
   if(!state.garden) state.garden = { plots:new Array(20).fill(null), storage:{} };
-  if(typeof state.garden.food !== 'number') state.garden.food = 0;
+  if(typeof state.garden.food !== 'number' || !Number.isFinite(state.garden.food) || state.garden.food < 0){
+    state.garden.food = 0;
+  }
   if(!state.garden.merchant || typeof state.garden.merchant !== 'object'){
     state.garden.merchant = { foodLv:0, seedLv:0, throwLv:0, ammoLv:0, lastFood:0, lastSeed:0, lastThrow:0, lastAmmo:0, lastFeed:0 };
   }
   const m = state.garden.merchant;
-  if(typeof m.foodLv !== 'number') m.foodLv = 0;
-  if(typeof m.seedLv !== 'number') m.seedLv = 0;
-  if(typeof m.throwLv !== 'number') m.throwLv = 0;
-  if(typeof m.ammoLv !== 'number') m.ammoLv = 0;
-  if(typeof m.lastFood !== 'number') m.lastFood = 0;
-  if(typeof m.lastSeed !== 'number') m.lastSeed = 0;
-  if(typeof m.lastThrow !== 'number') m.lastThrow = 0;
-  if(typeof m.lastAmmo !== 'number') m.lastAmmo = 0;
-  if(typeof m.lastFeed !== 'number' || !m.lastFeed) m.lastFeed = Date.now();
-  if(typeof m.foodPool !== 'number') m.foodPool = 0;
-  if(typeof state.garden.compostValue !== 'number'){
-    state.garden.compostValue = (typeof state.garden.compostAccelSec === 'number') ? state.garden.compostAccelSec : 0;
-    if(typeof state.garden.compostAccelSec !== 'undefined') delete state.garden.compostAccelSec;
+  ['foodLv','seedLv','throwLv','ammoLv'].forEach(function(k){
+    if(typeof m[k] !== 'number' || !Number.isFinite(m[k]) || m[k] < 0 || Math.floor(m[k]) !== m[k]) m[k] = 0;
+  });
+  ['lastFood','lastSeed','lastThrow','lastAmmo'].forEach(function(k){
+    if(typeof m[k] !== 'number' || !Number.isFinite(m[k]) || m[k] < 0) m[k] = 0;
+  });
+  if(typeof m.lastFeed !== 'number' || !Number.isFinite(m.lastFeed) || m.lastFeed <= 0) m.lastFeed = Date.now();
+  if(typeof m.foodPool !== 'number' || !Number.isFinite(m.foodPool) || m.foodPool < 0) m.foodPool = 0;
+  if(typeof state.garden.compostValue !== 'number' || !Number.isFinite(state.garden.compostValue) || state.garden.compostValue < 0){
+    state.garden.compostValue = 0;
   }
-  if(typeof state.garden.compostNextIdx !== 'number') state.garden.compostNextIdx = 0;
+  if(typeof state.garden.compostAccelSec !== 'undefined') delete state.garden.compostAccelSec;
+  if(typeof state.garden.compostNextIdx !== 'number' || !Number.isFinite(state.garden.compostNextIdx)) state.garden.compostNextIdx = 0;
   if(!Array.isArray(m.battleLog)) m.battleLog = [];
-  if(!m.matPools || typeof m.matPools !== 'object') m.matPools = { metal:0, gears:0, electronics:0, cloth:0, screws:0 };
+  if(!m.matPools || typeof m.matPools !== 'object') m.matPools = {};
+  ['metal','gears','electronics','cloth','screws','wood'].forEach(function(k){
+    if(typeof m.matPools[k] !== 'number' || !Number.isFinite(m.matPools[k]) || m.matPools[k] < 0) m.matPools[k] = 0;
+  });
   return state.garden;
 }
 
@@ -1185,7 +1113,7 @@ function _gardenMerchantFoodPoolFill(target){
 function _gardenMerchantLineProcess(lineKey, atTime){
   const g = _gardenMerchantInit();
   const m = g.merchant;
-  const now = (typeof atTime === 'number') ? atTime : Date.now();
+  const now = (typeof atTime === 'number' && Number.isFinite(atTime)) ? atTime : Date.now();
   function lineCfg(){
     if(lineKey === 'food') return { lvKey:'foodLv', lastKey:'lastFood', table:MERCHANT_FOOD_TABLE };
     if(lineKey === 'seed') return { lvKey:'seedLv', lastKey:'lastSeed', table:MERCHANT_SEED_TABLE };
@@ -1195,24 +1123,15 @@ function _gardenMerchantLineProcess(lineKey, atTime){
   }
   const L = lineCfg();
   if(!L) return false;
-  const lv = m[L.lvKey] || 0;
-  if(lv <= 0) return false;
-  const last = m[L.lastKey] || 0;
-  if(last === 0){
-    m[L.lastKey] = now;
-    if(window._dbg) window._dbg('[line] ' + lineKey + ' first-subscribe → set ' + L.lastKey + '=' + now);
-    return false;
-  }
+  const v = _gardenMerchantLineValidate(lineKey, L, m, now);
+  if(!v) return false;
+  const lv = v.lv;
+  const last = v.last;
+  const cfg = v.cfg;
   if(now - last < MERCHANT_INTERVAL_MS) return false;
   const times = Math.min(Math.floor((now - last) / MERCHANT_INTERVAL_MS), 500);
   if(times <= 0) return false;
-  const cfg = L.table[lv];
-  if(!cfg){
-    if(window._dbg) window._dbg('[line] ' + lineKey + ' ERR: no cfg for lv=' + lv);
-    return false;
-  }
   let did = 0;
-  const _errs = [];
   for(let _i = 0; _i < times; _i++){
     let ok = false;
     try {
@@ -1245,10 +1164,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
         ok = true;
       } else if(lineKey === 'throw'){
         if(cfg.legend){
-          if(typeof LEGEND_THROW_POOL === 'undefined' || !LEGEND_THROW_POOL.length){
-            _errs.push('LEGEND_THROW_POOL undefined');
-            break;
-          }
+          if(typeof LEGEND_THROW_POOL === 'undefined' || !LEGEND_THROW_POOL.length) break;
           if(g.food + 0.001 < cfg.foodCost) break;
           g.food -= cfg.foodCost;
           for(let _k = 0; _k < cfg.count; _k++){
@@ -1272,10 +1188,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
           ok = true;
         }
       } else if(lineKey === 'ammo'){
-        if(typeof LEGEND_AMMO_POOL === 'undefined' || !LEGEND_AMMO_POOL.length){
-          _errs.push('LEGEND_AMMO_POOL undefined');
-          break;
-        }
+        if(typeof LEGEND_AMMO_POOL === 'undefined' || !LEGEND_AMMO_POOL.length) break;
         if(g.food + 0.001 < cfg.foodCost) break;
         g.food -= cfg.foodCost;
         for(let _k = 0; _k < cfg.count; _k++){
@@ -1285,19 +1198,13 @@ function _gardenMerchantLineProcess(lineKey, atTime){
         ok = true;
       }
     } catch(e){
-      _errs.push(lineKey + ' iter' + _i + ': ' + e.message);
+      console.warn('[merchant ' + lineKey + ']', e);
       break;
     }
     if(!ok) break;
     did++;
   }
-  if(window._dbg && _errs.length){
-    for(const _e of _errs) window._dbg('[line-ERR] ' + _e);
-  }
   m[L.lastKey] = last + did * MERCHANT_INTERVAL_MS;
-  if(window._dbg && did > 0){
-    window._dbg('[line] ' + lineKey + ' produced did=' + did + ' newLast=' + m[L.lastKey]);
-  }
   return did > 0;
 }
 
@@ -1335,31 +1242,14 @@ function _gardenMerchantTick(){
   const m = g.merchant;
   const now = Date.now();
   let changed = false;
-  const errors = [];
-  try { if(_gardenMerchantLineProcess('food')) changed = true; } catch(e){ errors.push(['food', e]); }
-  try { if(_gardenMerchantLineProcess('seed')) changed = true; } catch(e){ errors.push(['seed', e]); }
-  try { if(_gardenMerchantLineProcess('throw')) changed = true; } catch(e){ errors.push(['throw', e]); }
-  try { if(_gardenMerchantLineProcess('ammo')) changed = true; } catch(e){ errors.push(['ammo', e]); }
+  try { if(_gardenMerchantLineProcess('food')) changed = true; } catch(e){ console.warn('[tick food]', e); }
+  try { if(_gardenMerchantLineProcess('seed')) changed = true; } catch(e){ console.warn('[tick seed]', e); }
+  try { if(_gardenMerchantLineProcess('throw')) changed = true; } catch(e){ console.warn('[tick throw]', e); }
+  try { if(_gardenMerchantLineProcess('ammo')) changed = true; } catch(e){ console.warn('[tick ammo]', e); }
   if(typeof _gardenMealTick === 'function'){
-    try{ if(_gardenMealTick(now)) changed = true; }catch(e){ errors.push(['meal', e]); }
+    try{ if(_gardenMealTick(now)) changed = true; }catch(e){ console.warn('[tick meal]', e); }
   }
   if(changed) save();
-  if(window._dbg && errors.length){
-    for(const pair of errors){
-      window._dbg('[tick-ERR] ' + pair[0] + ': ' + (pair[1] && pair[1].message ? pair[1].message : String(pair[1])));
-    }
-  }
-  if(window._dbg){
-    const snapshot = ['food','seed','throw','ammo'].map(function(k){
-      const lvKey = k + 'Lv';
-      const lastKey = 'last' + k.charAt(0).toUpperCase() + k.slice(1);
-      return k + ':lv' + (m[lvKey]||0) + '@' + (m[lastKey]||0);
-    }).join(' ');
-    if(window.__dbgLastSnapshot !== snapshot){
-      window.__dbgLastSnapshot = snapshot;
-      window._dbg('[tick-state] ' + snapshot);
-    }
-  }
 }
 
 function _gardenFoodStats(){
@@ -1502,17 +1392,11 @@ function renderGardenMerchant(box){
     if(!meta) return '';
     const lv = m[meta.lvKey] || 0;
     const last = m[meta.lastKey] || 0;
-    const elapsed = now - last;
+    const _validLast = (typeof last === 'number' && Number.isFinite(last) && last >= _MIN_VALID_TS && last <= now + 60000) ? last : now;
+    const elapsed = Math.max(0, now - _validLast);
     const remainMs = Math.max(0, MERCHANT_INTERVAL_MS - elapsed);
     const remain = Math.ceil(remainMs / 1000);
-    const ready = (last === 0) ? false : (elapsed >= MERCHANT_INTERVAL_MS);
-    if(window._dbg && lv > 0){
-      const key = lineKey + '|' + lv + '|' + last + '|' + ready;
-      if(window.__dbgCardKey !== key){
-        window.__dbgCardKey = key;
-        window._dbg('[card] ' + lineKey + ' lv=' + lv + ' last=' + last + ' elapsed=' + elapsed + ' ready=' + ready);
-      }
-    }
+    const ready = (lv > 0) && (elapsed >= MERCHANT_INTERVAL_MS);
     const pct = Math.min(100, Math.max(0, (elapsed / MERCHANT_INTERVAL_MS) * 100));
     let h = '<div class="mrc-card" data-line="' + lineKey + '">';
     h += '<div class="mrc-head">';
