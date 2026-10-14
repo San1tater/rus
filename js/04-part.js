@@ -741,7 +741,7 @@ function startBossBattle(bid){
     ammoRef:null,ammoInMag:0,weaponStates:{},engaged:false,engagedRange:0.35,startTime:Date.now(),
     aimPart:defaultAimPartForBoss(bid),lastManualClick:0,
     players:[{id:'local',isLocal:true}],lastH:0,
-    healDisabledUntil:0,healTimer:null,autoHealing:false,chainShots:0,lastShotTime:0,chainResetMs:600};
+    healDisabledUntil:0,healTimer:null,autoHealing:false,chainShots:0,lastShotTime:0,chainResetMs:600,shotLockUntil:0};
   if(bid==='swamp_hydra'||bid==='swamp_hydra_ii') initHydraHeads();
   if(bid==='core_omega'||bid==='core_omega_ii') initOmegaArms();
   battleHeroAnim.name='idle';

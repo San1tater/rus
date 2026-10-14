@@ -1622,8 +1622,6 @@ function _offlineBuildingSettle(now, baseTime){
   // ── 改造隊列：直接用 Date.now() 結算（startTime 是真實時間） ──
   processCrafting();
 
-  // ── 商人產線：離線期間補算 ──
-  if(typeof _gardenMerchantTick === 'function'){ try{ _gardenMerchantTick(); }catch(e){} }
 
   return { radioCount, armoryCount };
 }

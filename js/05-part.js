@@ -543,7 +543,7 @@ function battleLoop(now){
       interruptHeal();
     }
     /* 換彈期間禁止移動：腿不動=位置不動，避免視覺 bug */
-    const canMove = !battle.firing && !battle.consuming && !battle.reloading;
+    const canMove = !battle.firing && !battle.consuming && !battle.reloading && now >= (battle.shotLockUntil || 0);
 
     if(canMove && hasMoveInput){
       let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
@@ -861,6 +861,9 @@ function playerShoot(){
       return false;
     }
   }
+
+  /* 射擊鎖定位移：350ms 內禁止移動（一步一頓，連點期間持續鎖定） */
+  battle.shotLockUntil = performance.now() + 350;
 
   {
     const _fireAnimName = (battle.weaponSlot === 'secondary') ? 'fire_secondary'
