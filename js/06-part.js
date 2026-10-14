@@ -1,3 +1,102 @@
+/* ===== rev301 debug panel ===== */
+(function(){
+  if(window.__dbgInstalled) return;
+  window.__dbgInstalled = true;
+  const logs = [];
+  const MAX = 300;
+  function ts(){
+    const d = new Date();
+    return ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2) + ':' + ('0'+d.getSeconds()).slice(-2) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+  }
+  window._dbg = function(){
+    try {
+      const args = Array.prototype.slice.call(arguments);
+      const parts = args.map(function(a){
+        if(a === undefined) return 'undefined';
+        if(a === null) return 'null';
+        if(typeof a === 'string') return a;
+        if(typeof a === 'number' || typeof a === 'boolean') return String(a);
+        try { return JSON.stringify(a); } catch(e){ return String(a); }
+      });
+      const line = '[' + ts() + '] ' + parts.join(' ');
+      logs.push(line);
+      if(logs.length > MAX) logs.shift();
+      try { console.log('[dbg] ' + line); } catch(e){}
+      _render();
+    } catch(e){}
+  };
+  window.addEventListener('error', function(e){
+    try{
+      window._dbg('!!! onerror: ' + (e.message||'') + ' @' + ((e.filename||'').split('/').pop()) + ':' + (e.lineno||0));
+      if(e.error && e.error.stack) window._dbg('  stack: ' + String(e.error.stack).split('\n').slice(0,3).join(' / '));
+    }catch(_){}
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    try{
+      const r = e.reason;
+      window._dbg('!!! unhandled: ' + ((r && r.message) || String(r)));
+      if(r && r.stack) window._dbg('  stack: ' + String(r.stack).split('\n').slice(0,3).join(' / '));
+    }catch(_){}
+  });
+  let panelEl = null, fabEl = null;
+  function _fallbackCopy(txt){
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(e){}
+    ta.remove();
+    if(ok){ alert('已複製 ' + logs.length + ' 條'); }
+    else { prompt('長按選擇全部 → 複製', txt); }
+  }
+  function _render(){
+    if(!panelEl) return;
+    const el = document.getElementById('__dbg_content');
+    if(el) el.textContent = logs.join('\n') || '(暫無日誌)';
+  }
+  function _destroy(){
+    if(panelEl){ try{ panelEl.remove(); }catch(e){} panelEl = null; }
+  }
+  function _toggle(){
+    if(panelEl){ _destroy(); return; }
+    panelEl = document.createElement('div');
+    panelEl.id = '__dbg_panel';
+    panelEl.style.cssText = 'position:fixed;left:8px;right:8px;top:40px;bottom:120px;background:rgba(0,0,0,.95);color:#ddd;font-size:10px;font-family:Menlo,Consolas,monospace;z-index:99998;border:1px solid #e8a33d;border-radius:6px;padding:8px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 20px rgba(0,0,0,.7)';
+    panelEl.innerHTML = '<div style="flex:0 0 auto;display:flex;gap:6px;margin-bottom:6px">' +
+      '<button id="__dbg_copy" style="flex:1;background:#8a5f18;color:#fff;border:none;padding:8px;border-radius:4px;font-size:11px;font-weight:bold">📋 複製全部</button>' +
+      '<button id="__dbg_clear" style="flex:0 0 auto;background:#2c2419;color:#e8a33d;border:1px solid #3a2f25;padding:8px 12px;border-radius:4px;font-size:11px">清除</button>' +
+      '<button id="__dbg_close" style="flex:0 0 auto;background:#6a2a2a;color:#fff;border:none;padding:8px 12px;border-radius:4px;font-size:11px">關閉</button>' +
+      '</div>' +
+      '<pre id="__dbg_content" style="flex:1;min-height:0;overflow:auto;margin:0;white-space:pre-wrap;word-break:break-all;color:#bfb3a0;-webkit-user-select:text;user-select:text;font-size:10px;line-height:1.4">(暫無日誌)</pre>';
+    document.body.appendChild(panelEl);
+    document.getElementById('__dbg_copy').onclick = function(){
+      const txt = logs.join('\n');
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(function(){ alert('已複製 ' + logs.length + ' 條'); }).catch(function(){ _fallbackCopy(txt); });
+      } else { _fallbackCopy(txt); }
+    };
+    document.getElementById('__dbg_clear').onclick = function(){ logs.length = 0; _render(); };
+    document.getElementById('__dbg_close').onclick = _destroy;
+    _render();
+  }
+  function _ensure(){
+    if(fabEl) return;
+    fabEl = document.createElement('div');
+    fabEl.id = '__dbg_fab';
+    fabEl.textContent = '🛠';
+    fabEl.style.cssText = 'position:fixed;right:8px;bottom:80px;width:44px;height:44px;border-radius:50%;background:rgba(200,60,60,.85);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:99999;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.5);touch-action:manipulation';
+    fabEl.onclick = _toggle;
+    document.body.appendChild(fabEl);
+  }
+  if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', _ensure); }
+  else { setTimeout(_ensure, 500); }
+  window._dbg('debug panel installed');
+})();
+/* ===== end debug panel ===== */
 /* ============================================================
    基地
    ============================================================ */
@@ -1045,85 +1144,106 @@ function _gardenMerchantLineProcess(lineKey, atTime){
   const lv = m[L.lvKey] || 0;
   if(lv <= 0) return false;
   const last = m[L.lastKey] || 0;
-  /* 首次訂閱保護：last 尚未初始化（=0）時只設為 now，不做追溯生產 */
   if(last === 0){
     m[L.lastKey] = now;
+    if(window._dbg) window._dbg('[line] ' + lineKey + ' first-subscribe → set ' + L.lastKey + '=' + now);
     return false;
   }
   if(now - last < MERCHANT_INTERVAL_MS) return false;
   const times = Math.min(Math.floor((now - last) / MERCHANT_INTERVAL_MS), 500);
   if(times <= 0) return false;
   const cfg = L.table[lv];
-  if(!cfg) return false;
+  if(!cfg){
+    if(window._dbg) window._dbg('[line] ' + lineKey + ' ERR: no cfg for lv=' + lv);
+    return false;
+  }
   let did = 0;
+  const _errs = [];
   for(let _i = 0; _i < times; _i++){
     let ok = false;
-    if(lineKey === 'food'){
-      const matCosts = {};
-      if(cfg.gears) matCosts.gears = cfg.gears;
-      if(cfg.electronics) matCosts.electronics = cfg.electronics;
-      if(cfg.screws) matCosts.screws = cfg.screws;
-      const poolBefore = m.foodPool || 0;
-      const cropVal = _gardenTotalCropValue();
-      if(poolBefore + cropVal + 0.001 < cfg.cropValue) break;
-      if(!_gardenMerchantCanPay(matCosts)) break;
-      _gardenMerchantTryPay(matCosts);
-      _gardenMerchantFoodPoolFill(cfg.cropValue);
-      m.foodPool -= cfg.cropValue;
-      g.food += cfg.cropValue;
-      ok = true;
-    } else if(lineKey === 'seed'){
-      const matCosts = { metal: cfg.metal };
-      if(cfg.gears) matCosts.gears = cfg.gears;
-      if(cfg.electronics) matCosts.electronics = cfg.electronics;
-      if(cfg.screws) matCosts.screws = cfg.screws;
-      if(!_gardenMerchantTryPay(matCosts)) break;
-      const seedIds = Object.keys(SEEDS);
-      for(let _k = 0; _k < cfg.count; _k++){
-        const sid = seedIds[Math.floor(Math.random() * seedIds.length)];
-        const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
-        gardenStorageAdd(sid, rar, 1);
-      }
-      ok = true;
-    } else if(lineKey === 'throw'){
-      if(cfg.legend){
-        if(typeof LEGEND_THROW_POOL === 'undefined' || !LEGEND_THROW_POOL.length) break;
-        if(g.food + 0.001 < cfg.foodCost) break;
-        g.food -= cfg.foodCost;
-        for(let _k = 0; _k < cfg.count; _k++){
-          const tid = LEGEND_THROW_POOL[Math.floor(Math.random() * LEGEND_THROW_POOL.length)];
-          invAdd(tid, '傳奇', 1);
-        }
+    try {
+      if(lineKey === 'food'){
+        const matCosts = {};
+        if(cfg.gears) matCosts.gears = cfg.gears;
+        if(cfg.electronics) matCosts.electronics = cfg.electronics;
+        if(cfg.screws) matCosts.screws = cfg.screws;
+        const poolBefore = m.foodPool || 0;
+        const cropVal = _gardenTotalCropValue();
+        if(poolBefore + cropVal + 0.001 < cfg.cropValue) break;
+        if(!_gardenMerchantCanPay(matCosts)) break;
+        _gardenMerchantTryPay(matCosts);
+        _gardenMerchantFoodPoolFill(cfg.cropValue);
+        m.foodPool -= cfg.cropValue;
+        g.food += cfg.cropValue;
         ok = true;
-      } else {
+      } else if(lineKey === 'seed'){
         const matCosts = { metal: cfg.metal };
         if(cfg.gears) matCosts.gears = cfg.gears;
-        if(cfg.cloth) matCosts.cloth = cfg.cloth;
         if(cfg.electronics) matCosts.electronics = cfg.electronics;
         if(cfg.screws) matCosts.screws = cfg.screws;
         if(!_gardenMerchantTryPay(matCosts)) break;
-        const tIds = ['f1','rgd5','rgo','rgn','vog17','vog25'];
+        const seedIds = Object.keys(SEEDS);
         for(let _k = 0; _k < cfg.count; _k++){
-          const tid = tIds[Math.floor(Math.random() * tIds.length)];
+          const sid = seedIds[Math.floor(Math.random() * seedIds.length)];
           const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
-          invAdd(tid, rar, 1);
+          gardenStorageAdd(sid, rar, 1);
+        }
+        ok = true;
+      } else if(lineKey === 'throw'){
+        if(cfg.legend){
+          if(typeof LEGEND_THROW_POOL === 'undefined' || !LEGEND_THROW_POOL.length){
+            _errs.push('LEGEND_THROW_POOL undefined');
+            break;
+          }
+          if(g.food + 0.001 < cfg.foodCost) break;
+          g.food -= cfg.foodCost;
+          for(let _k = 0; _k < cfg.count; _k++){
+            const tid = LEGEND_THROW_POOL[Math.floor(Math.random() * LEGEND_THROW_POOL.length)];
+            invAdd(tid, '傳奇', 1);
+          }
+          ok = true;
+        } else {
+          const matCosts = { metal: cfg.metal };
+          if(cfg.gears) matCosts.gears = cfg.gears;
+          if(cfg.cloth) matCosts.cloth = cfg.cloth;
+          if(cfg.electronics) matCosts.electronics = cfg.electronics;
+          if(cfg.screws) matCosts.screws = cfg.screws;
+          if(!_gardenMerchantTryPay(matCosts)) break;
+          const tIds = ['f1','rgd5','rgo','rgn','vog17','vog25'];
+          for(let _k = 0; _k < cfg.count; _k++){
+            const tid = tIds[Math.floor(Math.random() * tIds.length)];
+            const rar = cfg.rarities[Math.floor(Math.random() * cfg.rarities.length)];
+            invAdd(tid, rar, 1);
+          }
+          ok = true;
+        }
+      } else if(lineKey === 'ammo'){
+        if(typeof LEGEND_AMMO_POOL === 'undefined' || !LEGEND_AMMO_POOL.length){
+          _errs.push('LEGEND_AMMO_POOL undefined');
+          break;
+        }
+        if(g.food + 0.001 < cfg.foodCost) break;
+        g.food -= cfg.foodCost;
+        for(let _k = 0; _k < cfg.count; _k++){
+          const aid = LEGEND_AMMO_POOL[Math.floor(Math.random() * LEGEND_AMMO_POOL.length)];
+          invAdd(aid, '傳奇', 1);
         }
         ok = true;
       }
-    } else if(lineKey === 'ammo'){
-      if(typeof LEGEND_AMMO_POOL === 'undefined' || !LEGEND_AMMO_POOL.length) break;
-      if(g.food + 0.001 < cfg.foodCost) break;
-      g.food -= cfg.foodCost;
-      for(let _k = 0; _k < cfg.count; _k++){
-        const aid = LEGEND_AMMO_POOL[Math.floor(Math.random() * LEGEND_AMMO_POOL.length)];
-        invAdd(aid, '傳奇', 1);
-      }
-      ok = true;
+    } catch(e){
+      _errs.push(lineKey + ' iter' + _i + ': ' + e.message);
+      break;
     }
     if(!ok) break;
     did++;
   }
+  if(window._dbg && _errs.length){
+    for(const _e of _errs) window._dbg('[line-ERR] ' + _e);
+  }
   m[L.lastKey] = last + did * MERCHANT_INTERVAL_MS;
+  if(window._dbg && did > 0){
+    window._dbg('[line] ' + lineKey + ' produced did=' + did + ' newLast=' + m[L.lastKey]);
+  }
   return did > 0;
 }
 
@@ -1161,14 +1281,31 @@ function _gardenMerchantTick(){
   const m = g.merchant;
   const now = Date.now();
   let changed = false;
-  try { if(_gardenMerchantLineProcess('food')) changed = true; } catch(e){ console.warn('[merchant food]', e); }
-  try { if(_gardenMerchantLineProcess('seed')) changed = true; } catch(e){ console.warn('[merchant seed]', e); }
-  try { if(_gardenMerchantLineProcess('throw')) changed = true; } catch(e){ console.warn('[merchant throw]', e); }
-  try { if(_gardenMerchantLineProcess('ammo')) changed = true; } catch(e){ console.warn('[merchant ammo]', e); }
+  const errors = [];
+  try { if(_gardenMerchantLineProcess('food')) changed = true; } catch(e){ errors.push(['food', e]); }
+  try { if(_gardenMerchantLineProcess('seed')) changed = true; } catch(e){ errors.push(['seed', e]); }
+  try { if(_gardenMerchantLineProcess('throw')) changed = true; } catch(e){ errors.push(['throw', e]); }
+  try { if(_gardenMerchantLineProcess('ammo')) changed = true; } catch(e){ errors.push(['ammo', e]); }
   if(typeof _gardenMealTick === 'function'){
-    try{ if(_gardenMealTick(now)) changed = true; }catch(e){ console.warn('[meal] err', e); }
+    try{ if(_gardenMealTick(now)) changed = true; }catch(e){ errors.push(['meal', e]); }
   }
   if(changed) save();
+  if(window._dbg && errors.length){
+    for(const pair of errors){
+      window._dbg('[tick-ERR] ' + pair[0] + ': ' + (pair[1] && pair[1].message ? pair[1].message : String(pair[1])));
+    }
+  }
+  if(window._dbg){
+    const snapshot = ['food','seed','throw','ammo'].map(function(k){
+      const lvKey = k + 'Lv';
+      const lastKey = 'last' + k.charAt(0).toUpperCase() + k.slice(1);
+      return k + ':lv' + (m[lvKey]||0) + '@' + (m[lastKey]||0);
+    }).join(' ');
+    if(window.__dbgLastSnapshot !== snapshot){
+      window.__dbgLastSnapshot = snapshot;
+      window._dbg('[tick-state] ' + snapshot);
+    }
+  }
 }
 
 function _gardenFoodStats(){
@@ -1315,6 +1452,13 @@ function renderGardenMerchant(box){
     const remainMs = Math.max(0, MERCHANT_INTERVAL_MS - elapsed);
     const remain = Math.ceil(remainMs / 1000);
     const ready = (last === 0) ? false : (elapsed >= MERCHANT_INTERVAL_MS);
+    if(window._dbg && lv > 0){
+      const key = lineKey + '|' + lv + '|' + last + '|' + ready;
+      if(window.__dbgCardKey !== key){
+        window.__dbgCardKey = key;
+        window._dbg('[card] ' + lineKey + ' lv=' + lv + ' last=' + last + ' elapsed=' + elapsed + ' ready=' + ready);
+      }
+    }
     const pct = Math.min(100, Math.max(0, (elapsed / MERCHANT_INTERVAL_MS) * 100));
     let h = '<div class="mrc-card" data-line="' + lineKey + '">';
     h += '<div class="mrc-head">';
