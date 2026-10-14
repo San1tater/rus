@@ -511,7 +511,8 @@ function battleLoop(now){
   }
 
   battle.firing = !battle.settling && !battle.reloading && !battle.consuming &&
-                  ((battle.fireHeld && battle.fireMode==='掃射') || battle.burstLeft>0);
+                  ((battle.fireHeld && battle.fireMode==='掃射') || battle.burstLeft>0 ||
+                   ((battleHeroAnim.name === 'fire_primary' || battleHeroAnim.name === 'fire_secondary') && battleHeroAnim.forcedEnd > now));
 
   const fxEl = document.getElementById('battle-fx');
   if(fxEl){
@@ -551,18 +552,32 @@ function battleLoop(now){
     battle.px = newPx;
   }
 
-  if(BATTLE_ONESHOT_ANIMS.indexOf(battleHeroAnim.name) === -1)  {
-    const _HARD_LOCK = ['reload','switch_secondary','switch_melee','hurt'];
+  {
+    /* 硬鎖：切槍/受擊播放期間不允許被移動動畫搶佔 */
+    const _HARD_LOCK = ['switch_secondary','switch_melee','hurt'];
     const _isHardLocked = _HARD_LOCK.indexOf(battleHeroAnim.name) !== -1 && battleHeroAnim.forcedEnd > now;
     if(!_isHardLocked){
       let _wantAnim;
-      if(canMove && hasMoveInput){
-        _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
-      } else if(battle.firing || (battleHeroAnim.forcedEnd > now && (battleHeroAnim.name === 'fire_primary' || battleHeroAnim.name === 'fire_secondary' || battleHeroAnim.name === 'attack_melee'))){
+      /* 1. 射擊中（含 fire 動畫 350ms 強制窗口）→ fire 動畫 */
+      if(battle.firing && (battle.weaponSlot === 'primary' || battle.weaponSlot === 'secondary' || battle.weaponSlot === 'melee')){
         if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
         else if(battle.weaponSlot === 'melee') _wantAnim = 'attack_melee';
         else _wantAnim = 'fire_primary';
-      } else {
+      }
+      /* 2. 有搖桿輸入且可移動 → walk/run（射擊中 canMove=false，不會走到這） */
+      else if(canMove && hasMoveInput){
+        _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+      }
+      /* 3. reload 動畫未過期且無移動輸入 → 保持 reload */
+      else if(battleHeroAnim.name === 'reload' && battleHeroAnim.forcedEnd > now){
+        _wantAnim = 'reload';
+      }
+      /* 4. attack_melee 未過期（無移動輸入）→ 保持 */
+      else if(battleHeroAnim.name === 'attack_melee' && battleHeroAnim.forcedEnd > now){
+        _wantAnim = 'attack_melee';
+      }
+      /* 5. idle */
+      else {
         _wantAnim = 'idle';
       }
       if(battleHeroAnim.name !== _wantAnim){
@@ -573,30 +588,7 @@ function battleLoop(now){
     }
   }
 
-  /* ===== rev-diag1 ===== */
-  {
-    var _d = document.getElementById('rev-diag');
-    if(!_d){
-      _d = document.createElement('div');
-      _d.id = 'rev-diag';
-      _d.style.cssText = 'position:absolute;top:44px;left:4px;z-index:999;background:rgba(0,0,0,.85);color:#0f0;font-family:Menlo,Consolas,monospace;font-size:10px;padding:5px 7px;pointer-events:none;line-height:1.5;border:1px solid #0f0;white-space:pre;border-radius:3px;';
-      var _z1 = document.getElementById('zone1');
-      if(_z1) _z1.appendChild(_d);
-      else document.body.appendChild(_d);
-    }
-    if(_d){
-      var _hasMv = (battle.moveDir !== 0);
-      _d.textContent = 'firing=' + battle.firing
-        + ' cm=' + canMove
-        + ' hasMv=' + _hasMv
-        + ' mv=' + battle.moveDir.toFixed(2)
-        + '\nanim=' + battleHeroAnim.name
-        + ' endIn=' + Math.round(battleHeroAnim.forcedEnd - now)
-        + ' bl=' + battle.burstLeft
-        + ' px=' + battle.px.toFixed(3);
-    }
-  }
-  /* ===== end rev-diag1 ===== */
+  
 
   updateBossAI(dt, now);
 
