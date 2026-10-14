@@ -554,27 +554,35 @@ function battleLoop(now){
     battle.px = newPx;
   }
 
-  if(BATTLE_ONESHOT_ANIMS.indexOf(battleHeroAnim.name) === -1 || battleHeroAnim.name === 'reload' || battleHeroAnim.name === 'attack_melee'){
-    if(canMove && hasMoveInput){
-      /* 移動優先：不允許 reload / attack_melee 阻擋腿部動畫 */
-      const _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+  /* rev-anim-v3: 移動最優先，無 oneshot 外層阻擋 */
+    {
+      let _wantAnim;
+      if(canMove && hasMoveInput){
+        /* 移動最優先：推摇杆一定播 walk/run */
+        _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+      } else if(battle.firing){
+        /* 射擊動作：由 playerShoot 決定動畫名，不在此重置 */
+        if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
+        else if(battle.weaponSlot === 'melee') _wantAnim = 'attack_melee';
+        else _wantAnim = 'fire_primary';
+      } else if(battle.reloading){
+        /* 換彈動作：靜止時播 reload */
+        _wantAnim = 'reload';
+      } else if((battleHeroAnim.name === 'switch_secondary' || battleHeroAnim.name === 'switch_melee') && battleHeroAnim.forcedEnd > now){
+        _wantAnim = battleHeroAnim.name;
+      } else if(battleHeroAnim.name === 'hurt' && battleHeroAnim.forcedEnd > now){
+        _wantAnim = 'hurt';
+      } else if(battleHeroAnim.name === 'attack_melee' && battleHeroAnim.forcedEnd > now){
+        _wantAnim = 'attack_melee';
+      } else {
+        _wantAnim = 'idle';
+      }
       if(battleHeroAnim.name !== _wantAnim){
         battleHeroAnim.name = _wantAnim;
         battleHeroAnim.frame = 0;
         battleHeroAnim.lastUpdate = performance.now();
       }
-    } else if(battleHeroAnim.name === 'reload' && battleHeroAnim.forcedEnd > now){
-      /* 靜止換彈：保持 reload */
-    } else if(battleHeroAnim.name === 'attack_melee' && battleHeroAnim.forcedEnd > now){
-      /* 靜止近戰：保持 attack_melee */
-    } else {
-      if(battleHeroAnim.name !== 'idle'){
-        battleHeroAnim.name = 'idle';
-        battleHeroAnim.frame = 0;
-        battleHeroAnim.lastUpdate = performance.now();
-      }
     }
-  }
 
     updateBossAI(dt, now);
 
@@ -793,8 +801,8 @@ function triggerReload(){
   if(battleHeroAnim.name !== 'reload'){
     battleHeroAnim.name = 'reload';
     battleHeroAnim.frame = 0;
+    battleHeroAnim.lastUpdate = performance.now();
   }
-  battleHeroAnim.lastUpdate = performance.now();
   battleHeroAnim.forcedEnd = performance.now() + 1700;
   const currentSlot = battle.weaponSlot;
   setTimeout(function(){

@@ -1302,6 +1302,7 @@ function _gardenMerchantRefreshUI(){
   }
 }
 function _gardenMerchantTick(){
+  if(window._gardenOfflineSettleRunning) return;
   const g = _gardenMerchantInit();
   const m = g.merchant;
   const now = Date.now();
@@ -5231,6 +5232,8 @@ function _offlineDoFarmerTask(srv, task, t){
 }
 
 function _gardenOfflineSettle(now, baseTime){
+  window._gardenOfflineSettleRunning = true;
+  try {
   const g = _gardenMerchantInit();
   if(now <= baseTime) return;
   const WORK_MS = (typeof GARDEN_WORK_MS === 'number') ? GARDEN_WORK_MS : 4000;
@@ -5388,6 +5391,10 @@ function _gardenOfflineSettle(now, baseTime){
   if(!state.garden.log) state.garden.log = [];
   state.garden.log.push({ t: Date.now(), text: summary, cls: 'offline', detail: detail });
   if(state.garden.log.length > 100) state.garden.log.splice(0, state.garden.log.length - 100);
+
+  } finally {
+    window._gardenOfflineSettleRunning = false;
+  }
 }
 
 function gardenCleanup(idx){
