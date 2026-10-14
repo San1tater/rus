@@ -539,35 +539,46 @@ function battleLoop(now){
      射擊期間搖桿輸入被「暫時忽略」（canMove=false），但 moveDir 保留，
      鬆開射擊後若 moveDir !== 0 立即恢復移動。 */
   const hasMoveInput = (battle.moveDir !== 0);
-  if(hasMoveInput && battle.consuming){
-    interruptHeal();
-  }
-  /* 硬鎖動畫期間（切槍、受擊）：禁止移動、禁止搶占動畫 */
-  const _HARD_LOCK = ['switch_secondary','switch_melee','hurt'];
-  const _isHardLocked = _HARD_LOCK.indexOf(battleHeroAnim.name) !== -1 && battleHeroAnim.forcedEnd > now;
-  const canMove = !battle.firing && !battle.consuming;
+    if(hasMoveInput && battle.consuming){
+      interruptHeal();
+    }
+    /* 換彈期間禁止移動：腿不動=位置不動，避免視覺 bug */
+    const canMove = !battle.firing && !battle.consuming && !battle.reloading;
 
-  if(canMove && hasMoveInput){
-    let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
-    /* ★ 中心點對中心點：玩家中心不能超過 BOSS 中心 */
-    if(newPx > battle.bx) newPx = Math.max(0.05, battle.bx);
-    battle.px = newPx;
-  }
+    if(canMove && hasMoveInput){
+      let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
+      if(newPx > battle.bx) newPx = Math.max(0.05, battle.bx);
+      battle.px = newPx;
+    }
 
-  /* rev-anim-v3: 移動最優先，無 oneshot 外層阻擋 */
+    /* 走路帧独立推进：只要玩家推着摇杆且非射击/换弹/治疗，就推进。
+       fire → walk → fire 往复时 walk 帧不从 0 重来，实现「走一步停一步」的连贯腿动画。 */
+    if(battle._walkFrame === undefined) battle._walkFrame = 0;
+    if(battle._walkTick === undefined) battle._walkTick = performance.now();
+    {
+      const _nowT = performance.now();
+      const _movingNow = canMove && hasMoveInput;
+      const _walkAnim = GAME_ANIMS.walk;
+      const _walkInterval = 1000 / _walkAnim.fps;
+      if(_movingNow && (_nowT - battle._walkTick >= _walkInterval)){
+        battle._walkTick = _nowT;
+        battle._walkFrame = (battle._walkFrame + 1) % _walkAnim.frameCount;
+      } else if(!_movingNow){
+        battle._walkTick = _nowT;
+      }
+    }
+
+    /* 動畫切換優先級：reload > firing > 移動 > switch/hurt/attack_melee > idle */
     {
       let _wantAnim;
-      if(canMove && hasMoveInput){
-        /* 移動最優先：推摇杆一定播 walk/run */
-        _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+      if(battle.reloading){
+        _wantAnim = 'reload';
       } else if(battle.firing){
-        /* 射擊動作：由 playerShoot 決定動畫名，不在此重置 */
         if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
         else if(battle.weaponSlot === 'melee') _wantAnim = 'attack_melee';
         else _wantAnim = 'fire_primary';
-      } else if(battle.reloading){
-        /* 換彈動作：靜止時播 reload */
-        _wantAnim = 'reload';
+      } else if(canMove && hasMoveInput){
+        _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
       } else if((battleHeroAnim.name === 'switch_secondary' || battleHeroAnim.name === 'switch_melee') && battleHeroAnim.forcedEnd > now){
         _wantAnim = battleHeroAnim.name;
       } else if(battleHeroAnim.name === 'hurt' && battleHeroAnim.forcedEnd > now){
@@ -579,12 +590,20 @@ function battleLoop(now){
       }
       if(battleHeroAnim.name !== _wantAnim){
         battleHeroAnim.name = _wantAnim;
-        battleHeroAnim.frame = 0;
         battleHeroAnim.lastUpdate = performance.now();
+        if(_wantAnim === 'walk' || _wantAnim === 'run'){
+          /* 用独立走路帧，保留连续性 */
+          battleHeroAnim.frame = battle._walkFrame;
+        } else {
+          battleHeroAnim.frame = 0;
+        }
+      } else if(_wantAnim === 'walk' || _wantAnim === 'run'){
+        /* 已在播走路，保持同步 */
+        battleHeroAnim.frame = battle._walkFrame;
       }
     }
 
-    updateBossAI(dt, now);
+        updateBossAI(dt, now);
 
   if(battle.firing){
     const interval=fireInterval(battle.fireMode,battle.weapon);

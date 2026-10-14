@@ -1816,7 +1816,7 @@ function _gardenTowerDemolish(idx){
   renderGardenGrid();
 }
 
-const GARDEN_RAID_INTERVAL_MS = 4 * 3600 * 1000;
+const GARDEN_RAID_INTERVAL_MS = 1 * 3600 * 1000;
 
 function _gardenRaidInit(){
   const g = _gardenMerchantInit();
