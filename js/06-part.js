@@ -2038,22 +2038,81 @@ function _raidDrawWorkerHelmet(ctx, B, anim, fi, color){
   ctx.stroke();
   ctx.restore();
 }
-function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType, flipX){
+/* rev304: 灰桶繪製 —— 上寬下窄梯形，中心對齊前後臂中點連線中點 */
+function drawBucketUnit(ctx, u){
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(u.bx - u.topHalf, u.topY);
+  ctx.lineTo(u.bx + u.topHalf, u.topY);
+  ctx.lineTo(u.bx + u.botHalf, u.botY);
+  ctx.lineTo(u.bx - u.botHalf, u.botY);
+  ctx.closePath();
+  ctx.fillStyle = '#9aa2aa';
+  ctx.fill();
+  ctx.strokeStyle = '#464d55';
+  ctx.lineWidth = 5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.restore();
+}
+/* rev306: 手持農具 —— 農民木棍（棕）/ 監工藍板 */
+function drawHandItemUnit(ctx, u){
+  if(u.handItemType === 'stick'){
+    /* 農具：細木柄 + 斜掛梯形鋤頭（穿過後手中心，不浮空） */
+    const cx = u.backMidX;
+    const cy = u.backMidY;
+    ctx.save();
+    /* 木柄：#c09050 亮棕、12px 細桿 */
+    ctx.strokeStyle = '#c09050';
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx + 4, cy + 45);
+    ctx.lineTo(cx - 4, cy - 85);
+    ctx.stroke();
+    /* 鋤頭：梯形，棍子頂端位於水平 1/4 位置（左側窄、右側寬），微向下傾斜 */
+    const topX = cx - 4;
+    const topY = cy - 85;
+    ctx.beginPath();
+    ctx.moveTo(topX - 16, topY - 5);   /* 左上（內側窄端） */
+    ctx.lineTo(topX - 16, topY + 5);   /* 左下 */
+    ctx.lineTo(topX + 50, topY + 24);  /* 右下（外側寬端，向下延伸） */
+    ctx.lineTo(topX + 50, topY - 12);  /* 右上 */
+    ctx.closePath();
+    ctx.fillStyle = '#b0b0b0';
+    ctx.fill();
+    ctx.restore();
+  } else if(u.handItemType === 'clipboard'){
+    /* 文件夾：與灰桶同邏輯 */
+    const w = 90, h = 110;
+    const cx = u.armMidX;
+    const cy = u.armMidY + 7;
+    ctx.save();
+    ctx.fillStyle = '#3a78c8';
+    ctx.fillRect(cx - w/2, cy - h/2, w, h);
+    ctx.restore();
+  }
+}
+function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType, flipX, hasBucket, handItem){
   const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
   const B = { x: 30, y: 30, w: 340, h: 460 };
   const ORIG_FOOT_X = 200;
   const ORIG_FOOT_Y = 515;
+  /* rev305: 僕人配色 —— 保留原色調提亮；上衣與褲子分開指定
+     farmer  綠  → 提亮綠（保留綠調）
+     guard   藍  → 提亮藍（保留藍調）
+     foreman 棕  → 黃上衣 / 白褲子 */
   const TYPE_COLORS = {
-    farmer:  { body: '#2e5a2e', dark: '#1e3a1e' },
-    guard:   { body: '#2e4a6a', dark: '#1e2a3a' },
-    foreman: { body: '#5a4a2e', dark: '#3a2e1e' }
+    farmer:  { body: '#5a9a48', legs: '#3a6a2e' },
+    guard:   { body: '#5088bb', legs: '#2e4a6a' },
+    foreman: { body: '#e0a830', legs: '#d8d0c0' }
   };
   const _colors = servantType ? TYPE_COLORS[servantType] : null;
   if(_colors){
     for(const L of GAME_LAYERS){
       L._oldColor = L.color;
-      if(L.id === 'right_leg' || L.id === 'left_leg') L.color = _colors.dark;
+      if(L.id === 'right_leg' || L.id === 'left_leg') L.color = _colors.legs;
       else if(L.id === 'torso' || L.id === 'back_arm' || L.id === 'front_arm') L.color = _colors.body;
     }
   }
@@ -2094,9 +2153,72 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
       }
     }
   }
+  /* rev304: 堆肥農民手持灰桶（上寬下窄梯形）
+     z=58 → 前臂(62)之後、後臂(55)與其餘圖層之前
+     桶中心 X = 前臂中點與後臂中點連線的中點 X
+     桶上緣 = 該中點 Y - 38（略高於手臂） */
+  if(hasBucket){
+    const _fa = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
+    const _ba = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
+    if(_fa && _ba){
+      const _fk = (anim.keys && anim.keys[_fa.id] && anim.keys[_fa.id][fi]) || {rot:0,dx:0,dy:0};
+      const _bk = (anim.keys && anim.keys[_ba.id] && anim.keys[_ba.id][fi]) || {rot:0,dx:0,dy:0};
+      const _fCx = B.x + B.w * (_fa.x + (_fk.dx||0) * 0.01);
+      const _fCy = B.y + B.h * (_fa.y + (_fk.dy||0) * 0.01);
+      const _fW = B.w * _fa.w, _fH = B.h * _fa.h;
+      const _fMidX = _fCx + _fW * (0.5 - _fa.pivot.x);
+      const _fMidY = _fCy + _fH * (0.5 - _fa.pivot.y);
+      const _bCx = B.x + B.w * (_ba.x + (_bk.dx||0) * 0.01);
+      const _bCy = B.y + B.h * (_ba.y + (_bk.dy||0) * 0.01);
+      const _bW = B.w * _ba.w, _bH = B.h * _ba.h;
+      const _bMidX = _bCx + _bW * (0.5 - _ba.pivot.x);
+      const _bMidY = _bCy + _bH * (0.5 - _ba.pivot.y);
+      const _cx = (_fMidX + _bMidX) / 2;
+      const _cy = (_fMidY + _bMidY) / 2;
+      units.push({
+        z: 58,
+        kind: 'bucket',
+        bx: _cx,
+        topY: _cy - 38,
+        botY: _cy + 97,
+        topHalf: 54,
+        botHalf: 39
+      });
+    }
+  }
+  /* rev306: 手持農具 —— 農民木棍 / 監工藍板 */
+  if(handItem === 'stick' || handItem === 'clipboard'){
+    const _fa = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
+    const _ba = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
+    if(_fa && _ba){
+      const _fk = (anim.keys && anim.keys[_fa.id] && anim.keys[_fa.id][fi]) || {rot:0,dx:0,dy:0};
+      const _bk = (anim.keys && anim.keys[_ba.id] && anim.keys[_ba.id][fi]) || {rot:0,dx:0,dy:0};
+      const _fCx = B.x + B.w * (_fa.x + (_fk.dx||0) * 0.01);
+      const _fCy = B.y + B.h * (_fa.y + (_fk.dy||0) * 0.01);
+      const _fW = B.w * _fa.w, _fH = B.h * _fa.h;
+      const _fMidX = _fCx + _fW * (0.5 - _fa.pivot.x);
+      const _fMidY = _fCy + _fH * (0.5 - _fa.pivot.y);
+      const _bCx = B.x + B.w * (_ba.x + (_bk.dx||0) * 0.01);
+      const _bCy = B.y + B.h * (_ba.y + (_bk.dy||0) * 0.01);
+      const _bW = B.w * _ba.w, _bH = B.h * _ba.h;
+      const _bMidX = _bCx + _bW * (0.5 - _ba.pivot.x);
+      const _bMidY = _bCy + _bH * (0.5 - _ba.pivot.y);
+      units.push({
+        z: (handItem === 'clipboard') ? 58 : 65,
+        kind: 'handitem',
+        handItemType: handItem,
+        armMidX: (_fMidX + _bMidX) / 2,
+        armMidY: (_fMidY + _bMidY) / 2,
+        backMidX: _bMidX,
+        backMidY: _bMidY
+      });
+    }
+  }
   units.sort(function(a, b){ return a.z - b.z; });
   for(const u of units){
     if(u.kind === 'layer') drawBodyLayer(ctx, u.layer, B, anim, fi);
+    else if(u.kind === 'bucket') drawBucketUnit(ctx, u);
+    else if(u.kind === 'handitem') drawHandItemUnit(ctx, u);
     else drawEqLayer(ctx, u, B, anim, fi);
   }
   if(servantType === 'foreman') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ffffff');
@@ -3792,6 +3914,39 @@ function _gardenGetActorCanvas(){
   return canvas;
 }
 
+/* 農民：一根木棍 */
+function _drawFarmTool(ctx, cx, footY, charH, flipX){
+  const dir = flipX ? -1 : 1;
+  const x = cx + dir * charH * 0.26;
+  const y1 = footY - charH * 0.20;
+  const y2 = footY - charH * 0.90;
+  ctx.save();
+  ctx.strokeStyle = '#7a5020';
+  ctx.lineWidth = Math.max(2, charH * 0.045);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y1);
+  ctx.lineTo(x + dir * charH * 0.05, y2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* 監工：一個藍色長方形 */
+function _drawClipboard(ctx, cx, footY, charH, flipX){
+  const dir = flipX ? -1 : 1;
+  const w = charH * 0.20;
+  const h = charH * 0.26;
+  const x = cx + dir * charH * 0.26 - w / 2;
+  const y = footY - charH * 0.55;
+  ctx.save();
+  ctx.fillStyle = '#3a78c8';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#1a3a6a';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+}
+
 function _gardenRenderActors(now){
   const p = document.getElementById('garden-page');
   if(!p) return;
@@ -3866,7 +4021,17 @@ function _gardenRenderActors(now){
       }
     }
     const wpSlot = equipped.primary ? 'primary' : (equipped.secondary ? 'secondary' : null);
-    _raidDrawHuman(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, (a.tx - a.x) < -0.5);
+    /* rev304: 指派到堆肥區的農民 → 手持灰桶 */
+    let _hasBucket = false;
+    if(a.type === 'farmer' && a._srv && typeof _isAssignedToCompost === 'function'){
+      _hasBucket = _isAssignedToCompost(a._srv);
+    }
+    /* rev306: 手持農具 —— 堆肥農民灰桶 / 一般農民木棍 / 監工藍板 */
+    let _handItem = null;
+    if(_hasBucket) _handItem = 'bucket';
+    else if(a.type === 'farmer') _handItem = 'stick';
+    else if(a.type === 'foreman') _handItem = 'clipboard';
+    _raidDrawHuman(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, (a.tx - a.x) < -0.5, _hasBucket, _handItem);
     if(a._srv){
       const _lbl = servantLabel(a._srv);
       ctx.save();
