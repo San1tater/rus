@@ -324,7 +324,6 @@ function onGardenPlotClick(idx){
   else { openGardenPlotDetail(idx); }
 }
 
-
 /* ===== rev284: 地塊責任人 helper ===== */
 function _gardenPlotOwnersHtml(idx, type){
   const servants = (state.servants || []).filter(function(s){
@@ -815,9 +814,12 @@ function renderGardenStorage(box){
   _retry();
 }
 
-
-
 const MERCHANT_INTERVAL_MS = 300000;
+/* rev303 fix32: 提前到使用前，避免 TDZ */
+const GARDEN_MEAL_INTERVAL_MS = 3600000;
+const GUARD_STAMINA_DRAIN_PER_HOUR = 120;
+const FOOD_COST_BASE = { full: 20, normal: 15, half: 10, lick: 5, starve: 0 };
+const RARITY_FOOD_MULT = { '破舊': 0.8, '一般': 1, '庫存': 1.5, '精品': 2.5, '傳奇': 5 };
 const MERCHANT_FOOD_TABLE = {
   0: { cropValue: 0 },
   1: { gears: 1, screws: 2, cropValue: 25 },
@@ -1904,7 +1906,6 @@ function _raidCleanupAll(){
   }
 }
 
-
 function _raidDrawWorkerHelmet(ctx, B, anim, fi, color){
   const L = GAME_LAYERS.find(function(l){ return l.id === 'head'; });
   if(!L) return;
@@ -2305,9 +2306,6 @@ function _raidLiveLogPush(text, cls){
 function _esc(s){ return String(s).replace(/[&<>]/g, function(c){ return c === '&' ? '&amp;' : (c === '<' ? '&lt;' : '&gt;'); }); }
 /* ===== end rev205 ===== */
 const _RARITY_COLOR = { '破舊':'#b87333', '一般':'#e0e0e0', '庫存':'#4caf50', '精品':'#2196f3', '傳奇':'#ffb300', '具名':'#a45ede' };
-
-
-
 
 function _mergeLoot(items){
   const map = {};
@@ -2803,8 +2801,6 @@ function _gardenRaidShowBattle(guards, enemies, region){
     run();
   });
 }
-
-
 
 function _isServantWorking(s){
   return !!(s && s.assignedPlots && s.assignedPlots.length > 0);
@@ -3667,8 +3663,6 @@ function _gardenActorTick(){
   }
 }
 
-
-
 let _gardenActorCanvasRAF = null;
 
 function _gardenGetActorCanvas(){
@@ -4055,13 +4049,6 @@ function openArmoryInfo(){
   ft.innerHTML = '';
   openModal({ title: '🔫 軍械庫生產', body: body, footer: ft });
 }
-
-
-
-
-
-
-
 
 function _gardenSoilFoodPerHour(){
   const plots = _gardenGetPlots();
@@ -4839,10 +4826,6 @@ document.addEventListener('click',e=>{
 
 window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,addProf,notify,offlineSettle,getMeleeHits,getOrCreateNamedItem,BossModule,probeAssetVersion,get assetVersion(){return ASSET_VERSION;}};
 
-
-
-
-
 /* ===== rev255: 五修合一 ===== */
 (function(){
   if(window._rev255Installed) return;
@@ -5048,10 +5031,6 @@ const SERVANT_LEAVE_REWARD = {
   '精品': { seedMin: 2, seedMax: 3, matMin: 4, matMax: 6 },
   '傳奇': { seedMin: 3, seedMax: 5, matMin: 6, matMax: 10 }
 };
-const GARDEN_MEAL_INTERVAL_MS = 3600000;
-const GUARD_STAMINA_DRAIN_PER_HOUR = 120;
-const FOOD_COST_BASE = { full: 20, normal: 15, half: 10, lick: 5, starve: 0 };
-const RARITY_FOOD_MULT = { '破舊': 0.8, '一般': 1, '庫存': 1.5, '精品': 2.5, '傳奇': 5 };
 
 function _gardenServantLeaveCheck(silent){
   const now = Date.now();
@@ -5425,8 +5404,6 @@ function _gardenOfflineSettle(now, baseTime){
     if(state.garden.log.length > 100) state.garden.log.splice(0, state.garden.log.length - 100);
   }
 }
-
-
 
 function gardenCleanup(idx){
   const plots = _gardenGetPlots();

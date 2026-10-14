@@ -692,21 +692,16 @@ function switchBattleWeapon(slot){
     battle.weaponStates[slot]={ammoInMag:battle.ammoInMag,ammoRef:battle.ammoRef};
   }
   else{battle.ammoRef=null;battle.ammoInMag=def.slot==='throwable'?getThrowableCount():1;battle.weaponStates[slot]={ammoInMag:battle.ammoInMag,ammoRef:null};}
-  if(slot === 'secondary'){
-    battleHeroAnim.name='switch_secondary';
-    battleHeroAnim.frame=0;
-    battleHeroAnim.lastUpdate=performance.now();
-    battleHeroAnim.forcedEnd=performance.now()+900;
-  } else if(slot === 'melee'){
-    battleHeroAnim.name='switch_melee';
-    battleHeroAnim.frame=0;
-    battleHeroAnim.lastUpdate=performance.now();
-    battleHeroAnim.forcedEnd=performance.now()+900;
-  } else if(slot === 'primary'){
-    battleHeroAnim.name='idle';
-    battleHeroAnim.frame=0;
-    battleHeroAnim.lastUpdate=performance.now();
-    battleHeroAnim.forcedEnd=0;
+  {
+    const _swAnim = (slot === 'secondary') ? 'switch_secondary'
+      : (slot === 'melee') ? 'switch_melee' : 'idle';
+    const _swDur = (slot === 'primary') ? 0 : 900;
+    if(battleHeroAnim.name !== _swAnim){
+      battleHeroAnim.name = _swAnim;
+      battleHeroAnim.frame = 0;
+    }
+    battleHeroAnim.lastUpdate = performance.now();
+    battleHeroAnim.forcedEnd = performance.now() + _swDur;
   }
   renderBattleControls($('#zone3'));
 }

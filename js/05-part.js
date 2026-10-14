@@ -512,7 +512,7 @@ function battleLoop(now){
 
   battle.firing = !battle.settling && !battle.reloading && !battle.consuming &&
                   ((battle.fireHeld && battle.fireMode==='掃射') || battle.burstLeft>0 ||
-                   ((battleHeroAnim.name === 'fire_primary' || battleHeroAnim.name === 'fire_secondary') && battleHeroAnim.forcedEnd > now));
+                   (battleHeroAnim.forcedEnd > now && (battleHeroAnim.name === 'fire_primary' || battleHeroAnim.name === 'fire_secondary' || battleHeroAnim.name === 'attack_melee')));
 
   const fxEl = document.getElementById('battle-fx');
   if(fxEl){
@@ -543,7 +543,10 @@ function battleLoop(now){
   if(hasMoveInput && battle.consuming){
     interruptHeal();
   }
-  const canMove = !battle.firing && !battle.consuming;
+  /* 硬鎖動畫期間（切槍、受擊）：禁止移動、禁止搶占動畫 */
+  const _HARD_LOCK = ['switch_secondary','switch_melee','hurt'];
+  const _isHardLocked = _HARD_LOCK.indexOf(battleHeroAnim.name) !== -1 && battleHeroAnim.forcedEnd > now;
+  const canMove = !battle.firing && !battle.consuming && !_isHardLocked;
 
   if(canMove && hasMoveInput){
     let newPx = clamp(battle.px + battle.moveDir*moveSpd, 0.05, 0.95);
@@ -552,43 +555,36 @@ function battleLoop(now){
     battle.px = newPx;
   }
 
-  {
-    /* 硬鎖：切槍/受擊播放期間不允許被移動動畫搶佔 */
-    const _HARD_LOCK = ['switch_secondary','switch_melee','hurt'];
-    const _isHardLocked = _HARD_LOCK.indexOf(battleHeroAnim.name) !== -1 && battleHeroAnim.forcedEnd > now;
-    if(!_isHardLocked){
-      let _wantAnim;
-      /* 1. 射擊中（含 fire 動畫 350ms 強制窗口）→ fire 動畫 */
-      if(battle.firing && (battle.weaponSlot === 'primary' || battle.weaponSlot === 'secondary' || battle.weaponSlot === 'melee')){
-        if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
-        else if(battle.weaponSlot === 'melee') _wantAnim = 'attack_melee';
-        else _wantAnim = 'fire_primary';
-      }
-      /* 2. 有搖桿輸入且可移動 → walk/run（射擊中 canMove=false，不會走到這） */
-      else if(canMove && hasMoveInput){
-        _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
-      }
-      /* 3. reload 動畫未過期且無移動輸入 → 保持 reload */
-      else if(battleHeroAnim.name === 'reload' && battleHeroAnim.forcedEnd > now){
-        _wantAnim = 'reload';
-      }
-      /* 4. attack_melee 未過期（無移動輸入）→ 保持 */
-      else if(battleHeroAnim.name === 'attack_melee' && battleHeroAnim.forcedEnd > now){
-        _wantAnim = 'attack_melee';
-      }
-      /* 5. idle */
-      else {
-        _wantAnim = 'idle';
-      }
-      if(battleHeroAnim.name !== _wantAnim){
-        battleHeroAnim.name = _wantAnim;
-        battleHeroAnim.frame = 0;
-        battleHeroAnim.lastUpdate = now;
-      }
+  if(!_isHardLocked){
+    let _wantAnim;
+    /* 1. 射擊中（含 fire 動畫 350ms 強制窗口）→ fire 動畫 */
+    if(battle.firing && (battle.weaponSlot === 'primary' || battle.weaponSlot === 'secondary' || battle.weaponSlot === 'melee')){
+      if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
+      else if(battle.weaponSlot === 'melee') _wantAnim = 'attack_melee';
+      else _wantAnim = 'fire_primary';
+    }
+    /* 2. 有搖桿輸入且可移動 → walk/run */
+    else if(canMove && hasMoveInput){
+      _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+    }
+    /* 3. reload 動畫未過期且無移動輸入 → 保持 reload */
+    else if(battleHeroAnim.name === 'reload' && battleHeroAnim.forcedEnd > now){
+      _wantAnim = 'reload';
+    }
+    /* 4. attack_melee 未過期（無移動輸入）→ 保持 */
+    else if(battleHeroAnim.name === 'attack_melee' && battleHeroAnim.forcedEnd > now){
+      _wantAnim = 'attack_melee';
+    }
+    /* 5. idle */
+    else {
+      _wantAnim = 'idle';
+    }
+    if(battleHeroAnim.name !== _wantAnim){
+      battleHeroAnim.name = _wantAnim;
+      battleHeroAnim.frame = 0;
+      battleHeroAnim.lastUpdate = now;
     }
   }
-
-  
 
   updateBossAI(dt, now);
 
@@ -804,8 +800,10 @@ function triggerReload(){
   battle._reloadToken = (battle._reloadToken || 0) + 1;
   const _myReloadToken = battle._reloadToken;
   refreshBattleControlsLive();
-  battleHeroAnim.name = 'reload';
-  battleHeroAnim.frame = 0;
+  if(battleHeroAnim.name !== 'reload'){
+    battleHeroAnim.name = 'reload';
+    battleHeroAnim.frame = 0;
+  }
   battleHeroAnim.lastUpdate = performance.now();
   battleHeroAnim.forcedEnd = performance.now() + 1700;
   const currentSlot = battle.weaponSlot;
@@ -847,21 +845,17 @@ function playerShoot(){
     }
   }
 
-  if(battle.weaponSlot === 'secondary'){
-    battleHeroAnim.name='fire_secondary';
-    battleHeroAnim.frame=0;
-    battleHeroAnim.lastUpdate=performance.now();
-    battleHeroAnim.forcedEnd=performance.now()+350;
-  } else if(battle.weaponSlot === 'melee'){
-    battleHeroAnim.name='attack_melee';
-    battleHeroAnim.frame=0;
-    battleHeroAnim.lastUpdate=performance.now();
-    battleHeroAnim.forcedEnd=performance.now()+600;
-  } else {
-    battleHeroAnim.name='fire_primary';
-    battleHeroAnim.frame=0;
-    battleHeroAnim.lastUpdate=performance.now();
-    battleHeroAnim.forcedEnd=performance.now()+350;
+  {
+    const _fireAnimName = (battle.weaponSlot === 'secondary') ? 'fire_secondary'
+      : (battle.weaponSlot === 'melee') ? 'attack_melee' : 'fire_primary';
+    const _fireDur = (battle.weaponSlot === 'melee') ? 600 : 350;
+    /* 只在動畫名變化時歸零 frame，讓同一輪動畫連貫播放 */
+    if(battleHeroAnim.name !== _fireAnimName){
+      battleHeroAnim.name = _fireAnimName;
+      battleHeroAnim.frame = 0;
+    }
+    battleHeroAnim.lastUpdate = performance.now();
+    battleHeroAnim.forcedEnd = performance.now() + _fireDur;
   }
   const _now = performance.now();
   if(_now - (battle.lastShotTime || 0) > (battle.chainResetMs||600)){ battle.chainShots = 0; }
