@@ -573,6 +573,31 @@ function battleLoop(now){
     }
   }
 
+  /* ===== rev-diag1 ===== */
+  {
+    var _d = document.getElementById('rev-diag');
+    if(!_d){
+      _d = document.createElement('div');
+      _d.id = 'rev-diag';
+      _d.style.cssText = 'position:absolute;top:44px;left:4px;z-index:999;background:rgba(0,0,0,.85);color:#0f0;font-family:Menlo,Consolas,monospace;font-size:10px;padding:5px 7px;pointer-events:none;line-height:1.5;border:1px solid #0f0;white-space:pre;border-radius:3px;';
+      var _z1 = document.getElementById('zone1');
+      if(_z1) _z1.appendChild(_d);
+      else document.body.appendChild(_d);
+    }
+    if(_d){
+      var _hasMv = (battle.moveDir !== 0);
+      _d.textContent = 'firing=' + battle.firing
+        + ' cm=' + canMove
+        + ' hasMv=' + _hasMv
+        + ' mv=' + battle.moveDir.toFixed(2)
+        + '\nanim=' + battleHeroAnim.name
+        + ' endIn=' + Math.round(battleHeroAnim.forcedEnd - now)
+        + ' bl=' + battle.burstLeft
+        + ' px=' + battle.px.toFixed(3);
+    }
+  }
+  /* ===== end rev-diag1 ===== */
+
   updateBossAI(dt, now);
 
   if(battle.firing){
