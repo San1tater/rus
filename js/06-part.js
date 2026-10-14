@@ -1123,13 +1123,28 @@ function _gardenMerchantLineProcess(lineKey, atTime){
   }
   const L = lineCfg();
   if(!L) return false;
-  const v = _gardenMerchantLineValidate(lineKey, L, m, now);
-  if(!v) return false;
-  const lv = v.lv;
-  const last = v.last;
-  const cfg = v.cfg;
-  if(now - last < MERCHANT_INTERVAL_MS) return false;
-  const times = Math.min(Math.floor((now - last) / MERCHANT_INTERVAL_MS), 500);
+  let lv = m[L.lvKey];
+  if(typeof lv !== 'number' || !Number.isFinite(lv) || lv < 0 || Math.floor(lv) !== lv){
+    m[L.lvKey] = 0;
+    return false;
+  }
+  if(lv === 0) return false;
+  const cfg = L.table[lv];
+  if(!cfg){ m[L.lvKey] = 0; return false; }
+  const INTERVAL = MERCHANT_INTERVAL_MS;
+  let last = m[L.lastKey];
+  const isValidLast = (typeof last === 'number' && Number.isFinite(last)
+    && last >= _MIN_VALID_TS
+    && last % INTERVAL === 0);
+  if(!isValidLast){
+    /* firstTick = 第一个 >= now + INTERVAL 的 INTERVAL 倍数 */
+    const firstTick = Math.ceil((now + INTERVAL) / INTERVAL) * INTERVAL;
+    m[L.lastKey] = firstTick - INTERVAL;
+    return false;
+  }
+  const nextTick = last + INTERVAL;
+  if(now < nextTick) return false;
+  const times = Math.min(Math.floor((now - nextTick) / INTERVAL) + 1, 500);
   if(times <= 0) return false;
   let did = 0;
   for(let _i = 0; _i < times; _i++){
@@ -1204,7 +1219,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
     if(!ok) break;
     did++;
   }
-  m[L.lastKey] = last + did * MERCHANT_INTERVAL_MS;
+  m[L.lastKey] = last + did * INTERVAL;
   return did > 0;
 }
 
@@ -1392,12 +1407,26 @@ function renderGardenMerchant(box){
     if(!meta) return '';
     const lv = m[meta.lvKey] || 0;
     const last = m[meta.lastKey] || 0;
-    const _validLast = (typeof last === 'number' && Number.isFinite(last) && last >= _MIN_VALID_TS && last <= now + 60000) ? last : now;
-    const elapsed = Math.max(0, now - _validLast);
-    const remainMs = Math.max(0, MERCHANT_INTERVAL_MS - elapsed);
-    const remain = Math.ceil(remainMs / 1000);
-    const ready = (lv > 0) && (elapsed >= MERCHANT_INTERVAL_MS);
-    const pct = Math.min(100, Math.max(0, (elapsed / MERCHANT_INTERVAL_MS) * 100));
+    const INTERVAL = MERCHANT_INTERVAL_MS;
+    const isValidLast = (typeof last === 'number' && Number.isFinite(last)
+      && last >= _MIN_VALID_TS && last % INTERVAL === 0);
+    let remain = 0, ready = false, pct = 0;
+    if(lv > 0 && isValidLast){
+      const nextTick = last + INTERVAL;
+      const remainMs = Math.max(0, nextTick - now);
+      remain = Math.ceil(remainMs / 1000);
+      ready = now >= nextTick;
+      const elapsed = Math.max(0, now - last);
+      pct = Math.min(100, Math.max(0, (elapsed / INTERVAL) * 100));
+    }
+    const st = (lv > 0) ? _gardenMerchantLineStatus(lineKey) : null;
+    const resourceOk = !st || !st.paused;
+    let _cdText = '';
+    if(lv > 0){
+      if(ready && resourceOk) _cdText = '就緒';
+      else if(ready && !resourceOk) _cdText = '缺資源';
+      else _cdText = remain + 's';
+    }
     let h = '<div class="mrc-card" data-line="' + lineKey + '">';
     h += '<div class="mrc-head">';
     h += '<div class="mrc-title">' + meta.icon + ' ' + meta.title + '</div>';
@@ -1423,7 +1452,7 @@ function renderGardenMerchant(box){
     if(lv > 0){
       h += '<div class="mrc-cd-row">';
       h += '<div class="mrc-cd-bar"><div class="fill" style="width:' + pct + '%"></div></div>';
-      h += '<div class="mrc-cd-num">' + (ready ? '就緒' : remain + 's') + '</div>';
+      h += '<div class="mrc-cd-num">' + _cdText + '</div>';
       h += '</div>';
     } else {
       h += '<div class="mrc-cd-row mrc-cd-off">待機（點擊等級訂閱）</div>';
@@ -4084,7 +4113,7 @@ function _rebindStatsClick(container){
 function openStatsDetail(key){
   if(key === 'armory'){ openArmoryInfo(); return; }
   if(key === 'radio'){ _openRadioDetail(); return; }
-  if(key === 'food' || key === 'seed' || key === 'throw'){ _openMerchantLineDetail(key); return; }
+  if(key === 'food' || key === 'seed' || key === 'throw' || key === 'ammo'){ _openMerchantLineDetail(key); return; }
   if(key === 'soil'){ _openSoilDetail(); return; }
 }
 
