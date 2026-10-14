@@ -95,7 +95,7 @@ function getControlCenterBody(){
 function openControlCenter(){
   const ft = el('div','modal-ft');
   ft.innerHTML = '<button class="btn ghost" id="m-close-cc">關閉</button>';
-  const bd = openModal({title:'🏛️ 控制中心', body:getControlCenterBody(), footer:ft});
+  const bd = openModal({title:'控制中心', body:getControlCenterBody(), footer:ft});
   const _heads = bd.querySelectorAll('[data-cc-sec]');
   for(let _i = 0; _i < _heads.length; _i++){
     (function(h){
@@ -106,7 +106,7 @@ function openControlCenter(){
   ft.querySelector('#m-close-cc').onclick = closeModal;
 }
 function openMerchant(){
-  openModal({title:'💰 商人', body:'<div class="empty-hint">商人系統開發中，敬請期待。</div>'});
+  openModal({title:'商人', body:'<div class="empty-hint">商人系統開發中，敬請期待。</div>'});
 }
 /* ===== rev130: 後院全屏分頁 ===== */
 const GARDEN_PLOT_TYPES = {
@@ -3923,7 +3923,7 @@ function openPreference(){
   let body = '';
   body += rarityPolicyBlockHTML('exp', '🎯 探索模式彈藥', p.ammoExplore, true);
   body += rarityPolicyBlockHTML('texp', '💣 探索模式手雷', p.throwableExplore, true);
-  const bd = openModal({title:'⚙️ 偏好設定', body});
+  const bd = openModal({title:'偏好設定', body});
   _bindPrefEvents(bd);
 }
 function _gardenMerchantLineStatus(lineKey){
@@ -4048,7 +4048,7 @@ function openArmoryInfo(){
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '';
-  openModal({ title: '🔫 軍械庫生產', body: body, footer: ft });
+  openModal({ title: '軍械庫生產', body: body, footer: ft });
 }
 
 function _gardenSoilFoodPerHour(){
@@ -5472,7 +5472,7 @@ function _openGardenLogDetail(entry){
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '';
-  openModal({ title: '📦 詳情', body: body, footer: ft });
+  openModal({ title: '詳情', body: body, footer: ft });
 }
 
 /* 產線結算彈窗 */
@@ -5502,7 +5502,7 @@ function _openMerchantBatchDetail(entry){
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '';
-  const bd = openModal({ title: '⏱ 產線結算', body: body, footer: ft });
+  const bd = openModal({ title: '產線結算', body: body, footer: ft });
   const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
   for(let _i = 0; _i < _hds.length; _i++){
     (function(h){
@@ -5540,12 +5540,21 @@ function _openOfflineGardenDetail(entry){
       for(const it of items){
         const def = itemDef(it.id) || { name: it.id };
         const _isFood = (it.id === 'food');
-        h += '<div class="item-row"' + (_isFood ? ' style="cursor:default"' : (' data-iid="' + it.id + '" data-irar="' + it.rarity + '"')) + '><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + def.name + '</div><div class="sub">' + it.rarity + '</div></div><div class="cnt">×' + it.count + '</div></div>';
+        const _iconHtml = _isFood ? '🍲' : itemIcon(it.id, 30);
+        h += '<div class="item-row"' + (_isFood ? ' style="cursor:default"' : (' data-iid="' + it.id + '" data-irar="' + it.rarity + '"')) + '><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + _iconHtml + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + def.name + '</div><div class="sub">' + it.rarity + '</div></div><div class="cnt">×' + it.count + '</div></div>';
       }
     }
     return h;
   }
-  /* 產線產出 */
+  /* 後院作物/種子/材料（放最上方） */
+  const _cArr = [], _sArr = [], _mArr = [];
+  if(d.crops){ for(const k in d.crops){ const sp = k.split('@'); _cArr.push({ id: sp[0], rarity: sp[1], count: d.crops[k] }); } }
+  if(d.seeds){ for(const k in d.seeds){ const sp = k.split('@'); _sArr.push({ id: sp[0], rarity: sp[1], count: d.seeds[k] }); } }
+  if(d.mats){ for(const k in d.mats){ _mArr.push({ id: k, rarity: '一般', count: d.mats[k] }); } }
+  body += _catHtml('crops', '🌾 作物', _cArr);
+  body += _catHtml('seeds', '🌰 種子', _sArr);
+  body += _catHtml('mats', '🔩 材料', _mArr);
+  /* 產線產出（放最後） */
   if(d.merchant){
     if(d.merchant.foodBatches > 0){
       body += _catHtml('mfood', '🍲 食物生產線', [{ id:'food', rarity:'一般', count: d.merchant.foodBatches }]);
@@ -5559,18 +5568,10 @@ function _openOfflineGardenDetail(entry){
       body += _catHtml(_k, _meta.icon + ' ' + _meta.title, _items);
     }
   }
-  /* 後院作物/種子/材料 */
-  const _cArr = [], _sArr = [], _mArr = [];
-  if(d.crops){ for(const k in d.crops){ const sp = k.split('@'); _cArr.push({ id: sp[0], rarity: sp[1], count: d.crops[k] }); } }
-  if(d.seeds){ for(const k in d.seeds){ const sp = k.split('@'); _sArr.push({ id: sp[0], rarity: sp[1], count: d.seeds[k] }); } }
-  if(d.mats){ for(const k in d.mats){ _mArr.push({ id: k, rarity: '一般', count: d.mats[k] }); } }
-  body += _catHtml('crops', '🌾 作物', _cArr);
-  body += _catHtml('seeds', '🌰 種子', _sArr);
-  body += _catHtml('mats', '🔩 材料', _mArr);
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '';
-  const bd = openModal({ title: '📦 離線後院', body: body, footer: ft });
+  const bd = openModal({ title: '離線後院', body: body, footer: ft });
   const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
   for(let _i = 0; _i < _hds.length; _i++){
     (function(h){
@@ -5623,7 +5624,7 @@ function _openBattleLogDetail(entry){
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '';
-  openModal({ title: '⚔️ 戰鬥詳情', body: body, footer: ft });
+  openModal({ title: '戰鬥詳情', body: body, footer: ft });
 }
 
 function _gardenUpdateBattleCol(){
@@ -5761,7 +5762,7 @@ function openServantRename(srvId){
   const _escaped = _servantEscHtml(cur);
   let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:6px">留空則使用編號（#' + (srv.tag || '?') + '）</div>';
   body += '<input id="rn-input" type="text" value="' + _escaped + '" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:8px;font-size:13px;font-family:inherit;box-sizing:border-box">';
-  const bd = openModal({ title: '✏️ 改名', body: body, footer: ft });
+  const bd = openModal({ title: '改名', body: body, footer: ft });
   const inp = bd.querySelector('#rn-input');
   if(inp){
     setTimeout(function(){ inp.focus(); inp.select(); }, 100);
@@ -5913,7 +5914,7 @@ function openManualFeed(presetPolicy){
   ft.className = 'modal-ft';
   const r0 = _calc();
   ft.innerHTML = '<button class="btn primary" id="feed-ok"' + (r0.canFeed ? '' : ' disabled') + '>放飯</button>';
-  const bd = openModal({ title: '🍲 手動放飯', body: _renderBody(), footer: ft });
+  const bd = openModal({ title: '手動放飯', body: _renderBody(), footer: ft });
   const _cdTimer = setInterval(function(){
     const _el = document.getElementById('feed-meal-cd');
     if(!_el){ clearInterval(_cdTimer); return; }

@@ -822,7 +822,11 @@ function triggerReload(){
     battleHeroAnim.frame = 0;
     battleHeroAnim.lastUpdate = performance.now();
   }
-  battleHeroAnim.forcedEnd = performance.now() + 1700;
+  /* 換彈時長 = reload 動畫實際時長（frameCount / fps * 1000ms）
+     動畫播完即恢復移動與射擊，不額外等待 */
+  const _reloadAnim = GAME_ANIMS.reload;
+  const _reloadMs = _reloadAnim ? Math.round((_reloadAnim.frameCount / _reloadAnim.fps) * 1000) : 1000;
+  battleHeroAnim.forcedEnd = performance.now() + _reloadMs;
   const currentSlot = battle.weaponSlot;
   setTimeout(function(){
     if(!battle || !battle.active) return;
@@ -837,7 +841,7 @@ function triggerReload(){
     battle.reloading = false;
     if(battleHeroAnim.name === 'reload'){ battleHeroAnim.name = 'idle'; battleHeroAnim.frame = 0; }
     refreshBattleControlsLive();
-  }, 1700);
+  }, _reloadMs);
 }
 function playerShoot(){
   if(battle.settling)return false;
@@ -1002,8 +1006,11 @@ function damageOmegaArm(armId, dmg){
   if(arm.hp <= 0){
     arm.alive = false;
     playHeadBreakFx(armId);
+    /* 打爆手臂後，若瞄準點指向該手臂，重置為預設瞄準點 */
     if(battle.aimPart === armId){
-      battle.aimPart = 'core';
+      battle.aimPart = (typeof defaultAimPartForBoss === 'function')
+        ? defaultAimPartForBoss(battle.bossId)
+        : 'core';
     }
   }
 }
@@ -1244,7 +1251,14 @@ function applyHydraDamage(dmg, isCrit, pen){
     if(head.hp <= 0){
       head.alive = false;
       playHeadBreakFx(headId);
-      if(battle.aimPart === headId){
+      /* 打爆頭部後，若瞄準點指向該頭（直接/頸/眼/嘴），重置為預設瞄準點 */
+      const _ap = battle.aimPart;
+      const _aimIsDeadHead = (
+        _ap === headId ||
+        (typeof HYDRA_NECK_MAP !== 'undefined' && HYDRA_NECK_MAP[_ap] === headId) ||
+        (/^(eyes|mouth)/.test(String(_ap || '')) && typeof findNearestHeadForLayer === 'function' && findNearestHeadForLayer(_ap) === headId)
+      );
+      if(_aimIsDeadHead){
         battle.aimPart = (typeof defaultAimPartForBoss === 'function') ? defaultAimPartForBoss(battle.bossId) : null;
       }
     }

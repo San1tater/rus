@@ -2023,7 +2023,7 @@ function openInventory(){
       }
     }
   }
-  const bd=openModal({title:'📦 物品倉庫',body});
+  const bd=openModal({title:'物品倉庫',body});
   if(_inventoryScrollPos > 0) bd.scrollTop = _inventoryScrollPos;
   bd.onscroll = () => { _inventoryScrollPos = bd.scrollTop; };
   $$('.cat-header',bd).forEach(h=>{h.onclick=()=>{const cat=h.dataset.cat;inventoryCollapsed[cat]=!inventoryCollapsed[cat];closeModal();openInventory();};});
@@ -2094,7 +2094,7 @@ function openOfflineDetail(log){
       }
     }
   }
-  const bd = openModal({title:'📦 離線獲得物資', body});
+  const bd = openModal({title:'離線獲得物資', body});
   $$('.cat-header[data-ocat]', bd).forEach(h => {
     h.onclick = () => {
       window._offlineCollapsed[h.dataset.ocat] = !window._offlineCollapsed[h.dataset.ocat];
@@ -2115,7 +2115,7 @@ function openLogHistory(){
     body+=`<div class="logline" ${clickAttr}>${l.html}</div>`;
   }
   body+='</div>';
-  const bd=openModal({title:'📜 歷史記錄',body,full:true});
+  const bd=openModal({title:'歷史記錄',body,full:true});
   $$('.itm',bd).forEach(e=>{e.onclick=()=>openItemDetail(e.dataset.iid,e.dataset.irar);});
   $$('[data-offline-idx]',bd).forEach(e=>{
     e.onclick=()=>{ const l=logs[parseInt(e.dataset.offlineIdx,10)]; if(l) openOfflineDetail(l); };
