@@ -2092,39 +2092,63 @@ function drawBucketUnit(ctx, u){
 }
 /* rev306: 手持農具 —— 農民木棍（棕）/ 監工藍板 */
 function drawHandItemUnit(ctx, u){
-  if(u.handItemType === 'stick'){
-    /* 農具：細木柄 + 斜掛梯形鋤頭（穿過後手中心，不浮空） */
+  if(u.handItemType === 'stick_head'){
+    /* 鋤頭梯形（左窄右寬），z=57 下層 */
+    const cx = u.backMidX;
+    const cy = u.backMidY;
+    const topX = cx - 4;
+    const topY = cy - 85;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(topX - 16, topY - 5);
+    ctx.lineTo(topX - 16, topY + 5);
+    ctx.lineTo(topX + 50, topY + 24);
+    ctx.lineTo(topX + 50, topY - 12);
+    ctx.closePath();
+    ctx.fillStyle = '#b0b0b0';
+    ctx.fill();
+    ctx.restore();
+  } else if(u.handItemType === 'stick_handle'){
+    /* 棍子 z=66 上層；上端 = 鋤頭垂直中線（topY + 6 = cy - 79） */
     const cx = u.backMidX;
     const cy = u.backMidY;
     ctx.save();
-    /* 木柄：#c09050 亮棕、12px 細桿 */
     ctx.strokeStyle = '#c09050';
     ctx.lineWidth = 12;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(cx + 4, cy + 45);
-    ctx.lineTo(cx - 4, cy - 85);
+    ctx.lineTo(cx - 4, cy - 79);
     ctx.stroke();
-    /* 鋤頭：梯形，棍子頂端位於水平 1/4 位置（左側窄、右側寬），微向下傾斜 */
-    const topX = cx - 4;
-    const topY = cy - 85;
-    ctx.beginPath();
-    ctx.moveTo(topX - 16, topY - 5);   /* 左上（內側窄端） */
-    ctx.lineTo(topX - 16, topY + 5);   /* 左下 */
-    ctx.lineTo(topX + 50, topY + 24);  /* 右下（外側寬端，向下延伸） */
-    ctx.lineTo(topX + 50, topY - 12);  /* 右上 */
-    ctx.closePath();
-    ctx.fillStyle = '#b0b0b0';
-    ctx.fill();
     ctx.restore();
   } else if(u.handItemType === 'clipboard'){
-    /* 文件夾：與灰桶同邏輯 */
     const w = 90, h = 110;
     const cx = u.armMidX;
     const cy = u.armMidY + 7;
     ctx.save();
     ctx.fillStyle = '#3a78c8';
     ctx.fillRect(cx - w/2, cy - h/2, w, h);
+    ctx.restore();
+  } else if(u.handItemType === 'sack'){
+    /* 麻袋：小倒三角 + 大三角，公共頂點 = 前臂中點，z=61 前臂下層 */
+    const cx = u.frontMidX;
+    const cy = u.frontMidY;
+    ctx.save();
+    ctx.fillStyle = '#8a5f30';
+    const topW = 30, topH = 22;
+    ctx.beginPath();
+    ctx.moveTo(cx - topW/2, cy - topH);
+    ctx.lineTo(cx + topW/2, cy - topH);
+    ctx.lineTo(cx, cy);
+    ctx.closePath();
+    ctx.fill();
+    const botW = 62, botH = 62;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + botW/2, cy + botH);
+    ctx.lineTo(cx - botW/2, cy + botH);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
 }
@@ -2238,15 +2262,19 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
       const _bW = B.w * _ba.w, _bH = B.h * _ba.h;
       const _bMidX = _bCx + _bW * (0.5 - _ba.pivot.x);
       const _bMidY = _bCy + _bH * (0.5 - _ba.pivot.y);
-      units.push({
-        z: (handItem === 'clipboard') ? 58 : 65,
-        kind: 'handitem',
-        handItemType: handItem,
-        armMidX: (_fMidX + _bMidX) / 2,
-        armMidY: (_fMidY + _bMidY) / 2,
-        backMidX: _bMidX,
-        backMidY: _bMidY
-      });
+      /* rev310: 農民拆三層 —— 鋤頭 z=57（下）、棍子 z=66（上）、麻袋 z=61（前臂下層）；監工文件夾 z=58 */
+      if(handItem === 'stick'){
+        units.push({ z: 57, kind: 'handitem', handItemType: 'stick_head',
+                     backMidX: _bMidX, backMidY: _bMidY });
+        units.push({ z: 66, kind: 'handitem', handItemType: 'stick_handle',
+                     backMidX: _bMidX, backMidY: _bMidY });
+        units.push({ z: 61, kind: 'handitem', handItemType: 'sack',
+                     frontMidX: _fMidX, frontMidY: _fMidY });
+      } else if(handItem === 'clipboard'){
+        units.push({ z: 58, kind: 'handitem', handItemType: 'clipboard',
+                     armMidX: (_fMidX + _bMidX) / 2,
+                     armMidY: (_fMidY + _bMidY) / 2 });
+      }
     }
   }
   units.sort(function(a, b){ return a.z - b.z; });
