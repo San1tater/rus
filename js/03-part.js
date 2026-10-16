@@ -1774,7 +1774,7 @@ function renderEquipZone(z2){
 let _inventoryScrollPos = 0;
 const modalLayer=$('#modal-layer');
 const modalEl=$('.modal',modalLayer);
-function openModal({title,body,footer,full}){
+function openModal({title,body,footer,full,onClose}){
   modalEl.className='modal'+(full?' full':'');modalEl.innerHTML='';
   if(title!==false){
     if(typeof title !== 'string'){
@@ -1782,7 +1782,7 @@ function openModal({title,body,footer,full}){
       else if(title == null) title = '';
       else title = String(title);
     }
-    const hd=el('div','modal-hd');hd.innerHTML=`<div>${title}</div><div class="x">✕</div>`;hd.querySelector('.x').onclick=function(){var _cb=window._modalOnCloseOverride;window._modalOnCloseOverride=null;if(typeof _cb==='function'){try{_cb();}catch(e){console.warn('[onClose]',e);closeModal();}}else{closeModal();}};modalEl.appendChild(hd);
+    const hd=el('div','modal-hd');hd.innerHTML=`<div>${title}</div><div class="x">✕</div>`;hd.querySelector('.x').onclick=function(){if(typeof onClose==='function'){try{onClose();}catch(e){console.warn('[onClose]',e);closeModal();}}else{closeModal();}};modalEl.appendChild(hd);
   }
   const bd=el('div','modal-bd-inner');
   if(typeof body==='string')bd.innerHTML=body;else if(body)bd.appendChild(body);
@@ -1833,7 +1833,6 @@ function openSlotDetail(slot){
     ft.innerHTML=`<button class="btn primary" id="m-change">裝備</button>`;
   }
   openModal({title:`${labels[slot]} 詳情`,body,footer:ft});
-  window._modalOnCloseOverride = closeModal;
   const op=ft.querySelector('#m-open');if(op)op.onclick=()=>{closeModal();openInventory();};
   const tidy=ft.querySelector('#m-tidy');
   if(tidy)tidy.onclick=()=>{
@@ -1887,7 +1886,7 @@ function openSlotPicker(slot,returnFn){
   let body='';
   if(!list.length)body='<div class="empty-hint">倉庫中沒有可裝備於此槽位的物品</div>';
   else{for(const it of list){body+=`<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon" style="background:${rarityBg(it.rarity)}">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${it.def.name}</div><div class="sub">${it.def.type||slot} · ${it.rarity}</div></div><div class="cnt">*${it.count}</div></div>`;}}
-  const bd=openModal({title:`選擇 ${slot} 裝備`,body});
+  const bd=openModal({title:`選擇 ${slot} 裝備`,body,onClose:function(){ openSlotDetail(slot); }});
   $$('.item-row',bd).forEach(row=>{row.onclick=()=>{const iid=row.dataset.iid,irar=row.dataset.irar;closeModal();openEquipmentCompare(slot,iid,irar, null, () => openSlotPicker(slot, returnFn));};});
 }
 function getDisplayStat(id,rarity,key){
@@ -1960,8 +1959,7 @@ function openEquipmentCompare(slot,newId,newRarity,onConfirm,onCancel){
   }
   const ft=el('div','modal-ft');
   ft.innerHTML=`<button class="btn primary" id="m-confirm">確定</button>`;
-  openModal({title:`更換 ${labels[slot]}`,body,footer:ft});
-  window._modalOnCloseOverride = ()=>{ closeModal(); if(onCancel) onCancel(); else renderCurrentTab(); };
+  openModal({title:`更換 ${labels[slot]}`,body,footer:ft,onClose:()=>{ closeModal(); if(onCancel) onCancel(); else renderCurrentTab(); }});
   ft.querySelector('#m-confirm').onclick=()=>{
     const oldId2=state.player.equipped[slot];
     if(oldId2){
@@ -2062,8 +2060,7 @@ function openItemDetail(id,rarity,returnFn){
   const ft=el('div','modal-ft');
   if(d.slot&&!d.fixed)ft.innerHTML=`<button class="btn primary" id="m-equip">裝備</button>`;
   else ft.innerHTML=``;
-  openModal({title:'物品詳情',body,footer:ft});
-  window._modalOnCloseOverride = function(){ if(typeof returnFn === 'function'){ returnFn(); } else { closeModal(); } };
+  openModal({title:'物品詳情',body,footer:ft,onClose:function(){ if(typeof returnFn === 'function'){ returnFn(); } else { closeModal(); } }});
   const eqb=ft.querySelector('#m-equip');
   if(eqb)eqb.onclick=()=>{const slot=d.slot;closeModal();openEquipmentCompare(slot,id,rarity, returnFn, () => openItemDetail(id,rarity,returnFn));};
 }

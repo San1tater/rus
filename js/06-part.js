@@ -1385,7 +1385,7 @@ function _gardenMerchantShowConfirm(lineKey, targetLv){
   } else {
     body += '<div style="font-size:11px;color:#a89a85;line-height:1.6;padding:8px 0">停止此產線，不再自動扣費。</div>';
   }
-  openModal({ title: '訂閱', body: body, footer: ft });
+  openModal({ title: '訂閱', body: body, footer: ft, onClose: function(){ _gardenMerchantShowPlans(lineKey); } });
   ft.querySelector('#mrc-cancel').onclick = function(){ closeModal(); _gardenMerchantShowPlans(lineKey); };
   ft.querySelector('#mrc-ok').onclick = function(){
     const wasOff = (m[meta.lvKey] || 0) === 0;
@@ -1530,6 +1530,39 @@ function _gardenTowerInit(plot){
   if(typeof c.maxShots === 'undefined') c.maxShots = 'inf';
   return c;
 }
+/* rev309: 塔裝備正規化 —— 若原稀有度已不存在，自動升級到背包中同 id 的最高稀有度；完全找不到才清空 */
+function _gardenTowerNormalizeEq(cfg){
+  if(!cfg || !cfg.eq) return;
+  const _slots = ['head','top','primary','secondary'];
+  for(const _slot of _slots){
+    const _id = cfg.eq[_slot];
+    if(!_id) continue;
+    const _rar = cfg.eqRarity[_slot] || '一般';
+    /* 檢查背包中是否有同 id 同稀有度 */
+    let _exists = (state.inventory[_id + '@' + _rar] || 0) > 0;
+    if(!_exists){
+      for(const _s in state.player.equipped){
+        if(state.player.equipped[_s] === _id && (state.player.equippedRarity[_s] || '一般') === _rar){ _exists = true; break; }
+      }
+    }
+    if(_exists) continue;
+    /* 找背包中同 id 的最高稀有度 */
+    let _bestRar = null, _bestIdx = -1;
+    for(const _k in state.inventory){
+      const _p = _k.split('@');
+      if(_p[0] !== _id) continue;
+      if(!state.inventory[_k] || state.inventory[_k] <= 0) continue;
+      const _i = RARITY_ORDER.indexOf(_p[1]);
+      if(_i > _bestIdx){ _bestIdx = _i; _bestRar = _p[1]; }
+    }
+    if(_bestRar){
+      cfg.eqRarity[_slot] = _bestRar;
+    } else {
+      cfg.eq[_slot] = null;
+      delete cfg.eqRarity[_slot];
+    }
+  }
+}
 function _gardenRepairConfirm(idx){
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
@@ -1562,6 +1595,7 @@ function _gardenTowerOpen(idx){
   const plot = plots[idx];
   if(!plot || plot.type !== 'tower') return;
   const cfg = _gardenTowerInit(plot);
+  _gardenTowerNormalizeEq(cfg);
   const servants = (state.servants || []).filter(function(s){
     return s.type === 'guard' && s.assignedPlots && s.assignedPlots.indexOf(idx) !== -1;
   });
@@ -1694,7 +1728,7 @@ function _gardenTowerPickEquip(idx, slot){
     body += '<div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + '</div>';
     body += '<div class="sub">' + it.rarity + '</div></div></div>';
   }
-  const bd = openModal({ title: '選擇裝備（' + slot + '）', body: body });
+  const bd = openModal({ title: '選擇裝備（' + slot + '）', body: body, onClose: function(){ _gardenTowerOpen(idx); } });
   const unequipBtn = bd.querySelector('[data-act="unequip"]');
   if(unequipBtn){
     unequipBtn.onclick = function(){
@@ -1741,7 +1775,7 @@ function _gardenTowerPickAmmo(idx, wDef){
     const d = AMMO[a];
     body += '<div class="item-row" data-amid="' + a + '"><div class="icon" style="background:' + rarityBg(d.rarity) + '">' + itemIcon(a, 30) + '</div><div class="info"><div class="nm ' + rarityClass(d.rarity) + '">' + d.name + '</div><div class="sub">' + d.rarity + ' · 穿甲 ' + (d.pen||0) + ' · 傷害 ' + (d.dmg||0) + '</div></div></div>';
   }
-  const bd = openModal({ title: '選擇彈藥', body: body });
+  const bd = openModal({ title: '選擇彈藥', body: body, onClose: function(){ _gardenTowerOpen(idx); } });
   const rows = bd.querySelectorAll('.item-row[data-amid]');
   for(let i = 0; i < rows.length; i++){
     (function(el){
@@ -1948,6 +1982,7 @@ function _gardenRaidCollectGuards(){
     const p = plots[i];
     if(!p || p.type !== 'tower' || p.broken) continue;
     const cfg = _gardenTowerInit(p);
+    _gardenTowerNormalizeEq(cfg);
     const weaponId = cfg.eq.primary || cfg.eq.secondary;
     const weaponRarity = cfg.eqRarity.primary || cfg.eqRarity.secondary || '一般';
     if(!weaponId) continue;
@@ -4878,7 +4913,7 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
   const result=renderModBody();
   const ft=el('div','modal-ft');
   ft.innerHTML=`<button class="btn primary" id="m-confirm" ${result.ok?'':'disabled'}>改造</button><button class="btn ghost" id="m-exit">退出</button>`;
-  const bd=openModal({title:`改造 ${wdef.name}`,body:result.body,footer:ft});
+  const bd=openModal({title:`改造 ${wdef.name}`,body:result.body,footer:ft,onClose:function(){ closeModal(); if(onCancel) onCancel(); }});
   $$('.mod-opt',bd).forEach(o=>{
     o.onclick=()=>{
       const opt=o.dataset.opt;const val=o.dataset.val;
@@ -5054,6 +5089,8 @@ window.addEventListener('beforeunload',save);
 function init(){
   const loaded=load();
   if(loaded){
+    /* rev309b: 後院戰鬥日誌只保留本次上線期間的記錄 */
+    if(state.garden && Array.isArray(state.garden.battleLog)) state.garden.battleLog = [];
     const elapsed=Date.now()-(state.lastSeen||Date.now());
     if(elapsed>60000){console.log('[init] 距上次儲存',(elapsed/1000).toFixed(1),'秒，觸發離線結算');offlineSettle();}
   } else {
@@ -5233,7 +5270,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
     const ft = document.createElement('div');
     ft.className = 'modal-ft';
     ft.innerHTML = '';
-    const bd = openModal({ title: '指派 ' + def.name, body: renderGridHtml(), footer: ft });
+    const bd = openModal({ title: '指派 ' + def.name, body: renderGridHtml(), footer: ft, onClose: function(){ openServantDetail(srvId); } });
     function bindCells(){
       const cells = bd.querySelectorAll('.srv-sa-cell');
       for(let i = 0; i < cells.length; i++){
@@ -6026,7 +6063,7 @@ function openServantRename(srvId){
   const _escaped = _servantEscHtml(cur);
   let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:6px">留空則使用編號（#' + (srv.tag || '?') + '）</div>';
   body += '<input id="rn-input" type="text" value="' + _escaped + '" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:8px;font-size:13px;font-family:inherit;box-sizing:border-box">';
-  const bd = openModal({ title: '改名', body: body, footer: ft });
+  const bd = openModal({ title: '改名', body: body, footer: ft, onClose: function(){ openServantDetail(srvId); } });
   const inp = bd.querySelector('#rn-input');
   if(inp){
     setTimeout(function(){ inp.focus(); inp.select(); }, 100);
