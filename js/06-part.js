@@ -2092,33 +2092,60 @@ function drawBucketUnit(ctx, u){
 }
 /* rev306: 手持農具 —— 農民木棍（棕）/ 監工藍板 */
 function drawHandItemUnit(ctx, u){
-  if(u.handItemType === 'stick_head'){
-    /* 鋤頭梯形（左窄右寬），z=57 下層 */
-    const cx = u.backMidX;
-    const cy = u.backMidY;
-    const topX = cx - 4;
-    const topY = cy - 85;
+  if(u.handItemType === 'sack'){
+    /* 米白色袋子（小倒三角 + 大三角，公共頂點在後手中心），描邊同桶 */
+    const cx = u.bagX;
+    const cy = u.bagY;
     ctx.save();
+    ctx.fillStyle = '#ede4d3';
+    ctx.strokeStyle = '#464d55';
+    ctx.lineWidth = 5;
+    ctx.lineJoin = 'round';
+    const topW = 42, topH = 31;
     ctx.beginPath();
-    ctx.moveTo(topX - 16, topY - 5);
-    ctx.lineTo(topX - 16, topY + 5);
-    ctx.lineTo(topX + 50, topY + 24);
-    ctx.lineTo(topX + 50, topY - 12);
+    ctx.moveTo(cx - topW/2, cy - topH);
+    ctx.lineTo(cx + topW/2, cy - topH);
+    ctx.lineTo(cx, cy);
     ctx.closePath();
-    ctx.fillStyle = '#b0b0b0';
     ctx.fill();
-    ctx.restore();
-  } else if(u.handItemType === 'stick_handle'){
-    /* 棍子 z=66 上層；上端 = 鋤頭垂直中線（topY + 6 = cy - 79） */
-    const cx = u.backMidX;
-    const cy = u.backMidY;
-    ctx.save();
-    ctx.strokeStyle = '#c09050';
-    ctx.lineWidth = 12;
-    ctx.lineCap = 'round';
+    ctx.stroke();
+    const botW = 87, botH = 87;
     ctx.beginPath();
-    ctx.moveTo(cx + 4, cy + 45);
-    ctx.lineTo(cx - 4, cy - 79);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + botW/2, cy + botH);
+    ctx.lineTo(cx - botW/2, cy + botH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  } else if(u.handItemType === 'shovel'){
+    /* 小鏟子：圓頭向下、柄頂端三角把手，握持點在前臂右端 */
+    const gx = u.gripX;
+    const gy = u.gripY;
+    ctx.save();
+    /* 柄：棕色矩形 */
+    ctx.strokeStyle = '#8a5f30';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.moveTo(gx, gy - 60);
+    ctx.lineTo(gx, gy + 40);
+    ctx.stroke();
+    /* 三角把手（柄頂端） */
+    ctx.fillStyle = '#8a5f30';
+    ctx.beginPath();
+    ctx.moveTo(gx, gy - 74);
+    ctx.lineTo(gx + 13, gy - 60);
+    ctx.lineTo(gx - 13, gy - 60);
+    ctx.closePath();
+    ctx.fill();
+    /* 圓頭鏟頭（柄底端） */
+    ctx.fillStyle = '#9a9a9a';
+    ctx.strokeStyle = '#464d55';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(gx, gy + 54, 16, 0, Math.PI * 2);
+    ctx.fill();
     ctx.stroke();
     ctx.restore();
   } else if(u.handItemType === 'clipboard'){
@@ -2128,27 +2155,6 @@ function drawHandItemUnit(ctx, u){
     ctx.save();
     ctx.fillStyle = '#3a78c8';
     ctx.fillRect(cx - w/2, cy - h/2, w, h);
-    ctx.restore();
-  } else if(u.handItemType === 'sack'){
-    /* 麻袋：小倒三角 + 大三角，公共頂點 = 前臂中點，z=61 前臂下層 */
-    const cx = u.frontMidX;
-    const cy = u.frontMidY;
-    ctx.save();
-    ctx.fillStyle = '#8a5f30';
-    const topW = 30, topH = 22;
-    ctx.beginPath();
-    ctx.moveTo(cx - topW/2, cy - topH);
-    ctx.lineTo(cx + topW/2, cy - topH);
-    ctx.lineTo(cx, cy);
-    ctx.closePath();
-    ctx.fill();
-    const botW = 62, botH = 62;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + botW/2, cy + botH);
-    ctx.lineTo(cx - botW/2, cy + botH);
-    ctx.closePath();
-    ctx.fill();
     ctx.restore();
   }
 }
@@ -2262,14 +2268,13 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
       const _bW = B.w * _ba.w, _bH = B.h * _ba.h;
       const _bMidX = _bCx + _bW * (0.5 - _ba.pivot.x);
       const _bMidY = _bCy + _bH * (0.5 - _ba.pivot.y);
-      /* rev310: 農民拆三層 —— 鋤頭 z=57（下）、棍子 z=66（上）、麻袋 z=61（前臂下層）；監工文件夾 z=58 */
+      /* rev311: 農民 → 後手米白袋 z=60（後手上層）+ 前手小鏟子 z=59（前手下層） */
       if(handItem === 'stick'){
-        units.push({ z: 57, kind: 'handitem', handItemType: 'stick_head',
-                     backMidX: _bMidX, backMidY: _bMidY });
-        units.push({ z: 66, kind: 'handitem', handItemType: 'stick_handle',
-                     backMidX: _bMidX, backMidY: _bMidY });
-        units.push({ z: 61, kind: 'handitem', handItemType: 'sack',
-                     frontMidX: _fMidX, frontMidY: _fMidY });
+        units.push({ z: 60, kind: 'handitem', handItemType: 'sack',
+                     bagX: _bMidX, bagY: _bMidY });
+        const _fRightX = _fCx + _fW * (1 - _fa.pivot.x);
+        units.push({ z: 59, kind: 'handitem', handItemType: 'shovel',
+                     gripX: _fRightX, gripY: _fMidY });
       } else if(handItem === 'clipboard'){
         units.push({ z: 58, kind: 'handitem', handItemType: 'clipboard',
                      armMidX: (_fMidX + _bMidX) / 2,
