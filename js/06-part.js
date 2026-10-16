@@ -2119,7 +2119,7 @@ function drawHandItemUnit(ctx, u){
     ctx.stroke();
     ctx.restore();
   } else if(u.handItemType === 'shovel'){
-    /* 小鏟子：圓頭向下、柄頂端三角把手，握持點在前臂右端 */
+    /* 小鏟子：方頭梯形鏟頭向下、柄頂端倒三角把手，握持點在前臂右端 */
     const gx = u.gripX;
     const gy = u.gripY;
     ctx.save();
@@ -2131,22 +2131,21 @@ function drawHandItemUnit(ctx, u){
     ctx.moveTo(gx, gy - 60);
     ctx.lineTo(gx, gy + 40);
     ctx.stroke();
-    /* 三角把手（柄頂端） */
+    /* 倒三角把手（柄頂端）：底邊在上、頂點在下，與柄相接 */
     ctx.fillStyle = '#8a5f30';
     ctx.beginPath();
-    ctx.moveTo(gx, gy - 74);
-    ctx.lineTo(gx + 13, gy - 60);
-    ctx.lineTo(gx - 13, gy - 60);
+    ctx.moveTo(gx - 13, gy - 74);
+    ctx.lineTo(gx + 13, gy - 74);
+    ctx.lineTo(gx, gy - 60);
     ctx.closePath();
     ctx.fill();
-    /* 圓頭鏟頭（柄底端） */
+    /* 方頭鏟頭（柄底端）：矩形 30×26 */
     ctx.fillStyle = '#9a9a9a';
     ctx.strokeStyle = '#464d55';
     ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(gx, gy + 54, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.lineJoin = 'round';
+    ctx.fillRect(gx - 12, gy + 40, 24, 36);
+    ctx.strokeRect(gx - 12, gy + 40, 24, 36);
     ctx.restore();
   } else if(u.handItemType === 'clipboard'){
     const w = 90, h = 110;
@@ -2274,7 +2273,7 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
                      bagX: _bMidX, bagY: _bMidY });
         const _fRightX = _fCx + _fW * (1 - _fa.pivot.x);
         units.push({ z: 59, kind: 'handitem', handItemType: 'shovel',
-                     gripX: _fRightX, gripY: _fMidY });
+                     gripX: _fRightX, gripY: _fMidY + 15 });
       } else if(handItem === 'clipboard'){
         units.push({ z: 58, kind: 'handitem', handItemType: 'clipboard',
                      armMidX: (_fMidX + _bMidX) / 2,
