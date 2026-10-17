@@ -429,8 +429,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-header .gp-food-info{flex:0 0 auto;margin-left:14px;font-size:12px;line-height:1.4;white-space:nowrap;display:flex;align-items:center;gap:8px}
 .gp-header .gp-food-info b{font-size:14px}
 .gp-header .gp-exit{flex:0 0 auto;margin-left:auto}
-.mrc-levels{display:flex;gap:4px;margin:6px 0 6px}
-.mrc-levels{display:flex;gap:4px;margin:6px 0 6px}
 .mrc-lv{flex:1;padding:5px 2px;font-size:10px;text-align:center;background:#241d16;border:1px solid #3a2f25;border-radius:4px;color:#7a6f60;cursor:pointer;user-select:none;transition:all .15s}
 .mrc-lv.on{background:#2a1f10;border-color:#e8a33d;color:#e8a33d;font-weight:bold}
 .mrc-lv:active{transform:scale(.95)}
@@ -462,7 +460,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .mrc-cur-lv{font-size:11px;color:#e8a33d;font-weight:bold;padding:4px 10px;border-radius:5px;background:rgba(232,163,61,.08);transition:background .15s}
 .mrc-sub-btn:hover{background:rgba(232,163,61,.18) !important}
 .mrc-sub-btn:active{transform:scale(.96)}
-.tower-eq-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
 .tower-eq{padding:6px 4px;border:1px solid #2a231c;border-radius:5px;background:#1a1510;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;cursor:pointer;user-select:none;transition:border-color .15s,background .15s}
 .tower-eq:hover{border-color:#8a5f18}
 .tower-eq:active{transform:scale(.96)}
@@ -504,7 +501,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-test-raid{font-size:11px;color:#e05252;background:#241010;border:1px solid #5a2a2a;padding:6px 10px;border-radius:6px;cursor:pointer;user-select:none;margin-right:6px}
 .gp-test-raid:hover{background:#3a1a1a;color:#ff6060}
 .gp-test-raid:active{transform:scale(.95)}
-.raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:visible}
 .raid-overlay-report{display:flex;flex-direction:column;background:#17140f}
 
 .raid-fx-layer{position:absolute;inset:0;pointer-events:none;z-index:25;overflow:visible}
@@ -516,23 +512,18 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .raid-report-title{font-size:17px;font-weight:bold;margin-bottom:4px}
 .raid-report-ft{flex:0 0 auto;padding:10px 14px;border-top:1px solid #2a231c;background:#17140f;display:flex}
 .raid-report-ft .btn{flex:1}
-.raid-canvas{position:absolute;left:0;top:0;pointer-events:none;z-index:11;display:block}
-.raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:visible}
 
 /* 舊元素停用 */
 
 @keyframes raidBannerIn{from{opacity:0;transform:translateX(-50%) scale(.7)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 /* 舊風格移除（若殘留） */
 
-.raid-enemy-zone,.raid-guard,.raid-proj,.raid-dmg,.raid-float,.raid-enemy{display:none !important}
 
 /* 舊元素徹底禁用 */
 
-.raid-side,.raid-unit,.raid-unit-sprite,.raid-enemy-zone,.raid-enemy,.raid-guard,.raid-proj,.raid-dmg,.raid-float,.raid-banner-win,.raid-banner-lose{display:none !important;visibility:hidden !important}
 
 /* 舊 raid-* 全禁 */
 
-.raid-side, .raid-unit, .raid-unit-sprite, .raid-unit-hpwrap, .raid-unit-name, .raid-unit-hp, .raid-enemy-zone, .raid-enemy, .raid-guard, .raid-proj, .raid-dmg, .raid-float, .raid-banner-win, .raid-banner-lose, .raid-hp-wrap, .raid-name, .raid-hp{display:none !important;visibility:hidden !important;pointer-events:none !important}
 .raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:hidden}
 
 .raid-topbar-title{color:#e8a33d;font-weight:bold;font-size:11px;letter-spacing:1px}
@@ -543,17 +534,8 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .raid-canvas{position:absolute;left:0;top:0;z-index:11;display:block;pointer-events:none}
 /* 舊元素徹底禁用 */
 
-.raid-side,.raid-unit,.raid-sprite,.raid-enemy-zone,.raid-enemy,.raid-guard,.raid-proj,.raid-dmg,.raid-float,.raid-banner-win,.raid-banner-lose,.raid-unit-sprite,.raid-unit-hpwrap,.raid-unit-name,.raid-hp-wrap,.raid-name,.raid-hp{display:none !important;visibility:hidden !important;pointer-events:none !important}
 .gp-actor-layer{display:none !important}
 .raid-banner-win, .raid-banner-lose, .raid-side, .raid-unit, .raid-sprite, .raid-enemy-zone, .raid-enemy, .raid-guard, .raid-proj, .raid-dmg, .raid-float, .raid-unit-sprite, .raid-unit-hpwrap, .raid-unit-name, .raid-hp-wrap, .raid-name, .raid-hp, #gp-actor-layer{display:none !important;visibility:hidden !important;pointer-events:none !important}
-.raid-banner-win, .raid-banner-lose{display:none !important;visibility:hidden !important}
-.battle-log-list{display:flex;flex-direction:column;gap:6px;padding:2px}
-.battle-log-item{padding:8px 10px;border-radius:6px;background:#151210;border:1px solid #2a231c;font-size:11px}
-.bl-head{display:flex;justify-content:space-between;margin-bottom:4px}
-.bl-sub{color:#a89a85;font-size:10px;margin-bottom:3px}
-.bl-line{color:#ddd;font-size:10px;line-height:1.5}
-.bl-line.lose{color:#e05252}
-.bl-line.win{color:#4caf50}
 .raid-float-btns{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:30;pointer-events:auto}
 .raid-float-btns .raid-top-btn{padding:5px 12px;border-radius:5px;background:rgba(36,29,22,.85);border:1px solid #3a2f25;color:#a89a85;font-size:11px;font-weight:bold;cursor:pointer;user-select:none}
 .raid-float-btns .raid-top-btn:hover{background:#3a2f25;color:#e8a33d}
@@ -720,175 +702,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .mrc-trade-price{font-size:11px;font-weight:bold;color:#4caf50;white-space:nowrap;flex:0 0 auto}
 .mrc-trade-price.disabled{color:#e05252;opacity:.6}
 
-/* rev325c-trade */
-.mrc-trade-wrap{display:flex;height:100%;gap:4px;padding:4px;box-sizing:border-box;min-height:0}
-.mrc-trade-list{flex:0 0 42%;overflow-y:auto;padding-right:4px;border-right:1px solid #2a231c;min-height:0}
-.mrc-trade-detail{flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:6px;min-height:0}
-.mrc-trade-cat{font-size:10px;color:#e8a33d;font-weight:bold;padding:5px 2px 2px;letter-spacing:1px}
-.mrc-trade-item{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:5px;margin-bottom:3px;cursor:pointer;transition:border-color .15s}
-.mrc-trade-item:hover{border-color:#8a5f18}
-.mrc-trade-item.on{border-color:#e8a33d;background:#2a1f10}
-.mrc-trade-item.owned{opacity:.65}
-.mrc-trade-icon{flex:0 0 auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#151210;border-radius:4px;border:1px solid #3a2f25}
-.mrc-trade-item-name{flex:1;min-width:0;font-size:11px;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mrc-td-head{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0}
-.mrc-td-icon{width:64px;height:64px;display:flex;align-items:center;justify-content:center;background:#151210;border-radius:6px;border:1px solid #3a2f25}
-.mrc-td-name{font-size:13px;font-weight:bold;color:#e8a33d}
-.mrc-td-desc{font-size:10px;color:#7a6f60;line-height:1.5;text-align:center}
-.mrc-td-price{font-size:11px;color:#4caf50;font-weight:bold;text-align:center}
-.mrc-td-qty{display:flex;align-items:center;justify-content:center;gap:8px;padding:4px 0;font-size:11px;color:#ddd}
-.mrc-td-qty-btn{background:#2c2419;border:1px solid #3a2f25;color:#e8a33d;font-size:14px;font-weight:bold;width:28px;height:28px;border-radius:4px;cursor:pointer}
-.mrc-td-qty-btn:active{transform:scale(.94)}
-.mrc-td-qty-val{min-width:24px;text-align:center;font-weight:bold;color:#fff}
-.mrc-td-total{font-size:12px;color:#4caf50;font-weight:bold;text-align:center;padding:4px 0;border-top:1px dashed #2a231c}
-.mrc-td-buy{background:#8a5f18;color:#fff;border:none;padding:10px 16px;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;margin-top:auto}
-.mrc-td-buy:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
-.mrc-td-owned{font-size:12px;color:#4caf50;font-weight:bold;text-align:center;padding:8px 0}
-.gp-plot.built[data-type="black_soil"]{background-image:url('icons/garden/black_soil.png')}
-.gp-plot.built[data-type="red_soil"]{background-image:url('icons/garden/red_soil.png')}
-
-/* rev325e-trade-grid */
-.mrc-trade-wrap{display:flex;height:100%;gap:6px;padding:6px;box-sizing:border-box;min-height:0}
-.mrc-trade-left{flex:0 0 44%;overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:6px}
-.mrc-trade-left::-webkit-scrollbar{width:3px}
-.mrc-trade-left::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:2px}
-.mrc-trade-right{flex:1;min-width:0;overflow-y:auto;padding:8px;background:#17140f;border:1px solid #2a231c;border-radius:8px;display:flex;flex-direction:column;gap:8px;min-height:0}
-.mrc-trade-right::-webkit-scrollbar{width:3px}
-.mrc-trade-right::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:2px}
-.mrc-trade-group{display:flex;flex-direction:column;gap:4px}
-.mrc-trade-group-title{font-size:10px;color:#e8a33d;font-weight:bold;padding:2px 2px 0;letter-spacing:1px}
-.mrc-trade-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-.mrc-trade-cell{background:#1a1510;border:1px solid #2a231c;border-radius:8px;padding:8px 4px 6px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:all .15s;overflow:hidden}
-.mrc-trade-cell:hover{border-color:#8a5f18}
-.mrc-trade-cell:active{transform:scale(.97)}
-.mrc-trade-cell.on{border-color:#e8a33d;background:#2a1f10;box-shadow:0 0 0 1px #e8a33d inset}
-.mrc-trade-cell.owned{opacity:.55;cursor:default}
-.mrc-trade-cell-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#151210;border-radius:6px;border:1px solid #3a2f25;flex:0 0 auto}
-.mrc-trade-cell-name{font-size:10px;color:#ddd;font-weight:bold;text-align:center;line-height:1.2;word-break:break-word;min-height:24px;display:flex;align-items:center;justify-content:center;padding:0 2px}
-.mrc-trade-cell-price{font-size:10px;color:#4caf50;font-weight:bold}
-.mrc-trade-cell-owned{font-size:9px;color:#7a6f60;font-weight:bold}
-.mrc-td-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#4a4038;font-size:11px;text-align:center;line-height:1.6}
-.mrc-td-head{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0}
-.mrc-td-icon{width:88px;height:88px;display:flex;align-items:center;justify-content:center;background:#151210;border-radius:10px;border:1px solid #3a2f25}
-.mrc-td-name{font-size:14px;font-weight:bold;color:#e8a33d}
-.mrc-td-desc{font-size:10px;color:#7a6f60;line-height:1.5;text-align:center;padding:0 4px}
-.mrc-td-section{border-top:1px dashed #2a231c;padding-top:8px;display:flex;flex-direction:column;gap:6px}
-.mrc-td-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#ddd}
-.mrc-td-row .lbl{color:#7a6f60}
-.mrc-td-qty{display:flex;align-items:center;gap:8px}
-.mrc-td-qty-btn{background:#2c2419;border:1px solid #3a2f25;color:#e8a33d;font-size:15px;font-weight:bold;width:32px;height:32px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.mrc-td-qty-btn:active{transform:scale(.94);background:#3a2f25}
-.mrc-td-qty-val{min-width:32px;text-align:center;font-size:14px;font-weight:bold;color:#fff}
-.mrc-td-total{font-size:13px;color:#4caf50;font-weight:bold;text-align:center}
-.mrc-td-buy{background:#8a5f18;color:#fff;border:none;padding:11px 16px;border-radius:8px;font-size:13px;font-weight:bold;cursor:pointer}
-.mrc-td-buy:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
-.mrc-td-owned{font-size:12px;color:#4caf50;font-weight:bold;text-align:center;padding:6px 0}
-
-/* rev325f-trade-compact */
-.mrc-trade-wrap{display:flex;height:100%;gap:0;padding:0;box-sizing:border-box;min-height:0}
-.mrc-trade-left{flex:0 0 46%;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px;box-sizing:border-box;border-right:1px solid #2a231c}
-.mrc-trade-left::-webkit-scrollbar{width:2px}
-.mrc-trade-left::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:1px}
-.mrc-trade-right{flex:1;min-width:0;min-height:0;overflow:hidden;padding:6px 8px;box-sizing:border-box;display:flex;flex-direction:column;gap:5px}
-.mrc-trade-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
-.mrc-trade-cell{background:#1a1510;border:1px solid #2a231c;border-radius:4px;padding:3px 1px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;overflow:hidden;transition:border-color .12s,background .12s;min-width:0}
-.mrc-trade-cell:hover{border-color:#8a5f18}
-.mrc-trade-cell:active{transform:scale(.96)}
-.mrc-trade-cell.on{border-color:#e8a33d;background:#2a1f10}
-.mrc-trade-cell.owned{opacity:.5;cursor:default}
-.mrc-trade-cell-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-.mrc-trade-cell-name{font-size:8px;color:#ddd;font-weight:bold;text-align:center;line-height:1.1;word-break:break-all;max-height:18px;overflow:hidden}
-.mrc-trade-cell-price{font-size:8px;color:#4caf50;font-weight:bold;line-height:1}
-.mrc-trade-cell.owned .mrc-trade-cell-price{color:#7a6f60}
-.mrc-td-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#4a4038;font-size:10px;text-align:center;line-height:1.6}
-.mrc-td-head{display:flex;align-items:center;gap:6px;flex:0 0 auto}
-.mrc-td-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:#151210;border-radius:5px;border:1px solid #3a2f25;flex:0 0 auto}
-.mrc-td-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.mrc-td-name{font-size:12px;font-weight:bold;color:#e8a33d;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mrc-td-desc{font-size:9px;color:#7a6f60;line-height:1.3;max-height:24px;overflow:hidden}
-.mrc-td-row{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#ddd;flex:0 0 auto}
-.mrc-td-row .lbl{color:#7a6f60;font-size:10px}
-.mrc-td-qty{display:flex;align-items:center;gap:4px}
-.mrc-td-qty-btn{background:#2c2419;border:1px solid #3a2f25;color:#e8a33d;font-size:13px;font-weight:bold;width:26px;height:26px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
-.mrc-td-qty-btn:active{transform:scale(.92)}
-.mrc-td-qty-val{min-width:22px;text-align:center;font-size:12px;font-weight:bold;color:#fff}
-.mrc-td-total{font-size:12px;color:#4caf50;font-weight:bold;text-align:right;flex:0 0 auto}
-.mrc-td-buy{background:#8a5f18;color:#fff;border:none;padding:8px 12px;border-radius:5px;font-size:12px;font-weight:bold;cursor:pointer;flex:0 0 auto;margin-top:auto}
-.mrc-td-buy:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
-.mrc-td-owned{font-size:11px;color:#4caf50;font-weight:bold;text-align:center;padding:6px 0;flex:0 0 auto}
-
-/* rev325g-trade */
-.mrc-trade-wrap{display:flex;height:100%;gap:0;padding:0;box-sizing:border-box;min-height:0}
-.mrc-trade-wrap .mrc-trade-left{flex:0 0 48%;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px;box-sizing:border-box;border-right:1px solid #2a231c}
-.mrc-trade-wrap .mrc-trade-left::-webkit-scrollbar{width:2px}
-.mrc-trade-wrap .mrc-trade-left::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:1px}
-.mrc-trade-wrap .mrc-trade-right{flex:1;min-width:0;min-height:0;overflow:hidden;padding:6px 8px;box-sizing:border-box;display:flex;flex-direction:column;gap:4px}
-.mrc-trade-wrap .mrc-trade-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
-.mrc-trade-wrap .mrc-trade-cell{background:#151210;border:1px solid #2a231c;border-radius:4px;padding:3px 1px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;overflow:hidden;transition:border-color .12s,background .12s;min-width:0}
-.mrc-trade-wrap .mrc-trade-cell:hover{border-color:#8a5f18}
-.mrc-trade-wrap .mrc-trade-cell:active{transform:scale(.96)}
-.mrc-trade-wrap .mrc-trade-cell.on{border-color:#e8a33d;box-shadow:0 0 0 1px #e8a33d inset}
-.mrc-trade-wrap .mrc-trade-cell.owned{opacity:.5;cursor:default}
-.mrc-trade-wrap .mrc-trade-cell-icon{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:3px;border:1px solid #3a2f25;flex:0 0 auto;overflow:hidden}
-.mrc-trade-wrap .mrc-trade-cell-icon img{width:100%;height:100%;object-fit:contain}
-.mrc-trade-wrap .mrc-trade-cell-name{font-size:7px;color:#ddd;font-weight:bold;text-align:center;line-height:1.1;word-break:break-all;max-height:14px;overflow:hidden;padding:0 1px}
-.mrc-trade-wrap .mrc-trade-cell-price{font-size:7px;color:#4caf50;font-weight:bold;line-height:1}
-.mrc-trade-wrap .mrc-trade-cell.owned .mrc-trade-cell-price{color:#7a6f60}
-.mrc-trade-wrap .mrc-td-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#4a4038;font-size:10px;text-align:center;line-height:1.6}
-.mrc-trade-wrap .mrc-td-head{display:flex;align-items:center;gap:6px;flex:0 0 auto}
-.mrc-trade-wrap .mrc-td-icon{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:5px;border:1px solid #3a2f25;flex:0 0 auto;overflow:hidden}
-.mrc-trade-wrap .mrc-td-icon img{width:100%;height:100%;object-fit:contain}
-.mrc-trade-wrap .mrc-td-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.mrc-trade-wrap .mrc-td-name{font-size:12px;font-weight:bold;color:#e8a33d;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mrc-trade-wrap .mrc-td-desc{font-size:9px;color:#7a6f60;line-height:1.3;max-height:24px;overflow:hidden}
-.mrc-trade-wrap .mrc-td-row{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#ddd;flex:0 0 auto}
-.mrc-trade-wrap .mrc-td-row .lbl{color:#7a6f60;font-size:10px}
-.mrc-trade-wrap .mrc-td-qty{display:flex;align-items:center;gap:4px}
-.mrc-trade-wrap .mrc-td-qty-btn{background:#2c2419;border:1px solid #3a2f25;color:#e8a33d;font-size:12px;font-weight:bold;width:24px;height:24px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
-.mrc-trade-wrap .mrc-td-qty-btn:active{transform:scale(.92)}
-.mrc-trade-wrap .mrc-td-qty-val{min-width:20px;text-align:center;font-size:11px;font-weight:bold;color:#fff}
-.mrc-trade-wrap .mrc-td-bottom{display:flex;align-items:center;gap:6px;margin-top:auto;padding-top:2px;flex:0 0 auto}
-.mrc-trade-wrap .mrc-td-total{font-size:12px;color:#4caf50;font-weight:bold;flex:0 0 auto;white-space:nowrap}
-.mrc-trade-wrap .mrc-td-buy{flex:1;background:#8a5f18;color:#fff;border:none;padding:7px 10px;border-radius:5px;font-size:12px;font-weight:bold;cursor:pointer;min-width:0}
-.mrc-trade-wrap .mrc-td-buy:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
-.mrc-trade-wrap .mrc-td-owned{font-size:11px;color:#4caf50;font-weight:bold;text-align:center;padding:6px 0;flex:0 0 auto}
-
-/* rev325h-trade */
-.mrc-trade-wrap{display:flex;height:100%;gap:0;padding:0;box-sizing:border-box;min-height:0}
-.mrc-trade-wrap .mrc-trade-left{flex:0 0 48%;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px;box-sizing:border-box;border-right:1px solid #2a231c}
-.mrc-trade-wrap .mrc-trade-left::-webkit-scrollbar{width:2px}
-.mrc-trade-wrap .mrc-trade-left::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:1px}
-.mrc-trade-wrap .mrc-trade-right{flex:1;min-width:0;min-height:0;overflow:hidden;padding:8px 10px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px}
-.mrc-trade-wrap .mrc-trade-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
-.mrc-trade-wrap .mrc-trade-cell{background:#151210;border:1px solid #2a231c;border-radius:5px;padding:5px 6px;display:flex;align-items:center;gap:6px;cursor:pointer;overflow:hidden;transition:border-color .12s;min-width:0}
-.mrc-trade-wrap .mrc-trade-cell:hover{border-color:#8a5f18}
-.mrc-trade-wrap .mrc-trade-cell:active{transform:scale(.97)}
-.mrc-trade-wrap .mrc-trade-cell.on{border-color:#e8a33d;box-shadow:0 0 0 1px #e8a33d inset}
-.mrc-trade-wrap .mrc-trade-cell.owned{opacity:.5;cursor:default}
-.mrc-trade-wrap .mrc-trade-cell-icon{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1px solid #3a2f25;flex:0 0 auto;overflow:hidden}
-.mrc-trade-wrap .mrc-trade-cell-icon img{width:100%;height:100%;object-fit:contain}
-.mrc-trade-wrap .mrc-trade-cell-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;overflow:hidden}
-.mrc-trade-wrap .mrc-trade-cell-name{font-size:11px;color:#ddd;font-weight:bold;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mrc-trade-wrap .mrc-trade-cell-price{font-size:11px;color:#4caf50;font-weight:bold;line-height:1.15;white-space:nowrap}
-.mrc-trade-wrap .mrc-trade-cell.owned .mrc-trade-cell-price{color:#7a6f60}
-.mrc-trade-wrap .mrc-td-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#4a4038;font-size:11px;text-align:center;line-height:1.6}
-.mrc-trade-wrap .mrc-td-head{display:flex;align-items:flex-start;gap:8px;flex:0 0 auto}
-.mrc-trade-wrap .mrc-td-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid #3a2f25;flex:0 0 auto;overflow:hidden}
-.mrc-trade-wrap .mrc-td-icon img{width:100%;height:100%;object-fit:contain}
-.mrc-trade-wrap .mrc-td-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.mrc-trade-wrap .mrc-td-name{font-size:14px;font-weight:bold;color:#e8a33d;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mrc-trade-wrap .mrc-td-desc{font-size:11px;color:#7a6f60;line-height:1.4}
-.mrc-trade-wrap .mrc-td-qty-row{display:flex;align-items:center;justify-content:space-between;gap:6px;flex:0 0 auto}
-.mrc-trade-wrap .mrc-td-qty{display:flex;align-items:center;gap:5px}
-.mrc-trade-wrap .mrc-td-qty-btn{background:#2c2419;border:1px solid #3a2f25;color:#e8a33d;font-size:15px;font-weight:bold;width:30px;height:30px;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
-.mrc-trade-wrap .mrc-td-qty-btn:active{transform:scale(.92);background:#3a2f25}
-.mrc-trade-wrap .mrc-td-qty-val{min-width:26px;text-align:center;font-size:14px;font-weight:bold;color:#fff}
-.mrc-trade-wrap .mrc-td-total{font-size:14px;color:#4caf50;font-weight:bold;white-space:nowrap}
-.mrc-trade-wrap .mrc-td-buy{width:100%;background:#8a5f18;color:#fff;border:none;padding:10px 14px;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;flex:0 0 auto;margin-top:auto}
-.mrc-trade-wrap .mrc-td-buy:active:not(:disabled){transform:scale(.98)}
-.mrc-trade-wrap .mrc-td-buy:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
-.mrc-trade-wrap .mrc-td-owned{font-size:12px;color:#4caf50;font-weight:bold;text-align:center;padding:10px 0;flex:0 0 auto}
-
 /* rev325i-trade-fix */
 .mrc-trade-wrap{display:flex !important;height:100% !important;gap:0 !important;padding:0 !important;box-sizing:border-box !important;min-height:0 !important}
 .mrc-trade-wrap .mrc-trade-left{flex:0 0 48% !important;min-height:0 !important;overflow-y:auto !important;overflow-x:hidden !important;padding:4px !important;box-sizing:border-box !important;border-right:1px solid #2a231c !important}
@@ -930,8 +743,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .mrc-trade-wrap .mrc-td-info .mrc-td-name{text-align:left !important}
 .mrc-trade-wrap .mrc-td-info .mrc-td-desc{text-align:left !important;padding:0 !important}
 
-/* rev325n-btn-center */
-.mrc-trade-wrap .mrc-td-btn-row{justify-content:center !important}
 
 
 /* rev344: 商人交易卡片图标约束 */
@@ -947,3 +758,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-plot.built[data-type="tower"]{background-image:url('icons/garden/tower_bg.png')}
 .gp-plot.built[data-type="shed"]{background-image:url('icons/garden/shed_bg.png')}
 .gp-plot.built[data-type="compost"]{background-image:url('icons/garden/compost_bg.png')}
+
+/* rev400: 修復特殊土地圖片 */
+.gp-plot.built[data-type="black_soil"]{background-image:url('icons/garden/black_soil.png')}
+.gp-plot.built[data-type="red_soil"]{background-image:url('icons/garden/red_soil.png')}
