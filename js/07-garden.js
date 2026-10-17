@@ -280,9 +280,9 @@ function renderGardenGrid(){
       const st = (isSoil && plot.crop) ? _gardenCropStatus(plot, now) : null;
       if(st){
         let icon = t.icon, lbl = t.name, extraCls = '';
-        if(st.status === 'growing'){ icon = '🌱'; lbl = st.remaining + 's'; }
-        else if(st.status === 'mature'){ icon = st.cropIcon; lbl = '成熟'; extraCls = ' mature'; }
-        else if(st.status === 'rotten'){ icon = '🥀'; lbl = '腐爛'; extraCls = ' rotten'; }
+        if(st.status === 'growing'){ icon = cropStageImgHtml(st.cropId, 'sprout', 52); lbl = st.remaining + 's'; }
+        else if(st.status === 'mature'){ icon = cropStageImgHtml(st.cropId, 'mature', 52); lbl = '成熟'; extraCls = ' mature'; }
+        else if(st.status === 'rotten'){ icon = cropStageImgHtml(st.cropId, 'rotten', 52); lbl = '腐爛'; extraCls = ' rotten'; }
         else if(st.status === 'cleaning'){ icon = '🧹'; lbl = st.remaining + 's'; extraCls = ' cleaning'; }
         html += '<div class="gp-plot built' + extraCls + '" data-type="' + plot.type + '" data-idx="' + i + '">' + (plot.fertilized ? '<div class="gp-fert-mark">💩</div>' : '') + '<div class="gp-plot-icon">' + icon + '</div><div class="gp-plot-lbl">' + lbl + '</div></div>';
       } else if(isSoil){
@@ -541,7 +541,7 @@ function openGardenSeedPickerWithRemove(idx, returnFn){
       const cropDef = CROPS[s.def.cropId];
       const yieldBase = Math.max(1, Math.round(s.def.baseYield * (RARITY_MULT[s.rarity] || 1)));
       body += '<div class="item-row" data-sid="' + s.id + '" data-srar="' + s.rarity + '">' +
-        '<div class="icon" style="font-size:20px">🌰</div>' +
+        '<div class="icon">' + seedImgHtml(s.id, 30) + '</div>' +
         '<div class="info"><div class="nm ' + rarityClass(s.rarity) + '">' + s.def.name + '</div>' +
         '<div class="sub">' + s.rarity + ' · 生長 ' + Math.round(s.def.growMs/1000) + 's · 收穫約 ' + yieldBase + ' ' + (cropDef ? cropDef.name : '') + '</div></div>' +
         '<div class="cnt">×' + s.count + '</div></div>';
@@ -635,7 +635,7 @@ function openGardenCropDetailWithRemove(idx, st, returnFn){
   body += _gardenPlotOwnersHtml(idx, 'farmer');
   body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px">當前作物</div>';
   body += '<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#1a1510;border:1px solid #2a231c;border-radius:5px">';
-  body += '<span style="font-size:24px;line-height:1;flex:0 0 auto">' + st.cropIcon + '</span>';
+  body += '<span style="font-size:24px;line-height:1;flex:0 0 auto">' + cropImgHtml(st.cropId, 24) + '</span>';
   body += '<div style="flex:1;min-width:0">';
   body += '<div class="' + rarityClass(st.rarity) + '" style="font-size:12px;font-weight:bold">' + st.cropName + '（' + st.rarity + '）</div>';
   body += '<div id="gp-crop-status" style="font-size:10px;color:' + _st0.color + ';margin-top:2px">' + _st0.text + '</div>';
@@ -748,7 +748,18 @@ function _gsBlockEx(title, colKey, items, minCells, fallbackIcon, cellStyle, fon
       if(idx < total){
         const it = items[idx];
         if(it){
-          const icon = fallbackIcon || (it.def && it.def.icon) || '?';
+          let icon;
+          if(typeof SEEDS !== 'undefined' && SEEDS[it.id]){
+            const _mw = /width:(\d+)px/.exec(cellStyle || '');
+            const _cp = _mw ? parseInt(_mw[1], 10) : 20;
+            icon = seedImgHtml(it.id, Math.floor(_cp * 0.7));
+          } else if(typeof CROPS !== 'undefined' && CROPS[it.id]){
+            const _mw2 = /width:(\d+)px/.exec(cellStyle || '');
+            const _cp2 = _mw2 ? parseInt(_mw2[1], 10) : 20;
+            icon = cropImgHtml(it.id, Math.floor(_cp2 * 0.7));
+          } else {
+            icon = fallbackIcon || (it.def && it.def.icon) || '?';
+          }
           html += '<div class="gs-cell filled" data-id="' + it.id + '" data-rar="' + it.rarity + '" style="background:' + rarityBg(it.rarity) + ';' + cellStyle + fontStyle + '">' +
             '<div class="gs-cell-icon">' + icon + '</div>' +
             '<div class="gs-cell-cnt">' + it.count + '</div>' +
@@ -1670,9 +1681,48 @@ function _openTradeResultDialog(gotItems, title, extraActions){
 function renderGardenMerchant(box){
   if(!window._merchantMainTab) window._merchantMainTab = 'lines';
   const curTab = window._merchantMainTab;
+  /* rev348: 保存滚动位置，避免定时重绘时丢失 */
+  const _prevScroll = { _box: box ? box.scrollTop : 0 };
+  if(box){
+    ['.mrc-trade-left','.mrc-trade-right','.mrc-cols','.mrc-wrap'].forEach(function(sel){
+      const _e = box.querySelector(sel);
+      if(_e) _prevScroll[sel] = _e.scrollTop;
+    });
+  }
   const g = _gardenMerchantInit();
   const m = g.merchant;
   const now = Date.now();
+  /* rev349: 签名守卫——结构未变则跳过全量重建，避免闪烁 */
+  let _sig;
+  if(curTab === 'lines'){
+    _sig = 'L|' + (m.foodLv||0) + '|' + (m.seedLv||0) + '|' + (m.throwLv||0) + '|' + (m.ammoLv||0);
+  } else {
+    const _ownedBlack = (state.garden && state.garden.ownedSpecialSoil && state.garden.ownedSpecialSoil.black_soil) ? 1 : 0;
+    const _ownedRed   = (state.garden && state.garden.ownedSpecialSoil && state.garden.ownedSpecialSoil.red_soil) ? 1 : 0;
+    _sig = 'T|' + (window._tradeSelectedId || '') + '|' + (window._tradeQty || 1) + '|' + _ownedBlack + '|' + _ownedRed;
+  }
+  const _forceRebuild = window._merchantLastTab !== curTab;
+  window._merchantLastTab = curTab;
+  const _domOk = box && box.querySelector('.mrc-page');
+  if(!_forceRebuild && window._merchantSig === _sig && _domOk){
+    /* 结构未变——只做局部更新，不动 DOM 树 */
+    if(curTab === 'lines'){
+      try { _gardenMerchantRefreshUI(); } catch(e){ console.warn('[merchant refresh]', e); }
+    } else if(window._tradeSelectedId){
+      const _item = findTradeItem(window._tradeSelectedId);
+      if(_item && !_isTradeOwned(_item)){
+        const _total = _item.price * (window._tradeQty || 1);
+        const _can = (g.food || 0) >= _total;
+        const _btn = box.querySelector('.mrc-td-buy');
+        if(_btn){
+          _btn.disabled = !_can;
+          _btn.textContent = _can ? '確認交易' : '食物不足';
+        }
+      }
+    }
+    return;
+  }
+  window._merchantSig = _sig;
   function lineBlock(lineKey){
     const meta = _gardenMerchantLineMeta(lineKey);
     if(!meta) return '';
@@ -1746,6 +1796,17 @@ function renderGardenMerchant(box){
       })(cells[i]);
     }
     renderTradeDetail();
+  }
+  /* rev348: 恢复滚动位置（在所有 innerHTML 替换之后） */
+  if(box){
+    if(_prevScroll._box > 0) box.scrollTop = _prevScroll._box;
+    ['.mrc-trade-left','.mrc-trade-right','.mrc-cols','.mrc-wrap'].forEach(function(sel){
+      const _v = _prevScroll[sel];
+      if(typeof _v === 'number' && _v > 0){
+        const _e = box.querySelector(sel);
+        if(_e) _e.scrollTop = _v;
+      }
+    });
   }
 }
 
@@ -4455,7 +4516,7 @@ function openGardenStorageDetail(id, rarity){
   const count = gardenStorageCount(id, rarity);
   if(count <= 0){  return; }
   const def = isSeed ? SEEDS[id] : CROPS[id];
-  const icon = isSeed ? '🌰' : def.icon;
+  const icon = isSeed ? seedImgHtml(id, 28) : cropImgHtml(id, 28);
   const nm = def.name || id;
   const ft = document.createElement('div');
   ft.className = 'modal-ft';

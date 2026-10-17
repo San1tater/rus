@@ -192,11 +192,11 @@ function calcConsumableHeal(item, medbayLv){
 }
 /* ===== rev130: 後院種子與作物 ===== */
 const SEEDS = {
-  seed_potato: { name:'馬鈴薯種子', cropId:'crop_potato', growMs:1200000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 },
-  seed_carrot: { name:'胡蘿蔔種子', cropId:'crop_carrot', growMs:2100000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 },
-  seed_cabbage:{ name:'捲心菜種子', cropId:'crop_cabbage',growMs:1500000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 },
-  seed_beet:   { name:'甜菜種子',   cropId:'crop_beet',   growMs:1800000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 },
-  seed_wheat:  { name:'小麥種子',   cropId:'crop_wheat',  growMs:2700000, baseYield:4, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000 }
+  seed_potato: { name:'馬鈴薯種子', cropId:'crop_potato', growMs:1200000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000, img:'seed_potato' },
+  seed_carrot: { name:'胡蘿蔔種子', cropId:'crop_carrot', growMs:2100000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000, img:'seed_carrot' },
+  seed_cabbage:{ name:'捲心菜種子', cropId:'crop_cabbage',growMs:1500000, baseYield:2, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000, img:'seed_cabbage' },
+  seed_beet:   { name:'甜菜種子',   cropId:'crop_beet',   growMs:1800000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000, img:'seed_beet' },
+  seed_wheat:  { name:'小麥種子',   cropId:'crop_wheat',  growMs:2700000, baseYield:4, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000, img:'seed_wheat' }
 };
 const CROP_BASE_FOOD = {
   crop_potato: 2,
@@ -211,11 +211,11 @@ function cropFoodValue(cropId, rarity){
   return Math.max(1, Math.round(base * mult));
 }
 const CROPS = {
-  crop_potato: { name:'馬鈴薯', icon:'🥔' },
-  crop_carrot: { name:'胡蘿蔔', icon:'🥕' },
-  crop_cabbage:{ name:'捲心菜', icon:'🥬' },
-  crop_beet:   { name:'甜菜',   icon:'🍠' },
-  crop_wheat:  { name:'小麥',   icon:'🌾' }
+  crop_potato: { name:'馬鈴薯', icon:'🥔', img:'crop_potato' },
+  crop_carrot: { name:'胡蘿蔔', icon:'🥕', img:'crop_carrot' },
+  crop_cabbage:{ name:'捲心菜', icon:'🥬', img:'crop_cabbage' },
+  crop_beet:   { name:'甜菜',   icon:'🍠', img:'crop_beet' },
+  crop_wheat:  { name:'小麥',   icon:'🌾', img:'crop_wheat' }
 };
 /* ===== end rev130 ===== */
 const MATERIALS={wood:{name:'木材'},metal:{name:'金屬廢料'},screws:{name:'螺絲'},cloth:{name:'布料'},gears:{name:'齒輪'},electronics:{name:'電子零件'}};
@@ -364,8 +364,14 @@ function itemIcon(id,size){
   const s=size||24;
   if(!id) return '';
   const v=assetSuffix();
-  if(typeof SEEDS!=='undefined' && SEEDS[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">🌰</span>`;
-  if(typeof CROPS!=='undefined' && CROPS[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${CROPS[id].icon}</span>`;
+  if(typeof SEEDS!=='undefined' && SEEDS[id]){
+    const _img = SEEDS[id].img || id;
+    return `<img src="icons/garden/seeds/${_img}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+  }
+  if(typeof CROPS!=='undefined' && CROPS[id]){
+    const _img = CROPS[id].img || id;
+    return `<img src="icons/garden/crops/${_img}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+  }
   if(MATERIAL_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${MATERIAL_EMOJI[id]}</span>`;
   if(PANTS_SHOES_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${PANTS_SHOES_EMOJI[id]}</span>`;
   const ammoDef=AMMO[id];
@@ -375,6 +381,33 @@ function itemIcon(id,size){
   }
   const rid=resolveIconId(id);
   return `<img src="icons/items/${rid}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+}
+/* rev346: 種子 / 作物 / 生長階段圖片 helper */
+function seedImgHtml(seedId, size){
+  const s = (typeof SEEDS !== 'undefined') ? SEEDS[seedId] : null;
+  if(!s) return `<span style="font-size:${Math.round(size*0.85)}px;line-height:1;display:inline-block">🌰</span>`;
+  const img = s.img || seedId;
+  return `<img src="icons/garden/seeds/${img}.png${assetSuffix()}" style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
+}
+function cropImgHtml(cropId, size){
+  const c = (typeof CROPS !== 'undefined') ? CROPS[cropId] : null;
+  if(!c) return '?';
+  const img = c.img || cropId;
+  return `<img src="icons/garden/crops/${img}.png${assetSuffix()}" style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
+}
+function cropStageImgHtml(cropId, stage, size){
+  const c = (typeof CROPS !== 'undefined') ? CROPS[cropId] : null;
+  if(!c) return '?';
+  const img = c.img || cropId;
+  let folder, file;
+  if(stage === 'sprout'){ folder = 'sprouts'; file = 'sprout_' + img; }
+  else if(stage === 'rotten'){ folder = 'rotten'; file = 'rotten_' + img; }
+  else { folder = 'mature'; file = 'mature_' + img; }
+  /* rev350: mature 找不到图时回退到 crops/（物品图标） */
+  const _fallback = (stage === 'mature')
+    ? ` onerror="this.onerror=null;this.src='icons/garden/crops/${img}.png${assetSuffix()}'"`
+    : '';
+  return `<img src="icons/garden/${folder}/${file}.png${assetSuffix()}"${_fallback} style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
 }
 function bossIcon(id){const _map={factory_king_ii:"factory_king",lab_queen_ii:"lab_queen",road_tyrant_ii:"road_tyrant",swamp_hydra_ii:"swamp_hydra",core_omega_ii:"core_omega"};const _rid=_map[id]||id;const _tint=(id.indexOf("_ii")>=0)?" boss-ii-tint":"";return `<img src="icons/bosses/${_rid}.png${assetSuffix()}" alt="" class="${_tint}">`;}
 function buildingIcon(id){return `<img src="icons/buildings/${id}.png${assetSuffix()}" alt="">`;}
