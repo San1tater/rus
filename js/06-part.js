@@ -5484,10 +5484,35 @@ function _tickHeroWalkSwitch(now){
   if(heroAnim.name === 'walk'){ heroAnim.name = 'run'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
   else if(heroAnim.name === 'run'){ heroAnim.name = 'walk'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
 }
+/* rev337: HP / 护甲面板实时刷新（不依赖切 tab） */
+function updatePlayerStatPanel(){
+  const panel = document.querySelector('#zone2 .player-stat-panel');
+  if(!panel) return;
+  const _f = function(v){ v = Math.round(v); if(v >= 1e7) return Math.round(v/1e6) + 'M'; if(v >= 1e6) return (v/1e6).toFixed(1) + 'M'; if(v >= 1e4) return Math.round(v/1e3) + 'K'; return v.toString(); };
+  const lv = panel.querySelector('.lv-v');
+  const hpv = panel.querySelector('.hp-v');
+  const hpm = panel.querySelector('.hp-m');
+  const apv = panel.querySelector('.ap-v');
+  const apm = panel.querySelector('.ap-m');
+  if(lv) lv.textContent = 'Lv.' + state.player.level;
+  if(hpv) hpv.textContent = _f(state.player.hp);
+  if(hpm) hpm.textContent = _f(state.player.maxHp);
+  if(apv) apv.textContent = _f(state.player.armor);
+  if(apm) apm.textContent = _f(state.player.maxArmor);
+}
 function heroLoop(now){
   _tickHeroWalkSwitch(now);
   updateHeroAnim(now);
   if(currentTab === 'explore'){ renderExploreHeroCanvas(); }
+  /* rev337: 每 500ms 检测 HP/护甲/等级变化，实时刷新面板 */
+  if(!heroLoop._lastHpCheck || now - heroLoop._lastHpCheck > 500){
+    heroLoop._lastHpCheck = now;
+    const _sig = state.player.hp + '|' + state.player.maxHp + '|' + state.player.armor + '|' + state.player.maxArmor + '|' + state.player.level;
+    if(heroLoop._lastSig !== _sig){
+      heroLoop._lastSig = _sig;
+      updatePlayerStatPanel();
+    }
+  }
   requestAnimationFrame(heroLoop);
 }
 requestAnimationFrame(heroLoop);

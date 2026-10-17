@@ -812,6 +812,8 @@ function refreshPlayerStats(){
   if(state.player.hp>state.player.maxHp)state.player.hp=state.player.maxHp;
   if(state.player.armor>state.player.maxArmor)state.player.armor=state.player.maxArmor;
   if(state.player.armor<0)state.player.armor=0;
+  /* rev338: HP / 護甲面板即時刷新 */
+  if(typeof updatePlayerStatPanel === 'function') updatePlayerStatPanel();
 }
 function addExp(n){
   state.player.exp+=n;let need=Math.round(50*Math.pow(1.15,state.player.level-1));
@@ -1791,11 +1793,11 @@ function renderEquipZone(z2){
   /* v51: 移除未使用變數 */
   const _fmt = (v) => { v = Math.round(v); if(v >= 1e7) return Math.round(v/1e6) + "M"; if(v >= 1e6) return (v/1e6).toFixed(1) + "M"; if(v >= 1e4) return Math.round(v/1e3) + "K"; return v.toString(); };
   html+=`<div class="player-stat-panel" style="left:3%;top:4%;text-align:right">
-    <div class="row lv-row"><b>Lv.${state.player.level}</b></div>
-    <div class="row"><span>❤️</span><b>${_fmt(state.player.hp)}</b></div>
-    <div class="row"><span></span><b style="color:#7a6f60">${_fmt(state.player.maxHp)}</b></div>
-    <div class="row"><span>🛡️</span><b>${_fmt(state.player.armor)}</b></div>
-    <div class="row"><span></span><b style="color:#7a6f60">${_fmt(state.player.maxArmor)}</b></div>
+    <div class="row lv-row"><b class="lv-v">Lv.${state.player.level}</b></div>
+    <div class="row"><span>❤️</span><b class="hp-v">${_fmt(state.player.hp)}</b></div>
+    <div class="row"><span></span><b class="hp-m" style="color:#7a6f60">${_fmt(state.player.maxHp)}</b></div>
+    <div class="row"><span>🛡️</span><b class="ap-v">${_fmt(state.player.armor)}</b></div>
+    <div class="row"><span></span><b class="ap-m" style="color:#7a6f60">${_fmt(state.player.maxArmor)}</b></div>
   </div>`;
   z2.innerHTML=html;
   {
