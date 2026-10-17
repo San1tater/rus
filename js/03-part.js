@@ -351,7 +351,7 @@ function defaultState(){
     garden:{plots:new Array(20).fill(null),storage:{}},
     servants:[],
     unlockedEquip:{},
-    seals:{},defeatedBosses:[],unlockedRegions:['廢棄工廠','廢棄實驗室'],
+    seals:{},defeatedBosses:[],unlockedRegions:['廢棄工廠'],
     lastSeen:Date.now(),radioLastTick:0,armoryLastTick:0,crafting:[],
     stats:{kills:0,deaths:0,bossKills:0},
   };
@@ -373,6 +373,22 @@ function load(){
     state.unlockedRegions=(state.unlockedRegions||[]).filter(r=>!!REGIONS[r]);
     {const _seen={};for(const id of state.preferences.regions){const _b=id.replace(/II$/,'');_seen[_b]=id;}state.preferences.regions=Object.values(_seen);}
     if(!state.unlockedRegions.includes('廢棄工廠'))state.unlockedRegions.push('廢棄工廠');
+    /* rev331: 區域解鎖與 boss 進度對齊 */
+    if(!Array.isArray(state.defeatedBosses)) state.defeatedBosses = [];
+    {
+      const _regionBossMap = [
+        {region:'廢棄實驗室', boss:'factory_king'},
+        {region:'郊區公路', boss:'lab_queen'},
+        {region:'輻射沼澤', boss:'road_tyrant'},
+        {region:'廢土核心', boss:'swamp_hydra'}
+      ];
+      for(const _m of _regionBossMap){
+        if(!state.defeatedBosses.includes(_m.boss)){
+          state.unlockedRegions = state.unlockedRegions.filter(x => x !== _m.region && x !== _m.region + 'II');
+          state.preferences.regions = state.preferences.regions.filter(x => x !== _m.region && x !== _m.region + 'II');
+        }
+      }
+    }
     delete state.preferences.autoSalvage;
     delete state.preferences.autoConsumeThreshold;
     if(!state.preferences.ammoOrder || typeof state.preferences.ammoOrder !== 'object'){
@@ -493,7 +509,14 @@ function _initUnlockedFrom(){
     if(d && d.slot) state.unlockedEquip[id + '@' + rar] = true;
   }
 }
-function invAddRaw(id,r,c){if(c<=0)return;const k=invKey(id,r);state.inventory[k]=(state.inventory[k]||0)+c;if(ALL_ITEMS[id]&&ALL_ITEMS[id].slot){if(!state.unlockedEquip)state.unlockedEquip={};state.unlockedEquip[id+'@'+r]=true;}}
+function invAddRaw(id,r,c){
+  if(c<=0)return;
+  if(!ALL_ITEMS[id] && !id.startsWith('named_')){
+    console.warn('[invAddRaw] 非法物品ID：', id, 'rarity:', r);
+    return;
+  }
+  const k=invKey(id,r);state.inventory[k]=(state.inventory[k]||0)+c;if(ALL_ITEMS[id]&&ALL_ITEMS[id].slot){if(!state.unlockedEquip)state.unlockedEquip={};state.unlockedEquip[id+'@'+r]=true;}
+}
 function invRemove(id,r,c){if(typeof SEEDS !== 'undefined' && SEEDS[id]){ return gardenStorageRemove(id, r, c); } const k=invKey(id,r);if(!state.inventory[k]||state.inventory[k]<c)return false;state.inventory[k]-=c;if(state.inventory[k]<=0)delete state.inventory[k];return true;}
 function invCount(id,r){return state.inventory[invKey(id,r)]||0;}
 /* ===== rev130: 後院儲備 helper ===== */
@@ -553,7 +576,18 @@ function gardenStorageCount(id, rarity){
   return s[id + '@' + rarity] || 0;
 }
 /* ===== end rev130 ===== */
-function invList(){const l=[];for(const k in state.inventory){const [id,r]=k.split('@');l.push({id,rarity:r,count:state.inventory[k],def:itemDef(id)});}return l;}
+function invList(){
+  const l=[];
+  for(const k in state.inventory){
+    const p=k.split('@');
+    if(p.length!==2) continue;
+    const id=p[0],r=p[1];
+    const def=itemDef(id);
+    if(!def && !id.startsWith('named_')) continue;
+    l.push({id,rarity:r,count:state.inventory[k],def});
+  }
+  return l;
+}
 function getAmmoByCal(cal){const l=[];for(const k in state.inventory){const p=k.split('@');if(p.length!==2)continue;const id=p[0],r=p[1];const d=AMMO[id];if(!d||d.cal!==cal)continue;const cnt=state.inventory[k];if(!cnt||cnt<=0)continue;l.push({id,rarity:r,count:cnt,def:d});}return l;}
 function _ammoOrderKey(slot){
   const id = state.player.equipped[slot];
@@ -981,6 +1015,10 @@ function consolidateInventoryDuplicates(){
 function invAdd(id,rarity,count){
   if(count<=0)return;
   if(typeof SEEDS !== 'undefined' && SEEDS[id]){ gardenStorageAdd(id, rarity, count); return; }
+  if(!ALL_ITEMS[id] && !id.startsWith('named_')){
+    console.warn('[invAdd] 非法物品ID：', id, 'rarity:', rarity);
+    return;
+  }
   const cat=itemCat(id);
   /* rev121: 已有該 baseId 的具名武器 → 原版傳奇直接分解，不入庫 */
   if(cat === 'weapon' && id.indexOf('named_') !== 0 && rarity === '傳奇'){
@@ -1641,6 +1679,13 @@ function offlineSettle(){
   const beforeInv = _offlineSnapshotInv();
   _offlineMode = true;
   for(let i=0;i<events;i++){
+    /* rev332: 離線結算死亡即時滿血，避免 1 HP 連續戰鬥 */
+    if(state.player.hp <= 0 || state.pendingHealFull){
+      state.player.hp = state.player.maxHp;
+      state.player.armor = state.player.maxArmor;
+      state.pendingHealFull = false;
+      state.exploreDelayUntil = 0;
+    }
     const region=pick(regionPool);const mode=state.preferences.actionMode;const r=REGIONS[region];
     const cc=mode==='attack'?r.combat.attack:r.combat.stealth;
     const cur=getCurrentNode(region);
@@ -1977,7 +2022,8 @@ function openEquipmentCompare(slot,newId,newRarity,onConfirm,onCancel){
     else{invRemove(newId,newRarity,1);state.player.equipped[slot]=newId;state.player.equippedRarity[slot]=newRarity;}
     refreshPlayerStats();save();
     closeModal();
-    if(onConfirm) onConfirm(); else renderCurrentTab();
+    renderCurrentTab();
+    if(onConfirm) onConfirm();
     
   };
 }
@@ -2013,6 +2059,7 @@ function openInventory(){
       body+=`<div class="cat-header" data-cat="${g}"><span>${names[g]} (${groups[g].length})</span><span>${collapsed?'▶':'▼'}</span></div>`;
       if(!collapsed){
         for(const it of groups[g]){
+          if(!it.def) continue;
           const ac=armorClass(it.def.level||0);
           const aVal=(it.def.armor!=null)?equipArmorValue(it.id,it.rarity):0;
           const dVal=(it.def.dmg!=null)?Math.round(it.def.dmg*(RARITY_MULT[it.rarity]||1)):null;

@@ -5054,6 +5054,11 @@ function renderRegionArea(z3){
   for(const baseName of _baseKeys){
     const r1=REGIONS[baseName];
     if(!r1)continue;
+    /* rev332: 未解鎖 region 顯示鎖定提示 */
+    if(r1.needUnlock && !state.unlockedRegions.includes(baseName)){
+      html+=`<div class="reg-item locked" style="opacity:.45;cursor:not-allowed"><div class="ri"><div class="rn">🔒 ${r1.name}</div><div class="rd" style="color:#e05252">${r1.unlockHint||'未解鎖'}</div></div></div>`;
+      continue;
+    }
     const iiName=baseName+'II';
     const r2=REGIONS[iiName];
     const t2Exists=!!r2;
@@ -5430,8 +5435,23 @@ function _scheduleNextTick(){
   if(_tickTimer) clearTimeout(_tickTimer);
   _tickTimer = setTimeout(()=>{
     const now = Date.now();
-    const dt = now - lastTickTime;
+    let dt = now - lastTickTime;
     lastTickTime = now;
+    /* rev332: 死亡冷卻恢復必須先於任何離線判斷 */
+    if(state.exploreDelayUntil && now >= state.exploreDelayUntil){
+      state.exploreDelayUntil = 0;
+      if(state.pendingHealFull){
+        state.player.hp = state.player.maxHp;
+        state.player.armor = state.player.maxArmor;
+        state.pendingHealFull = false;
+        refreshPlayerStats();
+      }
+      dt = 0;
+    }
+    if(state.exploreDelayUntil && now < state.exploreDelayUntil){
+      _scheduleNextTick();
+      return;
+    }
     const maxInterval = Math.max(getExploreInterval(), EVENT_INTERVAL_MS);
     if(dt > maxInterval*3){
       offlineSettle();
@@ -5441,18 +5461,6 @@ function _scheduleNextTick(){
     if(BossModule.isActive()){
       _scheduleNextTick();
       return;
-    }
-    if(state.exploreDelayUntil && now < state.exploreDelayUntil){
-      _scheduleNextTick();
-      return;
-    }
-    if(state.exploreDelayUntil && now >= state.exploreDelayUntil){
-      state.exploreDelayUntil = 0;
-      if(state.pendingHealFull){
-        state.player.hp = state.player.maxHp;
-        state.pendingHealFull = false;
-        refreshPlayerStats();
-      }
     }
     doExploreTick();
     save();
@@ -5509,7 +5517,7 @@ function init(){
     invAddRaw('bandage','一般',3);
     invAddRaw('ai2','一般',1);
     invAddRaw('5.45_ps','一般',30);
-    invAddRaw('9x19_ps','一般',16);
+    invAddRaw('9x19_ap63','一般',16); /* rev332: 原 9x19_ps 不存在，修正為合法 9x19 AP 6.3 */
     state.player.equipped.melee='6kh2';
     state.player.equippedRarity.melee='一般';
     invRemove('6kh2','一般',1);
