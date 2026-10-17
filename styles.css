@@ -932,3 +932,9 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 
 /* rev325n-btn-center */
 .mrc-trade-wrap .mrc-td-btn-row{justify-content:center !important}
+
+
+/* rev344: 商人交易卡片图标约束 */
+.mrc-trade-wrap .mrc-trade-cell-icon{overflow:hidden !important}
+.mrc-trade-wrap .mrc-trade-cell-icon img{max-width:100% !important;max-height:100% !important;width:auto !important;height:auto !important;object-fit:contain !important;display:block !important}
+.mrc-trade-wrap .mrc-trade-cell-icon span{font-size:22px !important;line-height:1 !important;max-width:100% !important;max-height:100% !important;display:flex !important;align-items:center !important;justify-content:center !important;overflow:hidden !important}
