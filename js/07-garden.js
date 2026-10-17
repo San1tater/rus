@@ -1448,8 +1448,8 @@ const MERCHANT_TRADE_ITEMS = [
     { id: 'seed_legend',  name: '傳奇種子包', desc: '傳奇種子×1', price: 1000, rarity: '傳奇', icon: '🌰', stackable: true }
   ]},
   { category: '特殊地塊', items: [
-    { id: 'black_soil', name: '黑土地', desc: '慢20% 高20%', price: 10000, rarity: '傳奇', imgIcon: 'black_soil', oneTime: true },
-    { id: 'red_soil',   name: '紅土地', desc: '慢40% 高30%', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
+    { id: 'black_soil', name: '黑土地', desc: '生长<span style="color:#e05252">↓20%</span> 产量<span style="color:#4caf50">↑20%</span>', price: 10000, rarity: '傳奇', imgIcon: 'black_soil', oneTime: true },
+    { id: 'red_soil',   name: '紅土地', desc: '生长<span style="color:#e05252">↓40%</span> 产量<span style="color:#4caf50">↑30%</span>', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
   ]},
   { category: '補給', items: [
     { id: 'ammo_supply', name: '彈藥補給', desc: '庫存彈藥×30', price: 100, rarity: '庫存', itemIconId: '5.45_ps', stackable: true },
