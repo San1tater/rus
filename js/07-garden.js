@@ -472,9 +472,14 @@ function openGardenPlotPicker(idx, returnFn){
     const row = document.createElement('div');
     row.className = 'item-row';
     row.setAttribute('data-type', key);
-    const _iconHtml = (key === 'soil')
-      ? ('<img src="icons/garden/soil.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="">')
-      : t.icon;
+    let _iconHtml;
+    if(key === 'soil'){
+      _iconHtml = '<img src="icons/garden/soil.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="">';
+    } else if(t.bg){
+      _iconHtml = '<img src="icons/garden/' + t.bg + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="">';
+    } else {
+      _iconHtml = t.icon;
+    }
     row.innerHTML = '<div class="icon" style="font-size:20px">' + _iconHtml + '</div><div class="info"><div class="nm">' + t.name + '</div><div class="sub">' + t.desc + '</div></div>';
     body.appendChild(row);
   }
@@ -682,7 +687,8 @@ function openGardenPlotDetail(idx, returnFn){
   if(!plot) return;
   const t = GARDEN_PLOT_TYPES[plot.type] || {name:'未知', icon:'?', desc:''};
   let body = '';
-  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold"><span style="font-size:26px;line-height:1">' + t.icon + '</span><span>' + t.name + '</span><button class="btn danger" id="gp-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
+  const _tIcon = t.bg ? ('<img src="icons/garden/' + t.bg + '.png' + assetSuffix() + '" style="width:26px;height:26px;object-fit:contain" alt="">') : ('<span style="font-size:26px;line-height:1">' + t.icon + '</span>');
+  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold">' + _tIcon + '<span>' + t.name + '</span><button class="btn danger" id="gp-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
   body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv || 1) + '</div>';
   if(plot.type === 'shed'){
     body += _gardenPlotOwnersHtml(idx, 'foreman');
@@ -1920,7 +1926,8 @@ function _gardenTowerOpen(idx){
       '</div>';
   }
   let body = '';
-  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold"><span style="font-size:24px;line-height:1">✖</span><span>哨塔</span><button class="btn danger" id="tower-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
+  const _twIcon = (GARDEN_PLOT_TYPES.tower.bg) ? ('<img src="icons/garden/' + GARDEN_PLOT_TYPES.tower.bg + '.png' + assetSuffix() + '" style="width:24px;height:24px;object-fit:contain" alt="">') : ('<span style="font-size:24px;line-height:1">✖</span>');
+  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold">' + _twIcon + '<span>哨塔</span><button class="btn danger" id="tower-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
   body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv||1) + '</div>';
   body += _gardenPlotOwnersHtml(idx, 'guard');
   body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:8px 0 4px">裝備</div>';
@@ -5997,7 +6004,8 @@ function openCompostDetail(idx, returnFn){
     return s.type === "farmer" && s.assignedPlots && s.assignedPlots.indexOf(idx) !== -1;
   });
   let body = "";
-  body += "<div style=\"display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold\"><span style=\"font-size:24px;line-height:1\">♻️</span><span>堆肥區</span><button class=\"btn danger\" id=\"cp-del\" style=\"margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto\">拆除</button></div>";
+  const _cpIcon = (GARDEN_PLOT_TYPES.compost.bg) ? ('<img src="icons/garden/' + GARDEN_PLOT_TYPES.compost.bg + '.png' + assetSuffix() + '" style="width:24px;height:24px;object-fit:contain" alt="">') : ("<span style=\"font-size:24px;line-height:1\">♻️</span>");
+  body += "<div style=\"display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold\">" + _cpIcon + "<span>堆肥區</span><button class=\"btn danger\" id=\"cp-del\" style=\"margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto\">拆除</button></div>";
   body += "<div class=\"detail-sub\">" + plotCoordName(idx) + " · Lv." + (plot.lv || 1) + "</div>";
   body += _gardenPlotOwnersHtml(idx, "farmer");
   body += "<div style=\"font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px\">堆肥值</div>";
