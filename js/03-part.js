@@ -324,6 +324,309 @@ function spawnExploreBullets(n){
   }
 }
 
+
+
+
+
+
+
+
+
+
+
+/* rev374: 動態計算野獸骨架的精確包圍盒 */
+
+
+
+
+
+
+
+
+
+
+function getBeastBounds(def) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const world = resolveBossWorld(def, { keys: {} }, 0);
+  for(const L of def.layers) {
+    const wp = world[L.id];
+    if(!wp) continue;
+    const w = def.canvas.w * L.w;
+    const h = def.canvas.h * L.h;
+    const px = w * L.pivot.x;
+    const py = h * L.pivot.y;
+    const rot = wp.rot * BOSS_DEG2RAD;
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    const corners = [[0,0],[w,0],[0,h],[w,h]];
+    for(const c of corners) {
+      const dx = c[0] - px, dy = c[1] - py;
+      const rx = dx*cos - dy*sin + wp.wx;
+      const ry = dx*sin + dy*cos + wp.wy;
+      if(rx < minX) minX = rx;
+      if(ry < minY) minY = ry;
+      if(rx > maxX) maxX = rx;
+      if(ry > maxY) maxY = ry;
+    }
+  }
+  if(!isFinite(minX)) return null;
+  return { minX, maxX, minY, maxY, w: maxX-minX, h: maxY-minY };
+}
+
+function drawEnemyPreview(ctx, enemyId, w, h) {
+  try {
+    if(typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[enemyId]) {
+      const def = BEAST_LAYERS[enemyId];
+      let bounds = null;
+      try { bounds = getBeastBounds(def); } catch(err) {}
+      
+      // 如果边界异常，使用原画布尺寸作为兜底
+      if(!bounds || bounds.h <= 0 || bounds.w <= 0) {
+        bounds = { minX: 0, maxX: def.canvas.w, minY: 0, maxY: def.canvas.h, w: def.canvas.w, h: def.canvas.h };
+      }
+      
+      const scale = h / bounds.h;
+      const ox = (w - bounds.w * scale) / 2 - bounds.minX * scale;
+      const oy = h - bounds.maxY * scale;
+      
+      ctx.save();
+      ctx.translate(ox, oy);
+      ctx.scale(scale, scale);
+      const world = resolveBossWorld(def, { keys: {} }, 0);
+      const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
+      for(const L of sorted) {
+        const wp = world[L.id];
+        const lw = def.canvas.w * L.w;
+        const lh = def.canvas.h * L.h;
+        const ppx = lw * L.pivot.x;
+        const ppy = lh * L.pivot.y;
+        ctx.save();
+        ctx.translate(wp.wx, wp.wy);
+        ctx.rotate((L.rot || 0) * BOSS_DEG2RAD);
+        ctx.translate(-ppx, -ppy);
+        if(L.id.indexOf('eye') === 0) {
+          ctx.shadowColor = '#ff0000';
+          ctx.shadowBlur = 15;
+        }
+        ctx.fillStyle = L.color;
+        ctx.fillRect(0, 0, lw, lh);
+        ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(1.5, 1.5, lw - 3, lh - 3);
+        ctx.restore();
+      }
+      ctx.restore();
+      return;
+    }
+    
+    if(typeof _raidDrawHuman === 'function') {
+      const targetCharH = h * 0.7; 
+      const scale = targetCharH / 386;
+      const groundY = h * 0.95;
+      const _eq = { head: 'ssh68', top: '6b231', primary: 'ak74' };
+      const _rar = { head: '一般', top: '一般', primary: '一般' };
+      _raidDrawHuman(ctx, w / 2, groundY, scale, _eq, _rar, 'idle', 0, 'primary', 'enemy', true, false, null);
+      return;
+    }
+  } catch (e) {
+    console.warn('[drawEnemyPreview] error:', e);
+  }
+}
+
+function _showExploreEnemyGraphics(enemies) {
+  const fx = document.getElementById('explore-fx');
+  if(!fx) return;
+  const oldGrp = document.getElementById('explore-enemy-group');
+  if(oldGrp) oldGrp.remove();
+  
+  const fxH = fx.clientHeight || 500;
+  const fxW = fx.clientWidth || 400;
+  const charPx = fxH * 0.58;
+  
+  const container = document.createElement('div');
+  container.id = 'explore-enemy-group';
+  container.style.position = 'absolute';
+  container.style.inset = '0';
+  container.style.zIndex = '10';
+  container.style.pointerEvents = 'none';
+  container.style.transition = 'opacity 0.4s';
+  
+  const maxEnemies = Math.min(enemies.length, 4);
+  const states = [];
+  const canvases = [];
+  
+  for(let i=0; i<maxEnemies; i++) {
+    try {
+      const e = enemies[i];
+      const isBeast = typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[e.id];
+      
+      let domH, domW;
+      if(isBeast) {
+        if(e.id === 'mutant_wolf') domH = charPx * 0.9;
+        else if(e.id === 'mutant_bear') domH = charPx * 1.05;
+        else domH = charPx * 0.8;
+        
+        let bounds = null;
+        try { bounds = getBeastBounds(BEAST_LAYERS[e.id]); } catch(err) {}
+        domW = (bounds && bounds.h > 0) ? domH * (bounds.w / bounds.h) : domH;
+      } else {
+        domH = charPx * 1.25;
+        domW = domH * (88 / 118);
+      }
+      
+      const cw = Math.round(domW * 2);
+      const ch = Math.round(domH * 2);
+      
+      const cvs = document.createElement('canvas');
+      cvs.width = cw;
+      cvs.height = ch;
+      cvs.style.width = domW + 'px';
+      cvs.style.height = domH + 'px';
+      cvs.style.position = 'absolute';
+      cvs.style.bottom = '5%'; 
+      
+      const widthPct = (domW / fxW) * 100;
+      let maxRightPct = 50 - widthPct;
+      if(maxRightPct < 0) maxRightPct = 0;
+      const targetRightPct = (i / Math.max(1, maxEnemies - 1)) * maxRightPct;
+      const targetLeftPx = fxW - (fxW * targetRightPct / 100) - domW;
+      
+      cvs.style.left = '0px';
+      cvs.style.transform = 'translate(' + (fxW + 200) + 'px, 0px)';
+      cvs.style.transition = 'transform 0.6s ease-out';
+      cvs.style.zIndex = 100 - i;
+      
+      const ctx = cvs.getContext('2d');
+      drawEnemyPreview(ctx, e.id, cw, ch);
+      container.appendChild(cvs);
+      canvases.push({ cvs, id: e.id });
+      
+      states.push({ cvs, targetLeftPx });
+      
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          cvs.style.transform = 'translate(' + targetLeftPx + 'px, 0px)';
+        });
+      });
+    } catch(err) {
+      console.warn('[showEnemy] error item:', err);
+    }
+  }
+  fx.appendChild(container);
+  window._exploreEnemyStates = { container, states, fxW, fxH, charPx };
+  
+  const imgsToLoad = [];
+  for(let i=0; i<maxEnemies; i++) {
+    if(!BEAST_LAYERS[enemies[i].id]) {
+      imgsToLoad.push(getHeroImg('icons/items/ssh68.png'));
+      imgsToLoad.push(getHeroImg('icons/items/6b231.png'));
+      imgsToLoad.push(getHeroImg('icons/items/ak74.png'));
+    }
+  }
+  const uniqImgs = [...new Set(imgsToLoad)];
+  
+  if(uniqImgs.length > 0) {
+    let loadedCount = 0;
+    uniqImgs.forEach(img => {
+      if(img.complete) loadedCount++;
+      else img.addEventListener('load', () => loadedCount++);
+    });
+    
+    let lastCount = loadedCount;
+    const timer = setInterval(() => {
+      if(!container.parentNode) { clearInterval(timer); return; }
+      if(loadedCount > lastCount) {
+        lastCount = loadedCount;
+        canvases.forEach(c => {
+          const ctx = c.cvs.getContext('2d');
+          ctx.clearRect(0, 0, c.cvs.width, c.cvs.height);
+          drawEnemyPreview(ctx, c.id, c.cvs.width, c.cvs.height);
+        });
+      }
+      if(loadedCount >= uniqImgs.length) clearInterval(timer);
+    }, 100);
+  }
+}
+
+function _resolveExploreEnemyGraphics(victory, survivors) {
+  if(!window._exploreEnemyStates) return;
+  const { container, states, fxW, fxH, charPx } = window._exploreEnemyStates;
+  if(!container.parentNode) return;
+  const playerX = fxW * 0.25;
+  const playerY = fxH * 0.95 - charPx * 0.5;
+  setTimeout(() => {
+    states.forEach(st => {
+      const { cvs } = st;
+      if(!cvs.parentNode) return;
+      if(!victory && survivors && survivors.length > 0) {
+        const rect = cvs.getBoundingClientRect();
+        const fxRect = container.getBoundingClientRect();
+        const startX = rect.left - fxRect.left;
+        const startY = rect.top - fxRect.top + rect.height * 0.5;
+        for(let b=0; b<3; b++) {
+          setTimeout(() => {
+            const bullet = document.createElement('div');
+            bullet.className = 'explore-bullet';
+            bullet.style.width = '8px';
+            bullet.style.height = '8px';
+            bullet.style.background = '#ff3030';
+            bullet.style.boxShadow = '0 0 10px #ff0000';
+            bullet.style.left = startX + 'px';
+            bullet.style.top = startY + 'px';
+            bullet.style.transition = 'all 0.35s ease-in';
+            container.appendChild(bullet);
+            requestAnimationFrame(() => {
+              bullet.style.left = playerX + (Math.random()-0.5)*30 + 'px';
+              bullet.style.top = playerY + (Math.random()-0.5)*30 + 'px';
+              bullet.style.opacity = '0.2';
+            });
+            setTimeout(() => bullet.remove(), 400);
+          }, b * 100);
+        }
+        setTimeout(() => {
+          if(cvs.parentNode) {
+            cvs.style.transition = 'transform 0.6s ease-in, opacity 0.6s ease-in';
+            cvs.style.transform = 'translate(' + (fxW + 200) + 'px, 0px)';
+            cvs.style.opacity = '0';
+          }
+        }, 800);
+      } else if(victory) {
+        const rect = cvs.getBoundingClientRect();
+        const fxRect = container.getBoundingClientRect();
+        const cx = rect.left - fxRect.left + rect.width/2;
+        const cy = rect.top - fxRect.top + rect.height/2;
+        cvs.style.transition = 'opacity 0.2s';
+        cvs.style.opacity = '0';
+        for(let p=0; p<8; p++) {
+          const debris = document.createElement('div');
+          debris.style.position = 'absolute';
+          debris.style.width = (8 + Math.random()*8) + 'px';
+          debris.style.height = (8 + Math.random()*8) + 'px';
+          debris.style.background = '#804020';
+          debris.style.left = cx + 'px';
+          debris.style.top = cy + 'px';
+          debris.style.transform = 'translate(-50%,-50%)';
+          debris.style.zIndex = '11';
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 20 + Math.random() * 40;
+          container.appendChild(debris);
+          requestAnimationFrame(() => {
+            debris.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.4, 1)';
+            debris.style.left = (cx + Math.cos(angle)*dist) + 'px';
+            debris.style.top = (cy + Math.sin(angle)*dist) + 'px';
+            debris.style.opacity = '0';
+            debris.style.transform = 'translate(-50%,-50%) rotate(' + (Math.random()*360) + 'deg)';
+          });
+          setTimeout(() => debris.remove(), 550);
+        }
+      }
+    });
+  }, 1000);
+  setTimeout(() => {
+    container.style.opacity = '0';
+    setTimeout(() => { if(container.parentNode) container.remove(); }, 400);
+  }, 2500);
+}
+
 function playExploreCombatFx(slot, isMelee){
   let animName = 'fire_primary';
   if(slot === 'secondary') animName = 'fire_secondary';
@@ -1242,7 +1545,10 @@ function autoCombat(region,node,enemies){
     if(!choice.slot){pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 時 遭遇了 ${fmtEnemies(enemies)}，<span class="lose">手無寸鐵，只能逃跑。</span>`,[],'explore');return{victory:false,loot:[]};}
     const {slot,weapon,ammo}=choice;const def=weapon.def;
     const isMeleeWeapon = def.slot === 'melee';
-    if(!_offlineMode) playExploreCombatFx(slot, isMeleeWeapon);
+    if(!_offlineMode) {
+      _showExploreEnemyGraphics(enemies);
+      setTimeout(() => playExploreCombatFx(slot, isMeleeWeapon), 800);
+    }
     addProf(slot,0.1);if(def.type)addProf(def.type,0.1);
     const ec=enemies.length;let bulletsUsed=0,hits=0,dmgDealt=0,crits=0;
     let mode='點射',rounds=1;
@@ -1362,6 +1668,10 @@ function autoCombat(region,node,enemies){
       }
     }
     const reallyVictory=remaining.every(e=>e.hp<=0)&&hits>0;
+    if(!_offlineMode) {
+      const _survivors = remaining.filter(e => e.hp > 0);
+      _resolveExploreEnemyGraphics(reallyVictory, _survivors);
+    }
     const ammoTxt=def.cal?`消耗 ${ammo.def.name}子彈${bulletsUsed}發`:(def.explosive?`投出 ${def.name}×1`:'');
     const isMelee=def.slot==='melee';
     const meleeHits=isMelee?getMeleeHits(def.rpm):0;

@@ -742,9 +742,10 @@ function _gardenComputeCellSize(box, cols){
   return cellSize;
 }
 
-function _gsBlockEx(title, colKey, items, minCells, fallbackIcon, cellStyle, fontStyle){
+function _gsBlockEx(title, colKey, items, minCells, fallbackIcon, cellSize, fontStyle){
   const total = Math.max(minCells, items.length);
   const rowsCount = Math.ceil(total / 4);
+  const cellStyle = 'width:' + cellSize + 'px;height:' + cellSize + 'px;min-width:' + cellSize + 'px;min-height:' + cellSize + 'px;flex:0 0 auto;';
   let html = '<div class="gs-col">';
   if(title) html += '<div class="gs-title">' + title + '</div>';
   html += '<div class="gs-wrap" data-col="' + colKey + '">';
@@ -757,13 +758,9 @@ function _gsBlockEx(title, colKey, items, minCells, fallbackIcon, cellStyle, fon
         if(it){
           let icon;
           if(typeof SEEDS !== 'undefined' && SEEDS[it.id]){
-            const _mw = /width:(\d+)px/.exec(cellStyle || '');
-            const _cp = _mw ? parseInt(_mw[1], 10) : 20;
-            icon = seedImgHtml(it.id, Math.floor(_cp * 0.7));
+            icon = seedImgHtml(it.id, Math.floor(cellSize * 0.7));
           } else if(typeof CROPS !== 'undefined' && CROPS[it.id]){
-            const _mw2 = /width:(\d+)px/.exec(cellStyle || '');
-            const _cp2 = _mw2 ? parseInt(_mw2[1], 10) : 20;
-            icon = cropImgHtml(it.id, Math.floor(_cp2 * 0.7));
+            icon = cropImgHtml(it.id, Math.floor(cellSize * 0.7));
           } else {
             icon = fallbackIcon || (it.def && it.def.icon) || '?';
           }
@@ -810,8 +807,8 @@ function renderGardenStorage(box){
     const prevSeeds = (typeof window._gsScrollSeeds === 'number') ? window._gsScrollSeeds : 0;
     const prevCrops = (typeof window._gsScrollCrops === 'number') ? window._gsScrollCrops : 0;
     let html = '<div class="gs-cols">';
-    html += _gsBlockEx('', 'seeds', seeds, MIN_CELLS, '🌰', cellStyle, fontStyle);
-    html += _gsBlockEx('', 'crops', crops, MIN_CELLS, null, cellStyle, fontStyle);
+    html += _gsBlockEx('', 'seeds', seeds, MIN_CELLS, '🌰', cellSize, fontStyle);
+    html += _gsBlockEx('', 'crops', crops, MIN_CELLS, null, cellSize, fontStyle);
     html += '</div>';
     box.innerHTML = html;
     { const _w = box.querySelector('.gs-wrap[data-col="seeds"]');
@@ -848,6 +845,7 @@ const MERCHANT_INTERVAL_MS = 300000;
 const GARDEN_MEAL_INTERVAL_MS = 3600000;
 const GUARD_STAMINA_DRAIN_PER_HOUR = 120;
 const FOOD_COST_BASE = { full: 20, normal: 15, half: 10, lick: 5, starve: 0 };
+const FOOD_COST_PER_HOUR = { full: 3, normal: 2, half: 1, lick: 0.5, starve: 0 };
 const RARITY_FOOD_MULT = { '破舊': 0.8, '一般': 1, '庫存': 1.5, '精品': 2.5, '傳奇': 5 };
 const MERCHANT_FOOD_TABLE = {
   0: { cropValue: 0 },
@@ -1126,14 +1124,7 @@ function _gardenMerchantLineProcess(lineKey, atTime){
   const g = _gardenMerchantInit();
   const m = g.merchant;
   const now = (typeof atTime === 'number' && Number.isFinite(atTime)) ? atTime : Date.now();
-  function lineCfg(){
-    if(lineKey === 'food') return { lvKey:'foodLv', lastKey:'lastFood', table:MERCHANT_FOOD_TABLE };
-    if(lineKey === 'seed') return { lvKey:'seedLv', lastKey:'lastSeed', table:MERCHANT_SEED_TABLE };
-    if(lineKey === 'throw') return { lvKey:'throwLv', lastKey:'lastThrow', table:MERCHANT_THROW_TABLE };
-    if(lineKey === 'ammo') return { lvKey:'ammoLv', lastKey:'lastAmmo', table:MERCHANT_AMMO_TABLE };
-    return null;
-  }
-  const L = lineCfg();
+  const L = _gardenMerchantLineMeta(lineKey);
   if(!L) return false;
   let lv = m[L.lvKey];
   if(typeof lv !== 'number' || !Number.isFinite(lv) || lv < 0 || Math.floor(lv) !== lv){
@@ -1309,11 +1300,10 @@ function _gardenFoodStats(){
   let food = Number(g.food);
   if(!isFinite(food)) food = 0;
   let consume = 0;
-  const FOOD_COST = { full:3, normal:2, half:1, lick:0.5, starve:0 };
   const servants = state.servants || [];
   for(const s of servants){
     if(!s.assignedPlots || !s.assignedPlots.length) continue;
-    consume += (FOOD_COST[s.foodPolicy || 'normal'] || 0) * 60;
+    consume += (FOOD_COST_PER_HOUR[s.foodPolicy || 'normal'] || 0) * 60;
   }
   /* rev324: 产线食物消耗（传奇投掷物 + 传奇弹药线） */
   let lineConsume = 0;
@@ -1452,7 +1442,7 @@ const MERCHANT_TRADE_ITEMS = [
     { id: 'red_soil',   name: '紅土地', desc: '生长<span style="color:#e05252">↓40%</span> 产量<span style="color:#4caf50">↑30%</span>', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
   ]},
   { category: '補給', items: [
-    { id: 'ammo_supply', name: '彈藥補給', desc: '庫存彈藥×30', price: 100, rarity: '庫存', itemIconId: '5.45_ps', stackable: true },
+    { id: 'ammo_supply', name: '彈藥補給', desc: '庫存彈藥×30', price: 100, rarity: '庫存', imgIcon: 'ammo_pack', stackable: true },
     { id: 'medkit',      name: '傳奇急救包', desc: '傳奇急救包×1', price: 800, rarity: '傳奇', itemIconId: 'ifak',      stackable: true }
   ]}
 ];
@@ -2510,7 +2500,8 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
   const TYPE_COLORS = {
     farmer:  { body: '#5a9a48', legs: '#3a6a2e' },
     guard:   { body: '#5088bb', legs: '#2e4a6a' },
-    foreman: { body: '#e0a830', legs: '#d8d0c0' }
+    foreman: { body: '#e0a830', legs: '#d8d0c0' },
+    enemy:   { body: '#8b2a2a', legs: '#3a1010' }
   };
   const _colors = servantType ? TYPE_COLORS[servantType] : null;
   if(_colors){
@@ -2639,50 +2630,68 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
   }
 }
 
-function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, weaponId){
-  const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
-  const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  const B = { x: 30, y: 30, w: 340, h: 460 };
-  const ORIG_FOOT_X = 200;
-  const ORIG_FOOT_Y = 515;
-  const COLOR_MAP = {
-    right_leg: '#3a1a1a',
-    left_leg:  '#3a1a1a',
-    torso:     '#7a2828',
-    head:      '#a07878',
-    face:      '#906868',
-    back_arm:  '#4a2020',
-    front_arm: '#5a2828'
-  };
-  ctx.save();
-  ctx.translate(px, py);
-  ctx.scale(-scale, scale);
-  ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
-  const units = [];
-  for(const L of GAME_LAYERS) units.push({ z: L.z, kind: 'layer', layer: L });
-  if(weaponId){
-    const cfg = getWeaponCfg('primary', weaponId);
-    if(cfg){
-      const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
-      if(layerDef){
-        const img = getHeroImg('icons/items/' + resolveIconId(weaponId) + '.png');
-        units.push({ z: layerDef.z - 0.5, kind: 'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img: img, trim: cfg.trim });
+
+
+
+
+function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, weaponId, enemyId){
+  if(typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[enemyId]) {
+    const def = BEAST_LAYERS[enemyId];
+    const bounds = getBeastBounds(def);
+    if(bounds) {
+      const targetVisualH = 386 * 0.9;
+      const actualScale = (targetVisualH * scale) / bounds.h;
+      
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(actualScale, actualScale);
+      
+      const centerX = (bounds.minX + bounds.maxX) / 2;
+      const bottomY = bounds.maxY;
+      ctx.translate(-centerX, -bottomY);
+      
+      const world = resolveBossWorld(def, { keys:{} }, 0);
+      const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
+      for(const L of sorted) {
+        const wp = world[L.id];
+        const w = def.canvas.w * L.w;
+        const h = def.canvas.h * L.h;
+        const ppx = w * L.pivot.x;
+        const ppy = h * L.pivot.y;
+        ctx.save();
+        ctx.translate(wp.wx, wp.wy);
+        ctx.rotate((L.rot || 0) * BOSS_DEG2RAD);
+        ctx.translate(-ppx, -ppy);
+        
+        if(L.id.indexOf('eye') === 0) {
+          ctx.shadowColor = '#ff0000';
+          ctx.shadowBlur = 15;
+        }
+        
+        ctx.fillStyle = L.color;
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, w - 2, h - 2);
+        ctx.restore();
       }
+      ctx.restore();
+      return;
     }
   }
-  units.sort(function(a, b){ return a.z - b.z; });
-  for(const u of units){
-    if(u.kind === 'layer'){
-      const old = u.layer.color;
-      u.layer.color = COLOR_MAP[u.layer.id] || old;
-      drawBodyLayer(ctx, u.layer, B, anim, fi);
-      u.layer.color = old;
-    } else {
-      drawEqLayer(ctx, u, B, anim, fi);
-    }
+  
+  // 人形怪：傳入真實裝備與配色
+  if(typeof _raidDrawHuman === 'function') {
+    const _eq = { head: 'ssh68', top: '6b231', primary: 'ak74' };
+    const _rar = { head: '一般', top: '一般', primary: '一般' };
+    _raidDrawHuman(ctx, px, py, scale, _eq, _rar, animName, frameIdx, 'primary', 'enemy', true, false, null);
+    return;
   }
-  ctx.restore();
 }
+
+
+
+
 
 /* ===== rev238: 腐烂 / 堆肥 / 弹药回退 ===== */
 function _gardenHasPlotType(type){
@@ -2964,6 +2973,7 @@ function _lootHtml(items, color){
     return '<span style="color:' + _c + '">' + it.name + '×' + it.count + '</span>';
   }).join(' ');
 }
+
 function _gardenRaidShowBattle(guards, enemies, region){
   const page = document.getElementById('garden-page');
   if(!page) return;
@@ -3006,6 +3016,9 @@ function _gardenRaidShowBattle(guards, enemies, region){
     overlay.className = 'raid-overlay';
     overlay.innerHTML = '<canvas class="raid-canvas" id="raid-canvas"></canvas>';
     wrap.appendChild(overlay);
+    
+    // 隐藏原本的仆人画布，防止固定守卫重叠
+    
 
     const canvas = overlay.querySelector('#raid-canvas');
     const dpr = window.devicePixelRatio || 1;
@@ -3116,7 +3129,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
         id: e.id, name: e.name,
         dmg: e.dmg || 10, pen: e.pen || 0, armorLevel: e.armorLevel || 1,
         rpm: 300,
-        x: _colX, y: _y,
+        x: wrapW + 120, targetX: _colX, slideIn: false, y: _y,
         hp: e.maxHp, maxHp: e.maxHp,
         armor: 0, maxArmor: 0,
         alive: true, isGuard: false,
@@ -3139,8 +3152,25 @@ function _gardenRaidShowBattle(guards, enemies, region){
       }
     }
 
-    function drawUnit(u, now){
+    function _spawnRaidDeathFx(x, y){
+  if(typeof window._raidParticles === 'undefined') window._raidParticles = [];
+  for(let i=0; i<8; i++){
+    window._raidParticles.push({
+      x: x, y: y - CHAR_PX/2,
+      vx: (Math.random()-0.5)*150, vy: (Math.random()-0.8)*150,
+      life: 1.0, color: '#804020', size: 6 + Math.random()*8
+    });
+  }
+}
+
+function drawUnit(u, now){
+      if(!u.alive) return;
       tickAnim(u, now);
+      if(!u.alive){
+        const age = now - (u.deadTime || now);
+        if(age > 1000) return;
+        ctx.globalAlpha = Math.max(0, 1 - age / 1000);
+      }
       let ox = 0;
       if(now < u.hurtUntil){
         const t = 1 - (u.hurtUntil - now) / 220;
@@ -3151,7 +3181,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
       if(u.isGuard){
         _raidDrawHuman(ctx, u.x + ox, u.y, SCALE, u.equipped, u.equippedRarity, u.animName, u.animFrame, u.weaponSlot, false);
       } else {
-        _raidDrawEnemy(ctx, u.x + ox, u.y, SCALE, u.animName, u.animFrame, u.weaponId || 'ak74');
+        _raidDrawEnemy(ctx, u.x + ox, u.y, SCALE, u.animName, u.animFrame, u.weaponId || 'ak74', u.id);
       }
       ctx.restore();
       const barW = 34, barH = 4;
@@ -3218,10 +3248,24 @@ function _gardenRaidShowBattle(guards, enemies, region){
       if(!page.querySelector('#raid-overlay')) return;
       ctx.clearRect(0, 0, wrapW, wrapH);
       const now = Date.now();
+      
+      for(const u of enemyUnits) { if (u.slideIn) { const diff = u.x - u.targetX; if (diff > 1) u.x -= diff * 0.12; else { u.x = u.targetX; u.slideIn = false; } } }
+
       for(let i = damageTexts.length - 1; i >= 0; i--){
         if(now - damageTexts[i].startTime > MAX_DMG_AGE) damageTexts.splice(i, 1);
       }
-      for(const u of guardUnits) drawUnit(u, now);
+      for(const u of guardUnits) {
+    if (!u.alive) continue;
+    const barW = 34, barH = 4;
+    const bx = u.x - barW / 2;
+    const by = u.y - CHAR_PX - 8;
+    ctx.fillStyle = 'rgba(0,0,0,.75)';
+    ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
+    ctx.fillStyle = '#1a1010';
+    ctx.fillRect(bx, by, barW, barH);
+    ctx.fillStyle = '#4caf50';
+    ctx.fillRect(bx, by, barW * Math.max(0, u.hp / u.maxHp), barH);
+  }
       for(const u of enemyUnits) drawUnit(u, now);
       for(const b of bullets) drawBullet(b);
       for(const d of damageTexts) drawDamage(d, now);
@@ -3340,8 +3384,10 @@ function _gardenRaidShowBattle(guards, enemies, region){
         }, 180 / speedRef.v);
         damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 18, text: '-' + shown + (crit ? '!' : ''), crit: crit, isEnemy: isEnemy, startTime: Date.now() });
         addLog(fromU.name + ' → ' + toU.name + '：-' + shown + (crit ? '!暴擊' : ''), isEnemy ? 'enemy' : 'ally');
-        if(toU.hp <= 0){
+        if(toU.hp <= 0) {
           toU.alive = false;
+          
+          
           toU.animName = 'idle'; toU.animFrame = 0;
           damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 30, text: isEnemy ? '☠' : '✖', crit: false, isEnemy: isEnemy, startTime: Date.now() });
           addLog((isEnemy ? '☠ ' : '✖ ') + toU.name + ' 倒下', isEnemy ? 'kill' : 'down');
@@ -3354,7 +3400,13 @@ function _gardenRaidShowBattle(guards, enemies, region){
     async function run(){
       try {
         addLog('⚔️ 戰鬥開始 · ' + region, 'round');
-        await sleep(500);
+        
+        // rev398: 触发怪物滑入
+        for(const u of enemyUnits) { u.slideIn = true; }
+        await sleep(700); // 等待滑入完成
+        
+        // 重置回合计时，防止滑入期间过早攻击
+        battleStartTime = Date.now();
         let round = 0;
         const maxRounds = 30;
         while(guardsAlive() && enemiesAlive() && round < maxRounds){
@@ -3409,8 +3461,10 @@ function _gardenRaidShowBattle(guards, enemies, region){
         addLog(win ? '⚔️ 防禦成功' : '💀 後院失守', win ? 'win' : 'lose');
         await sleep(700 / speedRef.v);
 
-        const ov = page.querySelector('#raid-overlay');
-        if(ov) ov.remove();
+        
+
+      const ov = page.querySelector('#raid-overlay');
+      if(ov) ov.remove();
 
         const sim = {
           log: logEntries,
@@ -3430,6 +3484,9 @@ function _gardenRaidShowBattle(guards, enemies, region){
         window._raidLiveActive = false;
         const ov = page.querySelector('#raid-overlay');
         if(ov) ov.remove();
+        
+        // 恢复原本的仆人画布
+        
         if(typeof renderGardenContent === 'function') renderGardenContent();
       }
     }
@@ -4107,6 +4164,9 @@ function _gardenActorTick(){
     }
     // 守衛：体力 > 0 站哨塔，体力 = 0 偷懒
     if(a.type === 'guard'){
+      if(window._raidLiveActive) animName = 'fire_primary';
+      else animName = 'idle';
+      /* 下面保留原逻辑 */
       if(a.stamina <= 0){
         if(!a.restPos){
           const gridRect = grid.getBoundingClientRect();
@@ -4380,40 +4440,10 @@ function _gardenGetActorCanvas(){
   return canvas;
 }
 
-/* 農民：一根木棍 */
-function _drawFarmTool(ctx, cx, footY, charH, flipX){
-  const dir = flipX ? -1 : 1;
-  const x = cx + dir * charH * 0.26;
-  const y1 = footY - charH * 0.20;
-  const y2 = footY - charH * 0.90;
-  ctx.save();
-  ctx.strokeStyle = '#7a5020';
-  ctx.lineWidth = Math.max(2, charH * 0.045);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x, y1);
-  ctx.lineTo(x + dir * charH * 0.05, y2);
-  ctx.stroke();
-  ctx.restore();
-}
 
-/* 監工：一個藍色長方形 */
-function _drawClipboard(ctx, cx, footY, charH, flipX){
-  const dir = flipX ? -1 : 1;
-  const w = charH * 0.20;
-  const h = charH * 0.26;
-  const x = cx + dir * charH * 0.26 - w / 2;
-  const y = footY - charH * 0.55;
-  ctx.save();
-  ctx.fillStyle = '#3a78c8';
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#1a3a6a';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, w, h);
-  ctx.restore();
-}
 
 function _gardenRenderActors(now){
+  
   const p = document.getElementById('garden-page');
   if(!p) return;
   const wrap = p.querySelector('.gp-grid-wrap');
@@ -4464,6 +4494,7 @@ function _gardenRenderActors(now){
     if(_moving) animName = 'walk';
     else if(a.state === 'work') animName = 'fire_primary';
     else animName = 'idle';
+    if(window._raidLiveActive && a.type === 'guard'){ animName = 'fire_primary'; }
     const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
     if(!a._animStart || a._animName !== animName){
       a._animStart = now;
@@ -4496,10 +4527,11 @@ function _gardenRenderActors(now){
     else if(a.type === 'farmer') _handItem = 'stick';
     else if(a.type === 'foreman') _handItem = 'clipboard';
     /* rev361: 朝向記憶，只在有明顯位移時才更新，防止原地抽搐 */
-    if(Math.abs(a.tx - a.x) > 2){
+    if(Math.abs(a.tx - a.x) > 2 && !window._raidLiveActive){
       a._facingLeft = (a.tx - a.x) < 0;
     }
-    const _facingLeft = (typeof a._facingLeft === 'boolean') ? a._facingLeft : false;
+    let _facingLeft = (typeof a._facingLeft === 'boolean') ? a._facingLeft : false;
+    if(window._raidLiveActive && a.type === 'guard'){ _facingLeft = false; }
     _raidDrawHuman(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, _facingLeft, _hasBucket, _handItem);
     if(a._srv){
       const _lbl = servantLabel(a._srv);
@@ -4624,6 +4656,7 @@ function openGarden(){
   renderGardenTabs();
   renderGardenContent();
   p.classList.add('on');
+  
   setTimeout(function(){
     try{
       const _r = (typeof _gardenStorageRotCheck === 'function') ? _gardenStorageRotCheck() : null;
@@ -5363,16 +5396,15 @@ function _logItem(id, rarity, count, isFood){
   const cursor = clickable ? '' : ' style="cursor:default"';
   return '<div class="item-row"' + attrs + cursor + '><div class="icon" style="background:' + rarityBg(rarity) + '">' + icon + '</div><div class="info"><div class="nm ' + rarityClass(rarity) + '">' + def.name + '</div><div class="sub">' + rarity + '</div></div><div class="cnt">×' + count + '</div></div>';
 }
-function _logBind(bd, entry){
+function _bindGardenLogItems(bd, entry){
   const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
   for(let _i = 0; _i < _hds.length; _i++){
     (function(h){
       h.onclick = function(){
         if(!window._gLogCollapsed) window._gLogCollapsed = {};
-        const _k = h.getAttribute('data-gcat');
-        window._gLogCollapsed[_k] = !window._gLogCollapsed[_k];
-        closeModal();
-        _openGardenLogDetail(entry);
+        const _kk = h.getAttribute('data-gcat');
+        window._gLogCollapsed[_kk] = !window._gLogCollapsed[_kk];
+        closeModal(); _openGardenLogDetail(entry);
       };
     })(_hds[_i]);
   }
@@ -5436,28 +5468,7 @@ function _openMerchantBatchDetail(entry){
   ft.className = 'modal-ft';
   ft.innerHTML = '';
   const bd = openModal({ title: '產線結算', body: body, footer: ft });
-  const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
-  for(let _i = 0; _i < _hds.length; _i++){
-    (function(h){
-      h.onclick = function(){
-        if(!window._gLogCollapsed) window._gLogCollapsed = {};
-        const _kk = h.getAttribute('data-gcat');
-        window._gLogCollapsed[_kk] = !window._gLogCollapsed[_kk];
-        closeModal(); _openGardenLogDetail(entry);
-      };
-    })(_hds[_i]);
-  }
-  const _rows = bd.querySelectorAll('.item-row[data-iid]');
-  for(let _i = 0; _i < _rows.length; _i++){
-    (function(row){
-      row.onclick = function(){
-        const iid = row.getAttribute('data-iid');
-        const irar = row.getAttribute('data-irar');
-        closeModal();
-        openItemDetail(iid, irar, function(){ _openGardenLogDetail(entry); });
-      };
-    })(_rows[_i]);
-  }
+  _bindGardenLogItems(bd, entry);
 }
 
 /* 離線後院彈窗（含產線分類） */
@@ -5505,28 +5516,7 @@ function _openOfflineGardenDetail(entry){
   ft.className = 'modal-ft';
   ft.innerHTML = '';
   const bd = openModal({ title: '離線後院', body: body, footer: ft });
-  const _hds = bd.querySelectorAll('.cat-header[data-gcat]');
-  for(let _i = 0; _i < _hds.length; _i++){
-    (function(h){
-      h.onclick = function(){
-        if(!window._gLogCollapsed) window._gLogCollapsed = {};
-        const _kk = h.getAttribute('data-gcat');
-        window._gLogCollapsed[_kk] = !window._gLogCollapsed[_kk];
-        closeModal(); _openGardenLogDetail(entry);
-      };
-    })(_hds[_i]);
-  }
-  const _rows = bd.querySelectorAll('.item-row[data-iid]');
-  for(let _i = 0; _i < _rows.length; _i++){
-    (function(row){
-      row.onclick = function(){
-        const iid = row.getAttribute('data-iid');
-        const irar = row.getAttribute('data-irar');
-        closeModal();
-        openItemDetail(iid, irar, function(){ _openGardenLogDetail(entry); });
-      };
-    })(_rows[_i]);
-  }
+  _bindGardenLogItems(bd, entry);
 }
 
 function _openBattleLogDetail(entry){

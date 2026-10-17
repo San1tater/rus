@@ -295,11 +295,10 @@ function renderBaseStats(){
   }
   const g = _gardenMerchantInit();
   const m = g.merchant;
-  const FOOD_COST = { full:3, normal:2, half:1, lick:0.5, starve:0 };
   let consumePerHour = 0;
   for(const s of (state.servants || [])){
     if(!s.assignedPlots || !s.assignedPlots.length) continue;
-    consumePerHour += (FOOD_COST[s.foodPolicy || 'normal'] || 0) * 60;
+    consumePerHour += (FOOD_COST_PER_HOUR[s.foodPolicy || 'normal'] || 0) * 60;
   }
   if(m.foodLv > 0){
     const prod = MERCHANT_FOOD_TABLE[m.foodLv].cropValue * 12;
