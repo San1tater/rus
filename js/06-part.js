@@ -115,7 +115,80 @@ const GARDEN_PLOT_TYPES = {
   shed:    { name: '工棚',   icon: '🛖', desc: '容納一個監工' },
   compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物' }
 ,
-  fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h' }};
+  fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h' },
+  black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 -20%，產量 +20%' },
+  red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 -40%，產量 +30%' }};
+const SPECIAL_SOIL_BONUS = {
+  soil:       { grow: 0,    yield: 0 },
+  black_soil: { grow: 0.20, yield: 0.20 },
+  red_soil:   { grow: 0.40, yield: 0.30 }
+};
+function _isSoilType(t){ return t === 'soil' || t === 'black_soil' || t === 'red_soil'; }
+function _getSoilBonus(t){ return SPECIAL_SOIL_BONUS[t] || SPECIAL_SOIL_BONUS.soil; }
+function _getPlotTypeIconHtml(type, size, flexNone){
+  const _flex = flexNone ? ';flex:0 0 auto' : '';
+  const _t = GARDEN_PLOT_TYPES[type];
+  if(!_t) return '<span style="font-size:' + size + 'px' + _flex + '">?</span>';
+  if(_t.imgIcon) return '<img src="icons/garden/' + _t.imgIcon + '.png' + assetSuffix() + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain' + _flex + '" alt="">';
+  return '<span style="font-size:' + size + 'px;line-height:1' + _flex + '">' + (_t.icon || '?') + '</span>';
+}
+function _getAvailableSoilTypes(currentType){
+  if(!state.garden || !state.garden.ownedSpecialSoil) return [];
+  return Object.keys(state.garden.ownedSpecialSoil).filter(function(t){
+    return state.garden.ownedSpecialSoil[t] && t !== currentType && _isSoilType(t);
+  });
+}
+function _getSpecialSoilBtnHtml(plot){
+  const avail = _getAvailableSoilTypes(plot.type);
+  if(!avail.length) return '';
+  return '<button class="btn" id="soil-apply" style="padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto;margin-left:6px">改造</button>';
+}
+function _applySpecialSoil(typeId){
+  const plots = _gardenGetPlots();
+  let cnt = 0;
+  for(let i = 0; i < plots.length; i++){
+    if(plots[i] && _isSoilType(plots[i].type)){
+      plots[i].type = typeId;
+      cnt++;
+    }
+  }
+  save();
+  renderGardenGrid();
+  renderGardenContent();
+  if(typeof _gardenUpdateFoodInfo === 'function') _gardenUpdateFoodInfo();
+  notify('已套用 ' + cnt + ' 塊土地');
+}
+function _openApplySoilDialog(typeId){
+  const names = { black_soil: '黑土地', red_soil: '紅土地' };
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn primary" id="m-apply">立即套用</button><button class="btn ghost" id="m-later">稍後</button>';
+  openModal({ title: '套用特殊土地', body: '<div style="font-size:12px;line-height:1.6">購買成功！是否立即將所有土地改造為 <b style="color:#e8a33d">' + (names[typeId] || typeId) + '</b>？</div>', footer: ft });
+  ft.querySelector('#m-apply').onclick = function(){ _applySpecialSoil(typeId); closeModal(); };
+  ft.querySelector('#m-later').onclick = closeModal;
+}
+function _openApplySpecificSoilDialog(idx){
+  const plots = _gardenGetPlots();
+  const plot = plots[idx];
+  if(!plot) return;
+  const avail = _getAvailableSoilTypes(plot.type);
+  if(!avail.length) return;
+  const names = { black_soil: '黑土地', red_soil: '紅土地' };
+  let body = '<div style="font-size:10px;color:#7a6f60;margin-bottom:8px">選擇要全局套用的土地類型（影響所有已種植的土地）。</div>';
+  for(const t of avail){
+    body += '<div class="item-row" data-tid="' + t + '"><div class="icon">' + _getPlotTypeIconHtml(t, 30) + '</div><div class="info"><div class="nm">' + (names[t] || t) + '</div><div class="sub">' + (GARDEN_PLOT_TYPES[t] ? GARDEN_PLOT_TYPES[t].desc : '') + '</div></div></div>';
+  }
+  const bd = openModal({ title: '選擇土地類型', body: body });
+  const rows = bd.querySelectorAll('.item-row[data-tid]');
+  for(let i = 0; i < rows.length; i++){
+    (function(row){
+      row.onclick = function(){
+        _applySpecialSoil(row.getAttribute('data-tid'));
+        closeModal();
+      };
+    })(rows[i]);
+  }
+}
 const GARDEN_TABS = [
   { id: 'log',      label: '📜 日誌' },
   { id: 'storage',  label: '📦 儲備' },
@@ -168,6 +241,12 @@ function _ensureGardenPage(){
        導致 click 不派發。委託到 #garden-page 可從根源解決。 */
     const _et = e.target;
     if(_et && _et.closest){
+      /* rev326: 行內物品圖標優先處理（與探索日誌一致 → 直接跳物品詳情） */
+      const _itm = _et.closest('.itm');
+      if(_itm && _itm.dataset && _itm.dataset.iid){
+        if(typeof openItemDetail === 'function') openItemDetail(_itm.dataset.iid, _itm.dataset.irar || '一般');
+        return;
+      }
       const _logLine = _et.closest('.garden-log-line[data-log-idx]');
       if(_logLine){
         const _idx = parseInt(_logLine.getAttribute('data-log-idx'), 10);
@@ -297,7 +376,7 @@ function renderGardenGrid(){
     }
     if(plot && plot.type){
       const t = GARDEN_PLOT_TYPES[plot.type] || {name:'?', icon:'?'};
-      const isSoil = (plot.type === 'soil');
+      const isSoil = _isSoilType(plot.type);
       const st = (isSoil && plot.crop) ? _gardenCropStatus(plot, now) : null;
       if(st){
         let icon = t.icon, lbl = t.name, extraCls = '';
@@ -331,7 +410,7 @@ function onGardenPlotClick(idx){
   const plot = plots[idx];
   if(plot && plot.broken){ _gardenRepairConfirm(idx); return; }
   if(!plot){ openGardenPlotPicker(idx); return; }
-  if(plot.type === 'soil'){ openGardenSoilAction(idx); }
+  if(_isSoilType(plot.type)){ openGardenSoilAction(idx); }
   else if(plot.type === 'tower'){ _gardenTowerOpen(idx); }
   else if(plot.type === 'compost'){ openCompostDetail(idx); }
   else { openGardenPlotDetail(idx); }
@@ -359,7 +438,7 @@ function _gardenPlotOwnersHtml(idx, type){
     const color = pct <= 0 ? '#e05252' : (pct <= 30 ? '#e8741e' : (pct <= 70 ? '#e8a33d' : '#4caf50'));
     const tDef = SERVANT_TYPES[s.type] || {name:''};
     html += '<div class="owner-row">';
-    html += '<div class="tower-guard-btn" data-srv-id="' + s.id + '" style="background:' + rarityBg(s.rarity) + '">';
+    html += '<div class="tower-guard-btn" data-srv-id="' + s.id + '" data-plot-idx="' + idx + '" style="background:' + rarityBg(s.rarity) + '">';
     html += '<img class="tg-icon" src="' + _img + '" alt="">';
     html += '<div class="tg-name">' + servantLabel(s) + '</div>';
     html += '</div>';
@@ -459,8 +538,10 @@ function _gardenPlotOwnersBind(bd){
     (function(el){
       el.onclick = function(){
         const sid = el.getAttribute('data-srv-id');
+        const _pIdx = parseInt(el.getAttribute('data-plot-idx'), 10);
         closeModal();
-        setTimeout(function(){ openServantDetail(sid); }, 200);
+        const _returnFn = (isFinite(_pIdx) && _pIdx >= 0) ? function(){ onGardenPlotClick(_pIdx); } : null;
+        setTimeout(function(){ openServantDetail(sid, _returnFn); }, 200);
       };
     })(btns[i]);
   }
@@ -477,12 +558,16 @@ function _gardenPlotOwnersBind(bd){
   }
 }/* ===== end rev284 ===== */
 
-function openGardenPlotPicker(idx){
+function openGardenPlotPicker(idx, returnFn){
   const plots = _gardenGetPlots();
   const body = document.createElement('div');
   body.innerHTML = '<div style="font-size:11px;color:#e8a33d;margin-bottom:8px">選擇要建造的設施</div>';
+  /* rev326: 堆肥區 / 工棚為唯一建築，已存在則不再列出 */
+  const _UNIQUE_TYPES = { compost: true, shed: true };
   for(const key in GARDEN_PLOT_TYPES){
     const t = GARDEN_PLOT_TYPES[key];
+    if(t.special) continue;
+    if(_UNIQUE_TYPES[key] && _gardenHasPlotType(key)) continue;
     const row = document.createElement('div');
     row.className = 'item-row';
     row.setAttribute('data-type', key);
@@ -492,7 +577,8 @@ function openGardenPlotPicker(idx){
     row.innerHTML = '<div class="icon" style="font-size:20px">' + _iconHtml + '</div><div class="info"><div class="nm">' + t.name + '</div><div class="sub">' + t.desc + '</div></div>';
     body.appendChild(row);
   }
-  const bd = openModal({ title: plotCoordName(idx) + ' · 建造', body: body });
+  const _pickerOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
+  const bd = openModal({ title: plotCoordName(idx) + ' · 建造', body: body, onClose: _pickerOnClose });
   const rows = bd.querySelectorAll('.item-row[data-type]');
   for(let i = 0; i < rows.length; i++){
     (function(row){
@@ -511,7 +597,7 @@ function openGardenPlotPicker(idx){
 function openGardenSoilAction(idx){
   const plots = _gardenGetPlots();
   const plot = plots[idx];
-  if(!plot || plot.type !== 'soil') return;
+  if(!plot || !_isSoilType(plot.type)) return;
   const now = Date.now();
   _gardenSweep(now);
   const st = _gardenCropStatus(plot, now);
@@ -524,7 +610,7 @@ function openGardenSoilAction(idx){
   openGardenCropDetailWithRemove(idx, st);
 }
 
-function openGardenSeedPickerWithRemove(idx){
+function openGardenSeedPickerWithRemove(idx, returnFn){
   const plots = _gardenGetPlots();
   const plot = plots[idx];
   if(!plot) return;
@@ -561,7 +647,8 @@ function openGardenSeedPickerWithRemove(idx){
         '<div class="cnt">×' + s.count + '</div></div>';
     }
   }
-  const bd = openModal({ title: '土地配置', body: body });
+  const _seedOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
+  const bd = openModal({ title: '土地配置', body: body, onClose: _seedOnClose });
   const _del = bd.querySelector('#soil-del');
   if(_del) _del.onclick = function(){
     plots[idx] = null;
@@ -569,6 +656,10 @@ function openGardenSeedPickerWithRemove(idx){
     save(); closeModal();
     renderGardenGrid();
   };
+  const _ap1 = bd.querySelector('#soil-apply');
+  if(_ap1) _ap1.onclick = function(){ _openApplySpecificSoilDialog(idx); };
+  const _ap = bd.querySelector('#soil-apply');
+  if(_ap) _ap.onclick = function(){ closeModal(); _openApplySpecificSoilDialog(idx); };
   _gardenPlotOwnersBind(bd);
   const rows = bd.querySelectorAll('.item-row[data-sid]');
   for(let i = 0; i < rows.length; i++){
@@ -584,7 +675,7 @@ function openGardenSeedPickerWithRemove(idx){
 function gardenPlantSeed(idx, seedId, rarity){
   const plots = _gardenGetPlots();
   const plot = plots[idx];
-  if(!plot || plot.type !== 'soil') return;
+  if(!plot || !_isSoilType(plot.type)) return;
   if(plot.crop) return;
   const seed = SEEDS[seedId];
   if(!seed) return;
@@ -593,7 +684,8 @@ function gardenPlantSeed(idx, seedId, rarity){
     return;
   }
   const now = Date.now();
-  const growMs = seed.growMs;
+  const _sbG = _getSoilBonus(plot.type);
+  const growMs = Math.max(1000, Math.round(seed.growMs * (1 - _sbG.grow)));
   plot.crop = { seedId: seedId, rarity: rarity, plantedAt: now, matureAt: now + growMs, cleanupUntil: 0 };
   plot.lastSeed = seedId;
   plot.lastRarity = rarity;
@@ -612,7 +704,7 @@ function _gardenFertInfoHtml(plot){
   return '<span id="gp-fert-info" style="font-size:10px;color:#7ee07e;margin-left:8px;font-weight:normal">已施肥 · 約 ' + remainMin + ' 分鐘</span>';
 }
 
-function openGardenCropDetailWithRemove(idx, st){
+function openGardenCropDetailWithRemove(idx, st, returnFn){
   const plots = _gardenGetPlots();
   const plot = plots[idx];
   if(!plot) return;
@@ -638,7 +730,7 @@ function openGardenCropDetailWithRemove(idx, st){
   }
   const _st0 = _calcStatus();
   let body = '';
-  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold"><img style="width:28px;height:28px;object-fit:contain;flex:0 0 auto" src="icons/garden/soil.png' + assetSuffix() + '" alt=""><span>土地</span>' + _gardenFertInfoHtml(plot) + '<button class="btn danger" id="gp-act-remove" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
+  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold">' + _getPlotTypeIconHtml(plot.type, 28, true) + '<span>' + ((GARDEN_PLOT_TYPES[plot.type]||{}).name || '土地') + '</span>' + _gardenFertInfoHtml(plot) + _getSpecialSoilBtnHtml(plot) + '<button class="btn danger" id="gp-act-remove" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
   body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv || 1) + '</div>';
   body += _gardenPlotOwnersHtml(idx, 'farmer');
   body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px">當前作物</div>';
@@ -654,7 +746,8 @@ function openGardenCropDetailWithRemove(idx, st){
   body += '<button class="btn" id="gp-act-pull" ' + (canPull ? '' : 'disabled') + ' style="flex:1;padding:6px 12px;font-size:11px;opacity:' + (canPull ? '1' : '0.4') + '">拔除</button>';
   body += '<button class="btn" id="gp-act-clean" ' + (canClean ? '' : 'disabled') + ' style="flex:1;padding:6px 12px;font-size:11px;opacity:' + (canClean ? '1' : '0.4') + '">清理</button>';
   body += '</div>';
-  const bd = openModal({ title: '土地配置', body: body });
+  const _cropOnClose = function(){ if(window._gardenCropTimer){ clearInterval(window._gardenCropTimer); window._gardenCropTimer = null; } if(typeof returnFn === 'function'){ returnFn(); } else { closeModal(); } };
+  const bd = openModal({ title: '土地配置', body: body, onClose: _cropOnClose });
   window._gardenCropTimer = setInterval(function(){
     const _el = document.getElementById('gp-crop-status');
     if(!_el){ clearInterval(window._gardenCropTimer); window._gardenCropTimer = null; return; }
@@ -678,9 +771,11 @@ function openGardenCropDetailWithRemove(idx, st){
   if(_pb && canPull) _pb.onclick = function(){ plot.crop = null; save(); if(window._gardenCropTimer){ clearInterval(window._gardenCropTimer); window._gardenCropTimer = null; } closeModal(); renderGardenGrid(); renderGardenContent(); };
   const _cb = bd.querySelector('#gp-act-clean');
   if(_cb && canClean) _cb.onclick = function(){ gardenCleanup(idx); };
+  const _ap2 = bd.querySelector('#soil-apply');
+  if(_ap2) _ap2.onclick = function(){ closeModal(); _openApplySpecificSoilDialog(idx); };
   _gardenPlotOwnersBind(bd);
 }
-function openGardenPlotDetail(idx){
+function openGardenPlotDetail(idx, returnFn){
   const plots = _gardenGetPlots();
   const plot = plots[idx];
   if(!plot) return;
@@ -693,7 +788,8 @@ function openGardenPlotDetail(idx){
   } else if(plot.type === 'compost' || plot.type === 'fridge'){
     body += '<div style="font-size:11px;color:#7a6f60;line-height:1.6;padding:8px 0">' + (t.desc || '') + '</div>';
   }
-  const bd = openModal({ title: t.name, body: body });
+  const _plotOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
+  const bd = openModal({ title: t.name, body: body, onClose: _plotOnClose });
   const _del = bd.querySelector('#gp-del');
   if(_del) _del.onclick = function(){
     plots[idx] = null;
@@ -701,6 +797,8 @@ function openGardenPlotDetail(idx){
     save(); closeModal();
     renderGardenGrid();
   };
+  const _ap2 = bd.querySelector('#soil-apply');
+  if(_ap2) _ap2.onclick = function(){ _openApplySpecificSoilDialog(idx); };
   _gardenPlotOwnersBind(bd);
 }
 
@@ -1424,7 +1522,249 @@ function _gardenMerchantShowConfirm(lineKey, targetLv){
   };
 }
 
+/* rev325c: 商人交易系統 */
+const MERCHANT_TRADE_ITEMS = [
+  { category: '種子', items: [
+    { id: 'seed_stock',   name: '庫存種子包', desc: '隨機庫存稀有度種子 ×2', price: 50,   rarity: '庫存', icon: '🌰', stackable: true },
+    { id: 'seed_premium', name: '精品種子包', desc: '隨機精品稀有度種子 ×2', price: 200,  rarity: '精品', icon: '🌰', stackable: true },
+    { id: 'seed_legend',  name: '傳奇種子包', desc: '隨機傳奇稀有度種子 ×1', price: 1000, rarity: '傳奇', icon: '🌰', stackable: true }
+  ]},
+  { category: '特殊地塊', items: [
+    { id: 'black_soil', name: '黑土地', desc: '生長 -20%，產量 +20%。購買後可全局套用至所有土地。', price: 10000, rarity: '傳奇', imgIcon: 'black_soil', oneTime: true },
+    { id: 'red_soil',   name: '紅土地', desc: '生長 -40%，產量 +30%。購買後可全局套用至所有土地。', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
+  ]},
+  { category: '補給', items: [
+    { id: 'ammo_supply', name: '彈藥補給', desc: '隨機庫存稀有度彈藥 ×30', price: 100, rarity: '庫存', itemIconId: '5.45_ps', stackable: true },
+    { id: 'medkit',      name: '傳奇急救包', desc: 'IFAK 急救包（傳奇）×1', price: 800, rarity: '傳奇', itemIconId: 'ifak',      stackable: true }
+  ]}
+];
+
+
+
+function _tradeItemIconHtml(item, size){
+  if(item.imgIcon) return '<img src="icons/garden/' + item.imgIcon + '.png' + assetSuffix() + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain" alt="">';
+  if(item.itemIconId) return itemIcon(item.itemIconId, size);
+  return '<span style="font-size:' + Math.round(size * 0.85) + 'px;line-height:1">' + (item.icon || '📦') + '</span>';
+}
+
+function findTradeItem(id){
+  for(const cat of MERCHANT_TRADE_ITEMS){
+    for(const it of cat.items){ if(it.id === id) return it; }
+  }
+  return null;
+}
+
+function _isTradeOwned(item){
+  if(!item || !item.oneTime) return false;
+  return !!(state.garden && state.garden.ownedSpecialSoil && state.garden.ownedSpecialSoil[item.id]);
+}
+
+function renderTradeContent(){
+  if(!window._tradeSelectedId) window._tradeSelectedId = null;
+  if(!window._tradeQty) window._tradeQty = 1;
+  let html = '<div class="mrc-trade-wrap">';
+  html += '<div class="mrc-trade-left">';
+  html += '<div class="mrc-trade-grid">';
+  for(const cat of MERCHANT_TRADE_ITEMS){
+    for(const item of cat.items){
+      const sel = (window._tradeSelectedId === item.id) ? ' on' : '';
+      const owned = _isTradeOwned(item);
+      const ownedCls = owned ? ' owned' : '';
+      const bg = rarityBg(item.rarity || '一般');
+      html += '<div class="mrc-trade-cell' + sel + ownedCls + '" data-tid="' + item.id + '" style="background:' + bg + ' !important">';
+      html += '<div class="mrc-trade-cell-icon">' + _tradeItemIconHtml(item, 32) + '</div>';
+      html += '<div class="mrc-trade-cell-name">' + item.name + '</div>';
+      html += '<div class="mrc-trade-cell-price">' + (owned ? '✓ 已擁有' : ('🍲' + item.price)) + '</div>';
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  html += '</div>';
+  html += '<div class="mrc-trade-right" id="mrc-trade-right"></div>';
+  html += '</div>';
+  return html;
+}
+
+function renderTradeDetail(){
+  const el = document.getElementById('mrc-trade-right');
+  if(!el) return;
+  const item = findTradeItem(window._tradeSelectedId);
+  if(!item){
+    el.innerHTML = '<div class="mrc-td-empty">← 點擊左側商品<br>查看詳情</div>';
+    return;
+  }
+  const g = _gardenMerchantInit();
+  const food = g.food || 0;
+  const owned = _isTradeOwned(item);
+  const qty = item.stackable ? (window._tradeQty || 1) : 1;
+  const total = item.price * qty;
+  const canAfford = food >= total;
+  const bg = rarityBg(item.rarity || '一般');
+  let html = '';
+  html += '<div class="mrc-td-head">';
+  html += '<div class="mrc-td-icon" style="background:' + bg + ' !important">' + _tradeItemIconHtml(item, 36) + '</div>';
+  html += '<div class="mrc-td-info"><div class="mrc-td-name">' + item.name + '</div><div class="mrc-td-desc">' + item.desc + '</div></div>';
+  html += '</div>';
+  if(owned){
+    html += '<div class="mrc-td-owned">✓ 已擁有（土地配置中可套用）</div>';
+    el.innerHTML = html;
+    return;
+  }
+  html += '<div class="mrc-td-qty-row">';
+  if(item.stackable){
+    html += '<div class="mrc-td-qty"><button class="mrc-td-qty-btn" data-qty="dec">−</button><span class="mrc-td-qty-val">' + qty + '</span><button class="mrc-td-qty-btn" data-qty="inc">＋</button></div>';
+  } else {
+    html += '<div></div>';
+  }
+  html += '<div class="mrc-td-total">🍲 ' + total + '</div>';
+  html += '</div>';
+  html += '<button class="mrc-td-buy" data-tid="' + item.id + '"' + (canAfford ? '' : ' disabled') + '>' + (canAfford ? '確認交易' : '食物不足') + '</button>';
+  el.innerHTML = html;
+  const qb = el.querySelectorAll('.mrc-td-qty-btn');
+  for(let i = 0; i < qb.length; i++){
+    (function(btn){
+      btn.onclick = function(){
+        const dec = btn.getAttribute('data-qty') === 'dec';
+        let q = window._tradeQty || 1;
+        if(dec) q = Math.max(1, q - 1); else q = Math.min(99, q + 1);
+        window._tradeQty = q;
+        renderTradeDetail();
+      };
+    })(qb[i]);
+  }
+  const bb = el.querySelector('.mrc-td-buy');
+  if(bb && canAfford){ bb.onclick = function(){ buyTradeItem(item.id, qty); }; }
+}
+
+function buyTradeItem(itemId, qty){
+  qty = qty || 1;
+  const item = findTradeItem(itemId);
+  if(!item) return;
+  if(_isTradeOwned(item)) return;
+  const g = _gardenMerchantInit();
+  const total = item.price * qty;
+  if((g.food || 0) < total) return;
+  g.food -= total;
+  const got = [];
+  let extraActions = null;
+  if(item.oneTime){
+    if(!state.garden.ownedSpecialSoil) state.garden.ownedSpecialSoil = {};
+    state.garden.ownedSpecialSoil[item.id] = true;
+    got.push({
+      imgSrc: 'icons/garden/' + item.imgIcon + '.png' + assetSuffix(),
+      rarity: item.rarity || '傳奇',
+      name: item.name,
+      count: 1
+    });
+    extraActions = [{ label: '立即套用', cls: 'primary', type: 'apply', soilType: item.id }];
+  } else if(item.id === 'ammo_supply'){
+    const ids = Object.keys(AMMO).filter(function(k){ return AMMO[k].rarity === '庫存'; });
+    const collected = {};
+    for(let q = 0; q < qty; q++){
+      if(!ids.length) break;
+      const aid = ids[Math.floor(Math.random() * ids.length)];
+      invAdd(aid, '庫存', 30);
+      if(!collected[aid]) collected[aid] = { id: aid, rarity: '庫存', count: 0 };
+      collected[aid].count += 30;
+    }
+    for(const k in collected) got.push(collected[k]);
+  } else if(item.id === 'medkit'){
+    invAdd('ifak', '傳奇', qty);
+    got.push({ id: 'ifak', rarity: '傳奇', count: qty });
+  } else if(item.id === 'seed_stock' || item.id === 'seed_premium' || item.id === 'seed_legend'){
+    const rarity = item.id === 'seed_stock' ? '庫存' : item.id === 'seed_premium' ? '精品' : '傳奇';
+    const cnt = item.id === 'seed_legend' ? 1 : 2;
+    const ids = Object.keys(SEEDS);
+    const collected = {};
+    for(let q = 0; q < qty; q++){
+      for(let i = 0; i < cnt; i++){
+        const sid = ids[Math.floor(Math.random() * ids.length)];
+        gardenStorageAdd(sid, rarity, 1);
+        const key = sid + '@' + rarity;
+        if(!collected[key]) collected[key] = { id: sid, rarity: rarity, count: 0 };
+        collected[key].count += 1;
+      }
+    }
+    for(const k in collected) got.push(collected[k]);
+  }
+  save();
+  /* rev325p: 先彈窗，後刷新 */
+  try { _openTradeResultDialog(got, item.name, extraActions); } catch(e){ console.warn('[trade result]', e); }
+  try { if(typeof _gardenUpdateFoodInfo === 'function') _gardenUpdateFoodInfo(); } catch(e){ console.warn('[trade foodinfo]', e); }
+  try { _refreshMerchantView(); } catch(e){ console.warn('[trade refresh]', e); }
+}
+
+function _openTradeResultDialog(gotItems, title, extraActions){
+  let body = '';
+  body += '<div class="detail-title" style="color:#4caf50">✓ 購買成功</div>';
+  body += '<div class="detail-sub">' + title + '</div>';
+  if(!gotItems || !gotItems.length){
+    body += '<div class="empty-hint">無獲得物品</div>';
+  } else {
+    for(const it of gotItems){
+      let iconHtml, nm, clickable;
+      if(it.imgSrc){
+        iconHtml = '<img src="' + it.imgSrc + '" style="width:30px;height:30px;object-fit:contain" alt="">';
+        nm = it.name || '?';
+        clickable = false;
+      } else {
+        const def = itemDef(it.id) || { name: it.id };
+        iconHtml = itemIcon(it.id, 30);
+        nm = def.name;
+        clickable = true;
+      }
+      const _attr = clickable ? (' data-iid="' + it.id + '" data-irar="' + (it.rarity || '一般') + '"') : '';
+      const _cur = clickable ? '' : ' style="cursor:default"';
+      body += '<div class="item-row"' + _attr + _cur + '><div class="icon" style="background:' + rarityBg(it.rarity || '一般') + '">' + iconHtml + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity || '一般') + '">' + nm + '</div><div class="sub">' + (it.rarity || '') + '</div></div><div class="cnt">×' + it.count + '</div></div>';
+    }
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  const aa = extraActions || [];
+  let ftHtml = '';
+  for(const a of aa){
+    ftHtml += '<button class="btn ' + (a.cls || '') + '" data-act-label="' + a.label + '">' + a.label + '</button>';
+  }
+  /* rev327: 移除 close 按鈕（X 已提供關閉） */
+  ft.innerHTML = ftHtml;
+  const _bd = openModal({ title: '購買結果', body: body, footer: ft });
+  /* rev326: 購買結果裡的物品圖標可點擊 → 物品詳情 */
+  const _rows = _bd.querySelectorAll('.item-row[data-iid]');
+  for(let _ri = 0; _ri < _rows.length; _ri++){
+    (function(_row){
+      _row.onclick = function(){
+        const _iid = _row.getAttribute('data-iid');
+        const _irar = _row.getAttribute('data-irar');
+        if(typeof openItemDetail === 'function'){
+          openItemDetail(_iid, _irar, function(){ _openTradeResultDialog(gotItems, title, extraActions); });
+        }
+      };
+    })(_rows[_ri]);
+  }
+  const btns = ft.querySelectorAll('button[data-act-label]');
+  for(let i = 0; i < btns.length; i++){
+    (function(btn){
+      btn.onclick = function(){
+        const label = btn.getAttribute('data-act-label');
+        if(label === 'close'){ closeModal(); return; }
+        const found = aa.find(function(a){ return a.label === label; });
+        if(found){
+          closeModal();
+          if(found.type === 'apply' && found.soilType){ _applySpecialSoil(found.soilType); }
+          else if(found.onClick){ found.onClick(); }
+        } else {
+          closeModal();
+        }
+      };
+    })(btns[i]);
+  }
+}
+
+
+
 function renderGardenMerchant(box){
+  if(!window._merchantMainTab) window._merchantMainTab = 'lines';
+  const curTab = window._merchantMainTab;
   const g = _gardenMerchantInit();
   const m = g.merchant;
   const now = Date.now();
@@ -1434,16 +1774,13 @@ function renderGardenMerchant(box){
     const lv = m[meta.lvKey] || 0;
     const last = m[meta.lastKey] || 0;
     const INTERVAL = MERCHANT_INTERVAL_MS;
-    const isValidLast = (typeof last === 'number' && Number.isFinite(last)
-      && last >= _MIN_VALID_TS && last % INTERVAL === 0);
+    const isValidLast = (typeof last === 'number' && Number.isFinite(last) && last >= _MIN_VALID_TS && last % INTERVAL === 0);
     let remain = 0, ready = false, pct = 0;
     if(lv > 0 && isValidLast){
       const nextTick = last + INTERVAL;
-      const remainMs = Math.max(0, nextTick - now);
-      remain = Math.ceil(remainMs / 1000);
+      remain = Math.ceil(Math.max(0, nextTick - now) / 1000);
       ready = now >= nextTick;
-      const elapsed = Math.max(0, now - last);
-      pct = Math.min(100, Math.max(0, (elapsed / INTERVAL) * 100));
+      pct = Math.min(100, Math.max(0, ((now - last) / INTERVAL) * 100));
     }
     const st = (lv > 0) ? _gardenMerchantLineStatus(lineKey) : null;
     const resourceOk = !st || !st.paused;
@@ -1453,16 +1790,9 @@ function renderGardenMerchant(box){
       else if(ready && !resourceOk) _cdText = '缺資源';
       else _cdText = remain + 's';
     }
-    let h = '<div class="mrc-card" data-line="' + lineKey + '">';
-    h += '<div class="mrc-head">';
-    h += '<div class="mrc-title">' + meta.icon + ' ' + meta.title + '</div>';
-    h += '<div class="mrc-cur-lv mrc-sub-btn" data-line="' + lineKey + '">' + (lv === 0 ? '訂閱' : 'Lv.' + lv) + '</div>';
-    h += '</div>';
+    let h = '<div class="mrc-card" data-line="' + lineKey + '"><div class="mrc-head"><div class="mrc-title">' + meta.icon + ' ' + meta.title + '</div><div class="mrc-cur-lv mrc-sub-btn" data-line="' + lineKey + '">' + (lv === 0 ? '訂閱' : 'Lv.' + lv) + '</div></div>';
     if(lv > 0){
-      h += '<div class="mrc-cd-row">';
-      h += '<div class="mrc-cd-bar"><div class="fill" style="width:' + pct + '%"></div></div>';
-      h += '<div class="mrc-cd-num">' + _cdText + '</div>';
-      h += '</div>';
+      h += '<div class="mrc-cd-row"><div class="mrc-cd-bar"><div class="fill" style="width:' + pct + '%"></div></div><div class="mrc-cd-num">' + _cdText + '</div></div>';
     } else {
       h += '<div class="mrc-cd-row mrc-cd-off">待機（點擊等級訂閱）</div>';
     }
@@ -1470,21 +1800,47 @@ function renderGardenMerchant(box){
     return h;
   }
   let html = '<div class="mrc-page">';
-  html += '<div class="mrc-cols">';
-  html += '<div class="mrc-col">' + lineBlock('food') + lineBlock('seed') + '</div>';
-  html += '<div class="mrc-col">' + lineBlock('throw') + lineBlock('ammo') + '</div>';
-  html += '</div>';
-  html += '</div>';
+  html += '<div class="mrc-subnav"><div class="mrc-subtab' + (curTab === 'lines' ? ' on' : '') + '" data-mtab="lines">產線</div><div class="mrc-subtab' + (curTab === 'trade' ? ' on' : '') + '" data-mtab="trade">交易</div></div>';
+  html += '<div class="mrc-wrap">';
+  if(curTab === 'lines'){
+    html += '<div class="mrc-cols"><div class="mrc-col">' + lineBlock('food') + lineBlock('seed') + '</div><div class="mrc-col">' + lineBlock('throw') + lineBlock('ammo') + '</div></div>';
+  } else {
+    html += renderTradeContent();
+  }
+  html += '</div></div>';
   box.innerHTML = html;
-  const btns = box.querySelectorAll('.mrc-sub-btn');
-  for(let i = 0; i < btns.length; i++){
+  const sub = box.querySelectorAll('.mrc-subtab');
+  for(let i = 0; i < sub.length; i++){
     (function(el){
-      el.onclick = function(){
-        const lineKey = el.getAttribute('data-line');
-        if(!lineKey) return;
-        _gardenMerchantShowPlans(lineKey);
-      };
-    })(btns[i]);
+      el.onclick = function(){ window._merchantMainTab = el.getAttribute('data-mtab'); renderGardenMerchant(box); };
+    })(sub[i]);
+  }
+  if(curTab === 'lines'){
+    const btns = box.querySelectorAll('.mrc-sub-btn');
+    for(let i = 0; i < btns.length; i++){
+      (function(el){
+        el.onclick = function(){ const lk = el.getAttribute('data-line'); if(lk) _gardenMerchantShowPlans(lk); };
+      })(btns[i]);
+    }
+  } else {
+    const cells = box.querySelectorAll('.mrc-trade-cell');
+    for(let i = 0; i < cells.length; i++){
+      (function(el){
+        el.onclick = function(){
+          const tid = el.getAttribute('data-tid');
+          if(!tid) return;
+          const item = findTradeItem(tid);
+          if(!item) return;
+          if(_isTradeOwned(item)) return;
+          window._tradeSelectedId = tid;
+          window._tradeQty = 1;
+          const _all = box.querySelectorAll('.mrc-trade-cell');
+          for(let j = 0; j < _all.length; j++){ _all[j].classList.toggle('on', _all[j].getAttribute('data-tid') === tid); }
+          renderTradeDetail();
+        };
+      })(cells[i]);
+    }
+    renderTradeDetail();
   }
 }
 
@@ -3187,7 +3543,7 @@ function renderGardenServants(box){
   _retry();
 }
 
-function openServantDetail(srvId){
+function openServantDetail(srvId, returnFn){
   const srv = (state.servants || []).find(function(s){ return s.id === srvId; });
   if(!srv) return;
   const def = SERVANT_TYPES[srv.type] || {name:'?', icon:'?', desc:''};
@@ -3260,7 +3616,8 @@ body += '<button class="btn danger" id="srv-dismiss" style="margin-left:auto;pad
   body += '<option value="starve">餓著（0%）</option>';
   body += '</select>';
   body += '<div style="font-size:9px;color:#5a5040;margin-top:4px;line-height:1.5">需與商人訂閱食物生產線後生效</div>';
-  const bd = openModal({ title: '僕人詳情', body: body, footer: ft });
+  const _detailOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
+  const bd = openModal({ title: '僕人詳情', body: body, footer: ft, onClose: _detailOnClose });
   const _wdBtn = ft.querySelector('#srv-withdraw');
   if(_wdBtn) _wdBtn.onclick = function(){
     const _list = srv.assignedPlots || [];
@@ -3304,8 +3661,8 @@ body += '<button class="btn danger" id="srv-dismiss" style="margin-left:auto;pad
     });
   };
   const _rnBtn = bd.querySelector('.srv-rename-btn');
-  if(_rnBtn) _rnBtn.onclick = function(){ closeModal(); openServantRename(srvId); };
-  ft.querySelector('#srv-assign').onclick = function(){ closeModal(); openServantAssign(srvId); };
+  if(_rnBtn) _rnBtn.onclick = function(){ closeModal(); openServantRename(srvId, returnFn); };
+  ft.querySelector('#srv-assign').onclick = function(){ closeModal(); openServantAssign(srvId, returnFn); };
   const apSel = bd.querySelector('#srv-auto-plant');
   if(apSel){
     apSel.value = srv.autoPlant || 'off';
@@ -3495,7 +3852,7 @@ function _gardenFarmerFindTask(a, srv){
   // 優先：清理腐爛
   for(const idx of a.assignedPlots){
     const plot = plots[idx];
-    if(!plot || plot.type !== 'soil' || !plot.crop) continue;
+    if(!plot || !_isSoilType(plot.type) || !plot.crop) continue;
     const c = plot.crop;
     const seed = SEEDS[c.seedId];
     if(!seed) continue;
@@ -3509,7 +3866,7 @@ function _gardenFarmerFindTask(a, srv){
   const _harvestCands = [];
   for(const idx of a.assignedPlots){
     const plot = plots[idx];
-    if(!plot || plot.type !== 'soil' || !plot.crop) continue;
+    if(!plot || !_isSoilType(plot.type) || !plot.crop) continue;
     const c = plot.crop;
     const seed = SEEDS[c.seedId];
     if(!seed) continue;
@@ -3526,7 +3883,7 @@ function _gardenFarmerFindTask(a, srv){
   if(autoPlant !== 'off'){
     for(const idx of a.assignedPlots){
       const plot = plots[idx];
-      if(!plot || plot.type !== 'soil') continue;
+      if(!plot || !_isSoilType(plot.type)) continue;
       if(plot.crop) continue;
       if(autoPlant === 'follow'){
         if(plot.lastSeed && plot.lastRarity && SEEDS[plot.lastSeed]){
@@ -3636,12 +3993,14 @@ function _gardenActorExecuteTask(a){
     const _foremanBonus = 1 + gardenGetForemanBonus();
     let count = Math.max(1, Math.round(seed.baseYield * mult * _farmerBonus * _foremanBonus * (0.8 + Math.random() * 0.4)));
     if(plot.fertilized && now < (plot.fertExpireAt || 0)){ count = Math.round(count * 1.3); }
+    const _sbH = _getSoilBonus(plot.type);
+    count = Math.max(1, Math.round(count * (1 + _sbH.yield)));
     plot.fertilized = false;
     plot.fertExpireAt = 0;
     gardenStorageAdd(seed.cropId, c.rarity, count);
     plot.crop = null;
     const cropDef = CROPS[seed.cropId];
-    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 收穫 <span class="r-' + c.rarity + '">' + (cropDef ? cropDef.name : '作物') + '×' + count + '</span>', 'harvest');
+    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 收穫 ' + (cropDef ? fmtItemSpan(seed.cropId, c.rarity, count) : ('<span class="r-' + c.rarity + '">作物×' + count + '</span>')), 'harvest');
     servantAddExp(srv, 5);
   } else if(a.task.type === 'cleanup'){
     if(!plot.crop) return;
@@ -3657,10 +4016,12 @@ function _gardenActorExecuteTask(a){
     const seed = SEEDS[seedId];
     if(!seed) return;
     const now = Date.now();
-    plot.crop = { seedId: seedId, rarity: rarity, plantedAt: now, matureAt: now + seed.growMs, cleanupUntil: 0 };
+    const _sbP = _getSoilBonus(plot.type);
+    const _growMs = Math.max(1000, Math.round(seed.growMs * (1 - _sbP.grow)));
+    plot.crop = { seedId: seedId, rarity: rarity, plantedAt: now, matureAt: now + _growMs, cleanupUntil: 0 };
     plot.lastSeed = seedId;
     plot.lastRarity = rarity;
-    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 種植 <span class="r-' + rarity + '">' + seed.name + '</span>', 'plant');
+    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 種植 ' + fmtItemSpan(seedId, rarity, 1), 'plant');
     servantAddExp(srv, 2);
   }
   srv.stamina = Math.max(0, (srv.stamina || 0) - GARDEN_STAMINA_PER_WORK);
@@ -4408,7 +4769,7 @@ function _gardenSoilFoodPerHour(){
   let ratePerHour = 0;
   let planted = 0;
   for(const p of plots){
-    if(!p || p.type !== 'soil' || !p.crop) continue;
+    if(!p || !_isSoilType(p.type) || !p.crop) continue;
     planted++;
     const seed = SEEDS[p.crop.seedId];
     if(!seed) continue;
@@ -4579,7 +4940,7 @@ function _openSoilDetail(){
   const now = Date.now();
   for(let i = 0; i < plots.length; i++){
     const p = plots[i];
-    if(!p || p.type !== 'soil' || !p.crop) continue;
+    if(!p || !_isSoilType(p.type) || !p.crop) continue;
     const seed = SEEDS[p.crop.seedId];
     if(!seed) continue;
     const mult = RARITY_MULT[p.crop.rarity] || 1;
@@ -5217,6 +5578,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
       const cropDef = CROPS[seed.cropId];
       gardenStorageAdd(seed.cropId, c.rarity, count);
       plot.crop = null;
+      _gardenLog('<span class="pl">玩家</span> 收穫 ' + fmtItemSpan(seed.cropId, c.rarity, count), 'harvest');
       save();
       try { closeModal(); } catch(e){}
       
@@ -5240,7 +5602,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
     } catch(e){ console.warn('[refresh servants] err', e); }
   };
 
-  window.openServantAssign = function(srvId){
+  window.openServantAssign = function(srvId, returnFn){
     const srv = (state.servants || []).find(function(s){ return s.id === srvId; });
     if(!srv) return;
     const def = SERVANT_TYPES[srv.type];
@@ -5260,7 +5622,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
         let disabled = false;
         if(!plot || !plot.type){
           cls += ' empty'; inner = '<div class="srv-sa-icon">＋</div>'; disabled = true;
-        } else if(plot.type !== def.targetPlot){
+        } else if(srv.type === 'farmer' ? !(plot.type === 'compost' || _isSoilType(plot.type)) : (plot.type !== def.targetPlot)){
           cls += ' mismatch';
           const t = GARDEN_PLOT_TYPES[plot.type] || {icon:'?'};
           inner = '<div class="srv-sa-icon">' + ((plot.type === 'soil') ? '🌱' : t.icon) + '</div>'; disabled = true;
@@ -5290,13 +5652,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
       const _hasCompost = newList.some(function(x){ return _plots[x] && _plots[x].type === 'compost'; });
       const _hasOther = newList.some(function(x){ return _plots[x] && _plots[x].type !== 'compost'; });
       let _finalList = newList;
-      if(_hasCompost && _hasOther){
-        _finalList = newList.filter(function(x){ return _plots[x] && _plots[x].type === 'compost'; });
-        for(const k in selected){
-          const _i = parseInt(k, 10);
-          if(selected[k] && _plots[_i] && _plots[_i].type !== 'compost') delete selected[k];
-        }
-      }
+      /* rev327: 混选冲突改由 cell click 弹确认处理 */
       for(const other of (state.servants || [])){
         if(other.id === srvId) continue;
         if(!Array.isArray(other.assignedPlots)) continue;
@@ -5320,7 +5676,7 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
     const ft = document.createElement('div');
     ft.className = 'modal-ft';
     ft.innerHTML = '';
-    const bd = openModal({ title: '指派 ' + def.name, body: renderGridHtml(), footer: ft, onClose: function(){ openServantDetail(srvId); } });
+    const bd = openModal({ title: '指派 ' + def.name, body: renderGridHtml(), footer: ft, onClose: function(){ openServantDetail(srvId, returnFn); } });
     function bindCells(){
       const cells = bd.querySelectorAll('.srv-sa-cell');
       for(let i = 0; i < cells.length; i++){
@@ -5331,19 +5687,51 @@ window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,a
             const plot = plots[idx];
             if(!plot) return;
             if(selected[idx]){ delete selected[idx]; applyAndSave(); refresh(); return; }
-            if(countSel() >= maxSlots){  return; }
+            if(countSel() >= maxSlots){ return; }
+
+            const _wouldBeCompost = (plot.type === 'compost');
+            let _conflictType = null;
+            for(const _k in selected){
+              if(!selected[_k]) continue;
+              const _p = plots[parseInt(_k, 10)];
+              if(!_p) continue;
+              if(_wouldBeCompost && _p.type !== 'compost'){ _conflictType = 'toCompost'; break; }
+              if(!_wouldBeCompost && _p.type === 'compost'){ _conflictType = 'toNormal'; break; }
+            }
             const owner = plot.assignedServant;
-            if(owner && owner !== srvId){
-              openConfirm('此格已被其他僕人指派，是否取代？', function(){
-                selected[idx] = true;
-                applyAndSave();
-                refresh();
-              });
+            const _ownerConflict = (owner && owner !== srvId);
+
+            const _doAdd = function(){ selected[idx] = true; applyAndSave(); refresh(); };
+            const _clearConflict = function(){
+              if(_conflictType === 'toCompost'){
+                for(const _k in selected) delete selected[_k];
+              } else {
+                for(const _k in selected){
+                  const _p = plots[parseInt(_k, 10)];
+                  if(_p && _p.type === 'compost') delete selected[_k];
+                }
+              }
+            };
+
+            if(_conflictType && _ownerConflict){
+              const _msg = (_conflictType === 'toCompost')
+                ? '指派至堆肥區將解除其他地塊綁定；且此格已被他人指派。是否取代？'
+                : '指派至普通地塊將解除堆肥區綁定；且此格已被他人指派。是否取代？';
+              openConfirm(_msg, function(){ _clearConflict(); _doAdd(); });
               return;
             }
-            selected[idx] = true;
-            applyAndSave();
-            refresh();
+            if(_conflictType){
+              const _msg = (_conflictType === 'toCompost')
+                ? '指派至堆肥區將解除此僕人在其他所有地塊的綁定（僅保留堆肥區）。確認？'
+                : '指派至普通地塊將解除此僕人在堆肥區的綁定。確認？';
+              openConfirm(_msg, function(){ _clearConflict(); _doAdd(); });
+              return;
+            }
+            if(_ownerConflict){
+              openConfirm('此格已被其他僕人指派，是否取代？', _doAdd);
+              return;
+            }
+            _doAdd();
           };
         })(cells[i]);
       }
@@ -5528,7 +5916,7 @@ function _offlineFindFarmerTask(srv, t, actor){
   const cleanCands = [];
   for(const idx of (srv.assignedPlots || [])){
     const plot = plots[idx];
-    if(!plot || plot.type !== 'soil' || !plot.crop) continue;
+    if(!plot || !_isSoilType(plot.type) || !plot.crop) continue;
     const c = plot.crop;
     const seed = SEEDS[c.seedId];
     if(!seed) continue;
@@ -5539,7 +5927,7 @@ function _offlineFindFarmerTask(srv, t, actor){
   const harvestCands = [];
   for(const idx of (srv.assignedPlots || [])){
     const plot = plots[idx];
-    if(!plot || plot.type !== 'soil' || !plot.crop) continue;
+    if(!plot || !_isSoilType(plot.type) || !plot.crop) continue;
     const c = plot.crop;
     const seed = SEEDS[c.seedId];
     if(!seed) continue;
@@ -5554,7 +5942,7 @@ function _offlineFindFarmerTask(srv, t, actor){
   if(autoPlant !== 'off'){
     for(const idx of (srv.assignedPlots || [])){
       const plot = plots[idx];
-      if(!plot || plot.type !== 'soil') continue;
+      if(!plot || !_isSoilType(plot.type)) continue;
       if(plot.crop) continue;
       if(autoPlant === 'follow' && plot.lastSeed && plot.lastRarity && SEEDS[plot.lastSeed]){
         if(gardenStorageCount(plot.lastSeed, plot.lastRarity) > 0){
@@ -5614,6 +6002,8 @@ function _offlineDoFarmerTask(srv, task, t, actor){
     const _foB = 1 + gardenGetForemanBonus();
     let count = Math.max(1, Math.round(seed.baseYield * mult * _fB * _foB));
     if(plot.fertilized && t < (plot.fertExpireAt || 0)){ count = Math.round(count * 1.3); }
+    const _sbH2 = _getSoilBonus(plot.type);
+    count = Math.max(1, Math.round(count * (1 + _sbH2.yield)));
     plot.fertilized = false;
     plot.fertExpireAt = 0;
     gardenStorageAdd(seed.cropId, c.rarity, count);
@@ -5626,7 +6016,8 @@ function _offlineDoFarmerTask(srv, task, t, actor){
     if(!gardenStorageRemove(task.seedId, task.rarity, 1)) return { ok: false };
     const seed = SEEDS[task.seedId];
     if(!seed) return { ok: false };
-    let growMs = seed.growMs;
+    const _sbP2 = _getSoilBonus(plot.type);
+    let growMs = Math.max(1000, Math.round(seed.growMs * (1 - _sbP2.grow)));
     if(state.garden && typeof state.garden.compostAccelSec === 'number' && state.garden.compostAccelSec > 0){
       const maxUse = Math.min(state.garden.compostAccelSec, (growMs / 1000) * 0.5);
       if(maxUse > 0){
@@ -5826,10 +6217,14 @@ function gardenCleanup(idx){
   const plots = _gardenGetPlots();
   const plot = plots[idx];
   if(!plot || !plot.crop) return;
+  const _c = plot.crop;
+  const _seed = SEEDS[_c.seedId];
+  const _cropDef = _seed ? CROPS[_seed.cropId] : null;
+  const _info = _cropDef ? ('<span class="r-' + _c.rarity + '">' + _cropDef.name + '（' + _c.rarity + '）</span>') : '作物';
   plot.crop = null;
   save();
   try{ closeModal(); }catch(e){}
-  _gardenLog('手動清理腐爛作物（' + plotCoordName(idx) + '）', 'clean');
+  _gardenLog('手動清理腐爛作物（' + plotCoordName(idx) + ' · ' + _info + '）', 'clean');
   renderGardenGrid();
   renderGardenContent();
 }
@@ -6161,7 +6556,7 @@ function _servantEscHtml(s){
   return String(s).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;');
 }
 
-function openServantRename(srvId){
+function openServantRename(srvId, returnFn){
   const srv = (state.servants || []).find(function(s){ return s.id === srvId; });
   if(!srv) return;
   const cur = srv.customName || '';
@@ -6171,7 +6566,7 @@ function openServantRename(srvId){
   const _escaped = _servantEscHtml(cur);
   let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:6px">留空則使用編號（#' + (srv.tag || '?') + '）</div>';
   body += '<input id="rn-input" type="text" value="' + _escaped + '" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:8px;font-size:13px;font-family:inherit;box-sizing:border-box">';
-  const bd = openModal({ title: '改名', body: body, footer: ft, onClose: function(){ openServantDetail(srvId); } });
+  const bd = openModal({ title: '改名', body: body, footer: ft, onClose: function(){ openServantDetail(srvId, returnFn); } });
   const inp = bd.querySelector('#rn-input');
   if(inp){
     setTimeout(function(){ inp.focus(); inp.select(); }, 100);
@@ -6186,14 +6581,14 @@ function openServantRename(srvId){
     save();
     if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
     closeModal();
-    openServantDetail(srvId);
+    openServantDetail(srvId, returnFn);
   };
   ft.querySelector('#rn-clear').onclick = function(){
     srv.customName = '';
     save();
     if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
     closeModal();
-    openServantDetail(srvId);
+    openServantDetail(srvId, returnFn);
   };
   ft.querySelector('#rn-cancel').onclick = closeModal;
 }
@@ -6473,7 +6868,7 @@ function _gardenCompostFindTask(a, srv){
     for(let i = 0; i < total; i++){
       const idx = (start + i) % total;
       const p = plots[idx];
-      if(!p || p.type !== "soil") continue;
+      if(!p || !_isSoilType(p.type)) continue;
       if(p.fertilized) continue;
       if(stam < 120){ a._hasCompost = false; return null; }
       if((state.garden.compostValue || 0) < 8){ a._hasCompost = false; return null; }
@@ -6486,7 +6881,7 @@ function _gardenCompostFindTask(a, srv){
   if((state.garden.compostValue || 0) < 8) return null;
   return { type: "fetch_compost", plotIdx: -1 };
 }
-function openCompostDetail(idx){
+function openCompostDetail(idx, returnFn){
   const plots = _gardenGetPlots();
   const plot = plots[idx];
   if(!plot || plot.type !== "compost") return;
@@ -6502,7 +6897,8 @@ function openCompostDetail(idx){
   body += "<div style=\"font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px\">堆肥值</div>";
   body += "<div style=\"padding:10px;background:#1a1510;border:1px solid #2a231c;border-radius:5px;font-size:14px;color:#7ee07e;font-weight:bold;text-align:center\">💩 " + compostValue + "</div>";
   body += "<div style=\"font-size:10px;color:#7a6f60;margin-top:6px;line-height:1.5\">腐爛作物轉化為堆肥值（1 食物值 = 0.25 堆肥值）。每塊田施肥消耗 8 堆肥值。</div>";
-  const bd = openModal({ title: "堆肥區", body: body });
+  const _compostOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
+  const bd = openModal({ title: "堆肥區", body: body, onClose: _compostOnClose });
   const _del = bd.querySelector("#cp-del");
   if(_del) _del.onclick = function(){ plots[idx] = null; _clearPlotAssignments(idx); save(); closeModal(); renderGardenGrid(); };
   _gardenPlotOwnersBind(bd);

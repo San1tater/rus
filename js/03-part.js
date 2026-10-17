@@ -1886,7 +1886,8 @@ function openSlotPicker(slot,returnFn){
   let body='';
   if(!list.length)body='<div class="empty-hint">倉庫中沒有可裝備於此槽位的物品</div>';
   else{for(const it of list){body+=`<div class="item-row" data-iid="${it.id}" data-irar="${it.rarity}"><div class="icon" style="background:${rarityBg(it.rarity)}">${itemIcon(it.id,30)}</div><div class="info"><div class="nm ${rarityClass(it.rarity)}">${it.def.name}</div><div class="sub">${it.def.type||slot} · ${it.rarity}</div></div><div class="cnt">*${it.count}</div></div>`;}}
-  const bd=openModal({title:`選擇 ${slot} 裝備`,body,onClose:function(){ openSlotDetail(slot); }});
+  const _slotPickerOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
+  const bd=openModal({title:`選擇 ${slot} 裝備`,body,onClose:_slotPickerOnClose});
   $$('.item-row',bd).forEach(row=>{row.onclick=()=>{const iid=row.dataset.iid,irar=row.dataset.irar;closeModal();openEquipmentCompare(slot,iid,irar, null, () => openSlotPicker(slot, returnFn));};});
 }
 function getDisplayStat(id,rarity,key){
