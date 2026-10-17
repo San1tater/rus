@@ -484,15 +484,15 @@ function _showExploreEnemyGraphics(enemies) {
       cvs.style.position = 'absolute';
       cvs.style.bottom = '5%'; 
       
-            /* rev354-enemy-spread：左→右排列。
-         - i=0 左緣 = fxW*0.5（貼屏幕中線右側）
-         - 每往右一格，位置 + _enemySpacing
-         - 溢出只會發生在屏幕右側（右緣 > fxW），最左絕不越過 fxW*0.5
-         → 全部敵人都在右半區，不堆疊，不侵入左半區 */
-      const _enemySpacing = Math.max(fxW * 0.25, domW + 30);
-      const targetLeftPx = fxW * 0.5 + i * _enemySpacing;
-      const _vertJitter = ((i % 2 === 0) ? 1 : -1) * (2 + (i % 3));
-      cvs.style.bottom = (5 + _vertJitter) + '%';
+                  /* rev354-enemy-spread-v4：允許大量重疊，靠適當的水平+垂直偏移區分
+         - 水平間距 = fxW * 0.06（約 24px @fxW=400），只錯開一小部分輪廓
+         - 垂直偏移循環 [5%, 11%, 3%, 13%]，鄰居差 6~8%，靠高度明確區分
+         - i=0 貼屏幕中線右側（fxW*0.5），後續依次往右，溢出僅在屏幕右側 */
+      const _startX = fxW * 0.5;
+      const _enemySpacing = fxW * 0.06;
+      const _vertPattern = [5, 11, 3, 13];
+      const targetLeftPx = _startX + i * _enemySpacing;
+      cvs.style.bottom = _vertPattern[i % 4] + '%';
       
       cvs.style.left = '0px';
       cvs.style.transform = 'translate(' + (fxW + 200) + 'px, 0px)';
