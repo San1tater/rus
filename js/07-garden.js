@@ -4,14 +4,14 @@
    ============================================================ */
 /* ===== rev130: 後院全屏分頁 ===== */
 const GARDEN_PLOT_TYPES = {
-  soil:    { name: '土地',   icon: '', imgIcon: 'soil', desc: '種植作物' },
+  soil:    { name: '土地',   icon: '', imgIcon: 'soil', desc: '基礎土地，無增減' },
   tower:   { name: '哨塔',   icon: '<span style="color:#e05252;font-weight:bold">✖</span>', desc: '自動防禦', bg: 'tower_bg' },
   shed:    { name: '工棚',   icon: '🛖', desc: '容納一個監工', bg: 'shed_bg' },
   compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物', bg: 'compost_bg' }
 ,
   fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h' },
-  black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 -20%，產量 +20%' },
-  red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 -40%，產量 +30%' }};
+  black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 <span style="color:#e05252">↓20%</span> ｜ 產量 <span style="color:#4caf50">↑20%</span>' },
+  red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 <span style="color:#e05252">↓40%</span> ｜ 產量 <span style="color:#4caf50">↑30%</span>' }};
 const SPECIAL_SOIL_BONUS = {
   soil:       { grow: 0,    yield: 0 },
   black_soil: { grow: 0.20, yield: 0.20 },
@@ -1443,17 +1443,17 @@ function _gardenMerchantShowConfirm(lineKey, targetLv){
 /* rev325c: 商人交易系統 */
 const MERCHANT_TRADE_ITEMS = [
   { category: '種子', items: [
-    { id: 'seed_stock',   name: '庫存種子包', desc: '隨機庫存稀有度種子 ×2', price: 50,   rarity: '庫存', icon: '🌰', stackable: true },
-    { id: 'seed_premium', name: '精品種子包', desc: '隨機精品稀有度種子 ×2', price: 200,  rarity: '精品', icon: '🌰', stackable: true },
-    { id: 'seed_legend',  name: '傳奇種子包', desc: '隨機傳奇稀有度種子 ×1', price: 1000, rarity: '傳奇', icon: '🌰', stackable: true }
+    { id: 'seed_stock',   name: '庫存種子包', desc: '庫存種子×2', price: 50,   rarity: '庫存', icon: '🌰', stackable: true },
+    { id: 'seed_premium', name: '精品種子包', desc: '精品種子×2', price: 200,  rarity: '精品', icon: '🌰', stackable: true },
+    { id: 'seed_legend',  name: '傳奇種子包', desc: '傳奇種子×1', price: 1000, rarity: '傳奇', icon: '🌰', stackable: true }
   ]},
   { category: '特殊地塊', items: [
-    { id: 'black_soil', name: '黑土地', desc: '生長 -20%，產量 +20%。購買後可全局套用至所有土地。', price: 10000, rarity: '傳奇', imgIcon: 'black_soil', oneTime: true },
-    { id: 'red_soil',   name: '紅土地', desc: '生長 -40%，產量 +30%。購買後可全局套用至所有土地。', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
+    { id: 'black_soil', name: '黑土地', desc: '慢20% 高20%', price: 10000, rarity: '傳奇', imgIcon: 'black_soil', oneTime: true },
+    { id: 'red_soil',   name: '紅土地', desc: '慢40% 高30%', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
   ]},
   { category: '補給', items: [
-    { id: 'ammo_supply', name: '彈藥補給', desc: '隨機庫存稀有度彈藥 ×30', price: 100, rarity: '庫存', itemIconId: '5.45_ps', stackable: true },
-    { id: 'medkit',      name: '傳奇急救包', desc: 'IFAK 急救包（傳奇）×1', price: 800, rarity: '傳奇', itemIconId: 'ifak',      stackable: true }
+    { id: 'ammo_supply', name: '彈藥補給', desc: '庫存彈藥×30', price: 100, rarity: '庫存', itemIconId: '5.45_ps', stackable: true },
+    { id: 'medkit',      name: '傳奇急救包', desc: '傳奇急救包×1', price: 800, rarity: '傳奇', itemIconId: 'ifak',      stackable: true }
   ]}
 ];
 
