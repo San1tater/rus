@@ -326,7 +326,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-exit:active{background:#3a2f25;color:#e8a33d}
 .gp-grid-wrap{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:40px 24px}
 .gp-grid{display:grid;grid-template-columns:repeat(4,64px);grid-template-rows:repeat(5,64px);gap:4px;flex:0 0 auto}
-.gp-plot{width:64px;height:64px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;user-select:none;transition:transform .1s,border-color .15s,background .15s;box-sizing:border-box}
+.gp-plot{width:64px;height:64px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;user-select:none;transition:transform .1s,border-color .15s,background .15s;box-sizing:border-box;padding-bottom:12px}
 .gp-plot:active{transform:scale(.94)}
 .gp-plot.empty .gp-plot-icon{font-size:22px;color:#4a4038;line-height:1}
 .gp-plot.empty{background-image:url('images/garden/default.png');background-size:cover;background-position:center;background-color:rgba(30,25,20,.85)}
@@ -938,3 +938,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .mrc-trade-wrap .mrc-trade-cell-icon{overflow:hidden !important}
 .mrc-trade-wrap .mrc-trade-cell-icon img{max-width:100% !important;max-height:100% !important;width:auto !important;height:auto !important;object-fit:contain !important;display:block !important}
 .mrc-trade-wrap .mrc-trade-cell-icon span{font-size:22px !important;line-height:1 !important;max-width:100% !important;max-height:100% !important;display:flex !important;align-items:center !important;justify-content:center !important;overflow:hidden !important}
+
+
+/* rev351: .gp-plot 内容上移 */
