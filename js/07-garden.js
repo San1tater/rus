@@ -4116,8 +4116,40 @@ function _gardenActorTick(){
         const plotEl = grid.querySelector('.gp-plot[data-idx="' + idx + '"]');
         if(plotEl){
           const pRect = plotEl.getBoundingClientRect();
-          a.tx = pRect.left - wrapRect.left + pRect.width / 2;
-          a.ty = pRect.top - wrapRect.top + pRect.height - 4;
+          /* rev358: 守衛巡邏狀態機 (走動 -> 停留 -> 走動) */
+          if(window.BossModule && BossModule.isActive()){
+            if(typeof a.tx !== 'number'){ a.tx = pRect.left - wrapRect.left + pRect.width / 2; a.ty = pRect.top - wrapRect.top + pRect.height - 4; }
+          } else {
+            if(typeof a._guardState === 'undefined'){
+              a._guardState = 'idle';
+              a._guardTimer = now + 2000 + Math.random() * 3000;
+              a.tx = pRect.left - wrapRect.left + pRect.width / 2;
+              a.ty = pRect.top - wrapRect.top + pRect.height - 4;
+            }
+            const _isMoving = Math.abs(a.tx - a.x) > 0.5;
+            if(a._guardState === 'idle'){
+              if(now > a._guardTimer){
+                a._guardState = 'walk';
+                a._guardTimer = now + 1500 + Math.random() * 2000;
+                let _gtx = pRect.left - wrapRect.left + pRect.width / 2 + (Math.random() - 0.5) * pRect.width * 0.4;
+                /* rev361: 守衛巡邏目標太近時強制推遠 */
+                if(Math.abs(_gtx - a.x) < 8){
+                  const _dir = Math.random() > 0.5 ? 1 : -1;
+                  _gtx = a.x + _dir * (8 + Math.random() * 6);
+                  _gtx = Math.max(pRect.left - wrapRect.left + 8, Math.min(pRect.left - wrapRect.left + pRect.width - 8, _gtx));
+                }
+                a.tx = _gtx;
+                a.ty = pRect.top - wrapRect.top + pRect.height - 4;
+              }
+            } else if(a._guardState === 'walk'){
+              if(!_isMoving || now > a._guardTimer){
+                a._guardState = 'idle';
+                a._guardTimer = now + 3000 + Math.random() * 4000;
+                a.tx = a.x;
+                a.ty = pRect.top - wrapRect.top + pRect.height - 4;
+              }
+            }
+          }
         }
       }
       a.state = 'idle';
@@ -4183,6 +4215,21 @@ function _gardenActorTick(){
       continue;
     }
     if(a.stamina > 0 && a.restPos){ a.restPos = null; }
+    /* rev357: 堆肥農民體力不足以支撐完整任務時，原地待機，防止抽動 */
+    if(a.type === 'farmer' && typeof _isAssignedToCompost === 'function' && _isAssignedToCompost(a._srv)){
+      if(a.stamina < 220 && !a._hasCompost){
+        a.state = 'idle';
+        a.task = null;
+        if(!a._compostIdleUntil){
+          a._compostIdleUntil = now + 3000 + Math.random() * 3000;
+        }
+        if(now < a._compostIdleUntil){
+          continue;
+        } else {
+          a._compostIdleUntil = 0;
+        }
+      }
+    }
 
     if(a.task){
       if(a.task.createdAt && now - a.task.createdAt > 300000){
@@ -4289,10 +4336,16 @@ function _gardenActorTick(){
     const plotEl = grid.querySelector('.gp-plot[data-idx="' + idleIdx + '"]');
     if(plotEl){
       const pRect = plotEl.getBoundingClientRect();
-      a.tx = pRect.left - wrapRect.left + pRect.width / 2 + (Math.random() - 0.5) * 12;
+      a.tx = pRect.left - wrapRect.left + pRect.width / 2 + (Math.random() - 0.5) * 16;
       a.ty = pRect.top - wrapRect.top + pRect.height - 2 + (Math.random() - 0.5) * 10;
+      /* rev361: 目標點太近時強制推遠，避免原地抽搐 */
+      if(Math.abs(a.tx - a.x) < 12){
+        const _dir = Math.random() > 0.5 ? 1 : -1;
+        a.tx = a.x + _dir * (12 + Math.random() * 8);
+        a.tx = Math.max(pRect.left - wrapRect.left + 8, Math.min(pRect.left - wrapRect.left + pRect.width - 8, a.tx));
+      }
       const dist = Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2));
-      if(dist < 4){ a.idleUntil = now + 1800 + Math.random() * 2500; continue; }
+      if(dist < 10){ a.idleUntil = now + 1800 + Math.random() * 2500; continue; }
       const walkMs = Math.max(900, Math.min(2600, dist * 4));
       a.walkMs = walkMs;
       a.state = 'walk';
@@ -4386,24 +4439,22 @@ function _gardenRenderActors(now){
     const dt = Math.min(0.1, (now - a._lastRenderTime) / 1000);
     a._lastRenderTime = now;
     let didMove = false;
-    if(a.type !== 'guard'){
-      const dx = a.tx - a.x, dy = a.ty - a.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if(dist > 0.5){
-        const step = Math.min(dist, SPEED * dt);
-        a.x += (dx / dist) * step;
-        a.y += (dy / dist) * step;
-        didMove = true;
-      } else {
-        a.x = a.tx; a.y = a.ty;
-      }
+    const dx = a.tx - a.x, dy = a.ty - a.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if(dist > 0.5){
+      /* rev360: 守衛只在格子內踱步，速度放慢至 30% */
+      const _actorSpeed = (a.type === 'guard') ? SPEED * 0.3 : SPEED;
+      const step = Math.min(dist, _actorSpeed * dt);
+      a.x += (dx / dist) * step;
+      a.y += (dy / dist) * step;
+      didMove = true;
     } else {
       a.x = a.tx; a.y = a.ty;
     }
-    const _moving = (a.type !== 'guard') && (Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2)) > 0.8);
+    const _moving = Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2)) > 0.8; /* rev357: 守衛也播走路動畫 */
     let animName = 'idle';
-    if(a.type === 'guard') animName = 'idle';
-    else if(_moving) animName = 'walk';
+    /* rev359: 移除守衛死鎖，改為統一判斷是否移動 */
+    if(_moving) animName = 'walk';
     else if(a.state === 'work') animName = 'fire_primary';
     else animName = 'idle';
     const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
@@ -4437,7 +4488,12 @@ function _gardenRenderActors(now){
     if(_hasBucket) _handItem = 'bucket';
     else if(a.type === 'farmer') _handItem = 'stick';
     else if(a.type === 'foreman') _handItem = 'clipboard';
-    _raidDrawHuman(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, (a.tx - a.x) < -0.5, _hasBucket, _handItem);
+    /* rev361: 朝向記憶，只在有明顯位移時才更新，防止原地抽搐 */
+    if(Math.abs(a.tx - a.x) > 2){
+      a._facingLeft = (a.tx - a.x) < 0;
+    }
+    const _facingLeft = (typeof a._facingLeft === 'boolean') ? a._facingLeft : false;
+    _raidDrawHuman(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, _facingLeft, _hasBucket, _handItem);
     if(a._srv){
       const _lbl = servantLabel(a._srv);
       ctx.save();
@@ -4953,7 +5009,7 @@ function _offlineCompostFindTask(srv, t, actor){
     if(actor) actor._hasCompost = false;
     return null;
   }
-  if(stam < 100) return null;
+  if(stam < 220) return null; /* rev357: 確保體力足以完成取肥與施肥 */
   if((state.garden.compostValue || 0) < 8) return null;
   return { type: 'fetch_compost', plotIdx: -1 };
 }
