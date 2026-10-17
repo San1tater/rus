@@ -48,6 +48,7 @@ function getPlayerArmorLevel(){const headId=state.player.equipped.head;const top
 
 const ARMOR={
   ssh68:{name:'SSh-68 頭盔',slot:'head',armor:30,level:2},
+  ssh68m:{name:'SSh-68M 頭盔',slot:'head',armor:30,level:2},
   ssh94:{name:'SSh-94 頭盔',slot:'head',armor:40,level:3},
   kolpak:{name:'Kolpak-1S 頭盔',slot:'head',armor:20,level:1},
   '6b47':{name:'6B47 頭盔',slot:'head',armor:30,level:3},
@@ -233,7 +234,7 @@ const ITEM_WEIGHT = {
   mp133:3.54,mp153:3.6,mp155:3.4,saiga12:5.659,toz106:2.715,ks23:3.76,
   '6kh2':0.4,'6kh5':0.4,kukri:0.5,
   f1:0.6,rgd5:0.5,rgo:0.53,rgn:0.53,vog17:0.35,vog25:0.28,
-  ssh68:1.4,kolpak:1.0,'6b47':1.3,'6b47m':1.3,altyn:2.5,kiver:1.2,maska:2.6,zsh12m:3.0,
+  ssh68:1.4,ssh68m:1.4,ssh94:1.3,kolpak:1.0,'6b47':1.3,'6b47m':1.3,altyn:2.5,kiver:1.2,maska:2.6,zsh12m:3.0,
   balaclava:0.1,shemagh:0.15,gp7:0.5,ballglasses:0.1,
   paca:3.5,'6b13':10.6,'6b13m':9.15,'6b23':7.9,'6b231':7.9,'6b232':10.5,'6b43':20,zhuk6a:11.5,zhuk3:5.2,defender2:11.5,'6b45':11.5,redutm:9.5,
   cargopants:0.4,workboots:0.6,tactboots:0.7,lowaz:0.8,haix:0.75,belleville:0.8,
