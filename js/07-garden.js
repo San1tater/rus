@@ -5,9 +5,9 @@
 /* ===== rev130: 後院全屏分頁 ===== */
 const GARDEN_PLOT_TYPES = {
   soil:    { name: '土地',   icon: '', imgIcon: 'soil', desc: '種植作物' },
-  tower:   { name: '哨塔',   icon: '<span style="color:#e05252;font-weight:bold">✖</span>', desc: '自動防禦' },
-  shed:    { name: '工棚',   icon: '🛖', desc: '容納一個監工' },
-  compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物' }
+  tower:   { name: '哨塔',   icon: '<span style="color:#e05252;font-weight:bold">✖</span>', desc: '自動防禦', bg: 'tower_bg' },
+  shed:    { name: '工棚',   icon: '🛖', desc: '容納一個監工', bg: 'shed_bg' },
+  compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物', bg: 'compost_bg' }
 ,
   fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h' },
   black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 -20%，產量 +20%' },
@@ -285,7 +285,8 @@ function renderGardenGrid(){
         else if(st.status === 'rotten'){ icon = cropStageImgHtml(st.cropId, 'rotten', 52); lbl = '腐爛'; extraCls = ' rotten'; }
         else if(st.status === 'cleaning'){ icon = '🧹'; lbl = st.remaining + 's'; extraCls = ' cleaning'; }
         html += '<div class="gp-plot built' + extraCls + '" data-type="' + plot.type + '" data-idx="' + i + '">' + (plot.fertilized ? '<div class="gp-fert-mark">💩</div>' : '') + '<div class="gp-plot-icon">' + icon + '</div><div class="gp-plot-lbl">' + lbl + '</div></div>';
-      } else if(isSoil){
+      } else if(isSoil || t.bg){
+        /* rev353: 有背景圖的類型（含土壤 / 哨塔 / 工棚 / 堆肥區），不顯示 emoji，只留背景圖 + 標籤 */
         html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-lbl">' + t.name + '</div></div>';
       } else {
         html += '<div class="gp-plot built" data-type="' + plot.type + '" data-idx="' + i + '"><div class="gp-plot-icon">' + t.icon + '</div><div class="gp-plot-lbl">' + t.name + '</div></div>';
