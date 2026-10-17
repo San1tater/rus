@@ -641,6 +641,15 @@ function startPlayerFire(){
   if(!battle || !battle.active) return;
   if(battle.settling) return;
   if(battle.reloading) return;
+  /* rev354-fire-range：射程外點擊射擊按鈕 → 直接返回，不設置 firing/burstLeft。
+     避免 battleLoop 把動畫切成 fire_primary，導致射程外仍播射擊動畫。
+     射程外點擊亦不打断治疗、不扣子彈、不進入交战。 */
+  {
+    const _pr = battle.px + battle.playerWeaponRange;
+    const _bl = getBossLeftBoundaryN();
+    if(_pr < _bl) return;
+    if(!isAimPartInRange()) return;
+  }
   if(battle.consuming){
     if(battle.healTimer){ clearTimeout(battle.healTimer); battle.healTimer=null; }
     battle._healToken=(battle._healToken||0)+1;
@@ -851,8 +860,8 @@ function playerShoot(){
   let def=w.def;
   const playerRightPx=battle.px+battle.playerWeaponRange;
   const bossLeftPx=getBossLeftBoundaryN();
-  if(playerRightPx<bossLeftPx){if(Math.random()<0.05)return false;}
-  if(!isAimPartInRange()){if(Math.random()<0.05)return false;}
+  if(playerRightPx<bossLeftPx){return false;}
+  if(!isAimPartInRange()){return false;}
   const isMelee = def.slot === 'melee';
 
   if(def.cal && battle.ammoInMag <= 0){

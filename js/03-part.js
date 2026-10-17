@@ -484,11 +484,15 @@ function _showExploreEnemyGraphics(enemies) {
       cvs.style.position = 'absolute';
       cvs.style.bottom = '5%'; 
       
-      const widthPct = (domW / fxW) * 100;
-      let maxRightPct = 50 - widthPct;
-      if(maxRightPct < 0) maxRightPct = 0;
-      const targetRightPct = (i / Math.max(1, maxEnemies - 1)) * maxRightPct;
-      const targetLeftPx = fxW - (fxW * targetRightPct / 100) - domW;
+            /* rev354-enemy-spread：左→右排列。
+         - i=0 左緣 = fxW*0.5（貼屏幕中線右側）
+         - 每往右一格，位置 + _enemySpacing
+         - 溢出只會發生在屏幕右側（右緣 > fxW），最左絕不越過 fxW*0.5
+         → 全部敵人都在右半區，不堆疊，不侵入左半區 */
+      const _enemySpacing = Math.max(fxW * 0.25, domW + 30);
+      const targetLeftPx = fxW * 0.5 + i * _enemySpacing;
+      const _vertJitter = ((i % 2 === 0) ? 1 : -1) * (2 + (i % 3));
+      cvs.style.bottom = (5 + _vertJitter) + '%';
       
       cvs.style.left = '0px';
       cvs.style.transform = 'translate(' + (fxW + 200) + 'px, 0px)';
