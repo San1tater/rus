@@ -318,7 +318,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .subnav-tab:hover{color:#e8a33d}
 .subnav-body{flex:1;min-height:0;overflow:hidden;padding:10px}
 
-#garden-page{position:fixed;inset:0 0 calc(54px + env(safe-area-inset-bottom)) 0;z-index:9000;background:linear-gradient(180deg,#0e0c0a 0%,#151210 100%);display:none;flex-direction:column;overflow:hidden}
+#garden-page{position:fixed;inset:0 0 54px 0;z-index:9000;background:linear-gradient(180deg,#0e0c0a 0%,#151210 100%);display:none;flex-direction:column;overflow:hidden}
 #garden-page.on{display:flex}
 .gp-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #2a231c;background:#17140f}
 .gp-title{font-size:15px;color:#e8a33d;font-weight:bold;letter-spacing:1px}
@@ -399,12 +399,13 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 @keyframes actorLazy{from{transform:translate(-50%,-100%) scale(1)}to{transform:translate(-50%,-100%) scale(0.92)}}
 .srv-sa-info{font-size:11px;color:#e8a33d;text-align:center;margin-bottom:10px}
 .srv-sa-grid{display:grid;grid-template-columns:repeat(4,44px);gap:8px;justify-content:center;margin:10px auto}
-.srv-sa-cell{width:44px;height:44px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:4px;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;user-select:none;box-sizing:border-box;transition:transform .1s,border-color .15s,background .15s}
+.srv-sa-cell{width:44px;height:44px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:4px;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;user-select:none;box-sizing:border-box;overflow:hidden;transition:transform .1s,border-color .15s,background .15s}
 .srv-sa-cell:active:not([data-disabled="1"]){transform:scale(.92)}
 .srv-sa-cell[data-disabled="1"]{opacity:.3;cursor:default}
 .srv-sa-cell.selected{border-color:#e8a33d;background:rgba(232,163,61,.22);box-shadow:0 0 8px rgba(232,163,61,.45)}
 .srv-sa-cell.occupied:not(.selected){border-color:#a45ede;border-style:dashed}
-.srv-sa-icon{font-size:22px;line-height:1;pointer-events:none}
+.srv-sa-icon{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;line-height:1;pointer-events:none;overflow:hidden}
+.srv-sa-icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:3px}
 .srv-sa-owner{position:absolute;bottom:0;right:1px;font-size:9px;line-height:1.15;pointer-events:none;background:rgba(0,0,0,.78);color:#fff;border-radius:3px;padding:0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42px;box-sizing:border-box;font-weight:bold}
 .confirm-layer{position:fixed;inset:0;z-index:10001;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
 .confirm-box{background:#1e1813;border:1px solid #3a2f25;border-radius:10px;padding:18px 22px;max-width:320px;width:82%;box-shadow:0 8px 32px rgba(0,0,0,.8)}
@@ -758,6 +759,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-plot.built[data-type="tower"]{background-image:url('icons/garden/tower_bg.png')}
 .gp-plot.built[data-type="shed"]{background-image:url('icons/garden/shed_bg.png')}
 .gp-plot.built[data-type="compost"]{background-image:url('icons/garden/compost_bg.png')}
+.gp-plot.built[data-type="fridge"]{background-image:url('icons/garden/fridge.png')}
 
 /* rev400: 修復特殊土地圖片 */
 .gp-plot.built[data-type="black_soil"]{background-image:url('icons/garden/black_soil.png')}
