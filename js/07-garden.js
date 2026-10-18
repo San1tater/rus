@@ -9,7 +9,7 @@ const GARDEN_PLOT_TYPES = {
   shed:    { name: '工棚',   icon: '🛖', desc: '容納一個監工', bg: 'shed_bg' },
   compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物', bg: 'compost_bg' }
 ,
-  fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h' },
+  fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h', bg: 'fridge' },
   black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 <span style="color:#e05252">↓20%</span> ｜ 產量 <span style="color:#4caf50">↑20%</span>' },
   red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 <span style="color:#e05252">↓40%</span> ｜ 產量 <span style="color:#4caf50">↑30%</span>' }};
 const SPECIAL_SOIL_BONUS = {
@@ -19,12 +19,13 @@ const SPECIAL_SOIL_BONUS = {
 };
 function _isSoilType(t){ return t === 'soil' || t === 'black_soil' || t === 'red_soil'; }
 function _getSoilBonus(t){ return SPECIAL_SOIL_BONUS[t] || SPECIAL_SOIL_BONUS.soil; }
-function _getPlotTypeIconHtml(type, size, flexNone){
+function _getPlotTypeIconHtml(type, size, flexNone, fill){
   const _flex = flexNone ? ';flex:0 0 auto' : '';
   const _t = GARDEN_PLOT_TYPES[type];
   if(!_t) return '<span style="font-size:' + size + 'px' + _flex + '">?</span>';
-  if(_t.imgIcon) return '<img src="icons/garden/' + _t.imgIcon + '.png' + assetSuffix() + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain' + _flex + '" alt="">';
-  return '<span style="font-size:' + size + 'px;line-height:1' + _flex + '">' + (_t.icon || '?') + '</span>';
+  const _file = _t.imgIcon || _t.bg || type;
+  if(fill) return '<img src="icons/garden/' + _file + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;border-radius:3px" alt="">';
+  return '<img src="icons/garden/' + _file + '.png' + assetSuffix() + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain' + _flex + '" alt="">';
 }
 function _getAvailableSoilTypes(currentType){
   const _list = [];
@@ -472,14 +473,7 @@ function openGardenPlotPicker(idx, returnFn){
     const row = document.createElement('div');
     row.className = 'item-row';
     row.setAttribute('data-type', key);
-    let _iconHtml;
-    if(key === 'soil'){
-      _iconHtml = '<img src="icons/garden/soil.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="">';
-    } else if(t.bg){
-      _iconHtml = '<img src="icons/garden/' + t.bg + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="">';
-    } else {
-      _iconHtml = t.icon;
-    }
+    const _iconHtml = _getPlotTypeIconHtml(key, 28);
     row.innerHTML = '<div class="icon" style="font-size:20px">' + _iconHtml + '</div><div class="info"><div class="nm">' + t.name + '</div><div class="sub">' + t.desc + '</div></div>';
     body.appendChild(row);
   }
@@ -687,7 +681,7 @@ function openGardenPlotDetail(idx, returnFn){
   if(!plot) return;
   const t = GARDEN_PLOT_TYPES[plot.type] || {name:'未知', icon:'?', desc:''};
   let body = '';
-  const _tIcon = t.bg ? ('<img src="icons/garden/' + t.bg + '.png' + assetSuffix() + '" style="width:26px;height:26px;object-fit:contain" alt="">') : ('<span style="font-size:26px;line-height:1">' + t.icon + '</span>');
+  const _tIcon = _getPlotTypeIconHtml(plot.type, 26);
   body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold">' + _tIcon + '<span>' + t.name + '</span><button class="btn danger" id="gp-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
   body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv || 1) + '</div>';
   if(plot.type === 'shed'){
@@ -1916,7 +1910,7 @@ function _gardenTowerOpen(idx){
       '</div>';
   }
   let body = '';
-  const _twIcon = (GARDEN_PLOT_TYPES.tower.bg) ? ('<img src="icons/garden/' + GARDEN_PLOT_TYPES.tower.bg + '.png' + assetSuffix() + '" style="width:24px;height:24px;object-fit:contain" alt="">') : ('<span style="font-size:24px;line-height:1">✖</span>');
+  const _twIcon = _getPlotTypeIconHtml('tower', 24);
   body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold">' + _twIcon + '<span>哨塔</span><button class="btn danger" id="tower-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
   body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv||1) + '</div>';
   body += _gardenPlotOwnersHtml(idx, 'guard');
@@ -4771,13 +4765,13 @@ function closeGarden(){
         } else if(srv.type === 'farmer' ? !(plot.type === 'compost' || _isSoilType(plot.type)) : (plot.type !== def.targetPlot)){
           cls += ' mismatch';
           const t = GARDEN_PLOT_TYPES[plot.type] || {icon:'?'};
-          inner = '<div class="srv-sa-icon">' + ((plot.type === 'soil') ? '🌱' : t.icon) + '</div>'; disabled = true;
+          inner = '<div class="srv-sa-icon">' + _getPlotTypeIconHtml(plot.type, 22, false, true) + '</div>'; disabled = true;
         } else {
           const t = GARDEN_PLOT_TYPES[plot.type];
           const owner = plot.assignedServant;
           if(selected[i]) cls += ' selected';
           if(owner && owner !== srvId) cls += ' occupied';
-          inner = '<div class="srv-sa-icon">' + ((plot.type === 'soil') ? '🌱' : t.icon) + '</div>';
+          inner = '<div class="srv-sa-icon">' + _getPlotTypeIconHtml(plot.type, 22, false, true) + '</div>';
           if(owner && owner !== srvId){
             const otherSrv = (state.servants || []).find(function(s){ return s.id === owner; });
             if(otherSrv){
@@ -5994,7 +5988,7 @@ function openCompostDetail(idx, returnFn){
     return s.type === "farmer" && s.assignedPlots && s.assignedPlots.indexOf(idx) !== -1;
   });
   let body = "";
-  const _cpIcon = (GARDEN_PLOT_TYPES.compost.bg) ? ('<img src="icons/garden/' + GARDEN_PLOT_TYPES.compost.bg + '.png' + assetSuffix() + '" style="width:24px;height:24px;object-fit:contain" alt="">') : ("<span style=\"font-size:24px;line-height:1\">♻️</span>");
+  const _cpIcon = _getPlotTypeIconHtml('compost', 24);
   body += "<div style=\"display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold\">" + _cpIcon + "<span>堆肥區</span><button class=\"btn danger\" id=\"cp-del\" style=\"margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto\">拆除</button></div>";
   body += "<div class=\"detail-sub\">" + plotCoordName(idx) + " · Lv." + (plot.lv || 1) + "</div>";
   body += _gardenPlotOwnersHtml(idx, "farmer");
