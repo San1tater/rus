@@ -1454,6 +1454,20 @@ function getExploreWeaponRightEdge(canvasW, canvasH){
   const layout = computeWeaponCharLayout(cfg);
   if(!layout) return { x: centerX, y: groundY };
 
+  /* rev525e: 优先用 WEAPON_MUZZLE 精确枪口坐标（与战斗模式 getPlayerMuzzlePos 一致） */
+  const _wid = resolveIconId(wpId);
+  const _wm = (typeof WEAPON_MUZZLE !== 'undefined' && WEAPON_MUZZLE[_wid]) ? WEAPON_MUZZLE[_wid] : null;
+  const _tr = cfg.trim;
+  if(_wm && _tr && _tr.w > 0 && _tr.h > 0 && layout.isTrimMode){
+    const _baseW = layout.baseW;
+    const _baseH = _tr.h * (cfg.scale || 1.0);
+    const _mzLocalX = layout.anchorX + (_wm.x / _tr.w) * _baseW;
+    const _mzLocalY = layout.anchorY - _baseH / 2 + (_wm.y / _tr.h) * _baseH;
+    return {
+      x: centerX + scale * (_mzLocalX - ORIG_FOOT_X),
+      y: groundY + scale * (_mzLocalY - ORIG_FOOT_Y)
+    };
+  }
   return {
     x: centerX + scale * (layout.rightX - ORIG_FOOT_X),
     y: groundY + scale * (layout.anchorY - ORIG_FOOT_Y)

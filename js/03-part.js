@@ -448,8 +448,7 @@ function _showExploreEnemyGraphics(enemies) {
   });
   const oldGrp = document.getElementById('explore-enemy-group');
   if(oldGrp) oldGrp.remove();
-  const oldCorpse = document.getElementById('explore-corpse-group');
-  if(oldCorpse) oldCorpse.remove();
+  /* rev527: 不再清空 corpse-group，保留旧尸体继续左移 */
 }
 
 
@@ -853,12 +852,17 @@ function _spawnExploreCorpses(enemies){
   const fxW = fx.clientWidth || 400;
   const fxH = fx.clientHeight || 500;
   const charPx = fxH * 0.58;
-  const old = document.getElementById("explore-corpse-group");
-  if(old) old.remove();
-  const container = document.createElement("div");
-  container.id = "explore-corpse-group";
-  container.style.cssText = "position:absolute;inset:0;z-index:10;pointer-events:none;";
-  fx.appendChild(container);
+  /* rev527: 复用共享容器，每次生成独立 batch 子层，不影响旧尸体的左移 */
+  let container = document.getElementById("explore-corpse-group");
+  if(!container){
+    container = document.createElement("div");
+    container.id = "explore-corpse-group";
+    container.style.cssText = "position:absolute;inset:0;z-index:10;pointer-events:none;";
+    fx.appendChild(container);
+  }
+  const batch = document.createElement("div");
+  batch.style.cssText = "position:absolute;inset:0;pointer-events:none;";
+  container.appendChild(batch);
   const scrollSpeed = fxW / 10;
   const corpseEls = [];
   let xPos = fxW + 20;
@@ -927,7 +931,7 @@ function _spawnExploreCorpses(enemies){
         equip: equip
       };
       _rev506_renderCorpseTo(corpseObj);
-      container.appendChild(cvs);
+      batch.appendChild(cvs);
       corpseEls.push(corpseObj);
       const gap = drawW * (0.3 + Math.random() * 0.4);
       xPos += gap;
@@ -935,10 +939,10 @@ function _spawnExploreCorpses(enemies){
       /* silent */
     }
   }
-  if(!corpseEls.length){ container.remove(); return; }
+  if(!corpseEls.length){ batch.remove(); return; }
   const startTime = performance.now();
   function tick(){
-    if(!container.parentNode) return;
+    if(!batch.parentNode) return;
     const elapsed = (performance.now() - startTime) / 1000;
     const shift = scrollSpeed * elapsed;
     let allOut = true;
@@ -951,7 +955,7 @@ function _spawnExploreCorpses(enemies){
       }
       if(x + c.width > 0) allOut = false;
     }
-    if(allOut){ container.remove(); return; }
+    if(allOut){ batch.remove(); return; }
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
@@ -1820,6 +1824,69 @@ function getCurrentBg(){
   return `images/bg/${key}_r${pathIdx}_n${nodeIdx}.png${assetSuffix()}`;
 }
 const _bgPreloadCache = new Set();
+function _crossfadeExploreBg(newUrl){
+  const z1 = document.getElementById('zone1');
+  if(!z1) return;
+  const oldScroll = z1.querySelector('.bg-scroll');
+  if(!oldScroll){
+    const layers = document.querySelectorAll('#zone1 .bg-layer');
+    layers.forEach(function(l){ l.style.backgroundImage = newUrl; });
+    return;
+  }
+  /* 若已在过渡中 → 直接换旧层图片，跳过叠加，避免叠加 n 层 */
+  if(z1.querySelector('.bg-scroll.xfade-active')){
+    oldScroll.querySelectorAll('.bg-layer').forEach(function(l){ l.style.backgroundImage = newUrl; });
+    return;
+  }
+  /* 记录旧 track 的当前动画时间，用于同步新 track 相位 */
+  let elapsedMs = 0;
+  const oldTrack = oldScroll.querySelector('.bg-track');
+  if(oldTrack && typeof oldTrack.getAnimations === 'function'){
+    try {
+      const anims = oldTrack.getAnimations();
+      if(anims && anims.length && typeof anims[0].currentTime === 'number'){
+        elapsedMs = anims[0].currentTime;
+      }
+    } catch(e){ /* 忽略 */ }
+  }
+  /* 克隆 bg-scroll 作为上层新图层 */
+  const newScroll = oldScroll.cloneNode(true);
+  newScroll.classList.add('xfade-active');
+  newScroll.style.position = 'absolute';
+  newScroll.style.inset = '0';
+  newScroll.style.opacity = '0';
+  newScroll.style.transition = 'opacity 600ms ease-in-out';
+  newScroll.style.willChange = 'opacity';
+  newScroll.style.zIndex = '1';
+  oldScroll.style.position = 'absolute';
+  oldScroll.style.inset = '0';
+  oldScroll.style.zIndex = '0';
+  /* 新 track：animation-delay 用负值把动画快进到旧层当前相位 */
+  const newTrack = newScroll.querySelector('.bg-track');
+  if(newTrack && elapsedMs > 0){
+    newTrack.style.animationDelay = '-' + elapsedMs + 'ms';
+  }
+  /* 新图写进新图层的 .bg-layer */
+  newScroll.querySelectorAll('.bg-layer').forEach(function(l){
+    l.style.backgroundImage = newUrl;
+  });
+  z1.appendChild(newScroll);
+  /* 下一帧开始淡入 */
+  requestAnimationFrame(function(){
+    newScroll.style.opacity = '1';
+  });
+  /* 600ms 后：写回旧层 → 移除临时层 → 恢复旧层默认样式 */
+  setTimeout(function(){
+    oldScroll.querySelectorAll('.bg-layer').forEach(function(l){
+      l.style.backgroundImage = newUrl;
+    });
+    newScroll.remove();
+    oldScroll.style.position = '';
+    oldScroll.style.inset = '';
+    oldScroll.style.zIndex = '';
+  }, 640);
+}
+
 function preloadExploreBackgrounds(){
   let queued = 0;
   for(const region in REGIONS){
@@ -1852,20 +1919,8 @@ function updateExploreBg(){
     const curRaw=(layers[0].style.backgroundImage||'').replace(/["']/g,'"');
     const newNorm=newUrl.replace(/["']/g,'"');
     if(curRaw!==newNorm){
-      if(fadeEl){
-        /* rev279: 平滑淡入淡出（0.35s 漸黑 → 換圖 → 0.9s 漸顯）*/
-        fadeEl.style.transition='opacity 0.35s ease-out';
-        fadeEl.style.opacity='1';
-        setTimeout(function(){
-          layers.forEach(function(l){l.style.backgroundImage=newUrl;});
-          setTimeout(function(){
-            fadeEl.style.transition='opacity 0.9s ease-in';
-            fadeEl.style.opacity='0';
-          }, 80);
-        }, 380);
-      } else {
-        layers.forEach(function(l){l.style.backgroundImage=newUrl;});
-      }
+      /* rev526: 交叉淡入淡出（600ms，无黑屏） */
+      _crossfadeExploreBg(newUrl);
     }
   }
   const t=$('#zone1 .zone-title');
