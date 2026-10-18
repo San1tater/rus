@@ -984,7 +984,7 @@ function playerShoot(){
           if((battle.bossId === 'core_omega' || battle.bossId === 'core_omega_ii') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
           if(battle.bossHp <= 0){ endBattle(true); return true; }
         } else {
-          applyBossDamage(dmg,isCrit,def.pen||0);
+          applyBossDamage(dmg,isCrit,def.pen||0,def.slot==="throwable");
           if(battle.bossHp <= 0) return true;
         }
       }
@@ -1080,12 +1080,12 @@ function findNearestHeadForLayer(layerId){
   const anim = anims[battleBossAnim.name] || anims.idle; if(!anim) return null;
   const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
   const world = resolveBossWorld(def, anim, fi);
-  const _isEM = /^(eyes|mouth)/.test(layerId);
+  const _isEM = /^(eye|mouth)/.test(layerId);
   if(!_isEM){
     const self = world[layerId]; if(!self) return null;
     return pickHeadForPoint(self.wx, self.wy, def, world, anim, fi);
   }
-  const _emIds = def.layers.filter(L => /^(eyes|mouth)/.test(L.id)).map(L => L.id);
+  const _emIds = def.layers.filter(L => /^(eye|mouth)/.test(L.id)).map(L => L.id);
   const _group = [];
   const _visited = new Set();
   const _queue = [layerId];
@@ -1120,7 +1120,7 @@ function getHydraTargets(aimPart){
     if(battle.heads[h] && battle.heads[h].alive) return [h];
     return [];
   }
-  if(/^(eyes|mouth)/.test(aimPart)){
+  if(/^(eye|mouth)/.test(aimPart)){
     const owner = findNearestHeadForLayer(aimPart);
     if(owner && battle.heads[owner] && battle.heads[owner].alive) return [owner];
     return [];
@@ -1234,8 +1234,8 @@ function updateHeadBarsUI(){
     if(fill) fill.style.width = Math.max(0, head.hp / head.max * 100) + '%';
   }
 }
-function applyHydraDamage(dmg, isCrit, pen){
-  if(battle.bossArmor > 0){
+function applyHydraDamage(dmg, isCrit, pen, isThrowable){
+  if(battle.bossArmor > 0 && !isThrowable){
     const bl=BOSSES[battle.bossId]?(BOSSES[battle.bossId].armorLevel||0):0;
     const proxy = { hp: 0, armor: battle.bossArmor };
     const r = applyDamage(proxy, dmg, pen || 0, bl);
@@ -1246,7 +1246,7 @@ function applyHydraDamage(dmg, isCrit, pen){
     if(apEl) apEl.style.width = Math.max(0, battle.bossArmor / battle.bossMaxArmor * 100) + '%';
     return;
   }
-  const isBodyPart = !/^(head_|neck_|eyes|mouth)/.test(battle.aimPart);
+  const isBodyPart = !/^(head_|neck_|eye|mouth)/.test(battle.aimPart);
   const adjustedDmg = isBodyPart ? Math.round(dmg * 0.7) : dmg;
   const targets = getHydraTargets(battle.aimPart);
   if(!targets.length) return;
@@ -1260,12 +1260,11 @@ function applyHydraDamage(dmg, isCrit, pen){
     if(head.hp <= 0){
       head.alive = false;
       playHeadBreakFx(headId);
-      /* 打爆頭部後，若瞄準點指向該頭（直接/頸/眼/嘴），重置為預設瞄準點 */
       const _ap = battle.aimPart;
       const _aimIsDeadHead = (
         _ap === headId ||
         (typeof HYDRA_NECK_MAP !== 'undefined' && HYDRA_NECK_MAP[_ap] === headId) ||
-        (/^(eyes|mouth)/.test(String(_ap || '')) && typeof findNearestHeadForLayer === 'function' && findNearestHeadForLayer(_ap) === headId)
+        (/^(eye|mouth)/.test(String(_ap || '')) && typeof findNearestHeadForLayer === 'function' && findNearestHeadForLayer(_ap) === headId)
       );
       if(_aimIsDeadHead){
         battle.aimPart = (typeof defaultAimPartForBoss === 'function') ? defaultAimPartForBoss(battle.bossId) : null;
@@ -1276,9 +1275,11 @@ function applyHydraDamage(dmg, isCrit, pen){
   if(HYDRA_HEAD_IDS.every(id => !battle.heads[id].alive)){ battle.bossHp = 0; endBattle(true); return; }
   updateHeadBarsUI();
 }
-function applyBossDamage(dmg,isCrit,pen){
+
+
+function applyBossDamage(dmg,isCrit,pen,isThrowable){
   battle.engaged = true;
-  if((battle.bossId==='swamp_hydra'||battle.bossId==='swamp_hydra_ii') && battle.heads){ applyHydraDamage(dmg,isCrit,pen); return; }
+  if((battle.bossId==='swamp_hydra'||battle.bossId==='swamp_hydra_ii') && battle.heads){ applyHydraDamage(dmg,isCrit,pen,isThrowable); return; }
   if(battle.shieldMaxHp>0 && !battle.shieldBroken && battle.shieldHp>0){
     const _pen=pen||0;
     const _shieldScale=Math.min(1,Math.exp((_pen-7)*0.4));
@@ -1291,6 +1292,21 @@ function applyBossDamage(dmg,isCrit,pen){
     if(battle.shieldHp<=0)breakBossShield();
     return;
   }
+  if(isThrowable){
+    const _dmg = Math.round(dmg);
+    battle.bossHp = Math.max(0, battle.bossHp - _dmg);
+    battle.damageDealt += _dmg;
+    spawnHitFx(battle.bx,battle.by,`-${_dmg}${isCrit?'!':''}`,isCrit?'crit':'weak');
+    if(!battle.bossRetreat){
+      const hpPct = _dmg / Math.max(1, battle.bossMaxHp);
+      const retreatDist = Math.min(0.20, hpPct * 8);
+      if(retreatDist >= 0.01){
+        battle.bossRetreat = { targetX: clamp(battle.bx + retreatDist, 0.05 + BOSS_MIN_GAP, 0.95) };
+      }
+    }
+    if(battle.bossHp<=0)endBattle(true);
+    return;
+  }
   const bl=BOSSES[battle.bossId]?(BOSSES[battle.bossId].armorLevel||0):0;
   const target={hp:battle.bossHp,armor:battle.bossArmor};
   const res=applyDamage(target,dmg,pen||0,bl);
@@ -1298,7 +1314,6 @@ function applyBossDamage(dmg,isCrit,pen){
   battle.damageDealt += (res.armorLost + res.hpLost);
   const shownDmg = res.hpLost > 0 ? res.hpLost : res.armorLost;
   spawnHitFx(battle.bx,battle.by,`-${Math.round(shownDmg)}${isCrit?'!':''}`,isCrit?'crit':(res.hpLost>0?'':'armor'));
-  /* v56-retreat: 按 hp 傷害 / bossMaxHp 比例擊退（僅生命傷害觸發） */
   if(res.hpLost > 0 && !battle.bossRetreat
      && battle.bossId !== 'swamp_hydra' && battle.bossId !== 'swamp_hydra_ii'){
     const hpPct = res.hpLost / Math.max(1, battle.bossMaxHp);
@@ -1309,6 +1324,8 @@ function applyBossDamage(dmg,isCrit,pen){
   }
   if(battle.bossHp<=0)endBattle(true);
 }
+
+
 function breakBossShield(){
   if(!battle || battle.shieldBroken) return;
   battle.shieldBroken = true;

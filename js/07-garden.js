@@ -893,26 +893,6 @@ const MERCHANT_AMMO_TABLE = {
  * ════════════════════════════════════════════════════════════════ */
 /* ===== rev301 validate helper ===== */
 const _MIN_VALID_TS = 1577836800000;
-function _gardenMerchantLineValidate(lineKey, L, m, now){
-  if(!L || !L.lvKey || !L.lastKey || !L.table) return null;
-  let lv = m[L.lvKey];
-  if(typeof lv !== 'number' || !Number.isFinite(lv) || lv < 0 || Math.floor(lv) !== lv){
-    m[L.lvKey] = 0;
-    return null;
-  }
-  if(lv === 0) return null;
-  const cfg = L.table[lv];
-  if(!cfg){
-    m[L.lvKey] = 0;
-    return null;
-  }
-  const last = m[L.lastKey];
-  if(typeof last !== 'number' || !Number.isFinite(last) || last < _MIN_VALID_TS || last > now + 60000){
-    m[L.lastKey] = now;
-    return null;
-  }
-  return { lv: lv, last: last, cfg: cfg };
-}
 /* ===== end validate helper ===== */
 
 function _gardenMerchantInit(){
@@ -1436,10 +1416,14 @@ const MERCHANT_TRADE_ITEMS = [
     { id: 'red_soil',   name: '紅土地', desc: '生长<span style="color:#e05252">↓40%</span> 产量<span style="color:#4caf50">↑30%</span>', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
   ]},
   { category: '補給', items: [
-    { id: 'ammo_supply', name: '彈藥補給', desc: '庫存彈藥×30', price: 100, rarity: '庫存', imgIcon: 'ammo_pack', stackable: true },
+    { id: 'ammo_supply_stock',   name: '庫存彈藥包', desc: '庫存彈藥×30', price: 100, rarity: '庫存', imgIcon: 'ammo_pack', stackable: true },
+    { id: 'ammo_supply_premium', name: '精品彈藥包', desc: '精品彈藥×40', price: 300, rarity: '精品', imgIcon: 'ammo_pack', stackable: true },
+    { id: 'ammo_supply_legend',  name: '傳奇彈藥包', desc: '傳奇彈藥×50', price: 800, rarity: '傳奇', imgIcon: 'ammo_pack', stackable: true },
     { id: 'medkit',      name: '傳奇急救包', desc: '傳奇急救包×1', price: 800, rarity: '傳奇', itemIconId: 'ifak',      stackable: true }
   ]}
 ];
+;
+;
 
 
 
@@ -1564,15 +1548,19 @@ function buyTradeItem(itemId, qty){
       count: 1
     });
     extraActions = [{ label: '立即套用', cls: 'primary', type: 'apply', soilType: item.id }];
-  } else if(item.id === 'ammo_supply'){
-    const ids = Object.keys(AMMO).filter(function(k){ return AMMO[k].rarity === '庫存'; });
+  } else if(item.id === 'ammo_supply_stock' || item.id === 'ammo_supply_premium' || item.id === 'ammo_supply_legend'){
+    const rarity = item.id === 'ammo_supply_stock' ? '庫存'
+                 : item.id === 'ammo_supply_premium' ? '精品' : '傳奇';
+    const count = item.id === 'ammo_supply_stock' ? 30
+                 : item.id === 'ammo_supply_premium' ? 40 : 50;
+    const ids = Object.keys(AMMO).filter(function(k){ return AMMO[k].rarity === rarity; });
     const collected = {};
     for(let q = 0; q < qty; q++){
       if(!ids.length) break;
       const aid = ids[Math.floor(Math.random() * ids.length)];
-      invAdd(aid, '庫存', 30);
-      if(!collected[aid]) collected[aid] = { id: aid, rarity: '庫存', count: 0 };
-      collected[aid].count += 30;
+      invAdd(aid, rarity, count);
+      if(!collected[aid]) collected[aid] = { id: aid, rarity: rarity, count: 0 };
+      collected[aid].count += count;
     }
     for(const k in collected) got.push(collected[k]);
   } else if(item.id === 'medkit'){
@@ -1595,11 +1583,14 @@ function buyTradeItem(itemId, qty){
     for(const k in collected) got.push(collected[k]);
   }
   save();
-  /* rev325p: 先彈窗，後刷新 */
   try { _openTradeResultDialog(got, item.name, extraActions); } catch(e){ console.warn('[trade result]', e); }
   try { if(typeof _gardenUpdateFoodInfo === 'function') _gardenUpdateFoodInfo(); } catch(e){ console.warn('[trade foodinfo]', e); }
   try { _refreshMerchantView(); } catch(e){ console.warn('[trade refresh]', e); }
 }
+
+
+
+
 
 function _openTradeResultDialog(gotItems, title, extraActions){
   let body = '';
@@ -2629,42 +2620,77 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
 
 
 function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, weaponId, enemyId){
-  if(typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[enemyId]) {
-    const def = BEAST_LAYERS[enemyId];
-    const bounds = getBeastBounds(def);
+  /* rev514: REGIONS.enemies 用 ghoul/raider/raider_vet；HUMAN_ENEMY_DATA 键为 human_ghoul 等 */
+  var _realId = enemyId;
+  if(typeof HUMAN_ENEMY_DATA !== "undefined"){
+    if(!HUMAN_ENEMY_DATA[enemyId] && HUMAN_ENEMY_DATA["human_" + enemyId]){
+      _realId = "human_" + enemyId;
+    }
+  }
+  /* 人形敌人：走 _rev506_drawHumanCorpse（带装备/武器，支持任意动画） */
+  if(typeof HUMAN_ENEMY_DATA !== "undefined" && HUMAN_ENEMY_DATA[_realId]){
+    const def = HUMAN_ENEMY_DATA[_realId];
+    const anims = def.anims;
+    if(!anims) return;
+    const anim = anims[animName] || anims.idle;
+    if(!anim) return;
+    const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
+    /* 装备缓存：每种敌人固定一套（避免每帧随机） */
+    if(!window._rev510_raidEquipCache) window._rev510_raidEquipCache = {};
+    if(!window._rev510_raidEquipCache[_realId]){
+      window._rev510_raidEquipCache[_realId] = (typeof _rev506_getRandomEquip === "function")
+        ? _rev506_getRandomEquip(_realId) : null;
+    }
+    const equip = window._rev510_raidEquipCache[_realId];
+    const ox = px - def.canvas.w * scale / 2;
+    const oy = py - def.canvas.h * scale;
+    const _isDeath = (animName === "death");
+    if(typeof _rev506_drawHumanCorpse === "function"){
+      _rev506_drawHumanCorpse(ctx, _realId, scale, ox, oy, def, anim, fi, equip, _isDeath);
+      return;
+    }
+  }
+  /* 野兽：走 _drawEnemyAt */
+  if(typeof _drawEnemyAt === "function"){
+    var _bdef = (typeof BEAST_LAYERS !== "undefined" && BEAST_LAYERS[_realId]);
+    if(_bdef){
+      var _bx = px - _bdef.canvas.w * scale / 2;
+      var _by = py - _bdef.canvas.h * scale;
+      if(_drawEnemyAt(ctx, _realId, _bx, _by, scale, animName, frameIdx)) return;
+    }
+  }
+  if(typeof BEAST_LAYERS !== "undefined" && BEAST_LAYERS[_realId]) {
+    const def = BEAST_LAYERS[_realId];
+    const bounds = (typeof getBeastBounds === "function") ? getBeastBounds(def) : null;
     if(bounds) {
       const targetVisualH = 386 * 0.9;
       const actualScale = (targetVisualH * scale) / bounds.h;
-      
       ctx.save();
       ctx.translate(px, py);
       ctx.scale(actualScale, actualScale);
-      
       const centerX = (bounds.minX + bounds.maxX) / 2;
       const bottomY = bounds.maxY;
       ctx.translate(-centerX, -bottomY);
-      
-      const world = resolveBossWorld(def, { keys:{} }, 0);
+      const world = (typeof resolveBossWorld === "function") ? resolveBossWorld(def, { keys:{} }, 0) : {};
       const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
       for(const L of sorted) {
         const wp = world[L.id];
+        if(!wp) continue;
         const w = def.canvas.w * L.w;
         const h = def.canvas.h * L.h;
         const ppx = w * L.pivot.x;
         const ppy = h * L.pivot.y;
         ctx.save();
         ctx.translate(wp.wx, wp.wy);
-        ctx.rotate((L.rot || 0) * BOSS_DEG2RAD);
+        ctx.rotate((L.rot || 0) * Math.PI / 180);
         ctx.translate(-ppx, -ppy);
-        
-        if(L.id.indexOf('eye') === 0) {
-          ctx.shadowColor = '#ff0000';
+        if(L.id.indexOf("eye") === 0) {
+          ctx.shadowColor = "#ff0000";
           ctx.shadowBlur = 15;
         }
-        
         ctx.fillStyle = L.color;
         ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+        ctx.strokeStyle = "rgba(0,0,0,0.65)";
         ctx.lineWidth = 2;
         ctx.strokeRect(1, 1, w - 2, h - 2);
         ctx.restore();
@@ -2673,15 +2699,20 @@ function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, weaponId, enemyI
       return;
     }
   }
-  
-  // 人形怪：傳入真實裝備與配色
-  if(typeof _raidDrawHuman === 'function') {
-    const _eq = { head: 'ssh68', top: '6b231', primary: 'ak74' };
-    const _rar = { head: '一般', top: '一般', primary: '一般' };
-    _raidDrawHuman(ctx, px, py, scale, _eq, _rar, animName, frameIdx, 'primary', 'enemy', true, false, null);
-    return;
+
+  /* 最终兜底：_raidDrawHuman（原 fallback） */
+  if(typeof _raidDrawHuman === "function") {
+    const _eq = { head: "ssh68", top: "6b231", primary: "ak74" };
+    const _rar = { head: "一般", top: "一般", primary: "一般" };
+    _raidDrawHuman(ctx, px, py, scale, _eq, _rar, animName, frameIdx, "primary", "enemy", true, false, null);
   }
 }
+
+
+
+
+
+
 
 
 
@@ -3136,8 +3167,19 @@ function _gardenRaidShowBattle(guards, enemies, region){
     const damageTexts = [];
     const MAX_DMG_AGE = 900;
 
-    function tickAnim(u, now){
-      const anim = GAME_ANIMS[u.animName] || GAME_ANIMS.idle;
+function tickAnim(u, now){
+      let anim = null;
+      if(u.isGuard){
+        anim = GAME_ANIMS[u.animName] || GAME_ANIMS.idle;
+      } else {
+        if(typeof _resolveEnemyAnims === 'function'){
+          const _eid = (typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA['human_' + u.id]) ? 'human_' + u.id : u.id;
+          const _anims = _resolveEnemyAnims(_eid);
+          if(_anims && _anims[u.animName]) anim = _anims[u.animName];
+        }
+        if(!anim) anim = GAME_ANIMS[u.animName] || GAME_ANIMS.idle;
+      }
+      if(!anim) return;
       const interval = 1000 / anim.fps;
       if(now >= u.animNext){
         u.animNext = now + interval;
@@ -3158,35 +3200,35 @@ function _gardenRaidShowBattle(guards, enemies, region){
 }
 
 function drawUnit(u, now){
-      if(!u.alive) return;
-      tickAnim(u, now);
-      if(!u.alive){
-        const age = now - (u.deadTime || now);
-        if(age > 1000) return;
-        ctx.globalAlpha = Math.max(0, 1 - age / 1000);
+      if(!u.alive && u.animName !== 'death'){
+        u.animName = 'death';
+        u.animFrame = 0;
+        u.animNext = 0;
       }
+      tickAnim(u, now);
       let ox = 0;
       if(now < u.hurtUntil){
         const t = 1 - (u.hurtUntil - now) / 220;
         ox += Math.sin(t * Math.PI * 5) * 3;
       }
       ctx.save();
-      if(!u.alive) ctx.globalAlpha = 0.22;
       if(u.isGuard){
         _raidDrawHuman(ctx, u.x + ox, u.y, SCALE, u.equipped, u.equippedRarity, u.animName, u.animFrame, u.weaponSlot, false);
       } else {
         _raidDrawEnemy(ctx, u.x + ox, u.y, SCALE, u.animName, u.animFrame, u.weaponId || 'ak74', u.id);
       }
       ctx.restore();
-      const barW = 34, barH = 4;
-      const bx = u.x - barW / 2;
-      const by = u.y - CHAR_PX - 8;
-      ctx.fillStyle = 'rgba(0,0,0,.75)';
-      ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
-      ctx.fillStyle = '#1a1010';
-      ctx.fillRect(bx, by, barW, barH);
-      ctx.fillStyle = u.isGuard ? '#4caf50' : '#e05252';
-      ctx.fillRect(bx, by, barW * Math.max(0, u.hp / u.maxHp), barH);
+      if(u.alive){
+        const barW = 34, barH = 4;
+        const bx = u.x - barW / 2;
+        const by = u.y - CHAR_PX - 8;
+        ctx.fillStyle = 'rgba(0,0,0,.75)';
+        ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
+        ctx.fillStyle = '#1a1010';
+        ctx.fillRect(bx, by, barW, barH);
+        ctx.fillStyle = u.isGuard ? '#4caf50' : '#e05252';
+        ctx.fillRect(bx, by, barW * Math.max(0, u.hp / u.maxHp), barH);
+      }
     }
 
     function drawBullet(b){
@@ -3797,8 +3839,7 @@ function _gardenHasSeedOf(seedId, rarity){
 function _gardenUpdateFoodInfo(){
   const el = document.getElementById('gp-food-info');
   if(!el) return;
-  const s0 = _gardenFoodStats();
-  const s = { food: Number(s0.food) || 0, consume: Number(s0.consume) || 0, lineConsume: Number(s0.lineConsume) || 0, produce: Number(s0.produce) || 0 };
+  const s = _gardenFoodStats();
   const consStr = s.consume > 0 ? '-' + s.consume + '/h' : '0/h';
   const lineStr = s.lineConsume > 0 ? ' <span style="color:#e8a33d">-' + s.lineConsume + '/h</span>' : '';
   const prodStr = s.produce > 0 ? '+' + s.produce + '/h' : '0/h';
@@ -4158,10 +4199,7 @@ function _gardenActorTick(){
     }
     // 守衛：体力 > 0 站哨塔，体力 = 0 偷懒
     if(a.type === 'guard'){
-      if(window._raidLiveActive) animName = 'fire_primary';
-      else animName = 'idle';
-      /* 下面保留原逻辑 */
-      if(a.stamina <= 0){
+if(a.stamina <= 0){
         if(!a.restPos){
           const gridRect = grid.getBoundingClientRect();
           a.restPos = { x: Math.max(6, gridRect.left - wrapRect.left - 18), y: gridRect.top - wrapRect.top + 30 + Math.random() * Math.max(10, gridRect.height - 60) };
@@ -4488,8 +4526,7 @@ function _gardenRenderActors(now){
     if(_moving) animName = 'walk';
     else if(a.state === 'work') animName = 'fire_primary';
     else animName = 'idle';
-    if(window._raidLiveActive && a.type === 'guard'){ animName = 'fire_primary'; }
-    const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
+const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
     if(!a._animStart || a._animName !== animName){
       a._animStart = now;
       a._animName = animName;

@@ -149,7 +149,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   ctx.translate(_tf.ox, _tf.oy);
   ctx.scale(_tf.sx, _tf.sy);
 
-  const _SHIELD_LIDS = ['shield','shield-2','shield-2_copy','shield-2_copy_1'];
+  const _SHIELD_LIDS = ['shield','shield_2','shield_3','shield_4'];
   const _hideShield = ((bossId === 'road_tyrant' || bossId === 'road_tyrant_ii') && battle && battle.shieldBroken);
   const _hideHydraHead = ((bossId === 'swamp_hydra' || bossId === 'swamp_hydra_ii') && battle && battle.heads);
   let _hydraOwnerMap = null;
@@ -168,7 +168,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
       const anchorOwner = _resolveAnchorOwner(L.id);
       if(anchorOwner){ _hydraOwnerMap[L.id] = anchorOwner; }
     }
-    const _emIds = def.layers.filter(L => /^(eyes|mouth)/.test(L.id)).map(L => L.id);
+    const _emIds = def.layers.filter(L => /^(eye|mouth)/.test(L.id)).map(L => L.id);
     const _visited = new Set();
     for(const _id of _emIds){
       if(_visited.has(_id)) continue;
@@ -374,6 +374,16 @@ function getBeastBounds(def) {
 
 function drawEnemyPreview(ctx, enemyId, w, h) {
   try {
+    /* rev500：優先使用 09-enemy-data.js 的新數據 + anims（idle 第 0 帧） */
+    if (typeof _drawEnemyAt === 'function') {
+      var _def = (typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[enemyId]) || (typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA[enemyId]);
+      if (_def) {
+        var _s = Math.min(w / _def.canvas.w, h / _def.canvas.h);
+        var _ox = (w - _def.canvas.w * _s) / 2;
+        var _oy = h - _def.canvas.h * _s;
+        if (_drawEnemyAt(ctx, enemyId, _ox, _oy, _s, 'idle', 0)) return;
+      }
+    }
     if(typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[enemyId]) {
       const def = BEAST_LAYERS[enemyId];
       let bounds = null;
@@ -433,203 +443,583 @@ function drawEnemyPreview(ctx, enemyId, w, h) {
 }
 
 function _showExploreEnemyGraphics(enemies) {
-  const fx = document.getElementById('explore-fx');
-  if(!fx) return;
+  window._exploreLastEnemies = (enemies || []).map(function(e){
+    return { id: e.id, name: e.name };
+  });
   const oldGrp = document.getElementById('explore-enemy-group');
   if(oldGrp) oldGrp.remove();
-  
-  const fxH = fx.clientHeight || 500;
-  const fxW = fx.clientWidth || 400;
-  const charPx = fxH * 0.58;
-  
-  const container = document.createElement('div');
-  container.id = 'explore-enemy-group';
-  container.style.position = 'absolute';
-  container.style.inset = '0';
-  container.style.zIndex = '10';
-  container.style.pointerEvents = 'none';
-  container.style.transition = 'opacity 0.4s';
-  
-  const maxEnemies = Math.min(enemies.length, 4);
-  const states = [];
-  const canvases = [];
-  
-  for(let i=0; i<maxEnemies; i++) {
-    try {
-      const e = enemies[i];
-      const isBeast = typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[e.id];
-      
-      let domH, domW;
-      if(isBeast) {
-        if(e.id === 'mutant_wolf') domH = charPx * 0.9;
-        else if(e.id === 'mutant_bear') domH = charPx * 1.05;
-        else domH = charPx * 0.8;
-        
-        let bounds = null;
-        try { bounds = getBeastBounds(BEAST_LAYERS[e.id]); } catch(err) {}
-        domW = (bounds && bounds.h > 0) ? domH * (bounds.w / bounds.h) : domH;
-      } else {
-        domH = charPx * 1.25;
-        domW = domH * (88 / 118);
-      }
-      
-      const cw = Math.round(domW * 2);
-      const ch = Math.round(domH * 2);
-      
-      const cvs = document.createElement('canvas');
-      cvs.width = cw;
-      cvs.height = ch;
-      cvs.style.width = domW + 'px';
-      cvs.style.height = domH + 'px';
-      cvs.style.position = 'absolute';
-      cvs.style.bottom = '5%'; 
-      
-                  /* rev354-enemy-spread-v4：允許大量重疊，靠適當的水平+垂直偏移區分
-         - 水平間距 = fxW * 0.06（約 24px @fxW=400），只錯開一小部分輪廓
-         - 垂直偏移循環 [5%, 11%, 3%, 13%]，鄰居差 6~8%，靠高度明確區分
-         - i=0 貼屏幕中線右側（fxW*0.5），後續依次往右，溢出僅在屏幕右側 */
-      const _startX = fxW * 0.5;
-      const _enemySpacing = fxW * 0.06;
-      const _vertPattern = [5, 11, 3, 13];
-      const targetLeftPx = _startX + i * _enemySpacing;
-      cvs.style.bottom = _vertPattern[i % 4] + '%';
-      
-      cvs.style.left = '0px';
-      cvs.style.transform = 'translate(' + (fxW + 200) + 'px, 0px)';
-      cvs.style.transition = 'transform 0.6s ease-out';
-      cvs.style.zIndex = 100 - i;
-      
-      const ctx = cvs.getContext('2d');
-      drawEnemyPreview(ctx, e.id, cw, ch);
-      container.appendChild(cvs);
-      canvases.push({ cvs, id: e.id });
-      
-      states.push({ cvs, targetLeftPx });
-      
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          cvs.style.transform = 'translate(' + targetLeftPx + 'px, 0px)';
-        });
-      });
-    } catch(err) {
-      console.warn('[showEnemy] error item:', err);
+  const oldCorpse = document.getElementById('explore-corpse-group');
+  if(oldCorpse) oldCorpse.remove();
+}
+
+
+
+
+
+
+
+function _resolveExploreEnemyGraphics(victory, survivors) {
+  const enemies = window._exploreLastEnemies || [];
+  if(victory){
+    if(enemies.length){
+      setTimeout(function(){ _spawnExploreCorpses(enemies); }, 1500);
     }
-  }
-  fx.appendChild(container);
-  window._exploreEnemyStates = { container, states, fxW, fxH, charPx };
-  
-  const imgsToLoad = [];
-  for(let i=0; i<maxEnemies; i++) {
-    if(!BEAST_LAYERS[enemies[i].id]) {
-      imgsToLoad.push(getHeroImg('icons/items/ssh68.png'));
-      imgsToLoad.push(getHeroImg('icons/items/6b231.png'));
-      imgsToLoad.push(getHeroImg('icons/items/ak74.png'));
-    }
-  }
-  const uniqImgs = [...new Set(imgsToLoad)];
-  
-  if(uniqImgs.length > 0) {
-    let loadedCount = 0;
-    uniqImgs.forEach(img => {
-      if(img.complete) loadedCount++;
-      else img.addEventListener('load', () => loadedCount++);
-    });
-    
-    let lastCount = loadedCount;
-    const timer = setInterval(() => {
-      if(!container.parentNode) { clearInterval(timer); return; }
-      if(loadedCount > lastCount) {
-        lastCount = loadedCount;
-        canvases.forEach(c => {
-          const ctx = c.cvs.getContext('2d');
-          ctx.clearRect(0, 0, c.cvs.width, c.cvs.height);
-          drawEnemyPreview(ctx, c.id, c.cvs.width, c.cvs.height);
-        });
-      }
-      if(loadedCount >= uniqImgs.length) clearInterval(timer);
-    }, 100);
+  } else {
+    setTimeout(function(){ _spawnEnemyBulletsToPlayer(2 + Math.floor(Math.random() * 2)); }, 1500);
   }
 }
 
-function _resolveExploreEnemyGraphics(victory, survivors) {
-  if(!window._exploreEnemyStates) return;
-  const { container, states, fxW, fxH, charPx } = window._exploreEnemyStates;
-  if(!container.parentNode) return;
-  const playerX = fxW * 0.25;
-  const playerY = fxH * 0.95 - charPx * 0.5;
-  setTimeout(() => {
-    states.forEach(st => {
-      const { cvs } = st;
-      if(!cvs.parentNode) return;
-      if(!victory && survivors && survivors.length > 0) {
-        const rect = cvs.getBoundingClientRect();
-        const fxRect = container.getBoundingClientRect();
-        const startX = rect.left - fxRect.left;
-        const startY = rect.top - fxRect.top + rect.height * 0.5;
-        for(let b=0; b<3; b++) {
-          setTimeout(() => {
-            const bullet = document.createElement('div');
-            bullet.className = 'explore-bullet';
-            bullet.style.width = '8px';
-            bullet.style.height = '8px';
-            bullet.style.background = '#ff3030';
-            bullet.style.boxShadow = '0 0 10px #ff0000';
-            bullet.style.left = startX + 'px';
-            bullet.style.top = startY + 'px';
-            bullet.style.transition = 'all 0.35s ease-in';
-            container.appendChild(bullet);
-            requestAnimationFrame(() => {
-              bullet.style.left = playerX + (Math.random()-0.5)*30 + 'px';
-              bullet.style.top = playerY + (Math.random()-0.5)*30 + 'px';
-              bullet.style.opacity = '0.2';
-            });
-            setTimeout(() => bullet.remove(), 400);
-          }, b * 100);
-        }
-        setTimeout(() => {
-          if(cvs.parentNode) {
-            cvs.style.transition = 'transform 0.6s ease-in, opacity 0.6s ease-in';
-            cvs.style.transform = 'translate(' + (fxW + 200) + 'px, 0px)';
-            cvs.style.opacity = '0';
-          }
-        }, 800);
-      } else if(victory) {
-        const rect = cvs.getBoundingClientRect();
-        const fxRect = container.getBoundingClientRect();
-        const cx = rect.left - fxRect.left + rect.width/2;
-        const cy = rect.top - fxRect.top + rect.height/2;
-        cvs.style.transition = 'opacity 0.2s';
-        cvs.style.opacity = '0';
-        for(let p=0; p<8; p++) {
-          const debris = document.createElement('div');
-          debris.style.position = 'absolute';
-          debris.style.width = (8 + Math.random()*8) + 'px';
-          debris.style.height = (8 + Math.random()*8) + 'px';
-          debris.style.background = '#804020';
-          debris.style.left = cx + 'px';
-          debris.style.top = cy + 'px';
-          debris.style.transform = 'translate(-50%,-50%)';
-          debris.style.zIndex = '11';
-          const angle = Math.random() * Math.PI * 2;
-          const dist = 20 + Math.random() * 40;
-          container.appendChild(debris);
-          requestAnimationFrame(() => {
-            debris.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.4, 1)';
-            debris.style.left = (cx + Math.cos(angle)*dist) + 'px';
-            debris.style.top = (cy + Math.sin(angle)*dist) + 'px';
-            debris.style.opacity = '0';
-            debris.style.transform = 'translate(-50%,-50%) rotate(' + (Math.random()*360) + 'deg)';
-          });
-          setTimeout(() => debris.remove(), 550);
+/* id 映射：REGIONS.enemies 用 raider/ghoul/raider_vet，09 数据用 human_raider 等 */
+function _resolveEnemyDef(id){
+  if(typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[id]) return { def: BEAST_LAYERS[id], resolvedId: id };
+  if(typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA[id]) return { def: HUMAN_ENEMY_DATA[id], resolvedId: id };
+  if(typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA['human_' + id]) return { def: HUMAN_ENEMY_DATA['human_' + id], resolvedId: 'human_' + id };
+  return null;
+}
+
+/* anims 来源：BEAST_LAYERS 没 anims（在 BEAST_ANIMS）；HUMAN_ENEMY_DATA[id].anims 内嵌 */
+function _resolveEnemyAnims(id){
+  if(typeof BEAST_ANIMS !== 'undefined' && BEAST_ANIMS[id]) return BEAST_ANIMS[id];
+  if(typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA[id] && HUMAN_ENEMY_DATA[id].anims) return HUMAN_ENEMY_DATA[id].anims;
+  return null;
+}
+
+/* 计算死亡末帧的包围盒（复刻 _drawEnemyAt 的 rootRot/rootDy + 层局部变换） */
+function _measureDeathBBox(def, anim, frame){
+  const cw = def.canvas.w, ch = def.canvas.h;
+  const rootRot = ((anim.rootRot && anim.rootRot[frame]) || 0) * Math.PI / 180;
+  const rootDy = (anim.rootDy && anim.rootDy[frame]) || 0;
+  const rootPivot = anim.rootPivot || { x: 0.5, y: 0.95 };
+  const pcx = cw * rootPivot.x, pcy = ch * rootPivot.y;
+  const cosR = Math.cos(rootRot), sinR = Math.sin(rootRot);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for(let li = 0; li < def.layers.length; li++){
+    const L = def.layers[li];
+    const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][frame]) || {rot:0,dx:0,dy:0};
+    const w = cw * L.w, h = ch * L.h;
+    const cx = cw * L.x + cw * (k.dx||0) * 0.01;
+    const cy = ch * L.y + ch * (k.dy||0) * 0.01;
+    const px = w * L.pivot.x, py = h * L.pivot.y;
+    const rot = ((L.rot||0) + (k.rot||0)) * Math.PI / 180;
+    const cosL = Math.cos(rot), sinL = Math.sin(rot);
+    const corners = [[-px,-py],[w-px,-py],[-px,h-py],[w-px,h-py]];
+    for(let ci = 0; ci < 4; ci++){
+      const lx = corners[ci][0], ly = corners[ci][1];
+      const Px = cx + lx*cosL - ly*sinL;
+      const Py = cy + lx*sinL + ly*cosL;
+      const ddx = Px - pcx, ddy = Py - pcy;
+      const rotX = pcx + ddx*cosR - ddy*sinR;
+      const rotY = pcy + ddx*sinR + ddy*cosR + ch * rootDy;
+      if(rotX < minX) minX = rotX;
+      if(rotY < minY) minY = rotY;
+      if(rotX > maxX) maxX = rotX;
+      if(rotY > maxY) maxY = rotY;
+    }
+  }
+  if(!isFinite(minX)) return null;
+  return { minX, minY, maxX, maxY, w: maxX-minX, h: maxY-minY };
+}
+
+/* 尸体：从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
+/* rev506: 人形敌人尸体渲染 —— 装备 + 手臂水平 + torso 贴地 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 尸体：从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
+/* rev507: 人形敌人尸体渲染 —— 装备随机化 + back_arm 偏移 + torso 对齐 */
+const _rev506_ANIMAL_ANCHOR = {
+  mutant_bear: "torso",
+  mutant_wolf: "body",
+  mutant_rat: "body",
+  mutant_squirrel: "body"
+};
+
+const _rev506_HUMAN_EQUIP_POOL = {
+  human_ghoul: {
+    head: [null],
+    top: [null],
+    primary: ["6kh2", "6kh5", "kukri"]
+  },
+  human_raider: {
+    head: ["ssh68", "ssh94", "kolpak"],
+    top: ["paca", "6b23", "zhuk3"],
+    primary: ["aks74u", "aks74un", "ak74", "akms", "akm", "akmn"]
+  },
+  human_raider_vet: {
+    head: ["6b47", "6b47m", "kiver", "maska"],
+    top: ["6b13", "6b13m", "6b231", "6b232"],
+    primary: ["ak74m", "ak103", "ak104", "ak105", "ak12"]
+  }
+};
+
+function _rev506_pickRand(arr){
+  if(!arr || !arr.length) return null;
+  return pick(arr);
+}
+
+function _rev506_getRandomEquip(drawId){
+  const pool = _rev506_HUMAN_EQUIP_POOL[drawId];
+  if(!pool) return null;
+  return {
+    head: _rev506_pickRand(pool.head),
+    top: _rev506_pickRand(pool.top),
+    primary: _rev506_pickRand(pool.primary)
+  };
+}
+
+function _rev506_measureLayerMaxY(def, anim, frame, layerId){
+  const L = def.layers.find(function(l){ return l.id === layerId; });
+  if(!L) return null;
+  const cw = def.canvas.w, ch = def.canvas.h;
+  const rootRot = ((anim.rootRot && anim.rootRot[frame]) || 0) * Math.PI / 180;
+  const rootDy = (anim.rootDy && anim.rootDy[frame]) || 0;
+  const rootPivot = anim.rootPivot || { x: 0.5, y: 0.95 };
+  const pcx = cw * rootPivot.x, pcy = ch * rootPivot.y;
+  const cosR = Math.cos(rootRot), sinR = Math.sin(rootRot);
+  const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][frame]) || { rot:0, dx:0, dy:0 };
+  const w = cw * L.w, h = ch * L.h;
+  const cx = cw * L.x + cw * (k.dx || 0) * 0.01;
+  const cy = ch * L.y + ch * (k.dy || 0) * 0.01;
+  const px = w * L.pivot.x, py = h * L.pivot.y;
+  const rot = ((L.rot || 0) + (k.rot || 0)) * Math.PI / 180;
+  const cosL = Math.cos(rot), sinL = Math.sin(rot);
+  const corners = [[-px,-py],[w-px,-py],[-px,h-py],[w-px,h-py]];
+  let maxY = -Infinity;
+  for(let ci = 0; ci < 4; ci++){
+    const lx = corners[ci][0], ly = corners[ci][1];
+    const Px = cx + lx*cosL - ly*sinL;
+    const Py = cy + lx*sinL + ly*cosL;
+    const ddx = Px - pcx, ddy = Py - pcy;
+    const rotY = pcy + ddx*sinR + ddy*cosR + ch * rootDy;
+    if(rotY > maxY) maxY = rotY;
+  }
+  return maxY;
+}
+
+function _rev506_tryDrawArmorAtLayer(ctx, armorId, lw, lh, px, py){
+  /* rev515: 装备图标为面向右的角色设计；敌人面向左 → 必须水平翻转
+     scale(-1,1) + rotate(θ) 与 rotate(-θ) + scale(-1,1) 数学等价
+     baseW = 400 * scale * (lw/playerLayerW)（沿用 rev514）*/
+  if(typeof HEAD_ARMOR_LAYOUT === "undefined") return false;
+  const cfg = HEAD_ARMOR_LAYOUT[armorId];
+  if(!cfg) return false;
+  if(typeof getHeroImg !== "function" || typeof resolveIconId !== "function") return false;
+  const img = getHeroImg("icons/items/" + resolveIconId(armorId) + ".png");
+  if(!img || !img.complete || !img.naturalWidth) return false;
+
+  const _targetLayerId = cfg.layer || "head";
+  const _playerLayer = (typeof GAME_LAYERS !== "undefined")
+    ? GAME_LAYERS.find(function(l){ return l.id === _targetLayerId; })
+    : null;
+  const _playerLayerW = _playerLayer ? (340 * _playerLayer.w) : 68;
+  const _ratio = lw / _playerLayerW;
+
+  const baseW = 400 * (cfg.scale || 0.3) * _ratio;
+  const ar = img.naturalWidth / img.naturalHeight;
+  const baseH = baseW / ar;
+  const drawX = -baseW / 2;
+
+  const localX = px + lw * (cfg.ox || 0);
+  const localY = py + lh * (cfg.oy || 0);
+
+  ctx.save();
+  ctx.translate(localX, localY);
+  /* rev515: 水平翻转（装备面向左）*/
+  ctx.scale(-1, 1);
+  if(cfg.rotation) ctx.rotate(cfg.rotation * Math.PI / 180);
+  ctx.drawImage(img, drawX, -baseH/2, baseW, baseH);
+  ctx.restore();
+  return true;
+}
+
+
+
+
+
+
+
+function _rev506_tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
+  /* rev514: 完全复用玩家 WEAPON_LAYOUT（scale/ox/oy/rotation/trim）
+     baseW = trim.w * scale（绝对尺寸和玩家一致，不补偿层宽）
+     锚点镜像：localX = px - lw*ox
+     视觉旋转一致：rotate(-rotation) + scale(-1,1) → 枪口朝左 */
+  if(typeof WEAPON_LAYOUT === "undefined") return false;
+  if(typeof getHeroImg !== "function" || typeof resolveIconId !== "function") return false;
+  const baseId = resolveIconId(weaponId);
+  const layout = WEAPON_LAYOUT[baseId]
+    || (typeof HERO_VISIBLE_EQ !== "undefined" ? HERO_VISIBLE_EQ.primary : null);
+  if(!layout) return false;
+  const img = getHeroImg("icons/items/" + baseId + ".png");
+  if(!img || !img.complete || !img.naturalWidth) return false;
+
+  const hasTrim = !!(layout.trim && layout.trim.w > 0 && layout.trim.h > 0);
+  let baseW, baseH;
+  if(hasTrim){
+    baseW = layout.trim.w * (layout.scale || 1.0);
+    baseH = layout.trim.h * (layout.scale || 1.0);
+  } else {
+    baseW = 400 * (layout.scale || 0.3);
+    const ar = img.naturalWidth / img.naturalHeight;
+    baseH = baseW / ar;
+  }
+
+  /* localX：镜像后锚点（pivot 在右端 0.95，锚点向左偏移 lw*ox） */
+  const localX = px - lw * (layout.ox || 0);
+  /* localY：和玩家一致（py + lh*oy） */
+  const localY = py + lh * (layout.oy || 0);
+
+  ctx.save();
+  ctx.translate(localX, localY);
+  /* rotate(-rotation) + scale(-1,1)：视觉旋转与玩家一致，枪口朝左 */
+  ctx.rotate(-(layout.rotation || 0) * Math.PI / 180);
+  ctx.scale(-1, 1);
+  if(hasTrim){
+    ctx.drawImage(img, layout.trim.x, layout.trim.y, layout.trim.w, layout.trim.h,
+                  0, -baseH / 2, baseW, baseH);
+  } else {
+    ctx.drawImage(img, 0, -baseH / 2, baseW, baseH);
+  }
+  ctx.restore();
+  return true;
+}
+function _rev506_drawHumanCorpse(ctx, drawId, s, ox, oy, def, anim, fi, equipData, isDeath){
+  /* rev512: isDeath 可选参数
+     isDeath=true ：倒地专用（bodyBottomY 对齐 + armCorrection + 跳过 back_arm）
+     isDeath=false：正常动画（idle/attack/hurt 等，所有层按 anim.keys 绘制）
+     z 排序沿用玩家 drawBlockHero 逻辑：装备 z+0.5、武器 z-0.5（武器在手图层下方）*/
+  const cw = def.canvas.w, ch = def.canvas.h;
+  const eqData = equipData || null;
+  const isDeathMode = (isDeath !== false);
+  const rRot = (anim.rootRot && anim.rootRot[fi]) || 0;
+  const rRotRad = rRot * Math.PI / 180;
+  const rDy = (anim.rootDy && anim.rootDy[fi]) || 0;
+  const rPivot = anim.rootPivot || { x: 0.5, y: 0.95 };
+  const pcx = cw * rPivot.x, pcy = ch * rPivot.y;
+  const cosR = Math.cos(rRotRad), sinR = Math.sin(rRotRad);
+
+  /* 仅 death 模式：bodyBottomY 对齐 + front_arm 下移 */
+  let frontArmCx = null, frontArmCy = null;
+  if(isDeathMode){
+    let bodyBottomY = -Infinity;
+    for(let i = 0; i < def.layers.length; i++){
+      const L = def.layers[i];
+      if(L.id === "front_arm" || L.id === "back_arm") continue;
+      const y = _rev506_measureLayerMaxY(def, anim, fi, L.id);
+      if(y != null && y > bodyBottomY) bodyBottomY = y;
+    }
+    const faL = def.layers.find(function(l){ return l.id === "front_arm"; });
+    if(faL && isFinite(bodyBottomY)){
+      const k = (anim.keys && anim.keys.front_arm && anim.keys.front_arm[fi]) || {rot:0,dx:0,dy:0};
+      const lw_fa = cw * faL.w, lh_fa = ch * faL.h;
+      let cx = cw * faL.x + cw * (k.dx||0) * 0.01;
+      let cy = ch * faL.y + ch * (k.dy||0) * 0.01;
+      const px_fa = lw_fa * faL.pivot.x, py_fa = lh_fa * faL.pivot.y;
+      const localRot = -rRotRad;
+      const cosL = Math.cos(localRot), sinL = Math.sin(localRot);
+      let curMaxY = -Infinity;
+      const cs = [[0,0],[lw_fa,0],[0,lh_fa],[lw_fa,lh_fa]];
+      for(let i = 0; i < 4; i++){
+        const u = cs[i][0], v = cs[i][1];
+        const Lx = cx + (u-px_fa)*cosL - (v-py_fa)*sinL;
+        const Ly = cy + (u-px_fa)*sinL + (v-py_fa)*cosL;
+        const Wy = pcy + (Lx-pcx)*sinR + (Ly-pcy)*cosR + ch*rDy;
+        if(Wy > curMaxY) curMaxY = Wy;
+      }
+      const dy = bodyBottomY - curMaxY;
+      cx += dy * sinR;
+      cy += dy * cosR;
+      frontArmCx = cx;
+      frontArmCy = cy;
+    }
+  }
+
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(s, s);
+  ctx.translate(0, ch * rDy);
+  ctx.translate(pcx, pcy);
+  ctx.rotate(rRotRad);
+  ctx.translate(-pcx, -pcy);
+
+  /* z 排序 units（和玩家 drawBlockHero 一致：装备 z+0.5，武器 z-0.5）*/
+  const units = [];
+  for(const L of def.layers){
+    if(isDeathMode && L.id === "back_arm") continue;
+    if(L.id === "front_arm" && eqData && eqData.primary){
+      units.push({ z: L.z - 0.5, kind: "weapon", layer: L, weaponId: eqData.primary });
+    }
+    units.push({ z: L.z, kind: "layer", layer: L });
+    if(L.id === "head" && eqData && eqData.head){
+      units.push({ z: L.z + 0.5, kind: "armor", layer: L, armorId: eqData.head });
+    }
+    if(L.id === "torso" && eqData && eqData.top){
+      units.push({ z: L.z + 0.5, kind: "armor", layer: L, armorId: eqData.top });
+    }
+  }
+  units.sort(function(a, b){ return a.z - b.z; });
+
+  for(const u of units){
+    const L = u.layer;
+    const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || { rot:0, dx:0, dy:0 };
+    const lw = cw * L.w, lh = ch * L.h;
+    let cx, cy;
+    if(L.id === "front_arm" && frontArmCx != null){
+      cx = frontArmCx;
+      cy = frontArmCy;
+    } else {
+      cx = cw * L.x + cw * (k.dx || 0) * 0.01;
+      cy = ch * L.y + ch * (k.dy || 0) * 0.01;
+    }
+    const px = lw * L.pivot.x, py = lh * L.pivot.y;
+    let localRotRad;
+    if(isDeathMode && L.id === "front_arm"){
+      localRotRad = -rRotRad;
+    } else {
+      localRotRad = ((L.rot || 0) + (k.rot || 0)) * Math.PI / 180;
+    }
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(localRotRad);
+    ctx.translate(-px, -py);
+    if(u.kind === "layer"){
+      const color = (def.colors && def.colors[L.id]) || L.color || "#888";
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, lw, lh);
+      ctx.strokeStyle = "rgba(0,0,0,0.65)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, lw - 2, lh - 2);
+    } else if(u.kind === "armor"){
+      _rev506_tryDrawArmorAtLayer(ctx, u.armorId, lw, lh, px, py);
+    } else if(u.kind === "weapon"){
+      _rev506_tryDrawWeaponAtLayer(ctx, u.weaponId, lw, lh, px, py);
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+
+
+
+
+function _rev506_checkHumanImagesReady(equipData){
+  if(!equipData) return true;
+  const ids = [];
+  if(equipData.head) ids.push(equipData.head);
+  if(equipData.top) ids.push(equipData.top);
+  if(equipData.primary) ids.push(equipData.primary);
+  if(!ids.length) return true;
+  for(let i = 0; i < ids.length; i++){
+    const img = getHeroImg("icons/items/" + resolveIconId(ids[i]) + ".png");
+    if(!img || !img.complete || !img.naturalWidth) return false;
+  }
+  return true;
+}
+
+function _rev506_renderCorpseTo(c){
+  const cvs = c.el;
+  const ctx = cvs.getContext("2d");
+  const dpr = c.dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  ctx.scale(dpr, dpr);
+  if(c.isHuman){
+    _rev506_drawHumanCorpse(ctx, c.drawId, c.idleScale, c.ox, c.oy, c.def, c.deathAnim, c.lastFrame, c.equip);
+    c.fullyDrawn = _rev506_checkHumanImagesReady(c.equip);
+  } else {
+    if(typeof _drawEnemyAt === "function"){
+      _drawEnemyAt(ctx, c.drawId, c.ox, c.oy, c.idleScale, "death", c.lastFrame);
+    }
+    c.fullyDrawn = true;
+  }
+}
+
+/* 尸体：从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
+function _spawnExploreCorpses(enemies){
+  const fx = document.getElementById("explore-fx");
+  if(!fx) return;
+  if(typeof _drawEnemyAt !== "function") return;
+  const fxW = fx.clientWidth || 400;
+  const fxH = fx.clientHeight || 500;
+  const charPx = fxH * 0.58;
+  const old = document.getElementById("explore-corpse-group");
+  if(old) old.remove();
+  const container = document.createElement("div");
+  container.id = "explore-corpse-group";
+  container.style.cssText = "position:absolute;inset:0;z-index:10;pointer-events:none;";
+  fx.appendChild(container);
+  const scrollSpeed = fxW / 10;
+  const corpseEls = [];
+  let xPos = fxW + 20;
+  for(let i = 0; i < enemies.length; i++){
+    try {
+      const e = enemies[i];
+      const r = _resolveEnemyDef(e.id);
+      if(!r) continue;
+      const def = r.def;
+      const drawId = r.resolvedId;
+      const anims = _resolveEnemyAnims(drawId);
+      if(!anims) continue;
+      const deathAnim = anims.death;
+      if(!deathAnim) continue;
+      const lastFrame = deathAnim.frameCount - 1;
+      const bbox = _measureDeathBBox(def, deathAnim, lastFrame);
+      if(!bbox) continue;
+      const cw = def.canvas.w, ch = def.canvas.h;
+      const isHuman = (def.kind === "human");
+      let domHIdle;
+      if(drawId === "mutant_wolf") domHIdle = charPx * 0.9;
+      else if(drawId === "mutant_bear") domHIdle = charPx * 1.05;
+      else if(isHuman) domHIdle = charPx * 1.25;
+      else domHIdle = charPx * 0.8;
+      const idleScale = domHIdle / ch;
+      const anchorLayerId = isHuman ? "torso" : (_rev506_ANIMAL_ANCHOR[drawId] || "body");
+      const anchorMaxY = _rev506_measureLayerMaxY(def, deathAnim, lastFrame, anchorLayerId);
+      let canvasHeightUnits = bbox.h;
+      if(anchorMaxY !== null && anchorMaxY < bbox.maxY){
+        canvasHeightUnits = anchorMaxY - bbox.minY;
+      }
+      /* rev510: equip 提前抽取，供 padTop 判斷 */
+      const equip = isHuman ? _rev506_getRandomEquip(drawId) : null;
+      let padLeft = 0, padRight = 0, padTop = 0;
+      if(isHuman){
+        padLeft = 60;
+        padRight = 60;
+        /* rev510: 武器可能超出前臂上緣，預留頂部空間（20% 身高） */
+        if(equip && equip.primary){
+          padTop = Math.round(ch * 0.20);
         }
       }
-    });
-  }, 1000);
-  setTimeout(() => {
-    container.style.opacity = '0';
-    setTimeout(() => { if(container.parentNode) container.remove(); }, 400);
-  }, 2500);
+      canvasHeightUnits += padTop;
+      const canvasWidthUnits = bbox.w + padLeft + padRight;
+      const drawW = canvasWidthUnits * idleScale;
+      const drawH = canvasHeightUnits * idleScale;
+      const dpr = 2;
+      const cvs = document.createElement("canvas");
+      cvs.width = Math.max(1, Math.round(drawW * dpr));
+      cvs.height = Math.max(1, Math.round(drawH * dpr));
+      cvs.style.cssText = "position:absolute;left:0;bottom:5%;width:" + drawW + "px;height:" + drawH + "px;transform:translateX(" + xPos + "px);";
+      const corpseObj = {
+        el: cvs,
+        dpr: dpr,
+        isHuman: isHuman,
+        drawId: drawId,
+        def: def,
+        deathAnim: deathAnim,
+        lastFrame: lastFrame,
+        idleScale: idleScale,
+        ox: -(bbox.minX - padLeft) * idleScale,
+        oy: -(bbox.minY - padTop) * idleScale,
+        baseLeft: xPos,
+        width: drawW,
+        fullyDrawn: false,
+        equip: equip
+      };
+      _rev506_renderCorpseTo(corpseObj);
+      container.appendChild(cvs);
+      corpseEls.push(corpseObj);
+      const gap = drawW * (0.3 + Math.random() * 0.4);
+      xPos += gap;
+    } catch(err){
+      /* silent */
+    }
+  }
+  if(!corpseEls.length){ container.remove(); return; }
+  const startTime = performance.now();
+  function tick(){
+    if(!container.parentNode) return;
+    const elapsed = (performance.now() - startTime) / 1000;
+    const shift = scrollSpeed * elapsed;
+    let allOut = true;
+    for(let i = 0; i < corpseEls.length; i++){
+      const c = corpseEls[i];
+      const x = c.baseLeft - shift;
+      c.el.style.transform = "translateX(" + x + "px)";
+      if(!c.fullyDrawn){
+        _rev506_renderCorpseTo(c);
+      }
+      if(x + c.width > 0) allOut = false;
+    }
+    if(allOut){ container.remove(); return; }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
+
+
+
+
+
+/* 弹幕：从右飞入，到达玩家即停 + 玩家 hurt；仅在逃跑时调用 */
+function _spawnEnemyBulletsToPlayer(count){
+  const fx = document.getElementById('explore-fx');
+  if(!fx) return;
+  const fxW = fx.clientWidth || 400;
+  const fxH = fx.clientHeight || 500;
+  const playerX = fxW * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
+  const playerY = fxH * 0.58;
+  for(let i = 0; i < count; i++){
+    (function(idx){
+      setTimeout(function(){
+        if(!fx.parentNode) return;
+        const bullet = document.createElement('div');
+        const sy = playerY + (Math.random() - 0.5) * 60;
+        bullet.style.cssText = 'position:absolute;width:8px;height:8px;border-radius:50%;background:#ff3030;box-shadow:0 0 10px #ff0000;left:' + (fxW + 30) + 'px;top:' + sy + 'px;z-index:20;opacity:1;transition:left 0.4s linear, top 0.4s linear, opacity 0.15s linear;';
+        fx.appendChild(bullet);
+        requestAnimationFrame(function(){
+          bullet.style.left = playerX + 'px';
+          bullet.style.top = (playerY - 8) + 'px';
+        });
+        setTimeout(function(){
+          bullet.style.opacity = '0';
+          setTimeout(function(){ bullet.remove(); }, 160);
+          if(typeof heroAnim !== 'undefined'){
+            heroAnim.name = 'hurt';
+            heroAnim.frame = 0;
+            heroAnim.lastUpdate = performance.now();
+            heroAnim.forcedEnd = performance.now() + 500;
+          }
+        }, 400);
+      }, idx * 120);
+    })(i);
+  }
+}
+
+
+
+/* id 解析：
+   REGIONS.enemies 用 raider / ghoul / raider_vet，
+   09 数据用 human_raider / human_ghoul / human_raider_vet。
+   有 BEAST_LAYERS 命中直接用；否则尝试 HUMAN_ENEMY_DATA[id] 或 HUMAN_ENEMY_DATA["human_" + id]。 */
+
+
+/* 尸体：从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
+
+
+/* 弹幕：从右侧快速飞入，0.4s 后到达玩家位置即停并淡出；触发玩家 hurt。
+   只在 _resolveExploreEnemyGraphics(victory=false) 时调用。 */
+
+
+
+
+/* 尸体从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
+
+
+/* 弹幕从右侧快速飞入，打到玩家即停；触发玩家 hurt 动作 */
+
+
+
 
 function playExploreCombatFx(slot, isMelee){
   let animName = 'fire_primary';

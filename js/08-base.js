@@ -171,7 +171,7 @@ function _getArmoryProduction(){
   const armoryLv = getBuildingLv('armory');
   if(armoryLv <= 0) return null;
   const genLv = getBuildingLv('generator');
-  const genMult = 1 + genLv * 0.04;
+  const genMult = 1 + genLv * 0.2;
   const intervalMs = 3 * 60 * 1000 / genMult;
   let targetRarity = '一般';
   if(armoryLv <= 10) targetRarity = '破舊';
@@ -282,7 +282,7 @@ function _getArmorySummary(){
 function renderBaseStats(){
   const rows = [];
   const genLv = getBuildingLv('generator');
-  const genMult = 1 + genLv * 0.04;
+  const genMult = 1 + genLv * 0.2;
   const radioLv = getBuildingLv('radio');
   if(radioLv > 0){
     const mh = Math.round(12 * genMult * 5.5  * Math.max(1,Math.round(1+radioLv*0.3)));
@@ -360,7 +360,7 @@ function _openRadioDetail(){
   const lv = getBuildingLv('radio');
   if(lv <= 0){  return; }
   const genLv = getBuildingLv('generator');
-  const genMult = 1 + genLv * 0.04;
+  const genMult = 1 + genLv * 0.2;
   const intervalMs = 5 * 60 * 1000 / genMult;
   const perHour = Math.round(3600000 / intervalMs);
   let body = '';

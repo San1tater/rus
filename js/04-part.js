@@ -171,26 +171,36 @@ function isAimPartInRange(){
   const world=resolveBossWorld(def,anim,fi);
   const wp=world[part];
   if(!wp) return true;
+  /* rev520: 手动点击瞄准点优先（u,v 归一化局部坐标），否则用层中心 */
+  let localX, localY;
+  if(battle.aimLocal && battle.aimLocal.part === part && w > 0 && h > 0){
+    localX = battle.aimLocal.u * w;
+    localY = battle.aimLocal.v * h;
+  } else {
+    localX = w / 2;
+    localY = h / 2;
+  }
+  const offX = localX - px;
+  const offY = localY - py;
   const rot=wp.rot*(Math.PI/180);
   const cos=Math.cos(rot),sin=Math.sin(rot);
-  const corners=[[0,0],[w,0],[0,h],[w,h]];
-  let minX=Infinity;
-  for(const c of corners){
-    const dx=c[0]-px,dy=c[1]-py;
-    const rx=dx*cos-dy*sin+wp.wx;
-    if(rx<minX)minX=rx;
-  }
+  const rotOffX = offX*cos - offY*sin;
+  const worldX = wp.wx + rotOffX;
   const W=getSceneW();
   const bossSprite=document.getElementById('boss-sprite');
   const spriteW=bossSprite?bossSprite.clientWidth:280;
   const spriteH=bossSprite?bossSprite.clientHeight:280;
   const _tf=getBossCanvasTransform(def,battle.bossId,spriteW,spriteH);
-  const canvasMinX=_tf.ox+minX*_tf.sx;
+  const canvasCenterX=_tf.ox+worldX*_tf.sx;
   const spriteLeft=battle.bx*W-spriteW/2;
-  const worldMinX=(spriteLeft+canvasMinX)/W;
+  const worldCenterX=(spriteLeft+canvasCenterX)/W;
   const playerRight=battle.px+battle.playerWeaponRange;
-  return playerRight>=worldMinX;
+  return playerRight>=worldCenterX;
 }
+
+
+
+
 function getAimTargetPos(){
   if(!battle) return {x:0.75, y:0.3};
   const part = battle.aimPart;
@@ -209,14 +219,23 @@ function getAimTargetPos(){
   const world = anim ? resolveBossWorld(def, anim, fi) : null;
   const wp = world ? world[part] : null;
   if(!wp) return {x:battle.bx, y:battle.by};
-  const centerOffX = w/2 - px;
-  const centerOffY = h/2 - py;
+  /* rev520: 手动点击瞄准点优先（u,v 归一化局部坐标），否则用层中心 */
+  let localX, localY;
+  if(battle.aimLocal && battle.aimLocal.part === part && w > 0 && h > 0){
+    localX = battle.aimLocal.u * w;
+    localY = battle.aimLocal.v * h;
+  } else {
+    localX = w / 2;
+    localY = h / 2;
+  }
+  const offX = localX - px;
+  const offY = localY - py;
   const angle = wp.rot * BOSS_DEG2RAD;
   const cosA = Math.cos(angle), sinA = Math.sin(angle);
-  const rotOffX = centerOffX * cosA - centerOffY * sinA;
-  const rotOffY = centerOffX * sinA + centerOffY * cosA;
-  const centerWX = wp.wx + rotOffX;
-  const centerWY = wp.wy + rotOffY;
+  const rotOffX = offX * cosA - offY * sinA;
+  const rotOffY = offX * sinA + offY * cosA;
+  const targetWX = wp.wx + rotOffX;
+  const targetWY = wp.wy + rotOffY;
   const fxEl = document.getElementById('battle-fx');
   const W = fxEl ? fxEl.clientWidth : 400;
   const H = fxEl ? fxEl.clientHeight : 500;
@@ -224,8 +243,8 @@ function getAimTargetPos(){
   const spriteW = bossSprite ? bossSprite.clientWidth : 280;
   const spriteH = bossSprite ? bossSprite.clientHeight : 280;
   const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
-  const canvasPx = _tf.ox + centerWX * _tf.sx;
-  const canvasPy = _tf.oy + centerWY * _tf.sy;
+  const canvasPx = _tf.ox + targetWX * _tf.sx;
+  const canvasPy = _tf.oy + targetWY * _tf.sy;
   const spriteLeft = battle.bx * W - spriteW / 2;
   const spriteTop = battle.by * H;
   return {
@@ -233,6 +252,8 @@ function getAimTargetPos(){
     y: (spriteTop + canvasPy) / H
   };
 }
+
+
 
 function isWeakPointHit(){
   if(!battle) return false;
@@ -467,6 +488,34 @@ function renderBattleScene(z1){
     const part = pickAimPartFromClick(canvasX, canvasY);
     if(part){
       battle.aimPart = part;
+      /* rev520: 记录点击局部归一化位置（手动瞄准打点击处，而非区块中心） */
+      try {
+        const _def = BOSS_LAYERS[battle.bossId];
+        const _anims = BOSS_ANIMS[battle.bossId];
+        const _anim = _anims ? (_anims[battleBossAnim.name] || _anims.idle) : null;
+        if(_def && _anim){
+          const _fi = ((battleBossAnim.frame % _anim.frameCount) + _anim.frameCount) % _anim.frameCount;
+          const _L = _def.layers.find(function(l){ return l.id === part; });
+          if(_L){
+            const _k = (_anim.keys && _anim.keys[part] && _anim.keys[part][_fi]) || {rot:0,dx:0,dy:0};
+            const _w = _def.canvas.w * (_k.w !== undefined ? _k.w : _L.w);
+            const _h = _def.canvas.h * (_k.h !== undefined ? _k.h : _L.h);
+            const _px = _w * _L.pivot.x;
+            const _py = _h * _L.pivot.y;
+            const _world = resolveBossWorld(_def, _anim, _fi);
+            const _wp = _world[part];
+            if(_wp && _w > 0 && _h > 0){
+              const _angle = -_wp.rot * BOSS_DEG2RAD;
+              const _cosA = Math.cos(_angle), _sinA = Math.sin(_angle);
+              const _dx = canvasX - _wp.wx;
+              const _dy = canvasY - _wp.wy;
+              const _localX = _dx * _cosA - _dy * _sinA + _px;
+              const _localY = _dx * _sinA + _dy * _cosA + _py;
+              battle.aimLocal = { part: part, u: _localX / _w, v: _localY / _h };
+            }
+          }
+        }
+      } catch(e){ console.warn('[aimLocal]', e); battle.aimLocal = null; }
       const fx = document.getElementById('battle-fx');
       if(fx){
         const old = document.getElementById('aim-marker');
@@ -710,6 +759,9 @@ function defaultAimPartForBoss(bossId){
   if(!def) return null;
   const torso = def.layers.find(l => l.id === 'torso');
   if(torso) return 'torso';
+  /* rev518: 优先 body（生物本体），避免面积最大的地面装饰层（如 swamp）被选为默认瞄准点 */
+  const body = def.layers.find(l => l.id === 'body');
+  if(body) return 'body';
   let best = null, bestArea = 0;
   for(const L of def.layers){
     const a = L.w * L.h;
@@ -717,6 +769,8 @@ function defaultAimPartForBoss(bossId){
   }
   return best;
 }
+
+
 
 function startBossBattle(bid){
   const b=BOSSES[bid];if(!b)return;
