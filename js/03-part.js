@@ -2447,7 +2447,7 @@ function renderExplore(){
   const _displayRegion=region.replace(/II$/,' II');
   z1.innerHTML=`
     <div class="scene">
-      <div class="bg-scroll" style="--spd:${spd}s"><div class="bg-layer" style="background-image:url('${bg}')"></div><div class="bg-layer" style="background-image:url('${bg}')"></div></div>
+      <div class="bg-scroll" style="--spd:${spd}s"><div class="bg-track"><div class="bg-layer" style="background-image:url('${bg}')"></div><div class="bg-layer" style="background-image:url('${bg}')"></div></div></div>
       <div class="bg-fade" id="explore-bg-fade" style="opacity:0"></div><div class="groundline"></div>
       <div class="explore-fx" id="explore-fx"></div>
       <canvas id="hero-canvas" class="hero-canvas"></canvas>
