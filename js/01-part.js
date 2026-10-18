@@ -225,7 +225,7 @@ const MATERIAL_EMOJI = {wood:'🪵', metal:'🔩', screws:'🔧', cloth:'🧵', 
 
 /* ★ v17.5 重量系統（kg）——武器為空槍重，實戰時再加上滿彈匣彈藥重量 */
 const ITEM_WEIGHT = {
-  aks74u:1.809,aks74un:2.694,ak74:3.3,ak74n:3.3,ak74m:3.605,akm:3.495,akms:3.495,akmn:3.495,
+  aks74u:2.694,aks74un:2.735,ak74:3.3,ak74n:3.3,ak74m:3.605,akm:3.495,akms:3.495,akmn:3.495,
   ak103:3.605,ak104:3.605,ak105:3.2,ak12:3.606,asval:2.5,'9a91':2.452,sr3m:2.5,
   vss:2.6,svd:4.386,sv98:5.188,
   rpk16:3.017,rpd:7.4,rpdn:7.4,pkm:8.994,pkp:8.2,
@@ -234,9 +234,9 @@ const ITEM_WEIGHT = {
   mp133:3.54,mp153:3.6,mp155:3.4,saiga12:5.659,toz106:2.715,ks23:3.76,
   '6kh2':0.4,'6kh5':0.4,kukri:0.5,
   f1:0.6,rgd5:0.5,rgo:0.53,rgn:0.53,vog17:0.35,vog25:0.28,
-  ssh68:1.4,ssh68m:1.4,ssh94:1.3,kolpak:1.0,'6b47':1.3,'6b47m':1.3,altyn:2.5,kiver:1.2,maska:2.6,zsh12m:3.0,
+  ssh68:1.5,ssh68m:1.5,ssh94:3.5,kolpak:1.9,'6b47':1.3,'6b47m':1.3,altyn:2.5,kiver:1.2,maska:2.6,zsh12m:3.7,
   balaclava:0.1,shemagh:0.15,gp7:0.5,ballglasses:0.1,
-  paca:3.5,'6b13':10.6,'6b13m':9.15,'6b23':7.9,'6b231':7.9,'6b232':10.5,'6b43':20,zhuk6a:11.5,zhuk3:5.2,defender2:11.5,'6b45':11.5,redutm:9.5,
+  paca:3.5,'6b13':10.6,'6b13m':9.15,'6b23':7.9,'6b231':7.9,'6b232':10.5,'6b43':20,zhuk6a:11.5,zhuk3:5.2,defender2:11.5,'6b45':13.5,redutm:9.5,
   cargopants:0.4,workboots:0.6,tactboots:0.7,lowaz:0.8,haix:0.75,belleville:0.8,
   bplarge:1.6,
   bandage:0.05,water:0.6,ai2:0.2,painkiller:0.1,tushonka:0.5,splint:0.1,salewa:1.0,ifak:0.5,surv12:1.5,
