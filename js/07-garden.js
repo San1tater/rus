@@ -182,6 +182,46 @@ function _ensureGardenPage(){
   window.addEventListener('resize', function(){
     if(p.classList.contains('on')) _fitGardenGrid();
   });
+  /* rev560: 后院整页支持主 tab 滑动切换（capture 阶段独立绑定，避免仅日誌區生效的问题） */
+  (function(){
+    if(p._mainTabSwipeBound) return;
+    p._mainTabSwipeBound = true;
+    const TABS = ['explore', 'combat', 'garden', 'base'];
+    let sx = 0, sy = 0, st = 0, active = false;
+    p.addEventListener('touchstart', function(e){
+      if(e.touches.length !== 1){ active = false; return; }
+      const tgt = e.target;
+      if(tgt && tgt.closest && tgt.closest('.gp-grid-wrap')){
+        active = false; return;
+      }
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      st = Date.now();
+      active = true;
+    }, {passive: true, capture: true});
+    p.addEventListener('touchcancel', function(){ active = false; }, {capture: true});
+    p.addEventListener('touchend', function(e){
+      if(!active) return;
+      active = false;
+      if(!e.changedTouches || e.changedTouches.length !== 1) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = e.changedTouches[0].clientY - sy;
+      const dt = Date.now() - st;
+      if(dt > 800) return;
+      if(Math.abs(dx) < 60) return;
+      if(Math.abs(dy) > Math.abs(dx) * 0.6) return;
+      if(typeof BossModule !== 'undefined' && BossModule.isActive()) return;
+      if(typeof currentTab !== 'string') return;
+      const curIdx = TABS.indexOf(currentTab);
+      if(curIdx < 0) return;
+      const nextIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
+      if(nextIdx < 0 || nextIdx >= TABS.length) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const target = document.querySelector('.tab[data-tab="' + TABS[nextIdx] + '"]');
+      if(target) target.click();
+    }, {passive: false, capture: true});
+  })();
   return p;
 }
 
