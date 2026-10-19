@@ -1738,21 +1738,7 @@ function _safeMsgText(msg){
   } catch(e){ return ''; }
 }
 
-function notify(msg,type){
-  msg = _safeMsgText(msg);
-  if(typeof msg !== 'string'){
-    if(msg && msg.nodeType === 1) msg = msg.textContent || '';
-    else msg = String(msg);
-  }
-  if(battle && battle.active) return;
-  const n=el('div','toast'+(type?' '+type:''),msg);
-  let slot=0;
-  while(toastSlotSet.has(slot) && slot<7) slot++;
-  toastSlotSet.add(slot);
-  n.style.top=`calc(22% + ${slot*50}px)`;
-  document.body.appendChild(n);
-  setTimeout(()=>{toastSlotSet.delete(slot);n.remove();},2300);
-}
+function notify(msg,type){ /* notify disabled by user request: 不再显示任何 toast 弹窗 */ }
 function hasGardenPlotType(type){
   if(!state.garden || !Array.isArray(state.garden.plots)) return false;
   for(const p of state.garden.plots){ if(p && p.type === type) return true; }
