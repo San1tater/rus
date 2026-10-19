@@ -11,10 +11,10 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#7a6f60;font-size:11px;gap:2px}
 .tab.active{color:#e8a33d}
 .tab .ico{font-size:18px}
-.toast{position:fixed;top:22%;left:50%;background:rgba(30,24,19,.96);border:1px solid #e8a33d;border-radius:8px;padding:10px 16px;color:#e8a33d;font-size:12px;z-index:10000;max-width:82%;text-align:center;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.7);animation:toastFloat 2.2s ease-out forwards}
-.toast.error{border-color:#e05252;color:#e05252}
-.toast.ok{border-color:#4caf50;color:#4caf50}
-@keyframes toastFloat{0%{opacity:0;transform:translate(-50%,18px)}12%{opacity:1;transform:translate(-50%,0)}70%{opacity:1;transform:translate(-50%,-12px)}100%{opacity:0;transform:translate(-50%,-56px)}}
+/* .toast removed by user request */
+
+
+
 .scene{position:absolute;inset:0}
 .bg-scroll{position:absolute;inset:0;overflow:hidden}
 .bg-track{display:flex;width:200%;height:100%;animation:bgscroll var(--spd,10s) linear infinite;will-change:transform;transform:translateZ(0);backface-visibility:hidden}
