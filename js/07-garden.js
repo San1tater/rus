@@ -182,6 +182,42 @@ function _ensureGardenPage(){
   window.addEventListener('resize', function(){
     if(p.classList.contains('on')) _fitGardenGrid();
   });
+  /* rev557: 后院子 tab 左右滑动切换（排除 .gp-grid-wrap，保留地块交互） */
+  (function(){
+    if(p._swipeBound) return;
+    p._swipeBound = true;
+    const GIDS = ['log', 'storage', 'servant', 'merchant'];
+    let sx=0, sy=0, st=0, active=false;
+    p.addEventListener('touchstart', function(e){
+      if(e.touches.length !== 1){ active=false; return; }
+      const tgt = e.target;
+      if(tgt && tgt.closest && tgt.closest('.gp-grid-wrap')){ active = false; return; }
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      st = Date.now();
+      active = true;
+    }, {passive: true});
+    p.addEventListener('touchcancel', function(){ active = false; });
+    p.addEventListener('touchend', function(e){
+      if(!active) return;
+      active = false;
+      if(!e.changedTouches || e.changedTouches.length !== 1) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = e.changedTouches[0].clientY - sy;
+      const dt = Date.now() - st;
+      if(dt > 800) return;
+      if(Math.abs(dx) < 60) return;
+      if(Math.abs(dy) > Math.abs(dx) * 0.6) return;
+      const curIdx = GIDS.indexOf(_gardenActiveTab);
+      if(curIdx < 0) return;
+      const nextIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
+      if(nextIdx < 0 || nextIdx >= GIDS.length) return;
+      e.preventDefault();
+      _gardenActiveTab = GIDS[nextIdx];
+      if(typeof renderGardenTabs === 'function') renderGardenTabs();
+      if(typeof renderGardenContent === 'function') renderGardenContent();
+    }, {passive: false});
+  })();
   return p;
 }
 

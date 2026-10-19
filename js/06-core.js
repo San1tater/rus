@@ -47,6 +47,47 @@ $$('.tab').forEach(t=>{
   };
 });
 
+/* rev557: 主 tabbar 左右滑动切换（探索 / 战斗 / 后院 / 基地） */
+(function(){
+  if(window._mainTabSwipeBound) return;
+  window._mainTabSwipeBound = true;
+  const TABS = ['explore', 'combat', 'garden', 'base'];
+  const content = document.getElementById('content');
+  if(!content) return;
+  let sx=0, sy=0, st=0, active=false;
+  content.addEventListener('touchstart', function(e){
+    if(e.touches.length !== 1){ active=false; return; }
+    const tgt = e.target;
+    if(tgt && tgt.closest && (tgt.closest('#joystick') || tgt.closest('#fire-btn') || tgt.closest('#heal-btn') || tgt.closest('#modal-layer') || tgt.closest('#garden-page'))){
+      active = false; return;
+    }
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    st = Date.now();
+    active = true;
+  }, {passive: true});
+  content.addEventListener('touchcancel', function(){ active = false; });
+  content.addEventListener('touchend', function(e){
+    if(!active) return;
+    active = false;
+    if(!e.changedTouches || e.changedTouches.length !== 1) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    const dt = Date.now() - st;
+    if(dt > 800) return;
+    if(Math.abs(dx) < 60) return;
+    if(Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    if(typeof currentTab !== 'string') return;
+    const curIdx = TABS.indexOf(currentTab);
+    if(curIdx < 0) return;
+    const nextIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
+    if(nextIdx < 0 || nextIdx >= TABS.length) return;
+    e.preventDefault();
+    const target = document.querySelector('.tab[data-tab="' + TABS[nextIdx] + '"]');
+    if(target) target.click();
+  }, {passive: false});
+})();
+
 let lastTickTime=Date.now();
 function onlineTick(){
   const now=Date.now();const dt=now-lastTickTime;lastTickTime=now;
