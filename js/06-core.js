@@ -47,27 +47,30 @@ $$('.tab').forEach(t=>{
   };
 });
 
-/* rev557: 主 tabbar 左右滑动切换（探索 / 战斗 / 后院 / 基地） */
+/* rev558: 主 tabbar 左右滑动切换（探索 / 战斗 / 后院 / 基地）
+   监听 document.body 而非 #content，使 garden-page overlay 也能触发 */
 (function(){
-  if(window._mainTabSwipeBound) return;
-  window._mainTabSwipeBound = true;
+  if(window._mainTabSwipeVer === 558) return;
+  window._mainTabSwipeVer = 558;
   const TABS = ['explore', 'combat', 'garden', 'base'];
-  const content = document.getElementById('content');
-  if(!content) return;
+  const host = document.body;
   let sx=0, sy=0, st=0, active=false;
-  content.addEventListener('touchstart', function(e){
+  host.addEventListener('touchstart', function(e){
     if(e.touches.length !== 1){ active=false; return; }
     const tgt = e.target;
-    if(tgt && tgt.closest && (tgt.closest('#joystick') || tgt.closest('#fire-btn') || tgt.closest('#heal-btn') || tgt.closest('#modal-layer') || tgt.closest('#garden-page'))){
-      active = false; return;
+    if(tgt && tgt.closest){
+      if(tgt.closest('#joystick') || tgt.closest('#fire-btn') || tgt.closest('#heal-btn') ||
+         tgt.closest('#modal-layer') || tgt.closest('.gp-grid-wrap')){
+        active = false; return;
+      }
     }
     sx = e.touches[0].clientX;
     sy = e.touches[0].clientY;
     st = Date.now();
     active = true;
   }, {passive: true});
-  content.addEventListener('touchcancel', function(){ active = false; });
-  content.addEventListener('touchend', function(e){
+  host.addEventListener('touchcancel', function(){ active = false; });
+  host.addEventListener('touchend', function(e){
     if(!active) return;
     active = false;
     if(!e.changedTouches || e.changedTouches.length !== 1) return;
@@ -77,6 +80,8 @@ $$('.tab').forEach(t=>{
     if(dt > 800) return;
     if(Math.abs(dx) < 60) return;
     if(Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    /* rev559: Boss 戰進行中禁用滑動翻頁 */
+    if(typeof BossModule !== 'undefined' && BossModule.isActive()) return;
     if(typeof currentTab !== 'string') return;
     const curIdx = TABS.indexOf(currentTab);
     if(curIdx < 0) return;
