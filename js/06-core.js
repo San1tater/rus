@@ -260,4 +260,49 @@ document.addEventListener('click',e=>{
   if(t&&t.dataset.iid)openItemDetail(t.dataset.iid,t.dataset.irar);
 });
 
+
+/* ===== rev563: 後院頁診斷（console 執行 __gpDiag()） ===== */
+window.__gpDiag = function(){
+  const gp = document.getElementById('garden-page');
+  const ct = document.getElementById('content');
+  const tb = document.getElementById('tabbar');
+  console.group('[rev563 garden diag]');
+  if(gp){
+    const cs = getComputedStyle(gp);
+    const r = gp.getBoundingClientRect();
+    console.log('%c garden-page', 'color:#e8a33d;font-weight:bold');
+    console.log('  position:', cs.position);
+    console.log('  rect: top=' + r.top + ' bottom=' + r.bottom + ' height=' + r.height);
+    console.log('  offsetHeight:', gp.offsetHeight);
+    console.log('  z-index:', cs.zIndex);
+    console.log('  display:', cs.display);
+  } else console.log('%c garden-page: NOT FOUND', 'color:#e05252');
+  if(ct){
+    const cs = getComputedStyle(ct);
+    const r = ct.getBoundingClientRect();
+    console.log('%c content', 'color:#4a90d9;font-weight:bold');
+    console.log('  position:', cs.position);
+    console.log('  rect: top=' + r.top + ' bottom=' + r.bottom + ' height=' + r.height);
+    console.log('  clientHeight:', ct.clientHeight);
+  }
+  if(tb){
+    const r = tb.getBoundingClientRect();
+    console.log('%c tabbar', 'color:#a45ede;font-weight:bold');
+    console.log('  rect: top=' + r.top + ' bottom=' + r.bottom + ' height=' + r.height);
+  }
+  if(gp && ct && tb){
+    const gr = gp.getBoundingClientRect();
+    const cr = ct.getBoundingClientRect();
+    const tr = tb.getBoundingClientRect();
+    console.log('%c 對比', 'color:#4caf50;font-weight:bold');
+    console.log('  garden 底 = ' + gr.bottom.toFixed(1));
+    console.log('  content 底 = ' + cr.bottom.toFixed(1));
+    console.log('  tabbar 頂 = ' + tr.top.toFixed(1));
+    console.log('  garden 底 vs content 底 差 = ' + (gr.bottom - cr.bottom).toFixed(2) + 'px（應 ≈ 0）');
+    console.log('  content 底 vs tabbar 頂 差 = ' + (cr.bottom - tr.top).toFixed(2) + 'px（應 ≈ 0）');
+  }
+  console.groupEnd();
+};
+/* ===== end rev563 diag ===== */
+
 window.WastelandGame={VERSION,get state(){return state;},save,renderCurrentTab,addProf,notify,offlineSettle,getMeleeHits,getOrCreateNamedItem,BossModule,probeAssetVersion,get assetVersion(){return ASSET_VERSION;}};
