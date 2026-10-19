@@ -5,7 +5,7 @@ const battleBossAnim = { name:'idle', frame:0, lastUpdate:0, forcedEnd:0 };
 const BATTLE_BOSS_ONESHOT = ['attack_swipe','skill_charge','hurt','death'];
 
 const BOSS_DEG2RAD = Math.PI / 180;
-function resolveBossWorld(def, anim, frame){
+function _resolveBossWorldRaw(def, anim, frame){
   const result = {};
   const visiting = new Set();
   function resolve(L){
@@ -47,6 +47,57 @@ function resolveBossWorld(def, anim, frame){
   return result;
 }
 
+/* rev535: swamp_hydra 眼睛/嘴巴跟隨所屬頭部 */
+function resolveBossWorld(def, anim, frame){
+  const world = _resolveBossWorldRaw(def, anim, frame);
+  _applyHydraFollowWorld(def, anim, frame, world);
+  return world;
+}
+
+function _applyHydraFollowWorld(def, anim, frame, world){
+  if(!def || !def._hydraFollow) return;
+  if(!def._hydraEyeOwner) def._hydraEyeOwner = {};
+  if(!def._hydraRefWorld){
+    let idleAnim = null;
+    for(const bid in BOSS_ANIMS){
+      if(BOSS_LAYERS[bid] === def && BOSS_ANIMS[bid] && BOSS_ANIMS[bid].idle){
+        idleAnim = BOSS_ANIMS[bid].idle;
+        break;
+      }
+    }
+    if(!idleAnim) return;
+    def._hydraIdleAnim = idleAnim;
+    def._hydraRefWorld = _resolveBossWorldRaw(def, idleAnim, 0);
+    if(!def._hydraRefWorld) return;
+  }
+  const refWorld = def._hydraRefWorld;
+  const refAnim = def._hydraIdleAnim;
+  if(!refWorld || !refAnim) return;
+
+  for(const L of def.layers){
+    if(!/^(eye|mouth)/.test(L.id)) continue;
+    let owner = def._hydraEyeOwner[L.id];
+    if(!owner){
+      const rw = refWorld[L.id];
+      if(!rw) continue;
+      owner = pickHeadForPoint(rw.wx, rw.wy, def, refWorld, refAnim, 0);
+      if(!owner) continue;
+      def._hydraEyeOwner[L.id] = owner;
+    }
+    const cur = world[owner];
+    const ref = refWorld[owner];
+    if(!cur || !ref) continue;
+    const dx = cur.wx - ref.wx;
+    const dy = cur.wy - ref.wy;
+    const dr = cur.rot - ref.rot;
+    const w = world[L.id];
+    if(!w) continue;
+    w.wx += dx;
+    w.wy += dy;
+    w.rot += dr;
+  }
+}
+
 /* 計算 Boss 所有動畫所有幀的包圍盒；若超出 canvas，回傳 fit 變換。
    結果快取在 def._fitCached，避免每幀重算。 */
 function computeBossFit(def, bossId, canvasW, canvasH){
@@ -54,9 +105,12 @@ function computeBossFit(def, bossId, canvasW, canvasH){
   const cw = def.canvas.w, ch = def.canvas.h;
   const anims = BOSS_ANIMS[bossId];
   if(!anims){ def._fitCached = null; return null; }
+  /* rev534: core_omega 全局 fit 不含 death（death 有独立 fit，见 computeBossDeathFit） */
+  const _isOmega = (bossId === 'core_omega' || bossId === 'core_omega_ii');
   let aMinX = Infinity, aMinY = Infinity, aMaxX = -Infinity, aMaxY = -Infinity;
   let iMinX = Infinity, iMinY = Infinity, iMaxX = -Infinity, iMaxY = -Infinity;
   for(const animName in anims){
+    if(_isOmega && animName === 'death') continue;
     const anim = anims[animName];
     const isIdle = (animName === 'idle');
     for(let f = 0; f < anim.frameCount; f++){
@@ -71,8 +125,7 @@ function computeBossFit(def, bossId, canvasW, canvasH){
         const py = h * L.pivot.y;
         const rot = wp.rot * BOSS_DEG2RAD;
         const cos = Math.cos(rot), sin = Math.sin(rot);
-        const corners = [[0,0],[w,0],[0,h],[w,h]];
-        for(const c of corners){
+        for(const c of [[0,0],[w,0],[0,h],[w,h]]){
           const dx = c[0] - px, dy = c[1] - py;
           const rx = dx*cos - dy*sin + wp.wx;
           const ry = dx*sin + dy*cos + wp.wy;
@@ -94,19 +147,22 @@ function computeBossFit(def, bossId, canvasW, canvasH){
   if(!isFinite(iMinX)){ iMinX = aMinX; iMinY = aMinY; iMaxX = aMaxX; iMaxY = aMaxY; }
   const allW = aMaxX - aMinX, allH = aMaxY - aMinY;
   const idleH = iMaxY - iMinY;
-  const scaleByIdle = canvasH / idleH;
-  const scaleByAllH = canvasH / allH;
-  const scaleByAllW = canvasW / allW;
-  const idleW = iMaxX - iMinX;
   const fitScale = def.forceFit
-    ? Math.min(canvasH / idleH, canvasW / idleW)
-    : Math.min(scaleByIdle, scaleByAllH, scaleByAllW);
+    ? Math.min(canvasH / idleH, canvasW / allW)
+    : Math.min(canvasH / idleH, canvasH / allH, canvasW / allW);
   if(!def.forceFit && fitScale >= 1 && aMinX >= 0 && aMinY >= 0 && aMaxX <= cw && aMaxY <= ch){
     def._fitCached = null;
     return null;
   }
+  /* rev534: offsetX 以 idle 居中，超出任一边界时修正，确保所有动画左右都在画布内 */
   const idleCX = (iMinX + iMaxX) / 2;
-  const offsetX = canvasW / 2 - idleCX * fitScale;
+  let offsetX = canvasW / 2 - idleCX * fitScale;
+  if(def.forceFit){
+    const _lPx = aMinX * fitScale + offsetX;
+    const _rPx = aMaxX * fitScale + offsetX;
+    if(_lPx < 0) offsetX -= _lPx;
+    if(_rPx > canvasW) offsetX -= (_rPx - canvasW);
+  }
   const offsetY = canvasH - iMaxY * fitScale;
   const fit = { fitScale, offsetX, offsetY, cw: canvasW, ch: canvasH };
   def._fitCached = fit;
@@ -145,7 +201,14 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   const world = resolveBossWorld(def, anim, fi);
 
   ctx.save();
-  const _tf = getBossCanvasTransform(def, bossId, canvasW, canvasH);
+  /* rev534: core_omega death 动画用独立 fit，确保所有部件在画布内 */
+  let _tf;
+  if((bossId === 'core_omega' || bossId === 'core_omega_ii') && animName === 'death'){
+    const _df = computeBossDeathFit(def, bossId, canvasW, canvasH);
+    _tf = _df ? { sx: _df.fitScale, sy: _df.fitScale, ox: _df.offsetX, oy: _df.offsetY } : getBossCanvasTransform(def, bossId, canvasW, canvasH);
+  } else {
+    _tf = getBossCanvasTransform(def, bossId, canvasW, canvasH);
+  }
   ctx.translate(_tf.ox, _tf.oy);
   ctx.scale(_tf.sx, _tf.sy);
 
@@ -221,6 +284,24 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
     const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
     const px = w * L.pivot.x;
     const py = h * L.pivot.y;
+    /* rev533: core_omega 死亡动画时，完全飞出画布的部件跳过绘制 */
+    if((bossId === 'core_omega' || bossId === 'core_omega_ii') && animName === 'death'){
+      const _cd = Math.cos(wp.rot * BOSS_DEG2RAD);
+      const _sd = Math.sin(wp.rot * BOSS_DEG2RAD);
+      let _allOut = true;
+      for(const _cc of [[0,0],[w,0],[0,h],[w,h]]){
+        const _dxc = _cc[0] - px, _dyc = _cc[1] - py;
+        const _rxc = _dxc * _cd - _dyc * _sd + wp.wx;
+        const _ryc = _dxc * _sd + _dyc * _cd + wp.wy;
+        const _cxc = _tf.ox + _rxc * _tf.sx;
+        const _cyc = _tf.oy + _ryc * _tf.sy;
+        if(_cxc > -2 && _cxc < canvasW + 2 && _cyc > -2 && _cyc < canvasH + 2){
+          _allOut = false;
+          break;
+        }
+      }
+      if(_allOut) continue;
+    }
     ctx.save();
     ctx.translate(wp.wx, wp.wy);
     ctx.rotate(wp.rot * BOSS_DEG2RAD);
@@ -235,6 +316,48 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   ctx.restore();
 }
 
+function computeBossDeathFit(def, bossId, canvasW, canvasH){
+  /* rev534: core_omega death 动画独立 fit，只按 death 包围盒缩放，确保所有部件都在画布内 */
+  const _ck = 'death|' + canvasW + '|' + canvasH;
+  if(def._deathFitCache && def._deathFitCache._key === _ck) return def._deathFitCache;
+  const anims = BOSS_ANIMS[bossId];
+  if(!anims || !anims.death){ def._deathFitCache = null; return null; }
+  const cw = def.canvas.w, ch = def.canvas.h;
+  const anim = anims.death;
+  let dMinX = Infinity, dMinY = Infinity, dMaxX = -Infinity, dMaxY = -Infinity;
+  for(let f = 0; f < anim.frameCount; f++){
+    const world = resolveBossWorld(def, anim, f);
+    for(const L of def.layers){
+      const wp = world[L.id];
+      if(!wp) continue;
+      const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][f]) || {rot:0};
+      const w = cw * (k.w !== undefined ? k.w : L.w);
+      const h = ch * (k.h !== undefined ? k.h : L.h);
+      const px = w * L.pivot.x;
+      const py = h * L.pivot.y;
+      const rot = wp.rot * BOSS_DEG2RAD;
+      const cos = Math.cos(rot), sin = Math.sin(rot);
+      for(const c of [[0,0],[w,0],[0,h],[w,h]]){
+        const dx = c[0] - px, dy = c[1] - py;
+        const rx = dx*cos - dy*sin + wp.wx;
+        const ry = dx*sin + dy*cos + wp.wy;
+        if(rx < dMinX) dMinX = rx;
+        if(ry < dMinY) dMinY = ry;
+        if(rx > dMaxX) dMaxX = rx;
+        if(ry > dMaxY) dMaxY = ry;
+      }
+    }
+  }
+  if(!isFinite(dMinX)){ def._deathFitCache = null; return null; }
+  const dW = dMaxX - dMinX, dH = dMaxY - dMinY;
+  const fitScale = Math.min(canvasW / dW, canvasH / dH);
+  const dCX = (dMinX + dMaxX) / 2;
+  const offsetX = canvasW / 2 - dCX * fitScale;
+  const offsetY = canvasH - dMaxY * fitScale;
+  const r = { _key: _ck, fitScale, offsetX, offsetY };
+  def._deathFitCache = r;
+  return r;
+}
 function renderBossBattleCanvas(){
   if(!battle) return;
   if(!BOSS_LAYERS[battle.bossId]) return;
@@ -1390,7 +1513,7 @@ function pickThrowableByPreferenceOrOrder(context){
         if(cnt > 0) return {id:tid, rarity:rar, count:cnt, def:d};
       }
     }
-    return null;
+    /* rev539: order 中所有 id 都無貨 → fallback 偏好，不直接 return null */
   }
   return pickThrowableByPreference(context);
 }
@@ -1414,10 +1537,9 @@ function pickThrowableByPreference(context){
   }
   if(!items.length) return null;
   const pri = ctx.priority || '一般';
-  if(!ex.includes(pri)){
-    const primary = items.filter(a => a.rarity === pri);
-    if(primary.length) return pick(primary);
-  }
+  /* rev541: items 已过滤 exclude，无需再判断 ex.includes(pri) */
+  const primary = items.filter(a => a.rarity === pri);
+  if(primary.length) return pick(primary);
   const fb = ctx.fallback || 'desc';
   const order = (fb === 'asc')
     ? ['破舊','一般','庫存','精品','傳奇']
@@ -1808,20 +1930,24 @@ function consumeMaterial(id,amount){
   return remaining<=0.01;
 }
 
-function equipThrowable(id,rarity){const k=invKey(id,rarity);const total=state.inventory[k]||0;delete state.inventory[k];state.player.throwableStock=total;state.player.equipped.throwable=id;state.player.equippedRarity.throwable=rarity;}
-function unequipThrowable(){const id=state.player.equipped.throwable;if(!id)return;const rarity=state.player.equippedRarity.throwable||'一般';const cnt=state.player.throwableStock||0;if(cnt>0)invAddRaw(id,rarity,cnt);state.player.throwableStock=0;state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;}
+function equipThrowable(id,rarity){const k=invKey(id,rarity);const total=state.inventory[k]||0;delete state.inventory[k];state.player.throwableStock=total;state.player.equipped.throwable=id;state.player.equippedRarity.throwable=rarity;if(typeof _refreshThrowableSlot==='function')_refreshThrowableSlot();}
+function unequipThrowable(){const id=state.player.equipped.throwable;if(!id)return;const rarity=state.player.equippedRarity.throwable||'一般';const cnt=state.player.throwableStock||0;if(cnt>0)invAddRaw(id,rarity,cnt);state.player.throwableStock=0;state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;if(typeof _refreshThrowableSlot==='function')_refreshThrowableSlot();}
 function getThrowableCount(){return parseInt(state.player.throwableStock||0,10);}
-function ensureThrowableFromBackpack(){
+function ensureThrowableFromBackpack(context){
   if(getThrowableCount()>0)return true;
-  const opts=[];
-  for(const k in state.inventory){const [id,r]=k.split('@');const d=WEAPONS[id];if(d&&d.slot==='throwable'&&state.inventory[k]>0)opts.push({id,rarity:r,count:state.inventory[k]});}
-  if(!opts.length)return false;
-  opts.sort((a,b)=>{const da=(WEAPONS[a.id].dmg||0)*(RARITY_MULT[a.rarity]||1);const db=(WEAPONS[b.id].dmg||0)*(RARITY_MULT[b.rarity]||1);return db-da;});
-  const best=opts[0];
-  delete state.inventory[invKey(best.id,best.rarity)];
-  state.player.equipped.throwable=best.id;
-  state.player.equippedRarity.throwable=best.rarity;
-  state.player.throwableStock=best.count;
+  const _ctx = context || 'combat';
+  /* rev540: ammoOrder（彈藥準備頁）只作用於 Boss 戰；探索只用偏好 */
+  const t = (_ctx === 'combat')
+    ? pickThrowableByPreferenceOrOrder(_ctx)
+    : pickThrowableByPreference(_ctx);
+  if(!t) return false;
+  const total = invCount(t.id, t.rarity);
+  if(total <= 0) return false;
+  delete state.inventory[invKey(t.id, t.rarity)];
+  state.player.equipped.throwable=t.id;
+  state.player.equippedRarity.throwable=t.rarity;
+  state.player.throwableStock=total;
+  if(typeof _refreshThrowableSlot==='function')_refreshThrowableSlot();
   return true;
 }
 
@@ -1961,10 +2087,23 @@ function spawnCount(region){const R=region?REGIONS[region]:null;if(!R||!R.spawnW
 function chooseCombatWeaponVerbose(context,enemyCount){
   const trace=[];
   if(context==='explore'&&enemyCount>=2){
-    const _t=pickThrowableByPreferenceOrOrder('explore');
+    /* rev539: 裝備槽優先（手動或自動補充的下一次批次） */
+    if(getThrowableCount() > 0){
+      const _w = equippedWeapon('throwable');
+      if(_w){
+        const _ex = (state.preferences.throwableExplore || {}).exclude || [];
+        if(_ex.indexOf(_w.rarity) === -1){
+          trace.push('throwable(多敵·裝備槽):'+_w.def.name+'×'+getThrowableCount()+'✓');
+          return {slot:'throwable',weapon:_w,ammo:null,fromSlot:true,trace};
+        }
+        trace.push('throwable:多敵·裝備槽稀有度被探索排除');
+      }
+    }
+    /* rev540: 探索不讀 ammoOrder，只用 throwableExplore 偏好 */
+    const _t=pickThrowableByPreference('explore');
     if(_t){
       const _td=WEAPONS[_t.id];
-      trace.push('throwable(多敵優先):'+_td.name+'×'+_t.count+'✓');
+      trace.push('throwable(多敵·背包):'+_td.name+'×'+_t.count+'✓');
       return {slot:'throwable',weapon:{id:_t.id,rarity:_t.rarity,def:_td,slot:'throwable'},ammo:null,fromBag:true,trace};
     }
     trace.push('throwable:多敵但無手雷');
@@ -1974,6 +2113,25 @@ function chooseCombatWeaponVerbose(context,enemyCount){
     /* ★ 探索模式：投擲槽改為從背包按探索偏好挑選，不碰裝備槽；
        這樣玩家留給 Boss 戰的高稀有度手雷永遠不會在探索中被消耗。 */
     if(slot === 'throwable' && context === 'explore'){
+      /* rev537: 优先使用装备槽投掷物（手动或自动补充的下一次批次） */
+      if(getThrowableCount() > 0){
+        const _w = equippedWeapon('throwable');
+        if(_w){
+          const _ex = (state.preferences.throwableExplore || {}).exclude || [];
+          if(_ex.indexOf(_w.rarity) === -1){
+            trace.push(`throwable(装备槽):${_w.def.name}×${getThrowableCount()}✓`);
+            return {
+              slot:'throwable',
+              weapon:_w,
+              ammo:null,
+              fromSlot:true,
+              trace
+            };
+          }
+          trace.push('throwable:装备槽稀有度被探索偏好排除，回退背包');
+        }
+      }
+      /* 装备槽空或稀有度被排除 → 从背包按偏好取 */
       const t = pickThrowableByPreference('explore');
       if(t){
         const tdef = WEAPONS[t.id];
@@ -2018,6 +2176,12 @@ function _refreshThrowableSlot(){
   if(!z2) return;
   const slot = z2.querySelector('.slot[data-slot="throwable"]');
   if(!slot) return;
+  /* rev536: 库存耗尽自动清空装备槽 */
+  if(state.player.equipped.throwable && getThrowableCount() <= 0){
+    state.player.equipped.throwable = null;
+    delete state.player.equippedRarity.throwable;
+    state.player.throwableStock = 0;
+  }
   const id = state.player.equipped.throwable;
   const def = id ? itemDef(id) : null;
   if(def){
@@ -2032,7 +2196,16 @@ function _refreshThrowableSlot(){
     slot.innerHTML = '<div class="nm">投擲</div>';
   }
 }
-function checkThrowableUnequip(){const tid=state.player.equipped.throwable;if(!tid)return;if(getThrowableCount()<=0){const def=itemDef(tid);state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;state.player.throwableStock=0;refreshPlayerStats();if(typeof _refreshThrowableSlot==='function')_refreshThrowableSlot();}}
+
+/* rev536: 每 1 秒保险刷新投掷物栏（仅 explore tab，且非战斗），涵盖所有遗漏路径 */
+if(typeof window !== 'undefined' && !window._throwableSlotTimer){
+  window._throwableSlotTimer = setInterval(function(){
+    if(typeof currentTab !== 'undefined' && currentTab === 'explore'){
+      try{ _refreshThrowableSlot(); }catch(e){}
+    }
+  }, 1000);
+}
+
 function applyDropBonus(count){const sl=getBuildingLv('storage');return Math.max(1,Math.round(count*(1+sl*0.02)));}
 
 function autoCombat(region,node,enemies){
@@ -2128,14 +2301,23 @@ function autoCombat(region,node,enemies){
           pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');
           return {victory:false,loot:[]};
         }
-      } else {
-        /* 保險分支：理論上探索不會走到這裡（裝備槽投擲已被 chooseCombatWeaponVerbose 排除） */
-        if(getThrowableCount()<=0 && !ensureThrowableFromBackpack()){
+      } else if(choice.fromSlot){
+        /* rev537: 装备槽消耗 */
+        if(getThrowableCount()<=0 && !ensureThrowableFromBackpack('explore')){
           pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');
           return {victory:false,loot:[]};
         }
         state.player.throwableStock--;
-        setTimeout(checkThrowableUnequip,0);
+        if(state.player.throwableStock <= 0){
+          if(typeof ensureThrowableFromBackpack === 'function') ensureThrowableFromBackpack('explore');
+        }
+        if(typeof _refreshThrowableSlot==='function')_refreshThrowableSlot();
+      } else {
+        /* 兜底：从背包消耗 */
+        if(!invRemove(weapon.id, weapon.rarity, 1)){
+          pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');
+          return {victory:false,loot:[]};
+        }
       }
       bulletsUsed=1;
       const hitRate=getHitRate(def.type,mode)+10;
@@ -2505,27 +2687,32 @@ function offlineSettle(){
   const regionPool=getActiveRegions();
   const beforeInv = _offlineSnapshotInv();
   _offlineMode = true;
-  for(let i=0;i<events;i++){
-    /* rev332: 離線結算死亡即時滿血，避免 1 HP 連續戰鬥 */
-    if(state.player.hp <= 0 || state.pendingHealFull){
-      state.player.hp = state.player.maxHp;
-      state.player.armor = state.player.maxArmor;
-      state.pendingHealFull = false;
-      state.exploreDelayUntil = 0;
+  let buildingResults = {radioCount:0, armoryCount:0};
+  try {
+    for(let i=0;i<events;i++){
+      /* rev332: 離線結算死亡即時滿血，避免 1 HP 連續戰鬥 */
+      if(state.player.hp <= 0 || state.pendingHealFull){
+        state.player.hp = state.player.maxHp;
+        state.player.armor = state.player.maxArmor;
+        state.pendingHealFull = false;
+        state.exploreDelayUntil = 0;
+      }
+      const region=pick(regionPool);const mode=state.preferences.actionMode;const r=REGIONS[region];
+      const cc=mode==='attack'?r.combat.attack:r.combat.stealth;
+      const cur=getCurrentNode(region);
+      if(Math.random()<cc){const n=spawnCount(region);const enemies=genEnemies(region,n);const res=autoCombat(region,cur.node,enemies);if(res.victory)wins++;else runs++;}
+      else searchEvent(region,cur.node);
+      advanceNode(region);
     }
-    const region=pick(regionPool);const mode=state.preferences.actionMode;const r=REGIONS[region];
-    const cc=mode==='attack'?r.combat.attack:r.combat.stealth;
-    const cur=getCurrentNode(region);
-    if(Math.random()<cc){const n=spawnCount(region);const enemies=genEnemies(region,n);const res=autoCombat(region,cur.node,enemies);if(res.victory)wins++;else runs++;}
-    else searchEvent(region,cur.node);
-    advanceNode(region);
+    /* ★ 新增：離線期間建築產出補算（無線電、軍械庫、改造隊列）★ */
+    buildingResults = _offlineBuildingSettle(now, baseTime);
+    if(typeof _gardenOfflineSettle === 'function'){
+      try{ _gardenOfflineSettle(now, baseTime); }catch(e){ console.warn('[garden offline] err', e); }
+    }
+  } finally {
+    /* rev541: 確保異常時也重置 _offlineMode */
+    _offlineMode = false;
   }
-  /* ★ 新增：離線期間建築產出補算（無線電、軍械庫、改造隊列）★ */
-  const buildingResults = _offlineBuildingSettle(now, baseTime);
-  if(typeof _gardenOfflineSettle === 'function'){
-    try{ _gardenOfflineSettle(now, baseTime); }catch(e){ console.warn('[garden offline] err', e); }
-  }
-  _offlineMode = false;
   const loot = _offlineDiffInv(beforeInv);
   const lootList = [];
   let totalKinds = 0, totalCount = 0;

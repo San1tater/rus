@@ -899,7 +899,7 @@ const BOSS_ANIMS = {
         ring_b: [{rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}, {rot:-110.54, dx:28.96, dy:-17.06, w:0.6, h:0.04}],
         ring_l: [{rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}, {rot:0, dx:3.8, dy:28.31, w:0.04, h:0.6}],
         ring_r: [{rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}, {rot:67.17, dx:-5.67, dy:29.24, w:0.04, h:0.6}],
-        arm_lu_base: [{rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:39.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:32.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:26.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:64.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:74.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:59.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}],
+        arm_lu_base: [{rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:34.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:32.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:26.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:64.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:74.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:59.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}, {rot:44.4, dx:-7.21, dy:11.49, w:0.06, h:0.14}],
         arm_lu_mid: [{rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-34.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-41.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-46.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-1.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:8.4, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-11.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}, {rot:-26.6, dx:-61.79, dy:6.31, w:0.06, h:0.14}],
         arm_lu_tip: [{rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-20.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-25.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-29.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-5.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:2.2, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-7.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}, {rot:-17.8, dx:-79.57, dy:2.15, w:0.1, h:0.08}],
         arm_ru_base: [{rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:44.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:37.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:31.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:69.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:79.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:64.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}, {rot:49.5, dx:-4.6, dy:2.37, w:0.06, h:0.14}],
@@ -962,6 +962,57 @@ const BOSS_ANIMS = {
 
 /* ★ 交換 core_omega 的 idle 和 walk ★ */
 (function(){ var A = BOSS_ANIMS.core_omega; if(A){ var t = A.idle; A.idle = A.walk; A.walk = t; } })();
+
+/* rev535: core_omega 三個雷射技能各自獨立攻擊動畫 */
+(function(){
+  const A = BOSS_ANIMS.core_omega;
+  if(!A || !A.attack_swipe) return;
+  const base = A.attack_swipe;
+  function clone(){ return JSON.parse(JSON.stringify(base)); }
+  function setRot(anim, layerId, rots){
+    const arr = anim.keys[layerId];
+    if(!arr) return;
+    for(let i = 0; i < arr.length && i < rots.length; i++) arr[i].rot = rots[i];
+  }
+  function freezeExcept(anim, keep){
+    for(const lid in anim.keys){
+      if(lid.indexOf('arm_') !== 0) continue;
+      if(keep.indexOf(lid) >= 0) continue;
+      const arr = anim.keys[lid];
+      const r0 = arr[0] ? arr[0].rot : 0;
+      for(const k of arr) k.rot = r0;
+    }
+  }
+
+  /* 單發雷射：右上臂前伸 */
+  const single = clone();
+  freezeExcept(single, ['arm_ru_base','arm_ru_mid']);
+  setRot(single, 'arm_ru_base', [49.5, 35, 15, 30, 45, 49.5]);
+  setRot(single, 'arm_ru_mid',  [-43.92, -20, 5, -10, -30, -43.92]);
+  A.laser_single = single;
+
+  /* 掃射雷射：右下臂橫掃 */
+  const spray = clone();
+  freezeExcept(spray, ['arm_rd_base','arm_rd_mid']);
+  setRot(spray, 'arm_rd_base', [-89.4, -70, -40, -60, -80, -89.4]);
+  setRot(spray, 'arm_rd_mid',  [22.23, 40, 70, 50, 30, 22.23]);
+  A.laser_spray = spray;
+
+  /* 蓄力雷射：左下臂蓄力 + 核心眼睛放大 */
+  const charge = clone();
+  freezeExcept(charge, ['arm_ld_base','arm_ld_mid']);
+  setRot(charge, 'arm_ld_base', [6.88, -10, -25, -30, -15, 6.88]);
+  setRot(charge, 'arm_ld_mid',  [110.54, 90, 70, 60, 85, 110.54]);
+  const eyeArr = charge.keys['core_eye'];
+  if(eyeArr){
+    const whs = [0.06, 0.08, 0.12, 0.16, 0.10, 0.06];
+    for(let i = 0; i < eyeArr.length && i < whs.length; i++){
+      eyeArr[i].w = whs[i];
+      eyeArr[i].h = whs[i];
+    }
+  }
+  A.laser_charge = charge;
+})();
 
 const BOSS_SKILLS = {
   factory_king: [
@@ -1029,21 +1080,22 @@ const BOSS_SKILLS = {
   ],
   core_omega: [
     { id:'laser_single', name:'單發雷射', type:'aoe', cd:6, range:0.40,
-      dmg:50, pen:6, anim:'attack_swipe',
+      dmg:50, pen:6, anim:'laser_single',
       telegraph:900, hitDelay:900, totalTime:1400,
       aoe:true, knockback:0.05, telegraphRatio:0.12, unlockPhase:0, armRequired:'ring_t' },
     { id:'laser_spray', name:'掃射雷射', type:'aoe', cd:12, range:0.35,
-      dmg:32, pen:5, anim:'attack_swipe',
+      dmg:32, pen:5, anim:'laser_spray',
       telegraph:1200, hitDelay:1200, totalTime:1800,
       aoe:true, knockback:0.06, telegraphRatio:0.15, unlockPhase:1, armRequired:'ring_r' },
     { id:'laser_charge', name:'蓄力雷射', type:'aoe', cd:20, range:0.50,
-      dmg:95, pen:7, anim:'skill_charge',
+      dmg:95, pen:7, anim:'laser_charge',
       telegraph:2000, hitDelay:2000, totalTime:2800,
       aoe:true, knockback:0.10, telegraphRatio:0.18, unlockPhase:2, armRequired:'ring_b' }
   ]
 };
 
 (function(){const pairs=[['factory_king_ii','factory_king'],['lab_queen_ii','lab_queen'],['road_tyrant_ii','road_tyrant'],['swamp_hydra_ii','swamp_hydra'],['core_omega_ii','core_omega']];for(const p of pairs){const ii=p[0],base=p[1];if(BOSS_LAYERS[base])BOSS_LAYERS[ii]=BOSS_LAYERS[base];if(BOSS_ANIMS[base])BOSS_ANIMS[ii]=BOSS_ANIMS[base];if(BOSS_SKILLS[base])BOSS_SKILLS[ii]=BOSS_SKILLS[base];if(BOSS_WEAKPOINTS[base])BOSS_WEAKPOINTS[ii]=BOSS_WEAKPOINTS[base];if(BOSS_PHASES[base])BOSS_PHASES[ii]=BOSS_PHASES[base];}})();
+if(BOSS_LAYERS.swamp_hydra) BOSS_LAYERS.swamp_hydra._hydraFollow = true;
 
 const BUILDINGS={
   workbench:{name:'工作台',desc:'改造傳奇武器',cost:{wood:20,metal:10,screws:5},maxLv:50},

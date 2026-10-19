@@ -9,7 +9,7 @@ const GARDEN_PLOT_TYPES = {
   shed:    { name: '工棚',   icon: '🛖', desc: '容納一個監工', bg: 'shed_bg' },
   compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物', bg: 'compost_bg' }
 ,
-  fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h', bg: 'fridge' },
+  fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h', bg: 'fridge_bg' },
   black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 <span style="color:#e05252">↓20%</span> ｜ 產量 <span style="color:#4caf50">↑20%</span>' },
   red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 <span style="color:#e05252">↓40%</span> ｜ 產量 <span style="color:#4caf50">↑30%</span>' }};
 const SPECIAL_SOIL_BONUS = {
@@ -911,6 +911,9 @@ function _gardenMerchantInit(){
     if(typeof m[k] !== 'number' || !Number.isFinite(m[k]) || m[k] < 0) m[k] = 0;
   });
   if(typeof m.lastFeed !== 'number' || !Number.isFinite(m.lastFeed) || m.lastFeed <= 0) m.lastFeed = Date.now();
+  if(typeof m.lastCompostDecayAt !== 'number' || !Number.isFinite(m.lastCompostDecayAt) || m.lastCompostDecayAt <= 0){
+    m.lastCompostDecayAt = Math.floor(Date.now() / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
+  }
   if(typeof m.foodPool !== 'number' || !Number.isFinite(m.foodPool) || m.foodPool < 0) m.foodPool = 0;
   if(typeof state.garden.compostValue !== 'number' || !Number.isFinite(state.garden.compostValue) || state.garden.compostValue < 0){
     state.garden.compostValue = 0;
@@ -1240,6 +1243,23 @@ function _gardenMerchantRefreshUI(){
     if(fill) fill.style.width = pct + '%';
   }
 }
+/* rev535: 堆肥值每小時自然損耗 2%（線上/離線共用，不計入離線報告） */
+function _gardenCompostDecayTick(now){
+  const g = _gardenMerchantInit();
+  if(typeof g.lastCompostDecayAt !== 'number'){
+    g.lastCompostDecayAt = Math.floor(now / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
+    return;
+  }
+  const curHour = Math.floor(now / GARDEN_MEAL_INTERVAL_MS);
+  const lastHour = Math.floor(g.lastCompostDecayAt / GARDEN_MEAL_INTERVAL_MS);
+  if(curHour <= lastHour) return;
+  const hours = Math.min(curHour - lastHour, 24 * 30);
+  let v = (typeof g.compostValue === 'number' && isFinite(g.compostValue)) ? g.compostValue : 0;
+  for(let i = 0; i < hours; i++) v *= 0.98;
+  g.compostValue = v;
+  g.lastCompostDecayAt = curHour * GARDEN_MEAL_INTERVAL_MS;
+}
+
 function _gardenMerchantTick(){
   if(window._gardenOfflineSettleRunning) return;
   const g = _gardenMerchantInit();
@@ -2619,7 +2639,7 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
 
 
 
-function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, weaponId, enemyId){
+function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
   /* rev514: REGIONS.enemies 用 ghoul/raider/raider_vet；HUMAN_ENEMY_DATA 键为 human_ghoul 等 */
   var _realId = enemyId;
   if(typeof HUMAN_ENEMY_DATA !== "undefined"){
@@ -3215,7 +3235,7 @@ function drawUnit(u, now){
       if(u.isGuard){
         _raidDrawHuman(ctx, u.x + ox, u.y, SCALE, u.equipped, u.equippedRarity, u.animName, u.animFrame, u.weaponSlot, false);
       } else {
-        _raidDrawEnemy(ctx, u.x + ox, u.y, SCALE, u.animName, u.animFrame, u.weaponId || 'ak74', u.id);
+        _raidDrawEnemy(ctx, u.x + ox, u.y, SCALE, u.animName, u.animFrame, u.id);
       }
       ctx.restore();
       if(u.alive){
@@ -5215,6 +5235,10 @@ function _gardenOfflineSettle(now, baseTime){
   window._gardenOfflineSettleRunning = true;
   try {
   const g = _gardenMerchantInit();
+  /* rev535: 離線補扣堆肥（不寫入離線報告） */
+  if(typeof g.lastCompostDecayAt !== 'number' || g.lastCompostDecayAt > baseTime){
+    g.lastCompostDecayAt = Math.floor(baseTime / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
+  }
   if(now <= baseTime) return;
   /* rev320: 與探索一致，離線最多結算 8 小時 */
   baseTime = Math.max(baseTime, now - 8 * 3600 * 1000);
@@ -5286,6 +5310,9 @@ function _gardenOfflineSettle(now, baseTime){
       cursor = nextT;
       const curHour = Math.floor(cursor / GARDEN_MEAL_INTERVAL_MS);
       while(lastMealHour < curHour){ _gardenDoOneMeal(g); lastMealHour++; }
+      if(typeof _gardenCompostDecayTick === 'function'){
+        try{ _gardenCompostDecayTick(cursor); }catch(e){}
+      }
       if(typeof _gardenMerchantLineProcess === 'function'){
         const _oldBatch = window._merchantTickBatch;
         window._merchantTickBatch = { t: cursor, lines: {} };

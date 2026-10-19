@@ -378,11 +378,16 @@ function getAmmoShortName(id, slot){
 function renderAmmoOrderRow(slot, label){
   const equipped = state.player.equipped[slot];
   const order = getAmmoOrder(slot);
+  /* rev537: 过滤背包中已不存在的弹种 */
+  const available = equipped ? getAvailableAmmoForSlot(slot) : [];
+  const availableSet = {};
+  for(const _a of available) availableSet[_a.id] = true;
   /* rev120: 标签与 3 个格子一起参与 space-between，均分 3 个间距 */
   let html = '<div class="ammo-order-row" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;padding-right:18px">';
   html += '<div class="lbl" style="flex:0 0 18px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:center;writing-mode:vertical-rl;text-orientation:upright;line-height:1;letter-spacing:1px">' + label + '</div>';
   for(let i = 0; i < 3; i++){
-    const aid = order[i];
+    let aid = order[i];
+    if(aid && !availableSet[aid]) aid = null;
     let inner = '<span class="empty-lbl" style="font-size:10px;color:#5a5040">空</span>';
     let bgStyle = 'background:#1a1510;border-color:#3a2f25;';
     if(aid){

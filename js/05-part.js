@@ -135,8 +135,20 @@ function updateBossAI(dt, now){
   const playerRightN = getPlayerRightBoundaryN();
 
   const skills = getBossSkillList(b.bossId);
+  /* rev535: 當前階段可用的手臂技能若全因手臂被打爆而失效，提前解鎖下一階段技能 */
+  let _effectivePhase = b.phaseIdx;
+  if(b.bossId === 'core_omega' || b.bossId === 'core_omega_ii'){
+    let _guard = 0;
+    while(_guard++ < 4){
+      const _usable = skills.some(function(sk){
+        return phaseUnlocksSkill(_effectivePhase, sk) && !isOmegaSkillDisabled(sk);
+      });
+      if(_usable) break;
+      _effectivePhase++;
+    }
+  }
   for(const sk of skills){
-    if(!phaseUnlocksSkill(b.phaseIdx, sk)) continue;
+    if(!phaseUnlocksSkill(_effectivePhase, sk)) continue;
     if(isOmegaSkillDisabled(sk)) continue;
     if(now < (b.skillCds[sk.id] || 0)) continue;
     if(sk.type === 'dash'){
@@ -1487,6 +1499,8 @@ function endBattle(victory){
     b.active = false;
     b.settling = false;
     showBattleResult(bossDef, b, victory, loot);
+    /* rev541: 失敗路徑由 endBattle 清 battle，與勝利路徑的 finishBattleSettle 對稱 */
+    battle = null;
   }
 }
 function finishBattleSettle(){
@@ -1507,7 +1521,8 @@ function showBattleResult(bossDef, b, victory, loot){
     ${loot.length?loot.map(l=>`<div class="item-row" data-iid="${l.id}" data-irar="${l.rarity}"><div class="icon" style="background:${rarityBg(l.rarity)}">${itemIcon(l.id,30)}</div><div class="info"><div class="nm ${rarityClass(l.rarity)}">${(itemDef(l.id)||{name:l.id}).name}</div><div class="sub">${l.rarity}</div></div><div class="cnt">*${l.count}</div></div>`).join(''):'<div class="empty-hint">無</div>'}`;
   const ft=el('div','modal-ft');ft.innerHTML=`<button class="btn primary" id="m-ok">確認</button>`;
   const bd=openModal({title:'戰鬥結算',body,footer:ft});
-  ft.querySelector('#m-ok').onclick=()=>{closeModal();battle=null;save();renderCombat();};
+  /* rev541: battle 由调用方（endBattle / finishBattleSettle）清理，此处不再重复 */
+  ft.querySelector('#m-ok').onclick=()=>{closeModal();save();renderCombat();};
   $$('.item-row',bd).forEach(r=>{r.onclick=()=>openItemDetail(r.dataset.iid,r.dataset.irar);});
 }
 const BossModule = {

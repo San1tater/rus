@@ -760,7 +760,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-plot.built[data-type="tower"]{background-image:url('icons/garden/tower_bg.png')}
 .gp-plot.built[data-type="shed"]{background-image:url('icons/garden/shed_bg.png')}
 .gp-plot.built[data-type="compost"]{background-image:url('icons/garden/compost_bg.png')}
-.gp-plot.built[data-type="fridge"]{background-image:url('icons/garden/fridge.png')}
+.gp-plot.built[data-type="fridge"]{background-image:url('icons/garden/fridge_bg.png')}
 
 /* rev400: 修復特殊土地圖片 */
 .gp-plot.built[data-type="black_soil"]{background-image:url('icons/garden/black_soil.png')}
