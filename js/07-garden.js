@@ -1288,6 +1288,26 @@ function _gardenMerchantTick(){
   }
 }
 
+/* rev555: 食物每小时总消耗（僕人吃饭 + 各产线食物消耗）。新增消耗方只改此函数 */
+function _gardenFoodConsumePerHour(){
+  const g = _gardenMerchantInit();
+  const m = g.merchant;
+  let total = 0;
+  for(const s of (state.servants || [])){
+    if(!s.assignedPlots || !s.assignedPlots.length) continue;
+    total += (FOOD_COST_PER_HOUR[s.foodPolicy || 'normal'] || 0) * 60;
+  }
+  if(m.throwLv > 0){
+    const _t = MERCHANT_THROW_TABLE[m.throwLv];
+    if(_t && _t.legend && _t.foodCost) total += _t.foodCost * 12;
+  }
+  if(m.ammoLv > 0){
+    const _a = MERCHANT_AMMO_TABLE[m.ammoLv];
+    if(_a && _a.foodCost) total += _a.foodCost * 12;
+  }
+  return total;
+}
+
 function _gardenFoodStats(){
   const g = _gardenMerchantInit();
   const m = g.merchant;

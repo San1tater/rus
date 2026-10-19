@@ -295,14 +295,11 @@ function renderBaseStats(){
   }
   const g = _gardenMerchantInit();
   const m = g.merchant;
-  let consumePerHour = 0;
-  for(const s of (state.servants || [])){
-    if(!s.assignedPlots || !s.assignedPlots.length) continue;
-    consumePerHour += (FOOD_COST_PER_HOUR[s.foodPolicy || 'normal'] || 0) * 60;
-  }
-  if(m.foodLv > 0){
-    const prod = MERCHANT_FOOD_TABLE[m.foodLv].cropValue * 12;
-    const net = prod - consumePerHour;
+  /* rev555: 食物净产 = 产能 - 总消耗（僕人+投掷线+弹药线），统一走 _gardenFoodConsumePerHour */
+  const _totalFoodConsume = (typeof _gardenFoodConsumePerHour === 'function') ? _gardenFoodConsumePerHour() : 0;
+  const _foodProd = m.foodLv > 0 ? MERCHANT_FOOD_TABLE[m.foodLv].cropValue * 12 : 0;
+  if(_foodProd > 0 || _totalFoodConsume > 0){
+    const net = _foodProd - _totalFoodConsume;
     const st = _gardenMerchantLineStatus('food');
     rows.push({ key: 'food', label: '食物', value: (net >= 0 ? '+' : '') + net + '/h', paused: st && st.paused });
   }
@@ -454,6 +451,42 @@ function _openSoilDetail(){
   openModal({ title: '田地', body: body, footer: ft });
 }
 
+/* rev555: 基地子分页签左右滑动切换（stats ↔ room） */
+function _bindBaseSwipe(z2){
+  if(!z2) return;
+  if(z2._baseSwipeAbort) z2._baseSwipeAbort.abort();
+  z2._baseSwipeAbort = new AbortController();
+  const sig = z2._baseSwipeAbort.signal;
+  const TABS = ['stats', 'room'];
+  let sx = 0, sy = 0, active = false;
+  z2.addEventListener('touchstart', function(e){
+    if(!e.touches || e.touches.length !== 1){ active = false; return; }
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    active = true;
+  }, {passive: true, signal: sig});
+  z2.addEventListener('touchcancel', function(){
+    active = false;
+  }, {signal: sig});
+  z2.addEventListener('touchend', function(e){
+    if(!active) return;
+    active = false;
+    if(!e.changedTouches || !e.changedTouches[0]) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    if(Math.abs(dx) < 50) return;
+    if(Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    const cur = z2.querySelector('.subnav-tab.on');
+    if(!cur) return;
+    const curIdx = TABS.indexOf(cur.dataset.tab);
+    if(curIdx < 0) return;
+    const nextIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
+    if(nextIdx < 0 || nextIdx >= TABS.length) return;
+    const target = z2.querySelector('.subnav-tab[data-tab="' + TABS[nextIdx] + '"]');
+    if(target) target.click();
+  }, {passive: true, signal: sig});
+}
+
 function renderBase(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   let html='<div class="build-grid">';
@@ -486,6 +519,9 @@ function renderBase(){
       }
     };
   });
+
+  /* rev555: 左右滑动切换子分页签 */
+  _bindBaseSwipe(z2);
 
   renderRegionArea(z3);
 
