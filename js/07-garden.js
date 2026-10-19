@@ -2739,6 +2739,46 @@ function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
 
 
 /* ===== rev238: 腐烂 / 堆肥 / 弹药回退 ===== */
+
+/* rev553: 守卫枪口世界坐标（用于 raid 子弹起点）
+   参数 u：guardUnit（含 x, y, equipped, weaponSlot, animName, animFrame）
+   参数 scale：raid 中的 SCALE
+   返回 { x, y }（画布内世界坐标）；无武器时返回 null，调用方用旧偏移 fallback */
+function _getRaidMuzzleWorld(u, scale){
+  if(!u || !u.equipped || !u.weaponSlot) return null;
+  const wpId = u.equipped[u.weaponSlot];
+  if(!wpId) return null;
+  const cfg = getWeaponCfg(u.weaponSlot, wpId);
+  if(!cfg || !cfg.trim) return null;
+  const mz = WEAPON_MUZZLE[resolveIconId(wpId)];
+  if(!mz) return null;
+  const L = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
+  if(!L) return null;
+
+  const B = { x: 30, y: 30, w: 340, h: 460 };
+  const anim = GAME_ANIMS[u.animName] || GAME_ANIMS.idle;
+  if(!anim) return null;
+  const fi = ((u.animFrame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  const key = (anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0, dx:0, dy:0};
+
+  const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
+  const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
+  const w = B.w * L.w;
+  const h = B.h * L.h;
+  const anchorX = cx + w * (cfg.ox || 0);
+  const anchorY = cy + h * (cfg.oy || 0);
+
+  const baseW = cfg.trim.w * (cfg.scale || 1);
+  const baseH = cfg.trim.h * (cfg.scale || 1);
+  const mzlX = anchorX + (mz.x / cfg.trim.w) * baseW;
+  const mzlY = anchorY - baseH / 2 + (mz.y / cfg.trim.h) * baseH;
+
+  return {
+    x: u.x + scale * (mzlX - 200),
+    y: u.y + scale * (mzlY - 515)
+  };
+}
+
 function _gardenHasPlotType(type){
   const plots = _gardenGetPlots();
   for(let i = 0; i < plots.length; i++){
@@ -3357,8 +3397,15 @@ function drawUnit(u, now){
     }
 
     function playShot(fromU, toU, isEnemy){
-      const sx = isEnemy ? (fromU.x - MUZZLE_X_LEFT) : (fromU.x + MUZZLE_X_RIGHT);
-      const sy = fromU.y - MUZZLE_Y_UP;
+      let sx, sy;
+      if(isEnemy){
+        sx = fromU.x - MUZZLE_X_LEFT;
+        sy = fromU.y - MUZZLE_Y_UP;
+      } else {
+        const _mz = (typeof _getRaidMuzzleWorld === 'function') ? _getRaidMuzzleWorld(fromU, SCALE) : null;
+        sx = _mz ? _mz.x : (fromU.x + MUZZLE_X_RIGHT);
+        sy = _mz ? _mz.y : (fromU.y - MUZZLE_Y_UP);
+      }
       const tx = toU.x;
       const ty = toU.y - MUZZLE_Y_UP;
       const wAnim = isEnemy ? 'hurt' : (fromU.weaponSlot === 'secondary' ? 'fire_secondary' : 'fire_primary');
@@ -3373,8 +3420,15 @@ function drawUnit(u, now){
     }
 
     function playMiss(fromU, toU, isEnemy){
-      const sx = isEnemy ? (fromU.x - MUZZLE_X_LEFT) : (fromU.x + MUZZLE_X_RIGHT);
-      const sy = fromU.y - MUZZLE_Y_UP;
+      let sx, sy;
+      if(isEnemy){
+        sx = fromU.x - MUZZLE_X_LEFT;
+        sy = fromU.y - MUZZLE_Y_UP;
+      } else {
+        const _mz = (typeof _getRaidMuzzleWorld === 'function') ? _getRaidMuzzleWorld(fromU, SCALE) : null;
+        sx = _mz ? _mz.x : (fromU.x + MUZZLE_X_RIGHT);
+        sy = _mz ? _mz.y : (fromU.y - MUZZLE_Y_UP);
+      }
       const tx = toU.x;
       const ty = toU.y - MUZZLE_Y_UP;
       const wAnim = isEnemy ? 'hurt' : (fromU.weaponSlot === 'secondary' ? 'fire_secondary' : 'fire_primary');
