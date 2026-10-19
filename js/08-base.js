@@ -672,7 +672,7 @@ function _openGarageInfoModal(idx){
   const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
   const ammo = _garageAmmoEquiv();
 
-  let body = '<div class="detail-title">🏭 ' + b.name + ' Lv.' + lv + (isMax ? ' (MAX)' : '') + '</div>'
+  let body = '<div class="detail-title">' + buildingIcon('garage') + ' ' + b.name + ' Lv.' + lv + (isMax ? ' (MAX)' : '') + '</div>'
     + '<div class="detail-sub">' + b.desc + '</div>'
     + '<div class="stat-line"><span class="k">當前效果</span><span class="v">電台次數上限 ' + lv + '</span></div>';
   if(!isMax){
