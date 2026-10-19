@@ -2,8 +2,8 @@
    ★ BOSS MODULE — 資料區
    ============================================================ */
 const BOSSES={
-  factory_king:{name:'鐵匠',region:'廢棄工廠',hp:10000,armor:2000,armorLevel:4,dmg:125,pen:2,critRate:0.10,critMult:1.5,seal:'seal_factory',unlock:'廢棄實驗室',drops:['zhuk6a','svd','altyn','rpk16','maska','ssh94']},
-  lab_queen:{name:'醫師',region:'廢棄實驗室',hp:25000,armor:6000,armorLevel:5,dmg:225,pen:3,critRate:0.12,critMult:1.6,seal:'seal_lab',unlock:'郊區公路',drops:['altyn','zsh12m','rpk16','asval','maska','6b232','ssh94']},
+  factory_king:{name:'鐵匠',region:'廢棄工廠',hp:10000,armor:2000,armorLevel:4,dmg:125,pen:2,critRate:0.10,critMult:1.5,seal:'seal_factory',unlock:'廢棄實驗室',drops:['zhuk6a','svd','altyn','rpk16','maska','sssh94']},
+  lab_queen:{name:'醫師',region:'廢棄實驗室',hp:25000,armor:6000,armorLevel:5,dmg:225,pen:3,critRate:0.12,critMult:1.6,seal:'seal_lab',unlock:'郊區公路',drops:['altyn','zsh12m','rpk16','asval','maska','6b232','sssh94']},
   road_tyrant:{name:'鉗子',region:'郊區公路',hp:50000,armor:12500,armorLevel:6,dmg:350,pen:4,critRate:0.15,critMult:1.8,seal:'seal_road',unlock:'輻射沼澤',drops:['zhuk6a','svd','pkp','rpk16','belleville','zhuk3','redutm']},
   swamp_hydra:{name:'蝮蛇',region:'輻射沼澤',hp:90000,armor:20000,armorLevel:6,dmg:500,pen:5,critRate:0.18,critMult:2.0,seal:'seal_swamp',unlock:'廢土核心',drops:['altyn','zsh12m','svd','pkp','6b43','zhuk6a','maska']},
   core_omega:{name:'熔爐',region:'廢土核心',hp:160000,armor:120000,armorLevel:7,dmg:650,pen:6,critRate:0.20,critMult:2.2,seal:'seal_core',unlock:null,unlockTier2:'廢棄工廠',drops:['pkm','pkp','ash12','svd','altyn','zsh12m','6b43','defender2','zhuk6a','belleville','6b45','redutm','rgn']},
@@ -1331,7 +1331,7 @@ const HEAD_ARMOR_LAYOUT = {
   'redutm':   { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
   'ssh68':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
   'ssh68m':   { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.68, rotation:4 },
-  'ssh94':    { layer:"head", behind:false, scale:0.34, ox:-0.04, oy:-0.6, rotation:0 },
+  'sssh94':    { layer:"head", behind:false, scale:0.34, ox:-0.04, oy:-0.6, rotation:0 },
   'zhuk3':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
   'zhuk6a':   { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
   'zsh12m':   { layer:"head", behind:false, scale:0.35, ox:-0.1, oy:-0.6, rotation:4 },

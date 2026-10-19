@@ -671,7 +671,7 @@ const _rev506_HUMAN_EQUIP_POOL = {
     primary: ["6kh2", "6kh5", "kukri"]
   },
   human_raider: {
-    head: ["ssh68", "ssh94", "kolpak"],
+    head: ["ssh68", "sssh94", "kolpak"],
     top: ["paca", "6b23", "zhuk3"],
     primary: ["aks74u", "aks74un", "ak74", "akms", "akm", "akmn"]
   },
@@ -2877,10 +2877,16 @@ function openSlotDetail(slot){
       ${def.armored?`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>`:''}
       ${def.cal?`<div class="stat-line"><span class="k">口徑</span><span class="v">${def.cal}</span></div>`:''}
       ${def.mag?`<div class="stat-line"><span class="k">彈匣</span><span class="v">${def.mag}</span></div>`:''}
-      ${!isArmor&&def.rpm?`<div class="stat-line"><span class="k">射速</span><span class="v">${def.rpm} RPM</span></div>`:''}
-      ${dVal!=null?`<div class="stat-line"><span class="k">傷害</span><span class="v">${dVal}</span></div>`:''}
-      ${def.modes?`<div class="stat-line"><span class="k">射擊模式</span><span class="v">${def.modes.join('/')}</span></div>`:''}
-      ${def.explosive?`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸（群傷）</span></div>`:''}
+      ${def.slot==='throwable' ? `
+        <div class="stat-line"><span class="k">破片數</span><span class="v">${def.fragments || 1}</span></div>
+        <div class="stat-line"><span class="k">每片傷害</span><span class="v">${Math.round((def.fragmentDamage || def.dmg || 0) * (RARITY_MULT[rar]||1))}</span></div>
+        <div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>
+      ` : `
+        ${!isArmor&&def.rpm?`<div class="stat-line"><span class="k">射速</span><span class="v">${def.rpm} RPM</span></div>`:''}
+        ${dVal!=null?`<div class="stat-line"><span class="k">傷害</span><span class="v">${dVal}</span></div>`:''}
+        ${def.modes?`<div class="stat-line"><span class="k">射擊模式</span><span class="v">${def.modes.join('/')}</span></div>`:''}
+        ${def.explosive?`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸（群傷）</span></div>`:''}
+      `}
       ${slot==='melee'?`<div class="stat-line"><span class="k">每輪攻擊次數</span><span class="v">${getMeleeHits(def.rpm)}</span></div>`:''}
       ${def.scopeBonus?`<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+${def.scopeBonus}% 命中</span></div>`:''}
       ${def.fixed?`<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>`:''}
@@ -3113,14 +3119,20 @@ function openItemDetail(id,rarity,returnFn){
     ${d.armored?`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>`:''}
     ${d.cal?`<div class="stat-line"><span class="k">口徑</span><span class="v">${d.cal}</span></div>`:''}
     
-    ${dVal!=null?`<div class="stat-line"><span class="k">傷害</span><span class="v">${dVal}</span></div>`:''}
-    ${!isArmorDef&&d.pen?`<div class="stat-line"><span class="k">穿甲</span><span class="v">${d.pen}</span></div>`:''}
-    ${d.pellets?`<div class="stat-line"><span class="k">彈丸數</span><span class="v">${d.pellets}</span></div>`:''}
-    ${d.mag?`<div class="stat-line"><span class="k">彈匣</span><span class="v">${d.mag}</span></div>`:''}
-    ${!isArmorDef&&d.rpm?`<div class="stat-line"><span class="k">射速</span><span class="v">${d.rpm} RPM</span></div>`:''}
-    ${d.modes?`<div class="stat-line"><span class="k">模式</span><span class="v">${d.modes.join('/')}</span></div>`:''}
-    ${d.heal?`<div class="stat-line"><span class="k">治療</span><span class="v">${Math.round(d.heal*(RARITY_MULT[rarity]||1))}</span></div>`:''}
-    ${d.explosive?`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>`:''}
+    ${d.slot==='throwable' ? `
+      <div class="stat-line"><span class="k">破片數</span><span class="v">${d.fragments || 1}</span></div>
+      <div class="stat-line"><span class="k">每片傷害</span><span class="v">${Math.round((d.fragmentDamage || d.dmg || 0) * (RARITY_MULT[rarity]||1))}</span></div>
+      <div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>
+    ` : `
+      ${dVal!=null?`<div class="stat-line"><span class="k">傷害</span><span class="v">${dVal}</span></div>`:''}
+      ${!isArmorDef&&d.pen?`<div class="stat-line"><span class="k">穿甲</span><span class="v">${d.pen}</span></div>`:''}
+      ${d.pellets?`<div class="stat-line"><span class="k">彈丸數</span><span class="v">${d.pellets}</span></div>`:''}
+      ${d.mag?`<div class="stat-line"><span class="k">彈匣</span><span class="v">${d.mag}</span></div>`:''}
+      ${!isArmorDef&&d.rpm?`<div class="stat-line"><span class="k">射速</span><span class="v">${d.rpm} RPM</span></div>`:''}
+      ${d.modes?`<div class="stat-line"><span class="k">模式</span><span class="v">${d.modes.join('/')}</span></div>`:''}
+      ${d.heal?`<div class="stat-line"><span class="k">治療</span><span class="v">${Math.round(d.heal*(RARITY_MULT[rarity]||1))}</span></div>`:''}
+      ${d.explosive?`<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>`:''}
+    `}
     ${d.slot==='melee'?`<div class="stat-line"><span class="k">每輪攻擊次數</span><span class="v">${getMeleeHits(d.rpm)}</span></div>`:''}
     ${d.scopeBonus?`<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+${d.scopeBonus}% 命中</span></div>`:''}
     ${d.fixed?`<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>`:''}`;
