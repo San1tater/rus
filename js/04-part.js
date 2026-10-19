@@ -451,8 +451,7 @@ function renderBattleScene(z1){
       <div class="range-indicator" id="range-indicator" style="left:${rLeft}%;width:${rWidth}%"></div>
       <div class="damage-header"><div>對 Boss 傷害 <span class="num">${Math.round(b.damageDealt)}</span> / ${totalHp}</div><div class="bar"><div class="fill" id="dmg-bar" style="width:${dealtPct}%"></div></div></div>
       <div class="fighter boss-f" id="fighter-boss" style="left:${b.bx*100}%;top:${b.by*100}%">
-        ${(b.shieldMaxHp>0 && !b.shieldBroken) ? `<div class="shield-bar-wrap" id="shield-bar-wrap"><div class="bar"><div class="fill" id="boss-shield" style="width:${(b.shieldHp/b.shieldMaxHp*100)}%"></div></div></div>` : ''}
-        <div class="hpbar-wrap"><div class="nm">${b.bossName}${(b.bossId.indexOf("_ii")>=0)?" II":""}</div><div class="bar ap"><div class="fill" id="boss-ap" style="width:${(b.bossArmor/b.bossMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:${(b.bossHp/b.bossMaxHp*100)}%"></div></div></div>
+        <div class="hpbar-wrap${(b.shieldMaxHp>0 && !b.shieldBroken) ? ' has-shield' : ''}" id="boss-hpbar-wrap"><div class="nm">${b.bossName}${(b.bossId.indexOf("_ii")>=0 && b.bossName.indexOf("II") === -1)?" II":""}</div>${(b.shieldMaxHp>0 && !b.shieldBroken) ? `<div class="shield-bar-wrap" id="shield-bar-wrap"><div class="bar"><div class="fill" id="boss-shield" style="width:${(b.shieldHp/b.shieldMaxHp*100)}%"></div></div></div>` : ''}<div class="bar ap"><div class="fill" id="boss-ap" style="width:${(b.bossArmor/b.bossMaxArmor*100)}%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:${(b.bossHp/b.bossMaxHp*100)}%"></div></div></div>
         <div class="sprite" id="boss-sprite">${BOSS_LAYERS[b.bossId] ? '<canvas id="boss-battle-canvas"></canvas>' : bossIcon(b.bossId)}</div>
       </div>
       <div class="fighter hero-f" id="fighter-hero" style="left:${b.px*100}%;top:${b.py*100}%">
@@ -537,6 +536,57 @@ function renderBattleScene(z1){
   
   });
 }
+/* rev543: 按 idle 顶部像素动态调整血条 / 盾条位置（贴合角色头顶） */
+function updateBossHpbarPos(){
+  if(!battle) return;
+  const sp = document.getElementById('boss-sprite');
+  if(!sp) return;
+  const spriteH = sp.clientHeight;
+  const spriteW = sp.clientWidth;
+  if(!spriteW || !spriteH) return;
+  const def = BOSS_LAYERS[battle.bossId];
+  if(!def) return;
+  const anims = BOSS_ANIMS[battle.bossId];
+  if(!anims || !anims.idle) return;
+  const cacheKey = battle.bossId + '|idle|' + spriteW + '|' + spriteH;
+  let topPx = null;
+  if(battle._bossIdleTopKey === cacheKey){
+    topPx = battle._bossIdleTopPx;
+  } else {
+    const anim = anims.idle;
+    const world = resolveBossWorld(def, anim, 0);
+    let minY = Infinity;
+    for(const L of def.layers){
+      const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][0]) || {rot:0,dx:0,dy:0};
+      const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+      const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+      const px = w * L.pivot.x;
+      const py = h * L.pivot.y;
+      const wp = world[L.id];
+      if(!wp) continue;
+      const rot = wp.rot * Math.PI / 180;
+      const cos = Math.cos(rot), sin = Math.sin(rot);
+      for(const c of [[0,0],[w,0],[0,h],[w,h]]){
+        const dx = c[0] - px, dy = c[1] - py;
+        const ry = dx*sin + dy*cos + wp.wy;
+        if(ry < minY) minY = ry;
+      }
+    }
+    if(!isFinite(minY)) return;
+    const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
+    topPx = _tf.oy + minY * _tf.sy;
+    battle._bossIdleTopKey = cacheKey;
+    battle._bossIdleTopPx = topPx;
+  }
+  if(topPx == null) return;
+  /* hpbar 底部距 fighter 底部 = spriteH - topPx + 4（4px 间隙） */
+  /* rev544: 血条与角色头顶间距 4px → 14px，避免遮挡 Boss 头顶元素 */
+  const _hpBottom = Math.max(14, spriteH - topPx + 14);
+  const hpWrap = document.getElementById('boss-hpbar-wrap');
+  if(hpWrap) hpWrap.style.bottom = _hpBottom + 'px';
+  /* rev546: 盾条 / nm 均在 hpbar-wrap 内部 normal flow，由 flex 排版，无需单独定位 */
+}
+
 function updateFighterPos(){
   if(!battle)return;
   const h=$('#fighter-hero'),b=$('#fighter-boss');
@@ -548,6 +598,8 @@ function updateFighterPos(){
   if(dmgBar){const totalHp=battle.bossMaxHp+battle.bossMaxArmor;dmgBar.style.width=Math.min(100,(battle.damageDealt/totalHp)*100)+'%';}
   const dmgHd=$('.damage-header');
   if(dmgHd){dmgHd.querySelector('.num').textContent=Math.round(battle.damageDealt);}
+  /* rev543: 血条 / 盾条跟随角色顶部 */
+  if(typeof updateBossHpbarPos === 'function') updateBossHpbarPos();
 }
 function renderBattleJoystick(z2){
   z2.innerHTML=`<div class="joystick" id="joystick"><div class="stick" id="stick"></div></div><div class="z2-hint">拖動搖桿左右移動</div>`;

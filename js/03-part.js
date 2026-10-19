@@ -146,23 +146,20 @@ function computeBossFit(def, bossId, canvasW, canvasH){
   if(!isFinite(aMinX)){ def._fitCached = null; return null; }
   if(!isFinite(iMinX)){ iMinX = aMinX; iMinY = aMinY; iMaxX = aMaxX; iMaxY = aMaxY; }
   const allW = aMaxX - aMinX, allH = aMaxY - aMinY;
+  const idleW = iMaxX - iMinX;
   const idleH = iMaxY - iMinY;
+  /* rev543: forceFit 改用 idleW 主控（允许攻击帧溢出约 15%），避免 idle 被 allW 压得太小 */
+  /* rev546: 加入 allW * 0.97 约束，保证攻击帧溢出 ≤ 3%（每侧 1.5%） */
   const fitScale = def.forceFit
-    ? Math.min(canvasH / idleH, canvasW / allW)
+    ? Math.min(canvasH / idleH, canvasW / (idleW * 1.2), canvasW / (allW * 0.97))
     : Math.min(canvasH / idleH, canvasH / allH, canvasW / allW);
   if(!def.forceFit && fitScale >= 1 && aMinX >= 0 && aMinY >= 0 && aMaxX <= cw && aMaxY <= ch){
     def._fitCached = null;
     return null;
   }
-  /* rev534: offsetX 以 idle 居中，超出任一边界时修正，确保所有动画左右都在画布内 */
+  /* rev543: offsetX 仅保证 idle 居中；forceFit 时不再拉回，攻击帧允许溢出 */
   const idleCX = (iMinX + iMaxX) / 2;
-  let offsetX = canvasW / 2 - idleCX * fitScale;
-  if(def.forceFit){
-    const _lPx = aMinX * fitScale + offsetX;
-    const _rPx = aMaxX * fitScale + offsetX;
-    if(_lPx < 0) offsetX -= _lPx;
-    if(_rPx > canvasW) offsetX -= (_rPx - canvasW);
-  }
+  const offsetX = canvasW / 2 - idleCX * fitScale;
   const offsetY = canvasH - iMaxY * fitScale;
   const fit = { fitScale, offsetX, offsetY, cw: canvasW, ch: canvasH };
   def._fitCached = fit;

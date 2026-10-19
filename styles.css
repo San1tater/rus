@@ -127,7 +127,8 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .hpbar-wrap .bar .fill{height:100%}
 .hpbar-wrap .bar.hp .fill{background:#e05252}
 .hpbar-wrap .bar.ap .fill{background:#4a90d9}
-.hpbar-wrap .nm{font-size:8px;color:#e8a33d;text-align:center;white-space:nowrap;text-shadow:0 0 3px #000;position:absolute;bottom:calc(100% + 34px);left:50%;transform:translateX(-50%)}
+.hpbar-wrap .nm{font-size:8px;color:#e8a33d;text-align:center;white-space:nowrap;text-shadow:0 0 3px #000;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%)}
+/* rev545: .hpbar-wrap.has-shield .nm 由 JS 动态覆盖，不再硬编码 */
 .bullet{position:absolute;width:5px;height:5px;background:#ffe08a;border-radius:50%;box-shadow:0 0 6px #ffb300;transform:translate(-50%,-50%)}
 .bullet.enemy{background:#ff5252;box-shadow:0 0 6px #e05252}
 /* ============================================================
@@ -779,4 +780,27 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-header .gp-food-info:hover,
 .gp-header .gp-food-info:active{
   opacity: 1 !important;
+}
+
+/* rev546: Boss 血條組整體 flex 排版 — 名字、盾條、護甲條、血量條統一為一個 group，間距 4px */
+.fighter.boss-f .hpbar-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  width:min(50%,200px);
+}
+.fighter.boss-f .hpbar-wrap .nm{
+  position:static;
+  transform:none;
+  bottom:auto;
+  text-align:center;
+}
+.fighter.boss-f .hpbar-wrap .shield-bar-wrap{
+  position:static;
+  transform:none;
+  bottom:auto;
+  width:100%;
+}
+.fighter.boss-f .hpbar-wrap .bar{
+  margin-bottom:0;
 }
