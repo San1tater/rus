@@ -1012,19 +1012,19 @@ const BOSS_SKILLS = {
       unlockPhase:1 }
   ],
   swamp_hydra: [
-    { id:'spray',  name:'腐蝕噴灑', type:'aoe', cd:8,  range:0.28,
+    { id:'spray',  name:'腐蝕噴灑', type:'aoe', cd:8,  range:0.56,
       dmg:55, pen:5, anim:'skill_charge',
       telegraph:1200, hitDelay:1200, totalTime:2000,
-      aoe:true, knockback:0.06, telegraphRatio:0.28, unlockPhase:0,
+      aoe:true, knockback:0.06, telegraphRatio:0.56, unlockPhase:0,
       projectile:'acid' },
-    { id:'burst',  name:'毒沼爆發', type:'aoe', cd:14, range:0.35,
+    { id:'burst',  name:'毒沼爆發', type:'aoe', cd:14, range:0.58,
       dmg:75, pen:5, anim:'skill_charge',
       telegraph:1500, hitDelay:1500, totalTime:2400,
-      aoe:true, knockback:0.10, telegraphRatio:0.35, unlockPhase:0 },
-    { id:'breath', name:'毒霧吐息', type:'aoe', cd:20, range:0.45,
+      aoe:true, knockback:0.10, telegraphRatio:0.58, unlockPhase:0 },
+    { id:'breath', name:'毒霧吐息', type:'aoe', cd:20, range:0.60,
       dmg:100, pen:5, anim:'skill_charge',
       telegraph:1800, hitDelay:1800, totalTime:2800,
-      aoe:true, knockback:0.08, telegraphRatio:0.30, unlockPhase:1,
+      aoe:true, knockback:0.08, telegraphRatio:0.60, unlockPhase:1,
       projectile:'acid' }
   ],
   core_omega: [

@@ -162,8 +162,8 @@ function updateBossAI(dt, now){
   let bossMoving = false;
 
   if(b.bossId === 'swamp_hydra' || b.bossId === 'swamp_hydra_ii'){
-    /* v66-hydra-range: 全圖射程 0.85 */
-    if(playerRightN >= b.bx - 0.85){
+    /* rev533: 近战触发距离与 doBossMeleeSwipe 内部判定一致（0.30） */
+    if(playerRightN >= b.bx - 0.30){
       if(now - (b.lastMeleeAt || 0) > 1500){
         b.lastMeleeAt = now;
         doBossMeleeSwipe();
@@ -960,6 +960,49 @@ function playerShoot(){
       battle.ammoInMag=getThrowableCount();
       if(battle.weaponStates[battle.weaponSlot])battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;
       if(state.player.throwableStock<=0){if(ensureThrowableFromBackpack()){const nw=equippedWeapon('throwable');if(nw){battle.weapon=nw;w=nw;def=nw.def;}battle.ammoInMag=getThrowableCount();if(battle.weaponStates[battle.weaponSlot])battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;}}
+    }
+    /* rev531: Boss战投掷物走破片机制 + 补 _pdB 熟练度加成 */
+    if(def.slot==='throwable' && def.explosive && (def.fragments || 0) > 0){
+      const _hitRate = getHitRate(def.type, battle.fireMode) + 10;
+      const _pdB = 0.6 + clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL, 0, 1) * 0.9;
+      const _frags = def.fragments;
+      let _effFrags;
+      if(def.allFragmentsOnSingle){ _effFrags = _frags; }
+      else { _effFrags = Math.round(_frags * 0.25); }
+      const _pieceBaseDmg = (def.fragmentDamage || def.dmg || 0) * (RARITY_MULT[w.rarity]||1) * _pdB;
+      const _critRate = calcCritRate(w.rarity, '一般');
+      const _critMult = calcCritMult(w.rarity, '一般');
+      const _isWeak = isWeakPointHit();
+      const _mz = getPlayerMuzzlePos();
+      const _target = getAimTargetPos();
+      battle.bullets.push({sx:_mz.x,sy:_mz.y,tx:_target.x,ty:_target.y,t:0,player:true,big:true,arc:true});
+      let _fragHits = 0, _fragCrits = 0;
+      for(let _fi = 0; _fi < _effFrags; _fi++){
+        if(Math.random()*100 < _hitRate){
+          let _d = Math.round(_pieceBaseDmg) + rndInt(-2, 2);
+          let _isCrit = false;
+          if(Math.random() < _critRate){ _d = Math.round(_d * _critMult); _isCrit = true; _fragCrits++; }
+          _d = Math.max(1, _d);
+          _fragHits++;
+          if(_isWeak){
+            battle.engaged = true;
+            battle.bossHp = Math.max(0, battle.bossHp - _d);
+            battle.damageDealt += _d;
+            if((battle.bossId === 'core_omega' || battle.bossId === 'core_omega_ii') && battle.arms) damageOmegaArm(battle.aimPart, _d);
+            if(battle.bossHp <= 0){ endBattle(true); return true; }
+          } else {
+            applyBossDamage(_d, _isCrit, def.pen||0, true);
+            if(battle.bossHp <= 0) return true;
+          }
+        }
+      }
+      if(_fragHits > 0){
+        spawnHitFx(battle.bx, battle.by, _fragHits + '片' + (_fragCrits > 0 ? '×' + _fragCrits + '暴' : ''), 'weak');
+      }
+      addProf(battle.weaponSlot, 0.01);
+      if(def.type) addProf(def.type, 0.01);
+      refreshBattleControlsLive();
+      return true;
     }
     const hitRate=getHitRate(def.type,battle.fireMode)+10;
     const baseDmg=Math.round((def.dmg||0)*(RARITY_MULT[w.rarity]||1));

@@ -121,12 +121,12 @@ rpdn:{name:'RPDN',slot:'primary',type:'機槍',cal:'7.62',mag:TK_MAG.rpd,modes:[
   '6kh2':{name:'6Kh2 刺刀',slot:'melee',type:'刺刀',dmg:25,pen:1,modes:['近戰'],rpm:120,range:0.15},
   '6kh5':{name:'6Kh5 刺刀',slot:'melee',type:'刺刀',dmg:26,pen:1,modes:['近戰'],rpm:120,range:0.15},
   kukri:{name:'Kukri 彎刀',slot:'melee',type:'刀',dmg:32,pen:1,modes:['近戰'],rpm:100,range:0.18},
-  f1:{name:'F-1 手榴彈',slot:'throwable',type:'手榴彈',dmg:80,pen:6,modes:['投擲'],rpm:60,range:0.6,explosive:true},
-  rgd5:{name:'RGD-5 手榴彈',slot:'throwable',type:'手榴彈',dmg:60,pen:6,modes:['投擲'],rpm:60,range:0.5,explosive:true},
-  rgo:{name:'RGO 手榴彈',slot:'throwable',type:'手榴彈',dmg:100,pen:6,modes:['投擲'],rpm:60,range:0.6,explosive:true},
-  rgn:{name:'RGN 手榴彈',slot:'throwable',type:'手榴彈',dmg:90,pen:6,modes:['投擲'],rpm:60,range:0.6,explosive:true},
-  vog17:{name:'VOG-17 手榴彈',slot:'throwable',type:'手榴彈',dmg:75,pen:6,modes:['投擲'],rpm:60,range:0.55,explosive:true},
-  vog25:{name:'VOG-25 手榴彈',slot:'throwable',type:'手榴彈',dmg:78,pen:6,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+  f1:{name:'F-1 手榴彈',slot:'throwable',type:'手榴彈',dmg:16,fragments:90,fragmentDamage:16,allFragmentsOnSingle:false,pen:6,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  rgd5:{name:'RGD-5 手榴彈',slot:'throwable',type:'手榴彈',dmg:12,fragments:70,fragmentDamage:12,allFragmentsOnSingle:false,pen:6,modes:['投擲'],rpm:60,range:0.5,explosive:true},
+  rgo:{name:'RGO 手榴彈',slot:'throwable',type:'手榴彈',dmg:20,fragments:85,fragmentDamage:20,allFragmentsOnSingle:false,pen:6,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  rgn:{name:'RGN 手榴彈',slot:'throwable',type:'手榴彈',dmg:18,fragments:75,fragmentDamage:18,allFragmentsOnSingle:false,pen:6,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  vog17:{name:'VOG-17 手榴彈',slot:'throwable',type:'手榴彈',dmg:15,fragments:100,fragmentDamage:15,allFragmentsOnSingle:false,pen:6,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+  vog25:{name:'VOG-25 手榴彈',slot:'throwable',type:'手榴彈',dmg:16,fragments:35,fragmentDamage:16,allFragmentsOnSingle:true,pen:6,modes:['投擲'],rpm:60,range:0.55,explosive:true},
 };
 
 const AMMO={

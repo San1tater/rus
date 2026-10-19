@@ -852,7 +852,7 @@ function _spawnExploreCorpses(enemies){
   const fxW = fx.clientWidth || 400;
   const fxH = fx.clientHeight || 500;
   const charPx = fxH * 0.58;
-  /* rev527: 复用共享容器，每次生成独立 batch 子层，不影响旧尸体的左移 */
+  /* rev527: 復用共享容器，每次生成獨立 batch 子層，不影響舊屍體的左移 */
   let container = document.getElementById("explore-corpse-group");
   if(!container){
     container = document.createElement("div");
@@ -865,7 +865,9 @@ function _spawnExploreCorpses(enemies){
   container.appendChild(batch);
   const scrollSpeed = fxW / 10;
   const corpseEls = [];
-  let xPos = fxW + 20;
+
+  /* rev530: 先收集所有屍體參數，統一按金字塔佈局分配位置 */
+  const _items = [];
   for(let i = 0; i < enemies.length; i++){
     try {
       const e = enemies[i];
@@ -894,13 +896,11 @@ function _spawnExploreCorpses(enemies){
       if(anchorMaxY !== null && anchorMaxY < bbox.maxY){
         canvasHeightUnits = anchorMaxY - bbox.minY;
       }
-      /* rev510: equip 提前抽取，供 padTop 判斷 */
       const equip = isHuman ? _rev506_getRandomEquip(drawId) : null;
       let padLeft = 0, padRight = 0, padTop = 0;
       if(isHuman){
         padLeft = 60;
         padRight = 60;
-        /* rev510: 武器可能超出前臂上緣，預留頂部空間（20% 身高） */
         if(equip && equip.primary){
           padTop = Math.round(ch * 0.20);
         }
@@ -909,37 +909,65 @@ function _spawnExploreCorpses(enemies){
       const canvasWidthUnits = bbox.w + padLeft + padRight;
       const drawW = canvasWidthUnits * idleScale;
       const drawH = canvasHeightUnits * idleScale;
-      const dpr = 2;
-      const cvs = document.createElement("canvas");
-      cvs.width = Math.max(1, Math.round(drawW * dpr));
-      cvs.height = Math.max(1, Math.round(drawH * dpr));
-      cvs.style.cssText = "position:absolute;left:0;bottom:5%;width:" + drawW + "px;height:" + drawH + "px;transform:translateX(" + xPos + "px);";
-      const corpseObj = {
-        el: cvs,
-        dpr: dpr,
-        isHuman: isHuman,
-        drawId: drawId,
-        def: def,
-        deathAnim: deathAnim,
-        lastFrame: lastFrame,
-        idleScale: idleScale,
-        ox: -(bbox.minX - padLeft) * idleScale,
-        oy: -(bbox.minY - padTop) * idleScale,
-        baseLeft: xPos,
-        width: drawW,
-        fullyDrawn: false,
-        equip: equip
-      };
-      _rev506_renderCorpseTo(corpseObj);
-      batch.appendChild(cvs);
-      corpseEls.push(corpseObj);
-      const gap = drawW * (0.3 + Math.random() * 0.4);
-      xPos += gap;
-    } catch(err){
-      /* silent */
-    }
+      _items.push({ def, drawId, deathAnim, lastFrame, idleScale, isHuman, equip, bbox, padLeft, padTop, drawW, drawH });
+    } catch(err){ /* silent */ }
   }
-  if(!corpseEls.length){ batch.remove(); return; }
+
+  if(!_items.length){ batch.remove(); return; }
+
+  /* rev530: 金字塔布局 —— 3+2+1 */
+  /*   i<3 → 第 0 层；i<5 → 第 1 层（错开 0.5 格）；i>=5 → 第 2 层（居中） */
+  /*   每层 bottom 提升 50% 尸体高度（垂直重合 50%） */
+  /* rev530b/c: 固定间距，方便手调 */
+  const CORPSE_GAP_PX = 44;   /* 左右水平间距 */
+  const CORPSE_STEP_PX = 20;  /* rev530d: 上下层距 20px（上层 body 下缘落入下层 body 范围） */
+  const CORPSE_IN_LAYER_DOWN_PX = 12;  /* rev530c: 同层内每个比前一个偏下 12px */
+  const _unitGap = CORPSE_GAP_PX;
+  const _layerStep = CORPSE_STEP_PX;
+  const _inLayerDown = CORPSE_IN_LAYER_DOWN_PX;
+
+  function _getPlacement(i){
+    if(i < 3) return { layer: 0, offsetX: i, layerIndex: i };
+    if(i < 5) return { layer: 1, offsetX: (i - 3) + 0.5, layerIndex: i - 3 };
+    if(i === 5) return { layer: 2, offsetX: 1, layerIndex: 0 };
+    /* 溢出（>6 具）：最上层往右排 */
+    return { layer: 2, offsetX: 1 + (i - 5) * 0.8, layerIndex: i - 5 };
+  }
+
+  const _baseStartX = fxW + 20;
+  const _baseBottomPct = 5;
+
+  for(let i = 0; i < _items.length; i++){
+    const it = _items[i];
+    const place = _getPlacement(i);
+    const xPos = _baseStartX + place.offsetX * _unitGap;
+    const layerOffset = place.layer * _layerStep - (place.layerIndex || 0) * _inLayerDown;
+    const dpr = 2;
+    const cvs = document.createElement("canvas");
+    cvs.width = Math.max(1, Math.round(it.drawW * dpr));
+    cvs.height = Math.max(1, Math.round(it.drawH * dpr));
+    cvs.style.cssText = "position:absolute;left:0;bottom:calc(" + _baseBottomPct + "% + " + layerOffset + "px);width:" + it.drawW + "px;height:" + it.drawH + "px;transform:translateX(" + xPos + "px);z-index:" + (10 + place.layer) + ";";
+    const corpseObj = {
+      el: cvs,
+      dpr: dpr,
+      isHuman: it.isHuman,
+      drawId: it.drawId,
+      def: it.def,
+      deathAnim: it.deathAnim,
+      lastFrame: it.lastFrame,
+      idleScale: it.idleScale,
+      ox: -(it.bbox.minX - it.padLeft) * it.idleScale,
+      oy: -(it.bbox.minY - it.padTop) * it.idleScale,
+      baseLeft: xPos,
+      width: it.drawW,
+      fullyDrawn: false,
+      equip: it.equip
+    };
+    _rev506_renderCorpseTo(corpseObj);
+    batch.appendChild(cvs);
+    corpseEls.push(corpseObj);
+  }
+
   const startTime = performance.now();
   function tick(){
     if(!batch.parentNode) return;
@@ -1984,7 +2012,27 @@ function chooseFireMode(weapon,ec,ac){
 function modeBulletsPerTarget(mode){return{'點射':1,'短點射':3,'長點射':7,'掃射':99,'近戰':1,'投擲':1}[mode]||1;}
 function fmtItemSpan(id,r,c){const d=itemDef(id);const nm=d?d.name:id;return `<span class="${rarityClass(r)} itm" data-iid="${id}" data-irar="${r}">${nm}*${c}</span>`;}
 function fmtEnemies(enemies){const map={};for(const e of enemies){const k=e.id;if(!map[k])map[k]={...e,count:0};map[k].count++;}return Object.values(map).map(g=>`${g.name}*${g.count}(HP:${g.maxHp}*${g.count})`).join('、');}
-function checkThrowableUnequip(){const tid=state.player.equipped.throwable;if(!tid)return;if(getThrowableCount()<=0){const def=itemDef(tid);state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;state.player.throwableStock=0;refreshPlayerStats();}}
+function _refreshThrowableSlot(){
+  if(currentTab !== 'explore') return;
+  const z2 = document.getElementById('zone2');
+  if(!z2) return;
+  const slot = z2.querySelector('.slot[data-slot="throwable"]');
+  if(!slot) return;
+  const id = state.player.equipped.throwable;
+  const def = id ? itemDef(id) : null;
+  if(def){
+    slot.classList.remove('empty');
+    slot.classList.add('filled');
+    slot.style.background = rarityBg(state.player.equippedRarity.throwable || '一般');
+    slot.innerHTML = '<img class="slot-img" src="icons/items/' + resolveIconId(id) + '.png' + assetSuffix() + '" alt=""><div class="lbl">投擲</div>';
+  } else {
+    slot.classList.remove('filled');
+    slot.classList.add('empty');
+    slot.style.background = '';
+    slot.innerHTML = '<div class="nm">投擲</div>';
+  }
+}
+function checkThrowableUnequip(){const tid=state.player.equipped.throwable;if(!tid)return;if(getThrowableCount()<=0){const def=itemDef(tid);state.player.equipped.throwable=null;delete state.player.equippedRarity.throwable;state.player.throwableStock=0;refreshPlayerStats();if(typeof _refreshThrowableSlot==='function')_refreshThrowableSlot();}}
 function applyDropBonus(count){const sl=getBuildingLv('storage');return Math.max(1,Math.round(count*(1+sl*0.02)));}
 
 function autoCombat(region,node,enemies){
@@ -2092,8 +2140,26 @@ function autoCombat(region,node,enemies){
       bulletsUsed=1;
       const hitRate=getHitRate(def.type,mode)+10;
       const _pdT=0.6+clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL,0,1)*0.9;
-      const baseDmg=Math.round(def.dmg*(RARITY_MULT[weapon.rarity]||1)*_pdT);
-      for(const target of remaining){if(Math.random()*100<hitRate){let d=baseDmg+rndInt(-5,5);if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}target.hp-=Math.max(1,d);hits++;dmgDealt+=Math.max(1,d);}}
+      /* rev531: 破片机制 —— 每片独立 roll 命中/暴击，随机分给活目标 */
+      const _frags=def.fragments||1;
+      const _fragDmg=def.fragmentDamage||def.dmg||0;
+      const _aliveN=remaining.filter(function(e){return e.hp>0;}).length;
+      let _effFrags;
+      if(def.allFragmentsOnSingle){ _effFrags=_frags; }
+      else { _effFrags=Math.round(_frags*Math.min(1,_aliveN/4)); }
+      const _pieceBaseDmg=_fragDmg*(RARITY_MULT[weapon.rarity]||1)*_pdT;
+      for(let _fi=0;_fi<_effFrags;_fi++){
+        const _alive=remaining.filter(function(e){return e.hp>0;});
+        if(!_alive.length) break;
+        if(Math.random()*100<hitRate){
+          let d=_pieceBaseDmg+rndInt(-2,2);
+          if(Math.random()<critRate){d=Math.round(d*critMult);crits++;}
+          d=Math.max(1,Math.round(d));
+          const _t=pick(_alive);
+          _t.hp-=d;
+          hits++;dmgDealt+=d;
+        }
+      }
     } else {
       /* 近戰（唯一非槍械非投擲的近戰路徑） */
       mode=def.modes?def.modes[0]:'近戰';
@@ -2531,8 +2597,16 @@ function renderEquipZone(z2){
   ];
   let html=''; /* v17.5 移除剪影 */
   for(const s of slots){
-    const id=state.player.equipped[s.key];
-    const def=id?itemDef(id):null;
+    let id=state.player.equipped[s.key];
+    let def=id?itemDef(id):null;
+    /* rev533: throwable 库存耗尽时视为空槽 */
+    if(s.key === 'throwable' && id && getThrowableCount() <= 0){
+      state.player.equipped.throwable = null;
+      delete state.player.equippedRarity.throwable;
+      state.player.throwableStock = 0;
+      id = null;
+      def = null;
+    }
     const style=Object.entries(s.pos).map(([k,v])=>`${k}:${v}`).join(';');
     const isFixed=def&&def.fixed;
     let inner='';

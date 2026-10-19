@@ -636,9 +636,9 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .owner-empty:hover{border-color:#e8a33d;color:#e8a33d}
 .owner-empty:active{transform:scale(.98)}
 
-.gp-header .gp-food-info{cursor:pointer;user-select:none;transition:opacity .15s}
-.gp-header .gp-food-info:hover{opacity:.8}
-.gp-header .gp-food-info:active{opacity:.6}
+.gp-header .gp-food-info{user-select:none}
+.gp-header .gp-food-info:hover{}
+.gp-header .gp-food-info:active{}
 
 .gp-fert-mark{position:absolute;top:1px;right:2px;font-size:10px;line-height:1;z-index:4;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,.8))}
 
@@ -652,7 +652,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 
 /* rev322-garden-layout */
 .gp-food-bar{flex:0 0 auto;display:flex;align-items:center;padding:6px 12px;background:#1a1510;border-bottom:1px solid #2a231c;gap:8px;min-height:30px}
-.gp-food-info{flex:1;font-size:12px;line-height:1.4;cursor:pointer;user-select:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block;transition:opacity .15s}
+.gp-food-info{flex:1;font-size:12px;line-height:1.4;user-select:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block}
 .gp-food-info b{font-size:14px;color:#fff;margin:0 2px}
 .gp-food-info:hover{opacity:.8}
 .gp-food-info:active{opacity:.6}
@@ -765,3 +765,18 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 /* rev400: 修復特殊土地圖片 */
 .gp-plot.built[data-type="black_soil"]{background-image:url('icons/garden/black_soil.png')}
 .gp-plot.built[data-type="red_soil"]{background-image:url('icons/garden/red_soil.png')}
+
+
+/* rev530: 移除食物数字栏点击效果 */
+.gp-food-info,
+.gp-header .gp-food-info{
+  cursor: default !important;
+  transition: none !important;
+  user-select: none !important;
+}
+.gp-food-info:hover,
+.gp-food-info:active,
+.gp-header .gp-food-info:hover,
+.gp-header .gp-food-info:active{
+  opacity: 1 !important;
+}
