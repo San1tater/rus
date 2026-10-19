@@ -60,7 +60,7 @@ $$('.tab').forEach(t=>{
     const tgt = e.target;
     if(tgt && tgt.closest){
       if(tgt.closest('#joystick') || tgt.closest('#fire-btn') || tgt.closest('#heal-btn') ||
-         tgt.closest('#modal-layer') || tgt.closest('.gp-grid-wrap')){
+         tgt.closest('#modal-layer')){
         active = false; return;
       }
     }

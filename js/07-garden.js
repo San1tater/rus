@@ -121,7 +121,7 @@ function _ensureGardenPage(){
       '<div class="gp-tabs" id="gp-tabs">' + tabsHtml + '</div>' +
       '<div class="gp-content" id="gp-content"></div>' +
     '</div>';
-  document.body.appendChild(p);
+  (document.getElementById('content') || document.body).appendChild(p);
   /* rev295: 事件委托，避免 _gardenUpdateFoodInfo 重写 innerHTML 时丢失点击 */
   p.addEventListener('click', function(e){
     let node = e.target;
@@ -191,9 +191,7 @@ function _ensureGardenPage(){
     p.addEventListener('touchstart', function(e){
       if(e.touches.length !== 1){ active = false; return; }
       const tgt = e.target;
-      if(tgt && tgt.closest && tgt.closest('.gp-grid-wrap')){
-        active = false; return;
-      }
+      /* rev562: 動畫區也允許滑動切頁 */
       sx = e.touches[0].clientX;
       sy = e.touches[0].clientY;
       st = Date.now();
