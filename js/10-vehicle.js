@@ -407,13 +407,13 @@ const BTR_TIMELINE = {
 const PHASE_ORDER = ['enter', 'arrive', 'sink', 'center', 'support', 'lift', 'exit', 'leave'];
 
 const MUZZLE_PROFILES = {
-  kpvt:    { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 22, flashColor: '255,200,80'  },
-  pkt:     { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 16, flashColor: '255,220,120' },
-  nsvt:    { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 18, flashColor: '255,220,120' },
-  '2a72':  { burst: 15, intervalMs: 200,  pauseMs: 500, flashSize: 30, flashColor: '255,180,60'  },
-  '2a46':  { burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 48, flashColor: '255,140,40' },
-  '2a46m1':{ burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 48, flashColor: '255,140,40' },
-  default: { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 16, flashColor: '255,200,80'  }
+  kpvt:    { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450 },
+  pkt:     { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480 },
+  nsvt:    { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470 },
+  '2a72':  { burst: 15, intervalMs: 200,  pauseMs: 500, flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380 },
+  '2a46':  { burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300 },
+  '2a46m1':{ burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300 },
+  default: { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 22, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450 }
 };
 
 const BTRSupport = {
@@ -470,7 +470,11 @@ const BTRSupport = {
     if(!ann || !ann.muzzles) return;
     for(const m of ann.muzzles){
       const prof = MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default;
-      this.muzzles.push({ weaponId: m.weaponId, mx: m.x, my: m.y, profile: prof, shotsLeft: prof.burst, nextFireAt: 0 });
+      this.muzzles.push({
+        weaponId: m.weaponId, mx: m.x, my: m.y,
+        layerOrder: m.layerOrder === 'below' ? 'below' : 'above',
+        profile: prof, shotsLeft: prof.burst, nextFireAt: 0
+      });
     }
   },
 
@@ -740,7 +744,15 @@ const BTRSupport = {
   },
 
   _fireMuzzle(m, now) {
-    this.fireFx.push({ mx: m.mx, my: m.my, startTime: now, endTime: now + 80, size: m.profile.flashSize, color: m.profile.flashColor });
+    this.fireFx.push({
+      mx: m.mx, my: m.my,
+      startTime: now, endTime: now + 600,
+      size: m.profile.flashSize,
+      color: m.profile.flashColor,
+      bulletSize: m.profile.bulletSize,
+      bulletSpeed: m.profile.bulletSpeed,
+      layerOrder: m.layerOrder
+    });
     m.shotsLeft--;
     if(m.shotsLeft <= 0){ m.shotsLeft = m.profile.burst; m.nextFireAt = now + m.profile.pauseMs; }
     else { m.nextFireAt = now + m.profile.intervalMs; }
@@ -756,7 +768,36 @@ const BTRSupport = {
     const px = this.x * this.width + this.shakeX;
     const py = groundY - this.targetH + this.yOffset + this.shakeY;
 
-    /* BTR 本體 */
+    /* 1. below 火光 + 弹幕（在 BTR 之前绘制，被车体遮挡） */
+    for(const fx of this.fireFx){
+      if(fx.layerOrder !== 'below') continue;
+      this._drawOneFireFx(ctx, fx, now, px, py);
+    }
+
+    /* 2. 扬尘生成（从轮胎底部卷起） */
+    if(!this.dustParticles) this.dustParticles = [];
+    const intensity = (this.phase === 'support') ? 0.8
+                    : ((this.phase === 'enter' || this.phase === 'leave') ? 0.5
+                    : (this.phase === 'center' ? 0.3 : 0));
+    if(ann.wheels && intensity > 0 && Math.random() < intensity){
+      const wheel = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
+      const wheelCenterX = px + wheel.cx * this.targetW;
+      const wheelRadiusPx = wheel.r * this.targetW;
+      const wheelBottomY = py + wheel.cy * this.targetH + wheelRadiusPx * 0.98;
+      if(wheelCenterX > -60 && wheelCenterX < this.width + 60){
+        this.dustParticles.push({
+          x: wheelCenterX + (Math.random() - 0.5) * wheelRadiusPx * 1.4,
+          y: wheelBottomY + (Math.random() - 0.4) * 6,
+          vx: -(1 + Math.random() * 2.5),
+          vy: -(0.2 + Math.random() * 0.8),
+          life: 1,
+          size: 4 + Math.random() * 7,
+          hue: 28 + Math.random() * 18
+        });
+      }
+    }
+
+    /* 3. BTR 本體 */
     const wheelSpeed = (this.phase === 'support') ? 20 : ((this.phase === 'enter' || this.phase === 'leave') ? 6 : 3);
     const trackVel = (this.phase === 'support') ? 300 : ((this.phase === 'enter' || this.phase === 'leave') ? 100 : 30);
     renderVehicle(ctx, this.vehicleId, px, py, this.targetW, this.targetH, (now - this.startTime) / 1000, {
@@ -764,63 +805,61 @@ const BTRSupport = {
       doorOpen: (this.doorOpen || 0) * 180
     });
 
-    /* 火光（在 BTR 之上） */
+    /* 4. above 火光 + 弹幕（在 BTR 之后绘制，盖在车体上） */
     for(const fx of this.fireFx){
-      const ex = px + fx.mx * this.targetW;
-      const ey = py + fx.my * this.targetH;
-      const age = now - fx.startTime, total = fx.endTime - fx.startTime;
-      const alpha = Math.max(0, 1 - age / total);
-      const size = fx.size * (1 + (age / total) * 0.5);
-      const grad = ctx.createRadialGradient(ex, ey, 0, ex, ey, size);
-      grad.addColorStop(0, 'rgba(' + fx.color + ',' + alpha + ')');
-      grad.addColorStop(0.5, 'rgba(' + fx.color + ',' + (alpha * 0.5) + ')');
-      grad.addColorStop(1, 'rgba(' + fx.color + ',0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(ex, ey, size, 0, Math.PI * 2);
-      ctx.fill();
+      if(fx.layerOrder !== 'above') continue;
+      this._drawOneFireFx(ctx, fx, now, px, py);
     }
 
-    /* ★ 揚塵粒子（在最上層，BTR 和火光之後） */
-    if(!this.dustParticles) this.dustParticles = [];
-    const intensity = (this.phase === 'support') ? 0.95
-                    : ((this.phase === 'enter' || this.phase === 'leave') ? 0.6
-                    : (this.phase === 'center' ? 0.35 : 0));
-    const nPerSpawn = (this.phase === 'support') ? 2 : 1;
-    if(ann.wheels && intensity > 0 && Math.random() < intensity){
-      const wheel = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
-      const wheelX = px + wheel.cx * this.targetW;
-      const wheelY = py + (wheel.cy + wheel.r * 0.9) * this.targetH;
-      if(wheelX > -60 && wheelX < this.width + 60){
-        for(let k = 0; k < nPerSpawn; k++){
-          this.dustParticles.push({
-            x: wheelX + (Math.random() - 0.5) * 20,
-            y: wheelY + (Math.random() - 0.5) * 10,
-            vx: -(2 + Math.random() * 4),
-            vy: -(0.5 + Math.random() * 2),
-            life: 1,
-            size: 6 + Math.random() * 10,
-            hue: 28 + Math.random() * 18
-          });
-        }
-      }
-    }
+    /* 5. 扬尘绘制（最上层，BTR 和火光之后） */
     for(let i = this.dustParticles.length - 1; i >= 0; i--){
       const p = this.dustParticles[i];
       p.x += p.vx;
       p.y += p.vy;
-      p.vy -= 0.05;
+      p.vy += 0.06;
       p.vx *= 0.98;
-      p.life -= 0.018;
+      p.life -= 0.014;
       if(p.life <= 0){ this.dustParticles.splice(i, 1); continue; }
-      const alpha = Math.max(0, p.life) * 0.7;
-      const sz = p.size * (1.6 - p.life * 0.6);
-      ctx.fillStyle = 'hsla(' + p.hue + ',40%,50%,' + alpha + ')';
+      const alpha = Math.max(0, p.life) * 0.5;
+      const sz = p.size * (1.4 - p.life * 0.5);
+      ctx.fillStyle = 'hsla(' + p.hue + ',35%,48%,' + alpha + ')';
       ctx.beginPath();
       ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
       ctx.fill();
     }
+  },
 
+  _drawOneFireFx(ctx, fx, now, px, py) {
+    const age = now - fx.startTime, total = fx.endTime - fx.startTime;
+    if(age > total) return;
+    const t = age / total;
+    const x = px + fx.mx * this.targetW;
+    const y = py + fx.my * this.targetH;
+    /* 炮口闪光（前 20%） */
+    if(t < 0.2){
+      const ft = t / 0.2;
+      const flashR = fx.size * (1 - ft * 0.6);
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, flashR);
+      grad.addColorStop(0, 'rgba(' + fx.color + ',' + (1 - ft) + ')');
+      grad.addColorStop(1, 'rgba(' + fx.color + ',0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, flashR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    /* 弹幕（拖尾 + 圆点） */
+    const bx = x + t * fx.bulletSpeed;
+    const alpha = Math.max(0, 1 - t);
+    ctx.strokeStyle = 'rgba(' + fx.color + ',' + (alpha * 0.4) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + t * fx.bulletSpeed * 0.3, y);
+    ctx.lineTo(bx, y);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,220,120,' + alpha + ')';
+    ctx.beginPath();
+    ctx.arc(bx, y, fx.bulletSize, 0, Math.PI * 2);
+    ctx.fill();
   },
 
   _finishSupportAndLog() {
@@ -970,4 +1009,9 @@ window._openBTRSupportDetail = function(log){
   }
 };
 
-  })();
+  
+
+
+})();
+
+

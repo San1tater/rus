@@ -322,6 +322,12 @@ function renderBaseStats(){
   if(soil.planted > 0){
     rows.push({ key: 'soil', label: '田地', value: '+' + Math.round(soil.ratePerHour) + '/h' });
   }
+  if(typeof _gardenLiquorRatePerHour === 'function'){
+    const _liquorRate = Math.round(_gardenLiquorRatePerHour());
+    if(_liquorRate > 0){
+      rows.push({ key: 'liquor', label: '\u79C1\u9152', value: '+' + _liquorRate + '/h' });
+    }
+  }
   if(!rows.length){
     return '<div class="empty-hint">尚無生產活動</div>';
   }
@@ -351,6 +357,7 @@ function openStatsDetail(key){
   if(key === 'radio'){ _openRadioDetail(); return; }
   if(key === 'food' || key === 'seed' || key === 'throw' || key === 'ammo'){ _openMerchantLineDetail(key); return; }
   if(key === 'soil'){ _openSoilDetail(); return; }
+  if(key === 'liquor'){ _openLiquorDetail(); return; }
 }
 
 function _openRadioDetail(){
@@ -1653,4 +1660,62 @@ function rarityPolicyBlockHTML(prefix, title, ctx, showExclude){
   h += `<option value="asc" ${fb==='asc'?'selected':''}>升序（破舊→傳奇）</option>`;
   h += `</select></div>`;
   return h;
+}
+
+function _gardenLiquorRatePerHour(){
+  if(typeof _gardenGetPlots !== "function") return 0;
+  var plots = _gardenGetPlots();
+  var rate = 0;
+  for(var i = 0; i < plots.length; i++){
+    var p = plots[i];
+    if(!p || p.type !== "distillery") continue;
+    if(p.enabled === false) continue;
+    var hasFarmer = (state.servants || []).some(function(s){
+      return s.type === "farmer" && s.assignedPlots && s.assignedPlots.indexOf(i) !== -1;
+    });
+    if(!hasFarmer) continue;
+    var mult = 1;
+    var crop = p.currentCrop;
+    if(!crop && typeof _findCropForDistill === 'function'){
+      try { crop = _findCropForDistill(p); } catch(e){}
+    }
+    if(crop && crop.rarity){
+      mult = RARITY_MULT[crop.rarity] || 1;
+    }
+    rate += 12 * mult;
+  }
+  return rate;
+}
+
+function _openLiquorDetail(){
+  var plots = _gardenGetPlots();
+  var list = [];
+  for(var i = 0; i < plots.length; i++){
+    var p = plots[i];
+    if(!p || p.type !== "distillery") continue;
+    var hasFarmer = (state.servants || []).some(function(s){
+      return s.type === "farmer" && s.assignedPlots && s.assignedPlots.indexOf(i) !== -1;
+    });
+    list.push({ idx: i, active: hasFarmer && p.enabled !== false, enabled: p.enabled !== false, hasFarmer: hasFarmer });
+  }
+  var body = "";
+  body += "<div class=\"detail-sub\">\u5171 " + list.length + " \u9593\u84B8\u9945\u5BA4</div>";
+  body += "<div class=\"divider\"></div>";
+  if(!list.length){
+    body += "<div class=\"empty-hint\">\u5C1A\u672A\u5EFA\u9020\u84B8\u9945\u5BA4</div>";
+  } else {
+    for(var li = 0; li < list.length; li++){
+      var it = list[li];
+      var status = it.active ? "\u904B\u4F5C\u4E2D" : (it.enabled ? "\u7F3A\u8FB2\u6C11" : "\u5DF2\u505C\u7528");
+      var color = it.active ? "#7ee07e" : "#e05252";
+      body += "<div style=\"padding:6px 0;border-bottom:1px dashed #2a231c\">";
+      body += "<div style=\"font-size:12px;font-weight:bold;color:#e8a33d\">" + plotCoordName(it.idx) + " \u00B7 <span style=\"color:" + color + "\">" + status + "</span></div>";
+      body += "<div style=\"font-size:10px;color:#a89a85;margin-top:2px\">\u6BCF 5 \u5206\u9418 1 \u74F6\uFF0812/h\uFF09</div>";
+      body += "</div>";
+    }
+  }
+  var ft = document.createElement("div");
+  ft.className = "modal-ft";
+  ft.innerHTML = "";
+  openModal({ title: "\u79C1\u9152", body: body, footer: ft });
 }

@@ -404,6 +404,8 @@ function _gardenPickServantForPlot(idx, type){
     return servantLabel(a).localeCompare(servantLabel(b), 'zh-Hant');
   });
   const tDef = SERVANT_TYPES[type] || {name:'僕人'};
+  const _targetPlot = _gardenGetPlots()[idx];
+  const _isExclusiveList = !!(_targetPlot && (_targetPlot.type === 'compost' || _targetPlot.type === 'distillery'));
   let body = '';
   if(!all.length){
     body = '<div class="empty-hint">沒有可用的' + tDef.name + '</div>';
@@ -414,7 +416,7 @@ function _gardenPickServantForPlot(idx, type){
       const isFull = cur >= maxSlots;
       const alreadyHere = (s.assignedPlots || []).indexOf(idx) !== -1;
       const _img = 'icons/servants/' + s.type + '.png' + assetSuffix();
-      const dis = isFull || alreadyHere;
+      const dis = alreadyHere || (isFull && !_isExclusiveList);
       body += '<div class="item-row' + (dis ? ' disabled' : '') + '" data-sid="' + s.id + '"' + (dis ? ' style="opacity:.4"' : '') + '>';
       body += '<div class="icon" style="background:' + rarityBg(s.rarity) + '"><img src="' + _img + '" style="width:100%;height:100%;object-fit:contain"></div>';
       body += '<div class="info"><div class="nm ' + rarityClass(s.rarity) + '">' + servantLabel(s) + '</div>';
@@ -436,7 +438,7 @@ function _gardenPickServantForPlot(idx, type){
         const isExclusiveTarget = (targetPlot.type === 'compost' || targetPlot.type === 'distillery');
         const _targetLabel = targetPlot.type === 'distillery' ? '蒸餾室' : '堆肥區';
         const otherList = (srv.assignedPlots || []).filter(function(x){ return x !== idx; });
-        const hasCompostAlready = otherList.some(function(x){ return plots[x] && plots[x].type === 'compost'; });
+        const hasExclusiveAlready = otherList.some(function(x){ return plots[x] && (plots[x].type === 'compost' || plots[x].type === 'distillery'); });
         const hasOtherPlots = otherList.some(function(x){ return plots[x] && plots[x].type !== 'compost'; });
         function doAssign(){
           const maxSlots = servantSlots(srv.rarity, srv.type);
@@ -451,7 +453,13 @@ function _gardenPickServantForPlot(idx, type){
           if(isExclusiveTarget){
             srv.assignedPlots = [idx];
           } else {
-            srv.assignedPlots = otherList.filter(function(x){ return plots[x] && plots[x].type !== 'compost' && plots[x].type !== 'distillery'; });
+            for(var _oi2 = 0; _oi2 < otherList.length; _oi2++){
+            var _oldIdx2 = otherList[_oi2];
+            if(_oldIdx2 !== idx && plots[_oldIdx2] && (plots[_oldIdx2].type === 'compost' || plots[_oldIdx2].type === 'distillery') && plots[_oldIdx2].assignedServant === sid){
+              delete plots[_oldIdx2].assignedServant;
+            }
+          }
+          srv.assignedPlots = otherList.filter(function(x){ return plots[x] && plots[x].type !== 'compost' && plots[x].type !== 'distillery'; });
             if(srv.assignedPlots.indexOf(idx) === -1) srv.assignedPlots.push(idx);
           }
           if(plots[idx]) plots[idx].assignedServant = sid;
@@ -466,7 +474,7 @@ function _gardenPickServantForPlot(idx, type){
           openConfirm('指派至' + _targetLabel + '將解除此農民的其他 ' + otherList.length + ' 個地塊綁定。確認？', doAssign);
           return;
         }
-        if(!isExclusiveTarget && hasCompostAlready){
+        if(!isExclusiveTarget && hasExclusiveAlready){
           openConfirm('此農民已在蒸餾室/堆肥區，指派至其他地塊將解除綁定。確認？', doAssign);
           return;
         }
@@ -811,18 +819,6 @@ function _gsBlockEx(title, colKey, items, minCells, fallbackIcon, cellSize, font
   html += '</div></div>';
   return html;
 }
-
-/* rev562o: 手动生成私酒用于测试 */
-window._testLiquor = function(){
-  try {
-    gardenStorageAdd('liquor', '一般', 5);
-    gardenStorageAdd('liquor', '精品', 3);
-    if(typeof save === 'function') save();
-    if(typeof renderGardenContent === 'function') renderGardenContent();
-    console.log('[test] 已生成 私酒@一般×5、私酒@精品×3');
-    console.log('[test] storage:', JSON.parse(JSON.stringify(state.garden.storage)));
-  } catch(e){ console.error('[test] failed:', e); }
-};
 
 function renderGardenStorage(box){
   if(!box) return;
@@ -4069,6 +4065,12 @@ function _gardenFarmerFindTask(a, srv){
   if(typeof _isAssignedToCompost === 'function' && _isAssignedToCompost(srv)){
     return _gardenCompostFindTask(a, srv);
   }
+  if(typeof _isAssignedToDistillery === 'function' && _isAssignedToDistillery(srv)){
+    return null;
+  }
+  if(typeof _isAssignedToDistillery === 'function' && _isAssignedToDistillery(srv)){
+    return null;
+  }
   const plots = _gardenGetPlots();
   const now = Date.now();
   // 優先：清理腐爛
@@ -5004,7 +5006,7 @@ function closeGarden(){
         let disabled = false;
         if(!plot || !plot.type){
           cls += ' empty'; inner = '<div class="srv-sa-icon">＋</div>'; disabled = true;
-        } else if(srv.type === 'farmer' ? !(plot.type === 'compost' || _isSoilType(plot.type)) : (plot.type !== def.targetPlot)){
+        } else if(srv.type === 'farmer' ? !(plot.type === 'compost' || plot.type === 'distillery' || _isSoilType(plot.type)) : (plot.type !== def.targetPlot)){
           cls += ' mismatch';
           const t = GARDEN_PLOT_TYPES[plot.type] || {icon:'?'};
           inner = '<div class="srv-sa-icon">' + _getPlotTypeIconHtml(plot.type, 22, false, true) + '</div>'; disabled = true;
@@ -5071,14 +5073,15 @@ function closeGarden(){
             if(selected[idx]){ delete selected[idx]; applyAndSave(); refresh(); return; }
             if(countSel() >= maxSlots){ return; }
 
-            const _wouldBeCompost = (plot.type === 'compost');
+            const _wouldBeExclusive = (plot.type === 'compost' || plot.type === 'distillery');
             let _conflictType = null;
             for(const _k in selected){
               if(!selected[_k]) continue;
               const _p = plots[parseInt(_k, 10)];
               if(!_p) continue;
-              if(_wouldBeCompost && _p.type !== 'compost'){ _conflictType = 'toCompost'; break; }
-              if(!_wouldBeCompost && _p.type === 'compost'){ _conflictType = 'toNormal'; break; }
+              const _pIsExclusive = (_p.type === 'compost' || _p.type === 'distillery');
+              if(_wouldBeExclusive && !_pIsExclusive){ _conflictType = 'toCompost'; break; }
+              if(!_wouldBeExclusive && _pIsExclusive){ _conflictType = 'toNormal'; break; }
             }
             const owner = plot.assignedServant;
             const _ownerConflict = (owner && owner !== srvId);
@@ -5090,7 +5093,7 @@ function closeGarden(){
               } else {
                 for(const _k in selected){
                   const _p = plots[parseInt(_k, 10)];
-                  if(_p && _p.type === 'compost') delete selected[_k];
+                  if(_p && (_p.type === 'compost' || _p.type === 'distillery')) delete selected[_k];
                 }
               }
             };

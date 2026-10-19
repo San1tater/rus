@@ -1320,7 +1320,7 @@ function load(){
       if(!RARITY_ORDER.includes(c.priority)) c.priority = _prefDefaults[k].priority;
       if(!['asc','desc'].includes(c.fallback)) c.fallback = _prefDefaults[k].fallback;
     }
-    for(const k in state.seals){state.seals[k]=parseInt(state.seals[k]||0,10);}
+    for(const k in state.seals){state.seals[k]=Math.max(0,parseInt(state.seals[k]||0,10));}
     if(!state.player.equipped.backpack){state.player.equipped.backpack='bplarge';state.player.equippedRarity.backpack='傳奇';}
     removeInvalidInventoryItems();
     consolidateInventoryDuplicates();
