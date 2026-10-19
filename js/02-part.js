@@ -1106,7 +1106,8 @@ const BUILDINGS={
   medbay:{name:'醫療站',desc:'加強消耗品恢復',cost:{wood:15,cloth:10,metal:5},maxLv:50},
   radio:{name:'無線電',desc:'定期資源補給',cost:{electronics:5,metal:10,gears:3},maxLv:50},
   armory:{name:'軍械庫',desc:'產出主副彈藥',cost:{metal:25,gears:8,screws:10},maxLv:50},
-  forge:{name:'護甲車間',desc:'護甲值加成',cost:{metal:250,gears:80,screws:100},maxLv:50}};
+  forge:{name:'護甲車間',desc:'護甲值加成',cost:{metal:250,gears:80,screws:100},maxLv:50},
+  garage:{name:'車場',desc:'BTR 支援 / 載具研發',cost:{metal:500,gears:100,screws:200},maxLv:50}};
 
 const GAME_LAYERS = [
   { id:'right_leg', name:'右腿', z:18, color:'#2a2a2a', pivot:{x:0.5,y:0.05},
@@ -1724,7 +1725,19 @@ function renderExploreHeroCanvas(){
   if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
-  drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, heroAnim.eqSlot || null, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO);
+  const btr = window.BTRSupport;
+  const clipH = (btr && btr.active) ? btr.playerClipH : 1.0;
+  const offsetX = (btr && btr.active) ? btr.playerXOffset : 0;
+  if(clipH > 0.001){
+    if(clipH < 1.0){
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, w, h * clipH);
+      ctx.clip();
+    }
+    drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, heroAnim.eqSlot || null, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO + offsetX);
+    if(clipH < 1.0) ctx.restore();
+  }
 }
 
 function renderBattleHeroCanvas(){

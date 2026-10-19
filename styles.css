@@ -811,3 +811,343 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .radio-btn{position:absolute;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:5px;color:#e8a33d;font-weight:bold;cursor:pointer;user-select:none;z-index:4;box-sizing:border-box;display:flex;justify-content:center;align-items:center;text-align:center;padding:0}
 .radio-btn:active{transform:scale(0.94)}
 .radio-btn[data-mode="sweep"]{border-color:#a45ede;color:#a45ede;background:rgba(30,20,40,.85)}
+
+/* rev562: 蒸餾室背景圖 */
+.gp-plot.built[data-type="distillery"]{background-image:url('icons/garden/distillery_bg.png')}
+
+/* rev563: 电臺按鈕變體 */
+.radio-btn.cooldown{border-color:#5a5040;color:#7a6f60;background:rgba(20,20,20,.85)}
+.radio-btn.empty{border-color:#5a2a2a;color:#7a4a4a;background:rgba(30,15,15,.85)}
+.radio-btn.ready{border-color:#3a2f25;color:#e8a33d}
+
+/* rev565: 車場頁面 */
+#garage-page{position:fixed;inset:0;z-index:9000;background:linear-gradient(180deg,#0e0c0a 0%,#151210 100%);display:none;flex-direction:column;overflow:hidden}
+#garage-page.on{display:flex}
+.garage-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #2a231c;background:#17140f}
+.garage-title{font-size:15px;color:#e8a33d;font-weight:bold;letter-spacing:1px}
+.garage-lv{color:#7ee07e;margin-left:6px}
+.garage-x{font-size:18px;color:#a89a85;padding:6px 12px;background:#241d16;border:1px solid #3a2f25;border-radius:6px;cursor:pointer;user-select:none}
+.garage-x:active{background:#3a2f25;color:#e8a33d}
+.garage-body{flex:1;min-height:0;overflow:hidden;padding:6px;display:grid;grid-template-rows:minmax(120px,1fr) auto auto;gap:6px}
+.garage-vehicle-showcase{background:#1a1510;border:1px solid #3a2f25;border-radius:8px;padding:16px;text-align:center}
+.garage-vehicle-img{height:140px;display:flex;align-items:center;justify-content:center;position:relative}
+.garage-vehicle-img img{max-width:100%;max-height:100%;object-fit:contain}
+.garage-vehicle-placeholder{display:none;flex-direction:column;align-items:center;justify-content:center;font-size:48px;line-height:1.2;color:#5a5040}
+.garage-vehicle-placeholder span{font-size:14px;color:#a89a85;margin-top:8px}
+.garage-vehicle-name{font-size:18px;font-weight:bold;color:#e8a33d;margin-top:8px;letter-spacing:1px}
+.garage-card{background:#1a1510;border:1px solid #2a231c;border-radius:8px;padding:12px}
+.garage-card-title{font-size:13px;color:#e8a33d;font-weight:bold;margin-bottom:8px;letter-spacing:0.5px}
+.garage-card-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px;color:#a89a85;border-bottom:1px dashed #241d16;gap:8px;flex-wrap:wrap}
+.garage-card-row:last-child{border-bottom:none}
+.garage-card-row b{color:#e8a33d;font-weight:bold;text-align:right}
+.garage-upgrade-btn{width:100%;margin-top:10px;padding:10px;border:none;border-radius:6px;background:#8a5f18;color:#fff;font-size:13px;font-weight:bold;cursor:pointer}
+.garage-upgrade-btn:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
+.garage-upgrade-btn:active:not(:disabled){background:#a57118}
+
+/* rev566: 車場單屏 + 科技樹 */
+.garage-showcase{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;min-height:0;padding:4px 4px 20px}
+.garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;flex:1;min-height:0}
+.garage-showcase-ph{display:none;flex-direction:column;align-items:center;justify-content:center;font-size:42px;color:#5a5040;flex:1}
+.garage-vehicle-name{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#e8a33d;letter-spacing:1px;background:linear-gradient(0deg,rgba(0,0,0,.9) 0%,transparent 100%);padding:8px 0 3px}
+
+.garage-info{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;padding:6px 10px;background:#1a1510;border:1px solid #2a231c;border-radius:8px;font-size:11px;color:#a89a85}
+.garage-info-row{display:flex;justify-content:space-between;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.garage-info-row b{color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.garage-info-row.span2{grid-column:span 2}
+
+.garage-upgrade{display:flex;flex-direction:column;gap:4px;background:#1a1510;border:1px solid #2a231c;border-radius:8px;padding:6px 8px}
+.garage-upgrade-title{font-size:11px;color:#e8a33d;font-weight:bold}
+.garage-cost-row{display:flex;justify-content:space-around;font-size:10px;flex-wrap:wrap;gap:4px}
+.garage-cost-item{white-space:nowrap;font-family:Menlo,Consolas,monospace}
+.garage-cost-item.ok{color:#7ee07e}
+.garage-cost-item.bad{color:#e05252}
+.garage-actions{display:flex;gap:6px;margin-top:2px}
+.garage-actions button{flex:1;padding:8px;font-size:12px;font-weight:bold;border:none;border-radius:6px;cursor:pointer;background:#8a5f18;color:#fff}
+.garage-actions button:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
+.garage-actions button.tech{background:#3a2a5a}
+.garage-actions button.tech:active:not(:disabled){background:#4a3a6a}
+
+.garage-tech-tree{font-size:11px;color:#a89a85}
+.garage-tech-line-title{font-size:12px;color:#e8a33d;font-weight:bold;margin:8px 0 4px;letter-spacing:0.5px}
+.garage-tech-node{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #2a231c;border-radius:6px;background:#1a1510;margin-bottom:2px}
+.garage-tech-node.owned{border-color:#4caf50;background:#152a15}
+.garage-tech-node.current{border-color:#7ee07e;box-shadow:0 0 8px rgba(126,224,126,0.3)}
+.garage-tech-node.researchable{border-color:#e8a33d;background:#2a1f10}
+.garage-tech-node.locked{opacity:0.5}
+.garage-tech-node-info{flex:1;min-width:0}
+.garage-tech-node-name{font-size:12px;font-weight:bold;color:#e8a33d}
+.garage-tech-node-status{font-size:10px;color:#7a6f60;margin-top:2px;line-height:1.35;word-break:break-word}
+.garage-tech-node-status.ok{color:#7ee07e}
+.garage-tech-node-status.bad{color:#e05252}
+.garage-tech-node-btn{flex:0 0 auto;padding:6px 12px;font-size:11px;font-weight:bold;border:none;border-radius:4px;background:#8a5f18;color:#fff;cursor:pointer}
+.garage-tech-node-btn:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
+.garage-tech-node-img{flex:0 0 auto;width:52px;height:38px;display:flex;align-items:center;justify-content:center;background:#241d16;border:1px solid #3a2f25;border-radius:4px;overflow:hidden;font-size:20px}
+.garage-tech-node-img img{max-width:100%;max-height:100%;object-fit:contain}
+.garage-tech-arrow{text-align:center;color:#5a5040;font-size:12px;margin:1px 0;line-height:1}
+
+/* ===== rev561c: 車場全屏頁 z-index + 流式佈局 ===== */
+#garage-page{z-index:9200}
+.garage-body{flex:1;min-height:0;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
+.garage-showcase{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;padding:6px;max-height:180px;flex:0 0 auto}
+.garage-showcase img{max-width:100%;max-height:160px;object-fit:contain;display:block}
+.garage-showcase-ph{display:none;flex-direction:column;align-items:center;justify-content:center;font-size:42px;color:#5a5040;height:120px}
+.garage-vehicle-name-bar{text-align:center;font-size:14px;font-weight:bold;color:#e8a33d;letter-spacing:1px;padding:6px 0;flex:0 0 auto}
+.garage-stats{display:flex;flex-direction:column;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:2px 10px;flex:0 0 auto}
+.garage-stat-row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:11px;color:#a89a85;border-bottom:1px dashed #241d16;min-width:0}
+.garage-stat-row:last-child{border-bottom:none}
+.garage-stat-row .k{flex:0 0 auto;color:#7a6f60}
+.garage-stat-row .v{flex:1;min-width:0;text-align:right;color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garage-tech-btn{width:100%;padding:10px;border:none;border-radius:6px;background:#3a2a5a;color:#fff;font-size:13px;font-weight:bold;cursor:pointer;flex:0 0 auto}
+.garage-tech-btn:active{background:#4a3a6a}
+
+/* ===== rev561e: 車場頁（大圖 + 分欄底部） ===== */
+#garage-page{z-index:9200}
+.garage-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 8px;gap:6px;overflow:hidden}
+.garage-showcase{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;position:relative;padding:6px}
+.garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.garage-showcase-ph{display:none;flex-direction:column;align-items:center;justify-content:center;font-size:48px;color:#5a5040}
+.garage-vehicle-name-bar{position:absolute;top:6px;left:8px;font-size:11px;font-weight:bold;color:#e8a33d;background:rgba(14,12,10,.78);padding:2px 8px;border-radius:4px;border:1px solid #3a2f25;letter-spacing:0.5px;pointer-events:none}
+
+.garage-bottom{flex:0 0 auto;display:flex;gap:6px}
+.garage-bottom-left{flex:1 1 0;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:5px 8px}
+.garage-bottom-right{flex:0 0 44%;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:3px;justify-content:center}
+
+.garage-stat-row{display:flex;justify-content:space-between;gap:6px;padding:1px 0;font-size:10px;line-height:1.5;min-width:0}
+.garage-stat-row .k{flex:0 0 auto;color:#7a6f60}
+.garage-stat-row .v{flex:1;min-width:0;text-align:right;color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.garage-research-title{font-size:9px;color:#7a6f60;font-weight:bold}
+.garage-research-vehicle{font-size:12px;font-weight:bold;color:#e8a33d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
+.garage-research-empty{font-size:11px;color:#5a5040;line-height:1.4;padding:2px 0}
+.garage-research-bar{height:6px;background:#0e0c0a;border-radius:3px;overflow:hidden;border:1px solid #2a231c}
+.garage-research-bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,#e8a33d,#ffd680);transition:width .2s}
+.garage-research-exp{font-size:9px;color:#a89a85;text-align:right;font-family:Menlo,Consolas,monospace;line-height:1.3}
+
+.garage-actions{flex:0 0 auto;display:flex;gap:6px}
+.garage-tech-btn,.garage-camo-btn{flex:1;padding:9px;border:none;border-radius:6px;background:#3a2a5a;color:#fff;font-size:12px;font-weight:bold;cursor:pointer}
+.garage-camo-btn{background:#2a3a4a}
+.garage-tech-btn:active{background:#4a3a6a}
+.garage-camo-btn:active{background:#3a4a5a}
+
+/* ===== 縱向 WT 科技樹 ===== */
+.wt-tech-wrap{overflow:auto;padding:8px 4px;-webkit-overflow-scrolling:touch;display:flex;justify-content:center}
+.wt-tech-canvas{position:relative;width:320px;height:438px;flex:0 0 auto}
+.wt-node{position:absolute;background:#1a1510;border:2px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px 3px;box-sizing:border-box;cursor:pointer;user-select:none;overflow:hidden;transition:transform .1s,border-color .15s,box-shadow .15s}
+.wt-node:active{transform:scale(.95)}
+.wt-node-img{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.wt-node-img img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.wt-node-name{flex:0 0 auto;font-size:10px;font-weight:bold;color:#ddd;text-align:center;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:1px 2px}
+.wt-node.owned{border-color:#4caf50;background:#152a15}
+.wt-node.owned .wt-node-name{color:#7ee07e}
+.wt-node.current{border-color:#7ee07e;background:#1a3a1a;box-shadow:0 0 8px rgba(126,224,126,.5)}
+.wt-node.researchable{border-color:#e8a33d;background:#2a1f10}
+.wt-node.researchable .wt-node-name{color:#e8a33d}
+.wt-node.researching{border-color:#a45ede;background:#1f1528;box-shadow:0 0 8px rgba(164,94,222,.4)}
+.wt-node.researching .wt-node-name{color:#a45ede}
+.wt-node.locked{opacity:.5}
+.wt-node.locked .wt-node-name{color:#7a6f60}
+.wt-node-mark{position:absolute;top:2px;right:3px;font-size:10px;font-weight:bold;color:#e8a33d;background:rgba(0,0,0,.7);padding:0 3px;border-radius:3px;line-height:1.4}
+.wt-node.owned .wt-node-mark{color:#7ee07e}
+.wt-node.current .wt-node-mark{color:#fff;background:#4caf50}
+.wt-node.researching .wt-node-mark{color:#a45ede}
+
+/* ===== rev561f: 車場頁最終佈局 ===== */
+#garage-page{z-index:9200}
+.garage-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 8px;gap:6px;overflow:hidden}
+.garage-showcase{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;position:relative;padding:6px}
+.garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.garage-showcase-ph{display:none;flex-direction:column;align-items:center;justify-content:center;font-size:48px;color:#5a5040}
+.garage-vehicle-name-bar{position:absolute;top:6px;left:8px;font-size:11px;font-weight:bold;color:#e8a33d;background:rgba(14,12,10,.78);padding:2px 8px;border-radius:4px;border:1px solid #3a2f25;letter-spacing:0.5px;pointer-events:none}
+
+.garage-bottom{flex:0 0 auto;display:flex;gap:6px;align-items:stretch}
+
+/* 左半：詳情 */
+.garage-bottom-left{flex:1 1 0;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:3px 8px;display:flex;flex-direction:column;justify-content:space-around}
+.garage-stat-row{display:flex;justify-content:space-between;gap:6px;padding:0;font-size:9px;line-height:1.45;min-width:0}
+.garage-stat-row .k{flex:0 0 auto;color:#7a6f60}
+.garage-stat-row .v{flex:1;min-width:0;text-align:right;color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 右半：研發 + 按鈕 */
+.garage-bottom-right{flex:0 0 44%;min-width:0;display:flex;flex-direction:column;gap:4px}
+.garage-research-wrap{flex:1 1 auto;min-height:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:3px 4px;display:flex;flex-direction:column;gap:3px}
+.garage-research-img-wrap{flex:1 1 0;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.garage-research-img-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.garage-research-name{position:absolute;top:0;left:0;font-size:9px;font-weight:bold;color:#e8a33d;background:rgba(14,12,10,.85);padding:1px 4px;border-radius:3px;line-height:1.3;max-width:calc(100% - 2px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.garage-research-bar{flex:0 0 auto;height:5px;background:#0e0c0a;border-radius:3px;overflow:hidden;border:1px solid #2a231c}
+.garage-research-bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,#e8a33d,#ffd680)}
+.garage-research-exp{flex:0 0 auto;font-size:9px;color:#a89a85;text-align:right;font-family:Menlo,Consolas,monospace;line-height:1.2}
+.garage-research-empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#5a5040;text-align:center;padding:4px}
+
+.garage-actions{flex:0 0 auto;display:flex;gap:4px}
+.garage-tech-btn,.garage-camo-btn{flex:1;padding:6px 2px;border:none;border-radius:5px;background:#3a2a5a;color:#fff;font-size:10px;font-weight:bold;cursor:pointer;white-space:nowrap}
+.garage-camo-btn{background:#2a3a4a}
+.garage-tech-btn:active{background:#4a3a6a}
+.garage-camo-btn:active{background:#3a4a5a}
+
+/* ===== rev561g: 車場頁 v3 ===== */
+#garage-page{z-index:9200}
+.garage-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 8px;gap:6px;overflow:hidden}
+.garage-showcase{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;position:relative;padding:6px}
+.garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.garage-showcase-ph{display:none;flex-direction:column;align-items:center;justify-content:center;font-size:48px;color:#5a5040}
+.garage-vehicle-name-bar{position:absolute;top:6px;left:8px;font-size:11px;font-weight:bold;color:#e8a33d;background:rgba(14,12,10,.78);padding:2px 8px;border-radius:4px;border:1px solid #3a2f25;letter-spacing:0.5px;pointer-events:none;z-index:2}
+
+.garage-research-img-wrap{flex:0 0 auto;position:relative;width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;padding:4px;overflow:hidden}
+.garage-research-img-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.garage-research-name{position:absolute;top:4px;left:6px;font-size:11px;font-weight:bold;color:#e8a33d;background:rgba(14,12,10,.85);padding:2px 6px;border-radius:4px;border:1px solid #3a2f25;pointer-events:none;z-index:2;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.garage-bottom{flex:0 0 auto;display:flex;gap:6px;min-height:172px}
+.garage-bottom-left{flex:1 1 0;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:5px 8px;display:flex;flex-direction:column;justify-content:space-around}
+.garage-bottom-right{flex:0 0 42%;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:4px;justify-content:space-between}
+
+.garage-stat-row{display:flex;align-items:center;gap:4px;padding:0;font-size:10px;line-height:1.4;min-width:0}
+.garage-stat-row .k{flex:0 0 auto;color:#7a6f60;min-width:26px}
+.garage-stat-row .v-cur{flex:1 1 0;min-width:0;text-align:right;color:#7a6f60;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garage-stat-row .v-arrow{flex:0 0 auto;color:#3a2f25;font-size:10px}
+.garage-stat-row .v-new{flex:1 1 0;min-width:0;text-align:right;color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garage-stat-row .v-new.up{color:#4caf50}
+.garage-stat-row .v-new.down{color:#e05252}
+.garage-stat-row .v-new.diff{color:#a45ede}
+.garage-stat-row .v-cur-only{flex:1 1 0;min-width:0;text-align:right;color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.garage-research-title{font-size:10px;color:#7a6f60;font-weight:bold;flex:0 0 auto}
+.garage-research-bar{height:6px;background:#0e0c0a;border-radius:3px;overflow:hidden;border:1px solid #2a231c;flex:0 0 auto}
+.garage-research-bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,#e8a33d,#ffd680)}
+.garage-research-exp{font-size:9px;color:#a89a85;text-align:right;font-family:Menlo,Consolas,monospace;line-height:1.3;flex:0 0 auto}
+.garage-research-empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:#5a5040;text-align:center;padding:4px}
+.garage-req-row{display:flex;gap:8px;flex:0 0 auto;justify-content:space-between;font-size:10px}
+.garage-req-row span{white-space:nowrap}
+.garage-req-row .ok{color:#4caf50}
+.garage-req-row .bad{color:#e05252}
+
+.garage-actions{flex:0 0 auto;display:flex;gap:4px;margin-top:auto}
+.garage-tech-btn,.garage-camo-btn{flex:1;padding:7px 2px;border:none;border-radius:5px;background:#3a2a5a;color:#fff;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap}
+.garage-camo-btn{background:#2a3a4a}
+.garage-tech-btn:active{background:#4a3a6a}
+.garage-camo-btn:active{background:#3a4a5a}
+
+/* ===== 縱向 WT 科技樹 ===== */
+.wt-tech-wrap{overflow:auto;padding:8px 4px;-webkit-overflow-scrolling:touch;display:flex;justify-content:center}
+.wt-tech-canvas{position:relative;width:320px;height:438px;flex:0 0 auto}
+.wt-node{position:absolute;background:#1a1510;border:2px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px 3px;box-sizing:border-box;cursor:pointer;user-select:none;overflow:hidden;transition:transform .1s,border-color .15s,box-shadow .15s}
+.wt-node:active{transform:scale(.95)}
+.wt-node-img{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.wt-node-img img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.wt-node-name{flex:0 0 auto;font-size:10px;font-weight:bold;color:#ddd;text-align:center;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:1px 2px}
+.wt-node.owned{border-color:#4caf50;background:#152a15}
+.wt-node.owned .wt-node-name{color:#7ee07e}
+.wt-node.current{border-color:#7ee07e;background:#1a3a1a;box-shadow:0 0 8px rgba(126,224,126,.5)}
+.wt-node.researchable{border-color:#e8a33d;background:#2a1f10}
+.wt-node.researchable .wt-node-name{color:#e8a33d}
+.wt-node.researching{border-color:#a45ede;background:#1f1528;box-shadow:0 0 8px rgba(164,94,222,.4)}
+.wt-node.researching .wt-node-name{color:#a45ede}
+.wt-node.locked{opacity:.5}
+.wt-node.locked .wt-node-name{color:#7a6f60}
+.wt-node-mark{position:absolute;top:2px;right:3px;font-size:10px;font-weight:bold;color:#e8a33d;background:rgba(0,0,0,.7);padding:0 3px;border-radius:3px;line-height:1.4}
+.wt-node.owned .wt-node-mark{color:#7ee07e}
+.wt-node.current .wt-node-mark{color:#fff;background:#4caf50}
+.wt-node.researching .wt-node-mark{color:#a45ede}
+
+/* ===== rev561h: 車場頁 v4 最終樣式 ===== */
+#garage-page{z-index:9200}
+.garage-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 8px;gap:6px;overflow:hidden}
+.garage-showcase{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;position:relative;padding:6px}
+.garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.garage-showcase-ph{display:none;flex-direction:column;align-items:center;justify-content:center;font-size:48px;color:#5a5040}
+.garage-vehicle-name-bar{position:absolute;top:6px;left:8px;font-size:11px;font-weight:bold;color:#e8a33d;background:rgba(14,12,10,.78);padding:2px 8px;border-radius:4px;border:1px solid #3a2f25;letter-spacing:0.5px;pointer-events:none;z-index:2}
+
+.garage-bottom{flex:0 0 auto;display:flex;gap:6px;min-height:200px}
+.garage-bottom-left{flex:1 1 0;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;justify-content:space-around}
+.garage-bottom-right{flex:0 0 44%;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:6px;display:flex;flex-direction:column;gap:4px}
+
+.garage-stat-row{display:flex;align-items:center;gap:4px;padding:0;font-size:10px;line-height:1.4;min-width:0}
+.garage-stat-row .k{flex:0 0 auto;color:#7a6f60;min-width:26px}
+.garage-stat-row .v-cur{flex:1 1 0;min-width:0;text-align:right;color:#7a6f60;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garage-stat-row .v-arrow{flex:0 0 auto;color:#3a2f25;font-size:10px}
+.garage-stat-row .v-new{flex:1 1 0;min-width:0;text-align:right;color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garage-stat-row .v-new.up{color:#4caf50}
+.garage-stat-row .v-new.down{color:#e05252}
+.garage-stat-row .v-new.diff{color:#a45ede}
+.garage-stat-row .v-cur-only{flex:1 1 0;min-width:0;text-align:right;color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.garage-research-img-wrap{flex:1 1 auto;min-height:80px;position:relative;display:flex;align-items:center;justify-content:center;background:#151210;border:1px solid #241d16;border-radius:5px;overflow:hidden;padding:3px}
+.garage-research-img-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.garage-research-name{position:absolute;top:3px;left:5px;font-size:10px;font-weight:bold;color:#e8a33d;background:rgba(14,12,10,.85);padding:1px 5px;border-radius:3px;pointer-events:none;z-index:2;max-width:calc(100% - 10px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.garage-research-bar{flex:0 0 auto;height:6px;background:#0e0c0a;border-radius:3px;overflow:hidden;border:1px solid #2a231c}
+.garage-research-bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,#e8a33d,#ffd680)}
+.garage-research-exp{flex:0 0 auto;font-size:9px;color:#a89a85;text-align:right;font-family:Menlo,Consolas,monospace;line-height:1.2}
+.garage-research-empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:#5a5040;text-align:center;padding:4px}
+.garage-req-row{flex:0 0 auto;display:flex;gap:6px;justify-content:space-between;font-size:10px}
+.garage-req-row .ok{color:#4caf50}
+.garage-req-row .bad{color:#e05252}
+
+.garage-actions{flex:0 0 auto;display:flex;gap:4px;margin-top:auto}
+.garage-tech-btn,.garage-camo-btn{flex:1;padding:7px 2px;border:none;border-radius:5px;background:#3a2a5a;color:#fff;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap}
+.garage-camo-btn{background:#2a3a4a}
+.garage-tech-btn:active{background:#4a3a6a}
+.garage-camo-btn:active{background:#3a4a5a}
+
+/* 科技樹詳情：圖片撐滿彈窗寬度 */
+.garage-tech-detail-img-wrap{width:100%;height:170px;background:#151210 no-repeat center center;background-size:contain;border:1px solid #2a231c;border-radius:6px;margin-bottom:10px;box-sizing:border-box}
+
+/* 縱向 WT 科技樹（保持不變） */
+.wt-tech-wrap{overflow:auto;padding:8px 4px;-webkit-overflow-scrolling:touch;display:flex;justify-content:center}
+.wt-tech-canvas{position:relative;width:320px;height:438px;flex:0 0 auto}
+.wt-node{position:absolute;background:#1a1510;border:2px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px 3px;box-sizing:border-box;cursor:pointer;user-select:none;overflow:hidden;transition:transform .1s,border-color .15s,box-shadow .15s}
+.wt-node:active{transform:scale(.95)}
+.wt-node-img{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.wt-node-img img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.wt-node-name{flex:0 0 auto;font-size:10px;font-weight:bold;color:#ddd;text-align:center;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:1px 2px}
+.wt-node.owned{border-color:#4caf50;background:#152a15}
+.wt-node.owned .wt-node-name{color:#7ee07e}
+.wt-node.current{border-color:#7ee07e;background:#1a3a1a;box-shadow:0 0 8px rgba(126,224,126,.5)}
+.wt-node.researchable{border-color:#e8a33d;background:#2a1f10}
+.wt-node.researchable .wt-node-name{color:#e8a33d}
+.wt-node.researching{border-color:#a45ede;background:#1f1528;box-shadow:0 0 8px rgba(164,94,222,.4)}
+.wt-node.researching .wt-node-name{color:#a45ede}
+.wt-node.locked{opacity:.5}
+.wt-node.locked .wt-node-name{color:#7a6f60}
+.wt-node-mark{position:absolute;top:2px;right:3px;font-size:10px;font-weight:bold;color:#e8a33d;background:rgba(0,0,0,.7);padding:0 3px;border-radius:3px;line-height:1.4}
+.wt-node.owned .wt-node-mark{color:#7ee07e}
+.wt-node.current .wt-node-mark{color:#fff;background:#4caf50}
+.wt-node.researching .wt-node-mark{color:#a45ede}
+
+/* ===== rev561i: 科技樹詳情左右分欄 ===== */
+.garage-tech-detail-img-wrap{position:relative;width:100%;height:150px;background:#151210 no-repeat center center;background-size:contain;border:1px solid #2a231c;border-radius:6px;margin-bottom:8px;box-sizing:border-box}
+.garage-tech-detail-name{position:absolute;top:5px;left:6px;font-size:11px;font-weight:bold;color:#e8a33d;background:rgba(14,12,10,.85);padding:2px 7px;border-radius:4px;border:1px solid #3a2f25;pointer-events:none;z-index:2;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garage-tech-detail-cols{display:flex;gap:10px;align-items:stretch}
+.garage-tech-detail-left{flex:1 1 0;min-width:0}
+.garage-tech-detail-right{flex:0 0 42%;min-width:0;border-left:1px solid #2a231c;padding-left:10px;display:flex;flex-direction:column}
+.garage-tech-detail-col-title{font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:5px;letter-spacing:0.5px}
+.tech-detail-row{display:flex;justify-content:space-between;gap:4px;font-size:11px;line-height:1.65;min-width:0}
+.tech-detail-row .k{flex:0 0 auto;color:#7a6f60}
+.tech-detail-row .v{flex:1;min-width:0;text-align:right;color:#e8a33d;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tech-detail-row .v.ok{color:#4caf50}
+.tech-detail-row .v.bad{color:#e05252}
+.tech-detail-status{font-size:11px;line-height:1.5;padding:2px 0;font-weight:bold}
+
+/* ===== rev561j: 科技樹詳情按鈕樣式 ===== */
+.tech-detail-action{width:100%;margin-top:8px;padding:7px 4px;font-size:12px;border-radius:5px;flex:0 0 auto}
+.tech-detail-status{font-size:11px;line-height:1.5;padding:2px 0;font-weight:bold;flex:0 0 auto}
+
+/* ===== rev561m: garage-title-icon + req-icon ===== */
+.garage-title-icon{width:16px;height:16px;vertical-align:middle;display:inline-block;object-fit:contain;margin-right:4px;position:relative;top:-1px}
+.req-icon{width:12px;height:12px;vertical-align:middle;display:inline-block;object-fit:contain;margin-right:2px}
+.garage-req-row span{display:inline-flex;align-items:center;gap:2px;line-height:1}
+.tech-detail-row .k{display:inline-flex;align-items:center;gap:2px}
+
+/* ===== rev561n: 研发按钮纵排 ===== */
+.tech-detail-btn-col{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.tech-detail-btn-col .tech-detail-action{margin-top:0}
+.garage-research-empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:#5a5040;text-align:center;padding:8px;line-height:1.5}
+
+/* rev567: BTR 支援演出覆蓋層 */
+#btr-support-canvas{position:absolute;inset:0;pointer-events:none;z-index:8;display:block}
+
+/* rev566d: tech-detail 图片自适应 */
+.garage-tech-detail-img-wrap img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:8px;box-sizing:border-box}
+
+
+/* rev566e z-index override */
+#btr-support-canvas{z-index:1 !important}

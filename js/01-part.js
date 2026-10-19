@@ -218,6 +218,25 @@ const CROPS = {
   crop_beet:   { name:'甜菜',   icon:'🍠', img:'crop_beet' },
   crop_wheat:  { name:'小麥',   icon:'🌾', img:'crop_wheat' }
 };
+/* rev564: 花园额外物品 —— 不在 SEEDS/CROPS 里，但允许存在于 storage 里
+   加新物品只需在此加一条；_cleanGardenStorageRarity / 渲染 / 详情 都会自动识别 */
+const GARDEN_EXTRAS = {
+  liquor: { name: '私酒', icon: '🍶', img: 'liquor', desc: '由蒸餾室釀造' }
+};
+function _gardenStorageKind(id){
+  if(typeof SEEDS !== 'undefined' && SEEDS[id]) return 'seed';
+  if(typeof CROPS !== 'undefined' && CROPS[id]) return 'crop';
+  if(typeof GARDEN_EXTRAS !== 'undefined' && GARDEN_EXTRAS[id]) return 'crop';
+  return null;
+}
+function _gardenStorageItemIcon(id, size, fallbackIcon){
+  if(typeof SEEDS !== 'undefined' && SEEDS[id]) return seedImgHtml(id, size);
+  if(typeof CROPS !== 'undefined' && CROPS[id]) return cropImgHtml(id, size);
+  if(typeof GARDEN_EXTRAS !== 'undefined' && GARDEN_EXTRAS[id]){
+    return '<img src="icons/garden/' + GARDEN_EXTRAS[id].img + '.png' + assetSuffix() + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain;display:block" alt="">';
+  }
+  return fallbackIcon || '?';
+}
 /* ===== end rev130 ===== */
 const MATERIALS={wood:{name:'木材'},metal:{name:'金屬廢料'},screws:{name:'螺絲'},cloth:{name:'布料'},gears:{name:'齒輪'},electronics:{name:'電子零件'}};
 

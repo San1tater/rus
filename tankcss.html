@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>載具標注編輯器 v1.9</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;font-size:12px}
+#app{display:flex;flex-direction:column;height:100vh}
+header{flex:0 0 auto;padding:8px 12px;background:#1a1510;border-bottom:1px solid #2a231c;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+header h1{font-size:14px;color:#e8a33d;font-weight:bold;white-space:nowrap}
+header .spacer{flex:1}
+header label{font-size:10px;color:#7a6f60}
+header input[type=text]{background:#0e0c0a;border:1px solid #3a2f25;border-radius:4px;padding:5px 8px;color:#e8a33d;font-size:11px;font-family:monospace;width:100px}
+header button{background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:5px;padding:6px 11px;font-size:11px;cursor:pointer;white-space:nowrap}
+header button:hover{border-color:#e8a33d;color:#e8a33d}
+header button.primary{background:#8a5f18;border-color:#e8a33d;color:#fff}
+header button.danger{background:#3a1a1a;border-color:#6a2a2a;color:#e05252}
+main{flex:1;min-height:0;display:flex}
+aside{background:#151210;display:flex;flex-direction:column}
+#left{flex:0 0 260px;border-right:1px solid #2a231c}
+#center{flex:1;min-width:0;display:flex;flex-direction:column;background:#0a0806}
+#right{flex:0 0 260px;border-left:1px solid #2a231c}
+.panelHead{flex:0 0 auto;padding:9px 12px;border-bottom:1px solid #2a231c;background:#17140f;font-size:11px;color:#e8a33d;font-weight:bold}
+.panelScroll{flex:1;min-height:0;overflow-y:auto;padding:8px}
+.panelScroll::-webkit-scrollbar{width:6px}
+.panelScroll::-webkit-scrollbar-thumb{background:#3a2f25;border-radius:3px}
+.toolGroup{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin-bottom:10px}
+.toolBtn{background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:5px;padding:8px 4px;font-size:11px;cursor:pointer;text-align:center;user-select:none}
+.toolBtn:hover{border-color:#e8a33d;color:#e8a33d}
+.toolBtn.on{background:#8a5f18;border-color:#e8a33d;color:#fff;font-weight:bold}
+.toolBtn .ico{font-size:16px;display:block;margin-bottom:2px}
+.sectionTitle{font-size:10px;color:#e8a33d;font-weight:bold;padding:6px 0 4px;border-top:1px solid #2a231c;margin-top:8px;display:flex;justify-content:space-between;align-items:center}
+.sectionTitle:first-of-type{border-top:none;margin-top:0}
+.emptyHint{padding:20px 12px;text-align:center;color:#5a5040;font-size:11px;line-height:1.7}
+.objCard{background:#1a1510;border:1px solid #2a231c;border-radius:5px;padding:6px 8px;margin-bottom:4px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:11px}
+.objCard:hover{border-color:#8a5f18}
+.objCard.selected{border-color:#e8a33d;background:#241d16}
+.objCard.hidden{opacity:0.4}
+.objCard.special{border-color:#4af0ff;background:#1a2420}
+.objCard .ico{font-size:14px;flex:0 0 16px;text-align:center}
+.objCard .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd}
+.objCard .btn{background:#241d16;border:1px solid #3a2f25;color:#7a6f60;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer;flex:0 0 auto}
+.objCard .btn:hover{border-color:#e05252;color:#e05252}
+.weaponCard{background:#151210;border:1px solid #2a231c;border-radius:4px;padding:5px 8px;margin-bottom:3px;font-size:10px;display:flex;gap:6px;align-items:center}
+.weaponCard .wid{font-family:monospace;color:#c890d8;font-weight:bold;min-width:64px}
+.weaponCard .wtype{font-size:9px;color:#5a5040;background:#0e0c0a;padding:1px 4px;border-radius:2px}
+.weaponCard .wname{flex:1;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.weaponCard .wused{font-size:9px;color:#4caf50;font-weight:bold}
+#canvasWrap{flex:1;min-height:0;overflow:hidden;position:relative;background:#0a0806;display:flex;align-items:center;justify-content:center}
+#canvas{display:block;cursor:crosshair;touch-action:none;background:#14110c}
+#toolbar{flex:0 0 auto;padding:6px 10px;border-top:1px solid #2a231c;background:#17140f;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:10px;color:#7a6f60}
+#toolbar button{background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:4px;padding:4px 9px;font-size:10px;cursor:pointer}
+#toolbar button:hover{border-color:#e8a33d;color:#e8a33d}
+#toolbar button.on{background:#8a5f18;border-color:#e8a33d;color:#fff}
+#toolbar button.fireBtn{background:#4a1a1a;border-color:#8a2a2a;color:#ff9090;font-weight:bold}
+#toolbar button.simBtn{background:#1a2a4a;border-color:#2a4a6a;color:#90c0ff;font-weight:bold}
+#toolbar button.simBtn.on{background:#2a5a9a;border-color:#4a9ed9;color:#fff}
+#toolbar .zoomInfo{color:#e8a33d;font-family:monospace;min-width:50px;text-align:center}
+#toolbar .phaseInfo{color:#4af0ff;font-family:monospace;font-size:10px;min-width:110px}
+.propRow{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.propRow label{flex:0 0 70px;font-size:10px;color:#7a6f60}
+.propRow input{flex:1;min-width:0;background:#0e0c0a;border:1px solid #3a2f25;border-radius:3px;padding:4px 6px;color:#e8a33d;font-size:10px;font-family:monospace}
+.propRow input[type=range]{padding:0}
+.propRow select{flex:1;background:#0e0c0a;border:1px solid #3a2f25;border-radius:3px;padding:4px 6px;color:#e8a33d;font-size:10px}
+.propRow .unit{flex:0 0 auto;font-size:9px;color:#5a5040}
+.propRow .half{display:flex;gap:4px;flex:1}
+.propRow .half input{flex:1}
+.toggleBtn{background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:3px;padding:4px 8px;font-size:10px;cursor:pointer;flex:1}
+.toggleBtn.on{background:#8a5f18;border-color:#e8a33d;color:#fff}
+.toggleBtn:hover{border-color:#e8a33d;color:#e8a33d}
+#toast{position:fixed;top:18%;left:50%;transform:translateX(-50%);background:rgba(30,24,19,.96);border:1px solid #e8a33d;border-radius:8px;padding:8px 14px;color:#e8a33d;font-size:12px;z-index:10000;opacity:0;pointer-events:none;transition:opacity .2s;max-width:80%;text-align:center;line-height:1.5}
+#toast.on{opacity:1}
+#toast.err{border-color:#e05252;color:#e05252}
+#toast.ok{border-color:#4caf50;color:#4caf50}
+.helpTip{font-size:10px;color:#5a5040;line-height:1.5;padding:4px 0;border-top:1px solid #2a231c;margin-top:6px}
+.maskPointRow{display:flex;align-items:center;gap:3px;margin-bottom:3px;font-size:10px}
+.maskPointRow .label{flex:0 0 24px;color:#5a5040}
+.maskPointRow input{flex:1;min-width:0;background:#0e0c0a;border:1px solid #3a2f25;border-radius:3px;padding:3px 5px;color:#e8a33d;font-size:10px;font-family:monospace}
+.maskPointRow .del{background:#3a1a1a;border:1px solid #6a2a2a;color:#e05252;border-radius:3px;padding:1px 6px;font-size:10px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🚗 載具標注編輯器 v1.9</h1>
+    <label>ID</label>
+    <input type="text" id="vehicleId" value="btr80">
+    <span class="spacer"></span>
+    <button id="btnLoadImg" class="primary">📥 導入圖片</button>
+    <button id="btnLoadCfg">📂 載入配置</button>
+    <button id="btnExpJson">📤 匯出 JSON</button>
+    <button id="btnExpJs">📝 匯出 JS</button>
+    <button id="btnReset" class="danger">重置</button>
+    <input type="file" id="fileImg" accept="image/*" style="display:none">
+    <input type="file" id="fileCfg" accept=".json" style="display:none">
+  </header>
+  <main>
+    <aside id="left">
+      <div class="panelHead">🛠 工具</div>
+      <div class="panelScroll">
+        <div class="toolGroup">
+          <div class="toolBtn on" data-tool="select"><span class="ico">➤</span>選擇 1</div>
+          <div class="toolBtn" data-tool="wheel"><span class="ico">⭕</span>車輪 2</div>
+          <div class="toolBtn" data-tool="polygon"><span class="ico">⬟</span>多邊形 3</div>
+          <div class="toolBtn" data-tool="muzzle"><span class="ico">🎯</span>槍口 4</div>
+          <div class="toolBtn" data-tool="trackline" style="grid-column:span 2"><span class="ico">〰️</span>履帶折線 5</div>
+        </div>
+        <div class="sectionTitle"><span>📋 標注對象</span></div>
+        <div id="objList"></div>
+        <div class="sectionTitle"><span>🔫 載具武器</span><span style="font-size:9px;color:#5a5040;font-weight:normal">內置列表</span></div>
+        <div id="weaponList"></div>
+        <div class="sectionTitle">🛻 載具錨點</div>
+        <div class="propRow"><label>地面線 Y</label><input type="number" id="anchorGroundY" value="0.85" step="0.01" min="0" max="1"></div>
+        <div class="propRow"><label>中心 X</label><input type="number" id="anchorCenterX" value="0.5" step="0.01" min="0" max="1"></div>
+        <div class="sectionTitle">🚜 履帶遮罩折線</div>
+        <div class="propRow"><label>啟用</label><button id="pTrackMaskEnabled" class="toggleBtn">停用</button></div>
+        <div id="trackMaskPoints"></div>
+        <button id="btnAddMaskPoint" style="width:100%;background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:3px;padding:4px;font-size:10px;cursor:pointer;margin-top:4px">+ 添加控制點</button>
+        <div class="helpTip">折線以上的原圖部分會作為遮罩層，永遠遮蓋車輪旋轉頂端。與履帶滾動無關。</div>
+
+        <div class="sectionTitle">🛞 履帶滾動</div>
+        <div class="propRow"><label>啟用</label><button id="pTrackScrollEnabled" class="toggleBtn">停用</button></div>
+        <div id="trackScrollProps"></div>
+
+        <div class="sectionTitle">🎬 動畫預覽</div>
+        <div class="propRow"><label>速度</label><input type="range" id="animSpeed" min="0.1" max="3" value="1" step="0.1"><span class="unit" id="animSpeedVal">1.0x</span></div>
+      </div>
+    </aside>
+    <section id="center">
+      <div id="canvasWrap"><canvas id="canvas"></canvas></div>
+      <div id="toolbar">
+        <button id="btnPlay">▶ 播放</button>
+        <button id="btnSim" class="simBtn">🚀 支援期</button>
+        <button id="btnFirePreview" class="fireBtn">🔥 開火</button>
+        <button id="btnXray">👁 透視</button>
+        <button id="btnClear">🗑 清空</button>
+        <span style="flex:1"></span>
+        <span class="phaseInfo" id="phaseInfo"></span>
+        <button id="btnZoomOut">−</button>
+        <span class="zoomInfo" id="zoomInfo">100%</span>
+        <button id="btnZoomIn">+</button>
+        <button id="btnFit">適應</button>
+      </div>
+    </section>
+    <aside id="right">
+      <div class="panelHead">⚙️ 屬性</div>
+      <div class="panelScroll" id="propPanel">
+        <div class="emptyHint">左側選擇工具並在畫布上操作。</div>
+      </div>
+    </aside>
+  </main>
+</div>
+<div id="toast"></div>
+<script>
+"use strict";
+const VEHICLE_WEAPONS_LIBRARY = [
+  { id:'kpvt', name:'14.5mm KPVT', type:'機槍', caliber:'14.5mm' },
+  { id:'pkt', name:'7.62mm PKT', type:'機槍', caliber:'7.62mm' },
+  { id:'nsvt', name:'12.7mm NSVT', type:'機槍', caliber:'12.7mm' },
+  { id:'2a72', name:'30mm 2A72', type:'機炮', caliber:'30mm' },
+  { id:'2a46', name:'125mm 2A46', type:'主炮', caliber:'125mm' },
+  { id:'2a46m1', name:'125mm 2A46M-1', type:'主炮', caliber:'125mm' },
+];
+const VEHICLE_WEAPON_MAP = {
+  btr80:['kpvt','pkt'], btr80a:['2a72','pkt'], btr82a:['2a72','pkt'],
+  t80:['2a46','pkt','nsvt'], t80u:['2a46m1','pkt','nsvt'], t80um:['2a46m1','pkt','nsvt'],
+};
+function getWeaponsForVehicle(vid){ const ids=VEHICLE_WEAPON_MAP[vid]; if(!ids) return VEHICLE_WEAPONS_LIBRARY; return VEHICLE_WEAPONS_LIBRARY.filter(w=>ids.indexOf(w.id)!==-1); }
+function getWeaponById(id){ return VEHICLE_WEAPONS_LIBRARY.find(w=>w.id===id)||null; }
+function isValidWeaponId(id){ return !!getWeaponById(id); }
+
+const TRACKLINE_ID = '__trackline__';
+
+const S = {
+  vehicleId:'btr80', image:null,
+  anchor:{ groundY:0.85, centerX:0.5 },
+  trackMask:{
+    enabled:false,
+    points:[{x:0,y:0.6},{x:1,y:0.6}],
+  },
+  trackLine:{ points: [] },
+  trackScroll:{
+    enabled:false,
+    direction:-1,
+    spacing:0.06,
+    darkAlpha:0.28,
+    lightAlpha:0.12,
+    followWheel:0,
+    useTexture:true,
+    textureX0:0.15,
+    textureX1:0.40,
+    textureY0:null,
+    textureY1:null,
+        bandHeight:0.08,
+    textureOpacity:0.85,
+    useStripes:true,
+    stripeStrength:0.25,
+  },
+  objects:[], selectedId:null, tool:'select',
+  view:{scale:1,tx:0,ty:0}, draftPolygon:[], draftTrackLine:[],
+  mousePos:{x:0,y:0,inside:false}, playing:false, animTime:0, animSpeed:1,
+  shakeEnabled:false, xrayMode:false,
+  fireEffects:[], simFireTimer:null,
+};
+
+const BTR_PREVIEW_CYCLE = 20.0;
+function getDoorOpenProgress(animT, speed){
+  const spd = speed || 1;
+  const t = (animT * spd) % BTR_PREVIEW_CYCLE;
+  if(t < 1.0)  return 0;
+  if(t < 2.0)  return (t - 1.0) / 1.0;
+  if(t < 3.5)  return 1;
+  if(t < 4.5)  return 1 - (t - 3.5) / 1.0;
+  if(t < 12.0) return 0;
+  if(t < 13.0) return (t - 12.0) / 1.0;
+  if(t < 14.5) return 1;
+  if(t < 15.5) return 1 - (t - 14.5) / 1.0;
+  return 0;
+}
+function getDoorPhaseName(animT, speed){
+  const spd = speed || 1;
+  const t = (animT * spd) % BTR_PREVIEW_CYCLE;
+  if(t < 1.0)  return '① 行進對齊';
+  if(t < 2.0)  return '② 開門·接人';
+  if(t < 3.5)  return '③ 等上車…';
+  if(t < 4.5)  return '④ 關門';
+  if(t < 12.0) return '⑤ 支援期(門閉)';
+  if(t < 13.0) return '⑥ 開門·放人';
+  if(t < 14.5) return '⑦ 等下車…';
+  if(t < 15.5) return '⑧ 關門';
+  return '⑨ 收尾駛離';
+}
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let rafId = null, lastFrameTime = 0;
+const _wheelClipCache = new Map();
+const _doorClipCache = new Map();
+const _maskCache = new Map();
+
+function uid(){ return 'o'+Math.random().toString(36).slice(2,9); }
+function toast(msg,type){ const el=document.getElementById('toast'); el.textContent=msg; el.className='on'+(type==='err'?' err':(type==='ok'?' ok':'')); clearTimeout(toast._t); toast._t=setTimeout(()=>el.className='',2200); }
+function screenToNorm(sx,sy){ const r=canvas.getBoundingClientRect(); const px=(sx-r.left)*(canvas.width/r.width), py=(sy-r.top)*(canvas.height/r.height); return {x:((px-S.view.tx)/S.view.scale)/canvas.width, y:((py-S.view.ty)/S.view.scale)/canvas.height}; }
+function screenToInternal(sx,sy){ const r=canvas.getBoundingClientRect(); const px=(sx-r.left)*(canvas.width/r.width), py=(sy-r.top)*(canvas.height/r.height); return {x:(px-S.view.tx)/S.view.scale, y:(py-S.view.ty)/S.view.scale}; }
+function normToScreen(nx,ny){ const r=canvas.getBoundingClientRect(); const ix=nx*canvas.width*S.view.scale+S.view.tx, iy=ny*canvas.height*S.view.scale+S.view.ty; return {x:ix*(r.width/canvas.width)+r.left, y:iy*(r.height/canvas.height)+r.top}; }
+
+const imgCache = new Image();
+imgCache.onload = ()=>{ _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); render(); };
+function loadImageFromFile(file){ const r=new FileReader(); r.onload=()=>{ const img=new Image(); img.onload=()=>{ S.image={dataUrl:r.result,w:img.naturalWidth,h:img.naturalHeight}; canvas.width=img.naturalWidth; canvas.height=img.naturalHeight; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); fitView(); render(); toast('圖片已載入 '+img.naturalWidth+'×'+img.naturalHeight,'ok'); }; img.onerror=()=>toast('圖片解析失敗','err'); img.src=r.result; }; r.onerror=()=>toast('讀取失敗','err'); r.readAsDataURL(file); }
+function fitView(){ const w=document.getElementById('canvasWrap'); const ww=w.clientWidth-20, wh=w.clientHeight-20; if(ww<=0||wh<=0) return; const s=Math.min(ww/canvas.width,wh/canvas.height,1); S.view.scale=s; S.view.tx=(canvas.width-canvas.width*s)/2; S.view.ty=(canvas.height-canvas.height*s)/2; updateZoomInfo(); }
+function updateZoomInfo(){ document.getElementById('zoomInfo').textContent=Math.round(S.view.scale*100)+'%'; }
+function updatePhaseInfo(){ const el=document.getElementById('phaseInfo'); if(!el) return; if(!S.playing){ el.textContent=''; return; } el.textContent=getDoorPhaseName(S.animTime,S.animSpeed); }
+function getObjById(id){ if(id===TRACKLINE_ID) return null; return S.objects.find(o=>o.id===id); }
+function pointInPolygon(x,y,pts){ let inside=false; for(let i=0,j=pts.length-1;i<pts.length;j=i++){ const xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y; if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
+function distToSegment(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1; const len2=dx*dx+dy*dy; if(len2<1e-9) return Math.hypot(px-x1,py-y1); let t=((px-x1)*dx+(py-y1)*dy)/len2; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-(x1+t*dx),py-(y1+t*dy)); }
+
+function hitTest(nx,ny){
+  if(S.trackLine.points.length >= 2){
+    const s = normToScreen(nx, ny);
+    const th = 8;
+    for(let i=0;i<S.trackLine.points.length-1;i++){
+      const a = normToScreen(S.trackLine.points[i].x, S.trackLine.points[i].y);
+      const b = normToScreen(S.trackLine.points[i+1].x, S.trackLine.points[i+1].y);
+      if(distToSegment(s.x, s.y, a.x, a.y, b.x, b.y) <= th) return { id: TRACKLINE_ID, type:'trackline' };
+    }
+  }
+  for(let i=S.objects.length-1;i>=0;i--){ const o=S.objects[i]; if(o.hidden) continue; if(o.type==='wheel'&&o.wheel){ const dx=nx-o.wheel.cx,dy=(ny-o.wheel.cy)*(canvas.height/canvas.width); if(Math.hypot(dx,dy)<=o.wheel.r) return o; } else if(o.type==='muzzle'&&o.muzzle){ const s=normToScreen(nx,ny),s2=normToScreen(o.muzzle.x,o.muzzle.y); if(Math.hypot(s.x-s2.x,s.y-s2.y)<=12) return o; } else if(o.points&&o.points.length>=3){ if(pointInPolygon(nx,ny,o.points)) return o; } } return null; }
+
+function hitVertex(nx,ny){
+  if(S.selectedId === TRACKLINE_ID && S.trackLine.points.length >= 2){
+    const s = normToScreen(nx, ny);
+    const th = 10;
+    for(let i=0;i<S.trackLine.points.length;i++){
+      const p = normToScreen(S.trackLine.points[i].x, S.trackLine.points[i].y);
+      if(Math.hypot(s.x-p.x, s.y-p.y) <= th) return {kind:'trackline-vertex', idx:i};
+    }
+    return null;
+  }
+  const sel=getObjById(S.selectedId); if(!sel) return null; const th=10,s=normToScreen(nx,ny); if(sel.type==='wheel'&&sel.wheel){ const c=normToScreen(sel.wheel.cx,sel.wheel.cy); if(Math.hypot(s.x-c.x,s.y-c.y)<=th) return {kind:'center'}; const e=normToScreen(sel.wheel.cx+sel.wheel.r,sel.wheel.cy); if(Math.hypot(s.x-e.x,s.y-e.y)<=th) return {kind:'radius'}; } else if(sel.type==='muzzle'&&sel.muzzle){ const p=normToScreen(sel.muzzle.x,sel.muzzle.y); if(Math.hypot(s.x-p.x,s.y-p.y)<=th) return {kind:'point'}; } else if(sel.points){ for(let i=0;i<sel.points.length;i++){ const p=normToScreen(sel.points[i].x,sel.points[i].y); if(Math.hypot(s.x-p.x,s.y-p.y)<=th) return {kind:'vertex',idx:i}; } } return null;
+}
+
+function hitTrackMaskPoint(nx,ny){ if(!S.trackMask.enabled) return -1; const s=normToScreen(nx,ny); for(let i=0;i<S.trackMask.points.length;i++){ const p=normToScreen(S.trackMask.points[i].x,S.trackMask.points[i].y); if(Math.hypot(s.x-p.x,s.y-p.y)<=10) return i; } return -1; }
+
+function getDoorHingeAxis(o){
+  const pts=o.points; if(!pts||pts.length<3) return null;
+  if(o.type==='door_upper'){ const s=pts.slice().sort((a,b)=>b.x-a.x); let p1=s[0],p2=s[1]; if(p1.y>p2.y){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
+  if(o.type==='door_lower'){ const s=pts.slice().sort((a,b)=>b.y-a.y); let p1=s[0],p2=s[1]; if(p1.x>p2.x){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
+  if(o.type==='hatch'){
+    if(typeof o.hingeEdge==='number' && o.hingeEdge>=0 && o.hingeEdge<pts.length){ const i=o.hingeEdge, j=(i+1)%pts.length; return {p1:pts[i],p2:pts[j],edgeIdx:i}; }
+    const s=pts.slice().sort((a,b)=>b.y-a.y); let p1=s[0],p2=s[1]; if(p1.x>p2.x){const t=p1;p1=p2;p2=t;}
+    let idx=0; for(let i=0;i<pts.length;i++){ const j=(i+1)%pts.length; if((pts[i]===p1&&pts[j]===p2)||(pts[i]===p2&&pts[j]===p1)){ idx=i; break; } }
+    return {p1,p2,edgeIdx:idx};
+  }
+  return null;
+}
+
+function getMaskYAtX(nx){ const pts=S.trackMask.points.slice().sort((a,b)=>a.x-b.x); if(pts.length<2) return 1; if(nx<=pts[0].x) return pts[0].y; if(nx>=pts[pts.length-1].x) return pts[pts.length-1].y; for(let i=0;i<pts.length-1;i++){ if(nx>=pts[i].x && nx<=pts[i+1].x){ const t=(nx-pts[i].x)/(pts[i+1].x-pts[i].x); return pts[i].y+(pts[i+1].y-pts[i].y)*t; } } return 1; }
+
+// ★ 履帶上邊界：只依賴 trackLine，不再退化到 trackMask
+function getTrackTopYAtX(nx){
+  const pts = S.trackLine.points.slice().sort((a,b)=>a.x-b.x);
+  if(pts.length < 2) return null;
+  if(nx <= pts[0].x) {
+    const p0=pts[0], p1=pts[1]; const dx=p1.x-p0.x, dy=p1.y-p0.y;
+    const slope = dx>0.0001 ? dy/dx : 0;
+    return Math.max(0, Math.min(1, p0.y - slope * (p0.x - nx)));
+  }
+  if(nx >= pts[pts.length-1].x) {
+    const p0=pts[pts.length-2], p1=pts[pts.length-1]; const dx=p1.x-p0.x, dy=p1.y-p0.y;
+    const slope = dx>0.0001 ? dy/dx : 0;
+    return Math.max(0, Math.min(1, p1.y + slope * (nx - p1.x)));
+  }
+  for(let i=0;i<pts.length-1;i++){ if(nx>=pts[i].x && nx<=pts[i+1].x){ const t=(nx-pts[i].x)/(pts[i+1].x-pts[i].x); return pts[i].y+(pts[i+1].y-pts[i].y)*t; } }
+  return null;
+}
+
+// ★ 構建完整弧長參數化路徑（含兩端延伸到 x=0 / x=W）
+function buildTrackPath(){
+  const W = canvas.width, H = canvas.height;
+  const tl = S.trackLine;
+  if(tl.points.length < 2) return null;
+  // 嚴格使用原始順序，不排序、不延伸；兩端即為履帶端點
+  const raw = tl.points.map(p => ({x: p.x * W, y: p.y * H}));
+  const arcPts = [{x: raw[0].x, y: raw[0].y, arc: 0}];
+  let arc = 0;
+  for(let i=1;i<raw.length;i++){
+    arc += Math.hypot(raw[i].x - raw[i-1].x, raw[i].y - raw[i-1].y);
+    arcPts.push({x: raw[i].x, y: raw[i].y, arc});
+  }
+  return { pts: arcPts, totalArc: arc, W, H };
+}
+
+function sampleTrackPath(path, targetArc){
+  const pts = path.pts;
+  if(targetArc <= pts[0].arc){ const p0=pts[0], p1=pts[1]||pts[0]; return {x:p0.x, y:p0.y, angle: Math.atan2(p1.y-p0.y, p1.x-p0.x)}; }
+  if(targetArc >= pts[pts.length-1].arc){ const p0=pts[pts.length-2]||pts[pts.length-1], p1=pts[pts.length-1]; return {x:p1.x, y:p1.y, angle: Math.atan2(p1.y-p0.y, p1.x-p0.x)}; }
+  for(let i=0;i<pts.length-1;i++){
+    if(targetArc >= pts[i].arc && targetArc <= pts[i+1].arc){
+      const t = (targetArc - pts[i].arc) / (pts[i+1].arc - pts[i].arc);
+      const x = pts[i].x + (pts[i+1].x - pts[i].x) * t;
+      const y = pts[i].y + (pts[i+1].y - pts[i].y) * t;
+      return {x, y, angle: Math.atan2(pts[i+1].y-pts[i].y, pts[i+1].x-pts[i].x)};
+    }
+  }
+  return null;
+}
+
+function traceTrackClipPath(path){
+  // 折線以下到圖底（兩端之間），用於擦除原圖背景
+  const H = canvas.height;
+  const pts = path.pts;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+  const last = pts[pts.length-1];
+  ctx.lineTo(last.x, H);
+  ctx.lineTo(pts[0].x, H);
+  ctx.closePath();
+}
+
+function buildTrackBandShape(){
+  const path = buildTrackPath();
+  if(!path) return null;
+  const W = canvas.width, H = canvas.height;
+  const bandH = (S.trackScroll.bandHeight || 0.08) * H;
+  const pts = path.pts;
+  // 每個點沿「朝上法線」偏移 bandH（轉彎處平滑無凹陷）
+  const upNormals = [];
+  for(let i=0;i<pts.length;i++){
+    let ux, uy;
+    if(i === 0){ ux = pts[1].x - pts[0].x; uy = pts[1].y - pts[0].y; }
+    else if(i === pts.length-1){ ux = pts[i].x - pts[i-1].x; uy = pts[i].y - pts[i-1].y; }
+    else { ux = pts[i+1].x - pts[i-1].x; uy = pts[i+1].y - pts[i-1].y; }
+    const len = Math.hypot(ux, uy) || 1;
+    ux /= len; uy /= len;
+    let nx = -uy, ny = ux;
+    if(ny > 0){ nx = -nx; ny = -ny; }
+    upNormals.push({nx, ny});
+  }
+  const poly = [];
+  for(let i=0;i<pts.length;i++) poly.push({x: pts[i].x, y: pts[i].y});
+  for(let i=pts.length-1;i>=0;i--){
+    poly.push({x: pts[i].x + upNormals[i].nx * bandH, y: pts[i].y + upNormals[i].ny * bandH});
+  }
+  return { poly, bandH, path, W, H, upNormals };
+}
+
+function traceTrackBandPath(band){
+  const poly = band.poly;
+  ctx.beginPath();
+  ctx.moveTo(poly[0].x, poly[0].y);
+  for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
+  ctx.closePath();
+}
+
+// ★ 隱藏原圖履帶折線以下的部分（雙 clip 保護車體）
+function eraseOriginalTrack(){
+  if(!S.trackScroll.enabled) return;
+  const band = buildTrackBandShape();
+  if(!band) return;
+  const W = canvas.width, H = canvas.height;
+  ctx.save();
+  let minY = H;
+  for(const p of band.poly){ if(p.y < minY) minY = p.y; }
+  const pts = band.path.pts;
+  const xL = pts[0].x, xR = pts[pts.length-1].x;
+  const xMin = Math.max(0, Math.min(xL, xR));
+  const xMax = Math.min(W, Math.max(xL, xR));
+  ctx.beginPath();
+  ctx.rect(xMin, Math.max(0, minY), xMax - xMin, H - Math.max(0, minY));
+  ctx.clip();
+  if(S.trackMask.enabled && S.trackMask.points.length >= 2){
+    const tmPts = S.trackMask.points.slice().sort((a,b)=>a.x-b.x);
+    ctx.beginPath();
+    ctx.moveTo(0, getMaskYAtX(0) * H);
+    for(const p of tmPts) ctx.lineTo(p.x * W, p.y * H);
+    ctx.lineTo(W, getMaskYAtX(1) * H);
+    ctx.lineTo(W, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.clip();
+  }
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+function getTextureRect(){
+  const sc = S.trackScroll;
+  let y0n = sc.textureY0;
+  let y1n = sc.textureY1;
+  const H = canvas.height;
+  const bandH = (sc.bandHeight || 0.08) * H;
+  if(y0n == null || !isFinite(y0n)){
+    let tyMin = Infinity;
+    if(S.trackLine.points.length >= 2){
+      for(const p of S.trackLine.points){ const yTop = p.y*H - bandH; if(yTop < tyMin) tyMin = yTop; }
+    }
+    if(!isFinite(tyMin)) tyMin = H * 0.6;
+    y0n = Math.max(0, tyMin / H);
+  }
+  if(y1n == null || !isFinite(y1n)){
+    let tyMax = -Infinity;
+    if(S.trackLine.points.length >= 2){
+      for(const p of S.trackLine.points){ const yBot = p.y*H; if(yBot > tyMax) tyMax = yBot; }
+    }
+    if(!isFinite(tyMax)) tyMax = H * 0.9;
+    y1n = Math.min(1, tyMax / H);
+  }
+  let x0 = Math.max(0, Math.min(1, sc.textureX0));
+  let x1 = Math.max(0, Math.min(1, sc.textureX1));
+  if(x0 > x1){ const t = x0; x0 = x1; x1 = t; }
+  if(y0n > y1n){ const t = y0n; y0n = y1n; y1n = t; }
+  return { x0, x1, y0: y0n, y1: y1n };
+}
+
+function hitTextureRect(nx, ny){
+  const sc = S.trackScroll;
+  if(!sc.enabled || !sc.useTexture) return null;
+  const W = canvas.width, H = canvas.height;
+  const r = getTextureRect();
+  const x0=r.x0*W, x1=r.x1*W, y0=r.y0*H, y1=r.y1*H;
+  const px=nx*W, py=ny*H;
+  const th = 12 / S.view.scale;
+  const onLeft = Math.abs(px-x0)<=th, onRight = Math.abs(px-x1)<=th;
+  const onTop = Math.abs(py-y0)<=th, onBottom = Math.abs(py-y1)<=th;
+  const inX = px>=x0-th && px<=x1+th, inY = py>=y0-th && py<=y1+th;
+  if(!inX || !inY) return null;
+  if(onTop && onLeft) return 'tl';
+  if(onTop && onRight) return 'tr';
+  if(onBottom && onLeft) return 'bl';
+  if(onBottom && onRight) return 'br';
+  if(onTop) return 't';
+  if(onBottom) return 'b';
+  if(onLeft) return 'l';
+  if(onRight) return 'r';
+  return null;
+}
+
+function getWheelClipCanvas(o){
+  if(!S.image||!imgCache.complete||!imgCache.naturalWidth) return null;
+  if(!o.wheel) return null;
+  const w=canvas.width,h=canvas.height,cx=o.wheel.cx*w,cy=o.wheel.cy*h,r=o.wheel.r*w;
+  const size=Math.ceil(r*2); if(size<3) return null;
+  const maskKey = (S.trackMask.enabled && S.trackMask.points.length>=2) ? S.trackMask.points.map(p=>p.x.toFixed(3)+','+p.y.toFixed(3)).join(';') : 'off';
+  const key=S.image.dataUrl.slice(-40)+'|'+cx.toFixed(1)+'|'+cy.toFixed(1)+'|'+size+'|'+maskKey;
+  if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
+  const c=document.createElement('canvas'); c.width=size; c.height=size;
+  const cc=c.getContext('2d');
+  cc.save(); cc.beginPath(); cc.arc(size/2,size/2,size/2-0.5,0,Math.PI*2); cc.clip(); cc.drawImage(imgCache,-(cx-size/2),-(cy-size/2),w,h); cc.restore();
+  if(S.trackMask.enabled && S.trackMask.points.length>=2){
+    const maskY = getMaskYAtX(o.wheel.cx);
+    const maskYInCanvas = maskY * h - (cy - size/2);
+    if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
+      const below = document.createElement('canvas'); below.width=size; below.height=size;
+      const bc = below.getContext('2d'); bc.drawImage(c,0,0); bc.globalCompositeOperation='destination-in'; bc.fillRect(0, maskYInCanvas, size, size - maskYInCanvas);
+      cc.save(); cc.beginPath(); cc.arc(size/2,size/2,size/2-0.5,0,Math.PI*2); cc.clip(); cc.clearRect(0, 0, size, maskYInCanvas); cc.restore();
+      cc.save(); cc.beginPath(); cc.arc(size/2,size/2,size/2-0.5,0,Math.PI*2); cc.clip(); cc.translate(0, maskYInCanvas * 2); cc.scale(1, -1); cc.drawImage(below, 0, 0); cc.restore();
+    }
+  }
+  cc.save(); cc.globalCompositeOperation='destination-in'; cc.beginPath(); cc.arc(size/2,size/2,size/2-0.5,0,Math.PI*2); cc.fill(); cc.restore();
+  _wheelClipCache.set(key,c);
+  if(_wheelClipCache.size>40){ _wheelClipCache.delete(_wheelClipCache.keys().next().value); }
+  return c;
+}
+
+function getMaskCanvas(){
+  if(!S.image||!imgCache.complete||!imgCache.naturalWidth) return null;
+  if(!S.trackMask.enabled||S.trackMask.points.length<2) return null;
+  const w=canvas.width,h=canvas.height;
+  const key=S.image.dataUrl.slice(-40)+'|'+S.trackMask.points.map(p=>p.x.toFixed(3)+','+p.y.toFixed(3)).join(';');
+  if(_maskCache.has(key)) return _maskCache.get(key);
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const cc=c.getContext('2d');
+  const pts=S.trackMask.points.slice().sort((a,b)=>a.x-b.x);
+  cc.beginPath(); cc.moveTo(pts[0].x*w, 0); for(const p of pts) cc.lineTo(p.x*w, p.y*h); cc.lineTo(pts[pts.length-1].x*w, 0); cc.closePath(); cc.clip();
+  cc.drawImage(imgCache,0,0,w,h);
+  _maskCache.set(key,c);
+  if(_maskCache.size>20){ _maskCache.delete(_maskCache.keys().next().value); }
+  return c;
+}
+
+function getDoorClipCanvas(o){
+  if(!S.image||!imgCache.complete||!imgCache.naturalWidth) return null;
+  const pts=o.points; if(!pts||pts.length<3) return null;
+  const w=canvas.width,h=canvas.height;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const p of pts){ const px=p.x*w,py=p.y*h; if(px<minX)minX=px; if(py<minY)minY=py; if(px>maxX)maxX=px; if(py>maxY)maxY=py; }
+  const bw=Math.ceil(maxX-minX),bh=Math.ceil(maxY-minY);
+  if(bw<2||bh<2) return null;
+  const key=S.image.dataUrl.slice(-40)+'|'+pts.map(p=>p.x.toFixed(3)+','+p.y.toFixed(3)).join(';');
+  if(_doorClipCache.has(key)) return _doorClipCache.get(key);
+  const c=document.createElement('canvas'); c.width=bw; c.height=bh;
+  const cc=c.getContext('2d');
+  cc.beginPath(); cc.moveTo(pts[0].x*w-minX,pts[0].y*h-minY); for(let i=1;i<pts.length;i++) cc.lineTo(pts[i].x*w-minX,pts[i].y*h-minY); cc.closePath(); cc.clip();
+  cc.drawImage(imgCache,-minX,-minY,w,h);
+  const result={canvas:c,minX,minY,bw,bh};
+  _doorClipCache.set(key,result);
+  if(_doorClipCache.size>30){ _doorClipCache.delete(_doorClipCache.keys().next().value); }
+  return result;
+}
+
+function getShakeOffset(){ if(!S.shakeEnabled||!S.playing) return {x:0,y:0}; const t=performance.now(); return { x: Math.sin(t/40)*1.5, y: Math.cos(t/55)*1.2 }; }
+function getWheelRotSpeed(o){ const boost = (S.shakeEnabled&&S.playing) ? 3 : 1; return (o.rotSpeed||1) * boost; }
+
+function getTrackScrollVelocity(){
+  const sc = S.trackScroll;
+  if(!sc.enabled) return 0;
+  const ws = S.objects.filter(o=>o.type==='wheel' && o.wheel);
+  if(!ws.length) return 0;
+  let refR, refRot;
+  const idx = sc.followWheel|0;
+  if(idx > 0 && idx <= ws.length){ refR = ws[idx-1].wheel.r; refRot = getWheelRotSpeed(ws[idx-1]); }
+  else { refR = ws.reduce((s,w)=>s+w.wheel.r, 0) / ws.length; refRot = ws.reduce((s,w)=>s+getWheelRotSpeed(w), 0) / ws.length; }
+  return refRot * 3 * refR * canvas.width;
+}
+
+// ★ 沿弧長分佈的條紋（垂直於折線）
+function drawQuad(pA, pB, fillStyle, maxLen){
+  const avg = (pA.angle + pB.angle) / 2;
+  const nx = -Math.sin(avg);
+  const ny = Math.cos(avg);
+  if(ny < 0.05) return;
+  const lenA = Math.min(maxLen, (canvas.height - pA.y) / Math.max(0.01, ny));
+  const lenB = Math.min(maxLen, (canvas.height - pB.y) / Math.max(0.01, ny));
+  if(lenA <= 0 && lenB <= 0) return;
+  const endAx = pA.x + nx * lenA, endAy = pA.y + ny * lenA;
+  const endBx = pB.x + nx * lenB, endBy = pB.y + ny * lenB;
+  ctx.fillStyle = fillStyle;
+  ctx.beginPath();
+  ctx.moveTo(pA.x, pA.y);
+  ctx.lineTo(pB.x, pB.y);
+  ctx.lineTo(endBx, endBy);
+  ctx.lineTo(endAx, endAy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawTrackStripesLayer(band){
+  const sc = S.trackScroll;
+  if(!sc.useStripes) return;
+  const W = canvas.width;
+  const spacing = sc.spacing * W;
+  if(spacing < 3) return;
+  const darkW = spacing * 0.55;
+  const v = getTrackScrollVelocity();
+  const dir = sc.direction;
+  let offset = (S.animTime * v * dir) % spacing;
+  if(offset < 0) offset += spacing;
+  const maxLen = band.bandH * 2;
+  const totalArc = band.path.totalArc;
+  ctx.save();
+  traceTrackBandPath(band);
+  ctx.clip();
+  for(let a = offset - spacing; a < totalArc + spacing; a += spacing){
+    const arcA = Math.max(0, Math.min(totalArc, a));
+    const arcB = Math.max(0, Math.min(totalArc, a + darkW));
+    const arcC = Math.max(0, Math.min(totalArc, a + spacing));
+    const pA = sampleTrackPath(band.path, arcA);
+    const pB = sampleTrackPath(band.path, arcB);
+    const pC = sampleTrackPath(band.path, arcC);
+    if(!pA || !pB || !pC) continue;
+    drawQuadUp(pA, pB, 'rgba(0,0,0,' + (sc.darkAlpha * sc.stripeStrength) + ')', maxLen);
+    drawQuadUp(pB, pC, 'rgba(255,255,255,' + (sc.lightAlpha * sc.stripeStrength) + ')', maxLen);
+  }
+  ctx.restore();
+}
+
+function drawQuadUp(pA, pB, fillStyle, maxLen){
+  const avg = (pA.angle + pB.angle) / 2;
+  let nx = -Math.sin(avg);
+  let ny = Math.cos(avg);
+  if(ny > 0){ nx = -nx; ny = -ny; }
+  if(-ny < 0.05) return;
+  const lenA = Math.min(maxLen, pA.y / Math.max(0.01, -ny));
+  const lenB = Math.min(maxLen, pB.y / Math.max(0.01, -ny));
+  if(lenA <= 0 && lenB <= 0) return;
+  const endAx = pA.x + nx * lenA, endAy = pA.y + ny * lenA;
+  const endBx = pB.x + nx * lenB, endBy = pB.y + ny * lenB;
+  ctx.fillStyle = fillStyle;
+  ctx.beginPath();
+  ctx.moveTo(pA.x, pA.y);
+  ctx.lineTo(pB.x, pB.y);
+  ctx.lineTo(endBx, endBy);
+  ctx.lineTo(endAx, endAy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ★ 每段用 shear 變換貼上紋理
+function drawTrackTextureLayer(band){
+  const sc = S.trackScroll;
+  if(!sc.useTexture) return;
+  if(!S.image || !imgCache.complete || !imgCache.naturalWidth) return;
+  const W = canvas.width, H = canvas.height;
+  const r = getTextureRect();
+  const tx0 = Math.min(r.x0, r.x1) * W;
+  const tx1 = Math.max(r.x0, r.x1) * W;
+  const texW = tx1 - tx0;
+  if(texW < 2) return;
+  const ty0raw = r.y0 * H, ty1raw = r.y1 * H;
+  const texY0 = Math.min(ty0raw, ty1raw);
+  const texY1 = Math.max(ty0raw, ty1raw);
+  const texH = texY1 - texY0;
+  if(texH < 2) return;
+  const bandH = band.bandH;
+  const vScale = bandH / texH;
+  const v = getTrackScrollVelocity();
+  const dir = sc.direction;
+  let offset = (S.animTime * v * dir) % texW;
+  if(offset < 0) offset += texW;
+  const totalArc = band.path.totalArc;
+  ctx.save();
+  traceTrackBandPath(band);
+  ctx.clip();
+  ctx.globalAlpha = sc.textureOpacity;
+  for(let a = offset - texW; a < totalArc + texW; a += texW){
+    const arcA = Math.max(0, Math.min(totalArc, a));
+    const arcB = Math.max(0, Math.min(totalArc, a + texW));
+    const pA = sampleTrackPath(band.path, arcA);
+    const pB = sampleTrackPath(band.path, arcB);
+    if(!pA || !pB) continue;
+    const dx = pB.x - pA.x, dy = pB.y - pA.y;
+    const segLen = Math.hypot(dx, dy);
+    if(segLen < 2) continue;
+    const angle = Math.atan2(dy, dx);
+    const ux = Math.cos(angle), uy = Math.sin(angle);
+    const uScale = segLen / texW;
+    // 朝上法線（y 分量 ≤ 0，指向「車體方向」）
+    let nx = -uy, ny = ux;
+    if(ny > 0){ nx = -nx; ny = -ny; }
+    // 帶子上邊世界座標 = pA 沿朝上法線偏移 bandH
+    const topX = pA.x + nx * bandH;
+    const topY = pA.y + ny * bandH;
+    // V 軸朝下（從帶子上邊 → 帶子下邊），長度 vScale
+    // 原圖頂部 → 帶子上邊，原圖底部 → 帶子下邊 → 不翻轉
+    const vx = -nx, vy = -ny;
+    ctx.save();
+    ctx.translate(topX, topY);
+    ctx.transform(ux * uScale, uy * uScale, vx * vScale, vy * vScale, 0, 0);
+    ctx.drawImage(imgCache, tx0, texY0, texW, texH, 0, 0, texW, texH);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawTrackScroll(){
+  if(!S.trackScroll.enabled) return;
+  const band = buildTrackBandShape();
+  if(!band) return;
+  // 1. 不透明深色底：覆蓋原圖履帶區 + 兜底轉角空隙
+  ctx.save();
+  traceTrackBandPath(band);
+  ctx.fillStyle = 'rgba(40, 36, 30, 0)';
+  ctx.fill();
+  ctx.restore();
+  // 2. A 層紋理 + B 層條紋（均 clip 到 band 內）
+  drawTrackTextureLayer(band);
+  drawTrackStripesLayer(band);
+}
+
+// ============ render ============
+function render(){
+  if(!ctx) return;
+  const w=canvas.width,h=canvas.height;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,w,h);
+  drawGrid();
+  ctx.setTransform(S.view.scale,0,0,S.view.scale,S.view.tx,S.view.ty);
+
+  const shake = getShakeOffset();
+  ctx.save();
+  if(shake.x||shake.y) ctx.translate(shake.x, shake.y);
+
+  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder==='below') drawMuzzle(o,o.id===S.selectedId); }
+  drawFireEffects('below');
+
+  if(S.image){
+    if(imgCache.src!==S.image.dataUrl) imgCache.src=S.image.dataUrl;
+    if(imgCache.complete&&imgCache.naturalWidth>0){
+      const alpha = S.xrayMode ? 0.35 : 1;
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(imgCache,0,0,w,h);
+      ctx.globalAlpha = 1;
+    }
+  } else {
+    ctx.fillStyle='#0a0806'; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='#3a2f25'; ctx.font='20px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('點擊「導入圖片」載入載具側視圖',w/2,h/2);
+  }
+
+  eraseOriginalTrack();
+
+  drawTrackScroll();
+
+  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='wheel'&&o.wheel) drawWheel(o,o.id===S.selectedId,getWheelRotSpeed(o)); }
+
+  const maskC = getMaskCanvas();
+  if(maskC){ ctx.drawImage(maskC,0,0,w,h); }
+
+  // ★ 车门内部黑移到 maskC 之后（否则被车顶原图盖掉）
+  for(const o of S.objects){
+    if(o.hidden) continue;
+    if((o.type==='door_upper'||o.type==='door_lower'||o.type==='hatch')&&o.points&&o.points.length>=3){
+      const ang=getOpenAngle(o,S.playing?S.animTime:0);
+      if(ang>3){
+        ctx.fillStyle=o.fillColor||'#000000';
+        ctx.beginPath(); ctx.moveTo(o.points[0].x*w,o.points[0].y*h);
+        for(let i=1;i<o.points.length;i++) ctx.lineTo(o.points[i].x*w,o.points[i].y*h);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+
+  for(const o of S.objects){
+    if(o.hidden) continue;
+    if(o.type==='door_upper'||o.type==='door_lower') drawDoor(o,o.id===S.selectedId,0);
+    else if(o.type==='hatch') drawHatch(o,o.id===S.selectedId,0);
+    else if(o.type==='weapon'&&o.points) drawPolygon(o,o.id===S.selectedId);
+  }
+
+  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder!=='below') drawMuzzle(o,o.id===S.selectedId); }
+
+  drawFireEffects('above');
+
+  ctx.restore();
+
+  drawAnchorLines();
+  if(S.trackMask.enabled) drawTrackMaskLine();
+  drawTrackLineGuide();
+  if(S.trackScroll.enabled && S.trackScroll.useTexture) drawTextureRectOverlay();
+  if(S.draftPolygon.length>0) drawDraftPolygon();
+  if(S.draftTrackLine.length>0) drawDraftTrackLine();
+  drawHandles();
+
+  ctx.setTransform(1,0,0,1,0,0);
+}
+
+function drawTrackLineGuide(){
+  if(S.trackLine.points.length < 2) return;
+  const W = canvas.width, H = canvas.height;
+  const pts = S.trackLine.points;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(74,240,255,0.9)';
+  ctx.lineWidth = 2/S.view.scale;
+  ctx.setLineDash([10/S.view.scale, 6/S.view.scale]);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x*W, pts[0].y*H);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*W, pts[i].y*H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  for(const p of pts){
+    ctx.fillStyle = '#4af0ff';
+    ctx.beginPath(); ctx.arc(p.x*W, p.y*H, 5/S.view.scale, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5/S.view.scale; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawDraftTrackLine(){
+  if(S.draftTrackLine.length === 0) return;
+  const W = canvas.width, H = canvas.height;
+  ctx.save();
+  ctx.strokeStyle = '#4af0ff';
+  ctx.lineWidth = 2/S.view.scale;
+  ctx.setLineDash([6/S.view.scale, 4/S.view.scale]);
+  ctx.beginPath();
+  ctx.moveTo(S.draftTrackLine[0].x*W, S.draftTrackLine[0].y*H);
+  for(let i=1;i<S.draftTrackLine.length;i++) ctx.lineTo(S.draftTrackLine[i].x*W, S.draftTrackLine[i].y*H);
+  if(S.mousePos.inside) ctx.lineTo(S.mousePos.x*W, S.mousePos.y*H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  for(const p of S.draftTrackLine){
+    ctx.fillStyle = '#4af0ff';
+    ctx.beginPath(); ctx.arc(p.x*W, p.y*H, 5/S.view.scale, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawTextureRectOverlay(){
+  const sc = S.trackScroll;
+  if(!sc.useTexture) return;
+  const W = canvas.width, H = canvas.height;
+  const r = getTextureRect();
+  const x0 = r.x0*W, x1 = r.x1*W, y0 = r.y0*H, y1 = r.y1*H;
+  ctx.save();
+  ctx.strokeStyle='#ffcc44'; ctx.lineWidth=1.5/S.view.scale;
+  ctx.setLineDash([6/S.view.scale,4/S.view.scale]);
+  ctx.strokeRect(x0, y0, x1-x0, y1-y0);
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,204,68,0.9)';
+  ctx.font=(10/S.view.scale)+'px monospace';
+  ctx.textAlign='left';
+  ctx.fillText('紋理取樣區（可拖拽調整）', x0+4/S.view.scale, y0-4/S.view.scale);
+  const hs = 5/S.view.scale;
+  for(const [hx,hy] of [[x0,y0],[x1,y0],[x0,y1],[x1,y1]]){
+    ctx.fillStyle='#ffcc44';
+    ctx.beginPath(); ctx.arc(hx, hy, hs, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5/S.view.scale; ctx.stroke();
+  }
+  const midW = 8/S.view.scale, midH = 3/S.view.scale;
+  ctx.fillStyle='#ffcc44';
+  ctx.fillRect((x0+x1)/2 - midW, y0 - midH/2, midW*2, midH);
+  ctx.fillRect((x0+x1)/2 - midW, y1 - midH/2, midW*2, midH);
+  ctx.fillRect(x0 - midH/2, (y0+y1)/2 - midW, midH, midW*2);
+  ctx.fillRect(x1 - midH/2, (y0+y1)/2 - midW, midH, midW*2);
+  ctx.restore();
+}
+
+function getOpenAngle(o,animT){
+  let maxAngle=180;
+  if(o.type==='door_upper') maxAngle=180; else if(o.type==='door_lower') maxAngle=110; else if(o.type==='hatch') maxAngle=180;
+  if(!S.playing) return o.openAngle||0;
+  return getDoorOpenProgress(animT, S.animSpeed) * maxAngle;
+}
+
+function drawGrid(){ ctx.strokeStyle='rgba(232,163,61,0.06)'; ctx.lineWidth=1; for(let x=0;x<canvas.width;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); } for(let y=0;y<canvas.height;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); } }
+function drawAnchorLines(){ const w=canvas.width,h=canvas.height; const gy=S.anchor.groundY*h; ctx.strokeStyle='rgba(76,175,80,0.6)'; ctx.lineWidth=1.5/S.view.scale; ctx.setLineDash([8/S.view.scale,6/S.view.scale]); ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(w,gy); ctx.stroke(); const cx=S.anchor.centerX*w; ctx.strokeStyle='rgba(74,144,217,0.5)'; ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,h); ctx.stroke(); ctx.setLineDash([]); }
+function drawTrackMaskLine(){
+  const w=canvas.width,h=canvas.height;
+  const pts=S.trackMask.points.slice().sort((a,b)=>a.x-b.x);
+  if(pts.length<2) return;
+  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=2/S.view.scale;
+  ctx.setLineDash([6/S.view.scale,4/S.view.scale]);
+  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h);
+  ctx.stroke(); ctx.setLineDash([]);
+  for(const p of S.trackMask.points){
+    ctx.fillStyle='#4af0ff'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5/S.view.scale;
+    const s=6/S.view.scale;
+    ctx.beginPath(); ctx.arc(p.x*w,p.y*h,s,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+}
+function drawWheel(o,isSel,rotSpeed){
+  const w=canvas.width,h=canvas.height,cx=o.wheel.cx*w,cy=o.wheel.cy*h,r=o.wheel.r*w;
+  if(r<1) return;
+  let rot=0;
+  if(S.playing) rot=(S.animTime*rotSpeed*3)%(Math.PI*2);
+  const clip=getWheelClipCanvas(o);
+  if(clip){ ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot); ctx.drawImage(clip,-r,-r,r*2,r*2); ctx.restore(); }
+  else { ctx.fillStyle='rgba(74,144,217,0.15)'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); }
+  ctx.strokeStyle=isSel?'#e8a33d':'rgba(74,144,217,0.7)'; ctx.lineWidth=(isSel?2:1)/S.view.scale;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle=isSel?'#e8a33d':'#4a90d9';
+  ctx.beginPath(); ctx.arc(cx,cy,2.5/S.view.scale,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=isSel?'#e8a33d':'#7a6f60'; ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(o.name||'車輪',cx,cy+r+14/S.view.scale);
+}
+
+function drawDoor(o,isSel,animT){
+  const w=canvas.width,h=canvas.height; const pts=o.points;
+  if(!pts||pts.length<3) return;
+  const ang=getOpenAngle(o,S.playing?S.animTime:0);
+  const cosA=Math.cos(ang*Math.PI/180);
+  const isFront=cosA>=0;
+  const hinge=getDoorHingeAxis(o); if(!hinge) return;
+  const {p1,p2}=hinge;
+  const x1=p1.x*w,y1=p1.y*h,x2=p2.x*w,y2=p2.y*h;
+  const alpha=Math.atan2(y2-y1,x2-x1);
+  ctx.save();
+  ctx.translate(x1,y1); ctx.rotate(alpha); ctx.scale(1,cosA); ctx.rotate(-alpha); ctx.translate(-x1,-y1);
+  if(isFront){ const clip=getDoorClipCanvas(o); if(clip) ctx.drawImage(clip.canvas,clip.minX,clip.minY,clip.bw,clip.bh); else { ctx.fillStyle='rgba(232,163,61,0.4)'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); } }
+  else { ctx.fillStyle=o.fillColor||'#000000'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); ctx.strokeStyle='rgba(80,80,80,0.45)'; ctx.lineWidth=1/S.view.scale; ctx.stroke(); }
+  ctx.strokeStyle=isSel?'#e8a33d':'#e07ae8'; ctx.lineWidth=2/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=3/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.fillStyle='#4af0ff';
+  for(const [px,py] of [[x1,y1],[x2,y2]]){ const s=5/S.view.scale; ctx.fillRect(px-s,py-s,s*2,s*2); }
+  let cx=0,cy=0; for(const p of pts){ cx+=p.x; cy+=p.y; } cx=(cx/pts.length)*w; cy=(cy/pts.length)*h;
+  ctx.fillStyle=isSel?'#e8a33d':'#e07ae8'; ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='center';
+  ctx.fillText((o.name||'車門')+' '+Math.round(ang)+'° '+(isFront?'正':'背'),cx,cy-20/S.view.scale);
+}
+
+function drawHatch(o,isSel,animT){
+  const w=canvas.width,h=canvas.height; const pts=o.points;
+  if(!pts||pts.length<3) return;
+  const ang=getOpenAngle(o,S.playing?S.animTime:0);
+  const cosA=Math.cos(ang*Math.PI/180);
+  const showBack = cosA < 0;
+  let minY = Infinity, bestI = 0;
+  for(let i=0;i<pts.length;i++){
+    const j = (i+1)%pts.length;
+    const my = (pts[i].y + pts[j].y) / 2;
+    if(my < minY){ minY = my; bestI = i; }
+  }
+  let p1 = pts[bestI], p2 = pts[(bestI+1)%pts.length];
+  if(p1.x > p2.x){ const t = p1; p1 = p2; p2 = t; }
+  const x1=p1.x*w,y1=p1.y*h,x2=p2.x*w,y2=p2.y*h;
+  const alpha=Math.atan2(y2-y1,x2-x1);
+  ctx.save();
+  ctx.translate(x1,y1); ctx.rotate(alpha); ctx.scale(1,cosA); ctx.rotate(-alpha); ctx.translate(-x1,-y1);
+  if(!showBack){ const clip=getDoorClipCanvas(o); if(clip) ctx.drawImage(clip.canvas,clip.minX,clip.minY,clip.bw,clip.bh); else { ctx.fillStyle='rgba(120,200,255,0.4)'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); } }
+  else { ctx.fillStyle=o.fillColor||'#000000'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); ctx.strokeStyle='rgba(80,80,80,0.45)'; ctx.lineWidth=1/S.view.scale; ctx.stroke(); }
+  ctx.strokeStyle=isSel?'#e8a33d':'#4ad8e8'; ctx.lineWidth=2/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=3/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.fillStyle='#4af0ff';
+  for(const [px,py] of [[x1,y1],[x2,y2]]){ const s=5/S.view.scale; ctx.fillRect(px-s,py-s,s*2,s*2); }
+  let cx=0,cy=0; for(const p of pts){ cx+=p.x; cy+=p.y; } cx=(cx/pts.length)*w; cy=(cy/pts.length)*h;
+  ctx.fillStyle=isSel?'#e8a33d':'#4ad8e8'; ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='center';
+  ctx.fillText((o.name||'艙門')+' '+Math.round(ang)+'° '+(showBack?'背':'正'),cx,cy-20/S.view.scale);
+}
+
+function drawPolygon(o,isSel){
+  if(!o.points||o.points.length<3) return;
+  const w=canvas.width,h=canvas.height;
+  ctx.fillStyle=isSel?'rgba(232,163,61,0.2)':'rgba(122,111,96,0.15)';
+  ctx.beginPath(); ctx.moveTo(o.points[0].x*w,o.points[0].y*h);
+  for(let i=1;i<o.points.length;i++) ctx.lineTo(o.points[i].x*w,o.points[i].y*h);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=isSel?'#e8a33d':'#a45ede'; ctx.lineWidth=(isSel?2:1.5)/S.view.scale; ctx.stroke();
+  let cx=0,cy=0; for(const p of o.points){ cx+=p.x; cy+=p.y; } cx=(cx/o.points.length)*w; cy=(cy/o.points.length)*h;
+  ctx.fillStyle=isSel?'#e8a33d':'#a45ede'; ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='center'; ctx.fillText(o.name||'區域',cx,cy);
+}
+
+function drawMuzzle(o,isSel){
+  const w=canvas.width,h=canvas.height; const mx=o.muzzle.x*w,my=o.muzzle.y*h;
+  const isBelow=o.layerOrder==='below';
+  const isSelected=o.id===S.selectedId;
+  ctx.fillStyle=isSelected?'rgba(232,163,61,0.25)':(isBelow?'rgba(200,144,216,0.08)':'rgba(200,144,216,0.18)');
+  ctx.beginPath(); ctx.arc(mx,my,10/S.view.scale,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=isSelected?'#e8a33d':(isBelow?'#7a5a88':'#c890d8'); ctx.lineWidth=2/S.view.scale;
+  const s=8/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(mx-s,my); ctx.lineTo(mx+s,my); ctx.moveTo(mx,my-s); ctx.lineTo(mx,my+s); ctx.stroke();
+  ctx.fillStyle=isSelected?'#e8a33d':(isBelow?'#7a5a88':'#c890d8');
+  ctx.beginPath(); ctx.arc(mx,my,2.5/S.view.scale,0,Math.PI*2); ctx.fill();
+  let label=o.name||'槍口';
+  if(o.weaponId){ const wd=getWeaponById(o.weaponId); label+=' ['+(wd?wd.name:o.weaponId)+']'; }
+  if(isBelow) label+=' (下層)';
+  ctx.fillStyle=isSelected?'#e8a33d':(isBelow?'#5a4060':'#a89a85');
+  ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='left';
+  ctx.fillText(label,mx+14/S.view.scale,my+4/S.view.scale);
+}
+
+function drawFireEffects(layerFilter){
+  if(S.fireEffects.length===0) return;
+  const now=performance.now(); const w=canvas.width,h=canvas.height;
+  for(let i=S.fireEffects.length-1;i>=0;i--){
+    const fx=S.fireEffects[i];
+    if((fx.layerOrder==='below'?'below':'above')!==layerFilter) continue;
+    const age=now-fx.startTime;
+    if(age>fx.duration){ S.fireEffects.splice(i,1); continue; }
+    const t=age/fx.duration;
+    const x=fx.x*w,y=fx.y*h;
+    if(t<0.2){ const ft=t/0.2; const flashR=fx.flashSize*(1-ft*0.6); const grad=ctx.createRadialGradient(x,y,0,x,y,flashR); grad.addColorStop(0,fx.flashOuter); grad.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(x,y,flashR,0,Math.PI*2); ctx.fill(); }
+    const bx=x+t*fx.bulletSpeed, alpha=1-t;
+    ctx.strokeStyle=`rgba(255,200,80,${alpha*0.4})`; ctx.lineWidth=2/S.view.scale;
+    ctx.beginPath(); ctx.moveTo(x+t*fx.bulletSpeed*0.4,y); ctx.lineTo(bx,y); ctx.stroke();
+    ctx.fillStyle=`rgba(255,220,120,${alpha})`; ctx.beginPath(); ctx.arc(bx,y,fx.bulletSize/S.view.scale,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawDraftPolygon(){
+  const w=canvas.width,h=canvas.height;
+  ctx.strokeStyle='#e8a33d'; ctx.lineWidth=2/S.view.scale;
+  ctx.setLineDash([6/S.view.scale,4/S.view.scale]);
+  ctx.beginPath(); const p0=S.draftPolygon[0];
+  ctx.moveTo(p0.x*w,p0.y*h);
+  for(let i=1;i<S.draftPolygon.length;i++) ctx.lineTo(S.draftPolygon[i].x*w,S.draftPolygon[i].y*h);
+  if(S.mousePos.inside) ctx.lineTo(S.mousePos.x*w,S.mousePos.y*h);
+  ctx.stroke(); ctx.setLineDash([]);
+  for(const p of S.draftPolygon){ ctx.fillStyle='#e8a33d'; ctx.beginPath(); ctx.arc(p.x*w,p.y*h,4/S.view.scale,0,Math.PI*2); ctx.fill(); }
+}
+
+function drawHandles(){
+  if(S.selectedId === TRACKLINE_ID && S.trackLine.points.length >= 2){
+    const w=canvas.width,h=canvas.height;
+    ctx.fillStyle='#fff'; ctx.strokeStyle='#4af0ff'; ctx.lineWidth=2/S.view.scale;
+    const hs=6/S.view.scale;
+    for(const p of S.trackLine.points){ ctx.beginPath(); ctx.arc(p.x*w,p.y*h,hs,0,Math.PI*2); ctx.fill(); ctx.stroke(); }
+    return;
+  }
+  const o=getObjById(S.selectedId); if(!o) return;
+  const w=canvas.width,h=canvas.height;
+  ctx.fillStyle='#fff'; ctx.strokeStyle='#e8a33d'; ctx.lineWidth=2/S.view.scale;
+  const hs=5/S.view.scale;
+  function handle(x,y){ ctx.beginPath(); ctx.arc(x,y,hs,0,Math.PI*2); ctx.fill(); ctx.stroke(); }
+  if(o.type==='wheel'&&o.wheel){ handle(o.wheel.cx*w,o.wheel.cy*h); handle((o.wheel.cx+o.wheel.r)*w,o.wheel.cy*h); }
+  else if(o.type==='muzzle'&&o.muzzle){ handle(o.muzzle.x*w,o.muzzle.y*h); }
+  else if(o.points){ for(const p of o.points) handle(p.x*w,p.y*h); }
+}
+
+let dragState=null;
+canvas.addEventListener('pointerdown',(e)=>{
+  if(e.button!==0) return;
+  canvas.setPointerCapture(e.pointerId);
+  const n=screenToNorm(e.clientX,e.clientY);
+  const texEdge = hitTextureRect(n.x, n.y);
+  if(texEdge){ dragState = {kind:'texRect', edge: texEdge}; return; }
+  if(S.trackMask.enabled){ const idx=hitTrackMaskPoint(n.x,n.y); if(idx>=0){ dragState={kind:'maskPoint',idx}; return; } }
+  if(S.tool==='trackline'){
+    if(S.draftTrackLine.length >= 2){
+      const first = normToScreen(S.draftTrackLine[0].x, S.draftTrackLine[0].y);
+      const cur = normToScreen(n.x, n.y);
+      if(Math.hypot(cur.x-first.x, cur.y-first.y) < 10){ finishTrackLine(); return; }
+    }
+    S.draftTrackLine.push({x:n.x, y:n.y}); render(); return;
+  }
+  if(S.tool==='select'){
+    if(S.selectedId === TRACKLINE_ID){
+      const h = hitVertex(n.x, n.y);
+      if(h && h.kind==='trackline-vertex'){ dragState = {kind:'trackline-vertex', idx:h.idx}; return; }
+    }
+    const h=hitVertex(n.x,n.y);
+    if(h){ const sel=getObjById(S.selectedId); if(h.kind==='center') dragState={kind:'wheel-center',objId:sel.id}; else if(h.kind==='radius') dragState={kind:'wheel-radius',objId:sel.id}; else if(h.kind==='point') dragState={kind:'muzzle',objId:sel.id}; else if(h.kind==='vertex') dragState={kind:'vertex',objId:sel.id,vertexIdx:h.idx}; return; }
+    const hit=hitTest(n.x,n.y);
+    if(hit){ S.selectedId=hit.id; if(hit.id !== TRACKLINE_ID){ dragState={kind:'obj-move',objId:hit.id,startN:{x:n.x,y:n.y},initObj:JSON.parse(JSON.stringify(hit))}; } }
+    else S.selectedId=null;
+    updateObjectList(); updatePropPanel(); render();
+    return;
+  }
+  if(S.tool==='wheel'){ dragState={kind:'draw-wheel',startN:{x:n.x,y:n.y}}; return; }
+  if(S.tool==='muzzle'){
+    const newObj={id:uid(),type:'muzzle',name:'槍口 '+(S.objects.filter(o=>o.type==='muzzle').length+1),muzzle:{x:n.x,y:n.y},weaponId:null,layerOrder:'above',hidden:false};
+    S.objects.push(newObj); S.selectedId=newObj.id;
+    setTool('select'); updateObjectList(); updatePropPanel(); render();
+    return;
+  }
+  if(S.tool==='polygon'){
+    if(S.draftPolygon.length>=3){
+      const first=normToScreen(S.draftPolygon[0].x,S.draftPolygon[0].y);
+      const cur=normToScreen(n.x,n.y);
+      if(Math.hypot(cur.x-first.x,cur.y-first.y)<10){ finishPolygon(); return; }
+    }
+    S.draftPolygon.push({x:n.x,y:n.y}); render(); return;
+  }
+});
+
+canvas.addEventListener('pointermove',(e)=>{
+  const n=screenToNorm(e.clientX,e.clientY);
+  S.mousePos={x:n.x,y:n.y,inside:true};
+  if(dragState){
+    if(dragState.kind==='texRect'){
+      const sc = S.trackScroll;
+      const r = getTextureRect();
+      let x0=r.x0, x1=r.x1, y0=r.y0, y1=r.y1;
+      const px=n.x, py=n.y;
+      const edge = dragState.edge;
+      if(edge==='l' || edge==='tl' || edge==='bl') x0 = Math.max(0, Math.min(x1-0.01, px));
+      if(edge==='r' || edge==='tr' || edge==='br') x1 = Math.max(x0+0.01, Math.min(1, px));
+      if(edge==='t' || edge==='tl' || edge==='tr') y0 = Math.max(0, Math.min(y1-0.01, py));
+      if(edge==='b' || edge==='bl' || edge==='br') y1 = Math.max(y0+0.01, Math.min(1, py));
+      sc.textureX0=x0; sc.textureX1=x1; sc.textureY0=y0; sc.textureY1=y1;
+      renderTrackScrollProps(); render(); return;
+    }
+    if(dragState.kind==='maskPoint'){ const p=S.trackMask.points[dragState.idx]; p.x=Math.max(0,Math.min(1,n.x)); p.y=Math.max(0,Math.min(1,n.y)); _maskCache.clear(); _wheelClipCache.clear(); render(); return; }
+    if(dragState.kind==='trackline-vertex'){ const p = S.trackLine.points[dragState.idx]; p.x = Math.max(0, Math.min(1, n.x)); p.y = Math.max(0, Math.min(1, n.y)); updatePropPanel(); render(); return; }
+    const obj=dragState.objId?getObjById(dragState.objId):null;
+    if(dragState.kind==='obj-move'&&obj){
+      const dx=n.x-dragState.startN.x, dy=n.y-dragState.startN.y;
+      const init=dragState.initObj;
+      if(obj.type==='wheel'&&init.wheel){ obj.wheel.cx=Math.max(0,Math.min(1,init.wheel.cx+dx)); obj.wheel.cy=Math.max(0,Math.min(1,init.wheel.cy+dy)); _wheelClipCache.clear(); }
+      else if(obj.type==='muzzle'&&init.muzzle){ obj.muzzle.x=Math.max(0,Math.min(1,init.muzzle.x+dx)); obj.muzzle.y=Math.max(0,Math.min(1,init.muzzle.y+dy)); }
+      else if(obj.points&&init.points){ obj.points=init.points.map(p=>({x:Math.max(0,Math.min(1,p.x+dx)),y:Math.max(0,Math.min(1,p.y+dy))})); _doorClipCache.clear(); }
+      updatePropPanel(); render(); return;
+    }
+    if(dragState.kind==='vertex'&&obj&&obj.points){ obj.points[dragState.vertexIdx]={x:n.x,y:n.y}; _doorClipCache.clear(); updatePropPanel(); render(); return; }
+    if(dragState.kind==='wheel-center'&&obj&&obj.wheel){ obj.wheel.cx=n.x; obj.wheel.cy=n.y; _wheelClipCache.clear(); updatePropPanel(); render(); return; }
+    if(dragState.kind==='wheel-radius'&&obj&&obj.wheel){ obj.wheel.r=Math.max(0.01,Math.hypot(n.x-obj.wheel.cx,(n.y-obj.wheel.cy)*(canvas.height/canvas.width))); _wheelClipCache.clear(); updatePropPanel(); render(); return; }
+    if(dragState.kind==='muzzle'&&obj&&obj.muzzle){ obj.muzzle.x=n.x; obj.muzzle.y=n.y; updatePropPanel(); render(); return; }
+    if(dragState.kind==='draw-wheel'){ const dx=n.x-dragState.startN.x, dy=(n.y-dragState.startN.y)*(canvas.height/canvas.width); dragState.radius=Math.hypot(dx,dy); renderDrawPreview(dragState); return; }
+  }
+  if(S.tool==='polygon'&&S.draftPolygon.length>0) render();
+  if(S.tool==='trackline'&&S.draftTrackLine.length>0) render();
+});
+
+canvas.addEventListener('pointerup',(e)=>{
+  if(dragState){
+    if(dragState.kind==='draw-wheel'){
+      const n=screenToNorm(e.clientX,e.clientY);
+      const dx=n.x-dragState.startN.x, dy=(n.y-dragState.startN.y)*(canvas.height/canvas.width);
+      const r=Math.hypot(dx,dy);
+      if(r>0.01){
+        const ws=S.objects.filter(o=>o.type==='wheel');
+        const useR=ws.length>0?ws[0].wheel.r:r;
+        const newObj={id:uid(),type:'wheel',name:'車輪 '+(ws.length+1),wheel:{cx:dragState.startN.x,cy:dragState.startN.y,r:useR},rotSpeed:1,hidden:false};
+        S.objects.push(newObj); S.selectedId=newObj.id;
+        setTool('select'); updateObjectList(); updatePropPanel();
+      }
+    }
+    dragState=null; render();
+  }
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+});
+canvas.addEventListener('pointercancel',()=>{ dragState=null; });
+canvas.addEventListener('dblclick',(e)=>{
+  if(S.tool==='polygon'&&S.draftPolygon.length>=3) finishPolygon();
+  if(S.tool==='trackline'&&S.draftTrackLine.length>=2) finishTrackLine();
+});
+
+function finishTrackLine(){
+  if(S.draftTrackLine.length < 2){ toast('履帶折線至少需要 2 個點','err'); S.draftTrackLine=[]; render(); return; }
+  S.trackLine.points = S.draftTrackLine.slice();
+  S.draftTrackLine = [];
+  S.selectedId = TRACKLINE_ID;
+  setTool('select');
+  updateObjectList(); updatePropPanel(); render();
+  toast('履帶折線已標記（' + S.trackLine.points.length + ' 個點）','ok');
+}
+
+function renderDrawPreview(ds){
+  render();
+  const w=canvas.width,h=canvas.height;
+  ctx.setTransform(S.view.scale,0,0,S.view.scale,S.view.tx,S.view.ty);
+  const cx=ds.startN.x*w, cy=ds.startN.y*h, r=(ds.radius||0)*w;
+  ctx.strokeStyle='#e8a33d'; ctx.lineWidth=2/S.view.scale;
+  ctx.setLineDash([5/S.view.scale,4/S.view.scale]);
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(232,163,61,0.15)'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+}
+
+function finishPolygon(){
+  if(S.draftPolygon.length<3){ toast('至少需要 3 個頂點','err'); S.draftPolygon=[]; render(); return; }
+  const kind=prompt('多邊形類型：\n1 = 車門上片（繞右側邊翻）\n2 = 車門下片（繞底邊翻）\n3 = 艙門（繞底邊翻 90°）\n4 = 武器區域','1');
+  let type='weapon', name='';
+  if(kind==='1'){ type='door_upper'; name='車門(上) '+(S.objects.filter(o=>o.type===type).length+1); }
+  else if(kind==='2'){ type='door_lower'; name='車門(下) '+(S.objects.filter(o=>o.type===type).length+1); }
+  else if(kind==='3'){
+    type='hatch'; name='艙門 '+(S.objects.filter(o=>o.type===type).length+1);
+    let maxY=-1, bestI=0;
+    for(let i=0;i<S.draftPolygon.length;i++){ const j=(i+1)%S.draftPolygon.length; const my=(S.draftPolygon[i].y+S.draftPolygon[j].y)/2; if(my>maxY){ maxY=my; bestI=i; } }
+    const newObj={id:uid(),type:type,name:name,points:S.draftPolygon.slice(),hingeEdge:bestI,openAngle:0,fillColor:'#000000',hidden:false};
+    S.objects.push(newObj); S.selectedId=newObj.id; S.draftPolygon=[];
+    setTool('select'); updateObjectList(); updatePropPanel(); render();
+    toast('艙門已加入（默認底邊為軸，向外翻）','ok'); return;
+  } else { type='weapon'; name='武器 '+(S.objects.filter(o=>o.type===type).length+1); }
+  const newObj={id:uid(),type:type,name:name,points:S.draftPolygon.slice(),hidden:false,openAngle:0,fillColor:'#000000'};
+  S.objects.push(newObj); S.selectedId=newObj.id; S.draftPolygon=[];
+  setTool('select'); updateObjectList(); updatePropPanel(); render();
+  toast(name+' 已加入','ok');
+}
+
+function updateObjectList(){
+  const el=document.getElementById('objList'); if(!el) return;
+  let html = '';
+  if(S.trackLine.points.length >= 2){
+    const cls = (S.selectedId===TRACKLINE_ID ? ' selected' : '') + ' special';
+    html += '<div class="objCard' + cls + '" data-id="' + TRACKLINE_ID + '"><span class="ico">〰️</span><span class="nm">履帶折線（' + S.trackLine.points.length + ' 點）</span><span class="btn" data-clear-trackline="1">✕</span></div>';
+  }
+  if(S.objects.length===0 && S.trackLine.points.length<2){ el.innerHTML='<div class="emptyHint">尚無標注</div>'; return; }
+  const icons={wheel:'⭕',door_upper:'🚪',door_lower:'🚪',hatch:'⏏️',weapon:'🔫',muzzle:'🎯'};
+  for(const o of S.objects){
+    const cls=(o.id===S.selectedId?' selected':'')+(o.hidden?' hidden':'');
+    html+='<div class="objCard'+cls+'" data-id="'+o.id+'"><span class="ico">'+(icons[o.type]||'●')+'</span><span class="nm">'+(o.name||'未命名')+'</span><span class="btn" data-del="'+o.id+'">✕</span></div>';
+  }
+  el.innerHTML=html;
+  el.querySelectorAll('.objCard').forEach(card=>{
+    card.onclick=(e)=>{
+      if(e.target.dataset.del){ S.objects=S.objects.filter(o=>o.id!==e.target.dataset.del); if(S.selectedId===e.target.dataset.del)S.selectedId=null; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); updateObjectList(); updatePropPanel(); render(); return; }
+      if(e.target.dataset.clearTrackline){ if(!confirm('清除履帶折線？')) return; S.trackLine.points=[]; if(S.selectedId===TRACKLINE_ID)S.selectedId=null; updateObjectList(); updatePropPanel(); render(); return; }
+      S.selectedId=card.dataset.id; updateObjectList(); updatePropPanel(); render();
+    };
+  });
+}
+
+function renderWeaponList(){
+  const el=document.getElementById('weaponList'); if(!el) return;
+  const weapons=getWeaponsForVehicle(S.vehicleId);
+  if(weapons.length===0){ el.innerHTML='<div class="emptyHint" style="padding:8px 4px;font-size:10px">當前載具無已知武器</div>'; return; }
+  const usage={};
+  for(const o of S.objects) if(o.type==='muzzle'&&o.weaponId) usage[o.weaponId]=(usage[o.weaponId]||0)+1;
+  let html='';
+  for(const w of weapons){ const used=usage[w.id]||0; html+='<div class="weaponCard"><span class="wid">'+w.id+'</span><span class="wtype">'+w.type+'</span><span class="wname">'+w.name+'</span>'+(used>0?'<span class="wused">×'+used+'</span>':'')+'</div>'; }
+  el.innerHTML=html;
+}
+
+function renderTrackMaskPoints(){
+  const el=document.getElementById('trackMaskPoints'); if(!el) return;
+  let html='';
+  const pts=S.trackMask.points;
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i];
+    html+='<div class="maskPointRow"><span class="label">P'+i+'</span>'
+      +'<input type="number" data-mx="'+i+'" value="'+p.x.toFixed(3)+'" step="0.01" min="0" max="1" title="X">'
+      +'<input type="number" data-my="'+i+'" value="'+p.y.toFixed(3)+'" step="0.01" min="0" max="1" title="Y">'
+      +(pts.length>2?'<button class="del" data-mdel="'+i+'">✕</button>':'')
+      +'</div>';
+  }
+  el.innerHTML=html;
+  el.querySelectorAll('[data-mx]').forEach(inp=>{ inp.oninput=(e)=>{ const i=parseInt(inp.dataset.mx); const v=parseFloat(e.target.value); if(isFinite(v)){ pts[i].x=Math.max(0,Math.min(1,v)); _maskCache.clear(); _wheelClipCache.clear(); render(); } }; });
+  el.querySelectorAll('[data-my]').forEach(inp=>{ inp.oninput=(e)=>{ const i=parseInt(inp.dataset.my); const v=parseFloat(e.target.value); if(isFinite(v)){ pts[i].y=Math.max(0,Math.min(1,v)); _maskCache.clear(); _wheelClipCache.clear(); render(); } }; });
+  el.querySelectorAll('[data-mdel]').forEach(btn=>{ btn.onclick=()=>{ const i=parseInt(btn.dataset.mdel); if(pts.length<=2){ toast('至少 2 個控制點','err'); return; } pts.splice(i,1); _maskCache.clear(); _wheelClipCache.clear(); renderTrackMaskPoints(); render(); }; });
+  const eb=document.getElementById('pTrackMaskEnabled');
+  if(eb){ eb.textContent = S.trackMask.enabled?'啟用':'停用'; eb.className='toggleBtn'+(S.trackMask.enabled?' on':''); }
+}
+
+function renderTrackScrollProps(){
+  const el=document.getElementById('trackScrollProps'); if(!el) return;
+  const sc = S.trackScroll;
+  const r = getTextureRect();
+  const ws = S.objects.filter(o=>o.type==='wheel' && o.wheel);
+  const options = ['<option value="0"'+(sc.followWheel===0?' selected':'')+'>平均（全部車輪）</option>'];
+  for(let i=0;i<ws.length;i++){ options.push('<option value="'+(i+1)+'"'+(sc.followWheel===i+1?' selected':'')+'>車輪 '+(i+1)+'</option>'); }
+  const y0Auto = (sc.textureY0 == null || !isFinite(sc.textureY0));
+  const y1Auto = (sc.textureY1 == null || !isFinite(sc.textureY1));
+  let html = '';
+  html += '<div class="propRow"><label>方向</label><select id="tsDir">'
+    + '<option value="-1"'+(sc.direction===-1?' selected':'')+'>向左（車頭向右前進）</option>'
+    + '<option value="1"'+(sc.direction===1?' selected':'')+'>向右</option>'
+    + '</select></div>';
+  html += '<div class="propRow"><label>條紋間距</label><input type="number" id="tsSpacing" value="'+sc.spacing.toFixed(3)+'" step="0.005" min="0.01" max="0.3"></div>';
+  html += '<div class="propRow"><label>深色 α</label><input type="number" id="tsDark" value="'+sc.darkAlpha.toFixed(2)+'" step="0.02" min="0" max="1"></div>';
+  html += '<div class="propRow"><label>淺色 α</label><input type="number" id="tsLight" value="'+sc.lightAlpha.toFixed(2)+'" step="0.02" min="0" max="1"></div>';
+  html += '<div class="propRow"><label>速度來源</label><select id="tsFollow">' + options.join('') + '</select></div>';
+  html += '<div class="propRow"><label>原圖紋理</label><button id="tsUseTex" class="toggleBtn'+(sc.useTexture?' on':'')+'">'+(sc.useTexture?'啟用':'停用')+'</button></div>';
+  html += '<div class="propRow"><label>紋理 X起</label><input type="number" id="tsTexX0" value="'+sc.textureX0.toFixed(3)+'" step="0.01" min="0" max="1"></div>';
+  html += '<div class="propRow"><label>紋理 X止</label><input type="number" id="tsTexX1" value="'+sc.textureX1.toFixed(3)+'" step="0.01" min="0" max="1"></div>';
+  html += '<div class="propRow"><label>紋理 Y起</label><input type="number" id="tsTexY0" value="'+(y0Auto?'':sc.textureY0.toFixed(3))+'" step="0.01" min="0" max="1" placeholder="自動"></div>';
+  html += '<div class="propRow"><label>紋理 Y止</label><input type="number" id="tsTexY1" value="'+(y1Auto?'':sc.textureY1.toFixed(3))+'" step="0.01" min="0" max="1" placeholder="自動"></div>';
+  html += '<div class="propRow"><label>帶高 H</label><input type="number" id="tsBandH" value="'+((sc.bandHeight||0.08)).toFixed(3)+'" step="0.005" min="0.01" max="0.3"></div>';
+  html += '<div class="propRow"><label>紋理透明度</label><input type="number" id="tsTexOp" value="'+sc.textureOpacity.toFixed(2)+'" step="0.05" min="0" max="1"></div>';
+  html += '<div class="propRow"><label>程序條紋</label><button id="tsUseStripes" class="toggleBtn'+(sc.useStripes?' on':'')+'">'+(sc.useStripes?'啟用':'停用')+'</button></div>';
+  html += '<div class="propRow"><label>條紋強度</label><input type="number" id="tsStripeStr" value="'+sc.stripeStrength.toFixed(2)+'" step="0.05" min="0" max="1"></div>';
+  html += '<div style="font-size:10px;color:#7a6f60;margin-top:4px">取樣區 ' + (r.x0*100).toFixed(1) + '% ~ ' + (r.x1*100).toFixed(1) + '% × ' + (r.y0*100).toFixed(1) + '% ~ ' + (r.y1*100).toFixed(1) + '%</div>';
+  html += '<div class="helpTip">A 層：紋理沿履帶折線（下緣）弧長分佈，每 texW 弧長取一段；<br>B 層：程序化明暗條紋，垂直於當地折線方向；<br>帶高 H：從下緣向上延伸的距離；<br>履帶止於折線兩端，不向外延伸；轉角處由深色底兜底。</div>';
+  el.innerHTML = html;
+
+  const bindNum = (id, fn) => { const e=document.getElementById(id); if(e) e.oninput = (ev)=>{ const v=parseFloat(ev.target.value); if(isFinite(v)) fn(v); }; };
+  bindNum('tsSpacing', v=>{ sc.spacing=Math.max(0.01, Math.min(0.3, v)); render(); });
+  bindNum('tsDark', v=>{ sc.darkAlpha=Math.max(0, Math.min(1, v)); render(); });
+  bindNum('tsLight', v=>{ sc.lightAlpha=Math.max(0, Math.min(1, v)); render(); });
+  bindNum('tsTexX0', v=>{ sc.textureX0=Math.max(0, Math.min(1, v)); render(); });
+  bindNum('tsTexX1', v=>{ sc.textureX1=Math.max(0, Math.min(1, v)); render(); });
+  bindNum('tsBandH', v=>{ sc.bandHeight=Math.max(0.01, Math.min(0.3, v)); render(); });
+  bindNum('tsTexOp', v=>{ sc.textureOpacity=Math.max(0, Math.min(1, v)); render(); });
+  bindNum('tsStripeStr', v=>{ sc.stripeStrength=Math.max(0, Math.min(1, v)); render(); });
+
+  const y0Inp = document.getElementById('tsTexY0');
+  if(y0Inp) y0Inp.oninput = (ev)=>{ const raw=ev.target.value.trim(); if(raw===''){ sc.textureY0=null; } else { const v=parseFloat(raw); if(isFinite(v)) sc.textureY0=Math.max(0,Math.min(1,v)); } render(); };
+  const y1Inp = document.getElementById('tsTexY1');
+  if(y1Inp) y1Inp.oninput = (ev)=>{ const raw=ev.target.value.trim(); if(raw===''){ sc.textureY1=null; } else { const v=parseFloat(raw); if(isFinite(v)) sc.textureY1=Math.max(0,Math.min(1,v)); } render(); };
+
+  const d = document.getElementById('tsDir'); if(d) d.onchange = ()=>{ sc.direction=parseInt(d.value,10)===1?1:-1; render(); };
+  const f = document.getElementById('tsFollow'); if(f) f.onchange = ()=>{ sc.followWheel=parseInt(f.value,10)||0; render(); };
+  const ut = document.getElementById('tsUseTex'); if(ut) ut.onclick = ()=>{ sc.useTexture=!sc.useTexture; ut.textContent=sc.useTexture?'啟用':'停用'; ut.classList.toggle('on',sc.useTexture); render(); };
+  const us = document.getElementById('tsUseStripes'); if(us) us.onclick = ()=>{ sc.useStripes=!sc.useStripes; us.textContent=sc.useStripes?'啟用':'停用'; us.classList.toggle('on',sc.useStripes); render(); };
+  const eb = document.getElementById('pTrackScrollEnabled'); if(eb){ eb.textContent=sc.enabled?'啟用':'停用'; eb.className='toggleBtn'+(sc.enabled?' on':''); }
+}
+
+function updatePropPanel(){
+  const el=document.getElementById('propPanel'); if(!el) return;
+  if(S.selectedId === TRACKLINE_ID){
+    let html = '';
+    html += '<div class="sectionTitle">〰️ 履帶折線（下緣）</div>';
+    html += '<div class="propRow"><label>點數</label><span style="flex:1;color:#4af0ff;font-weight:bold">' + S.trackLine.points.length + '</span></div>';
+    for(let i=0;i<S.trackLine.points.length;i++){
+      html += '<div class="propRow"><label>P'+i+'</label><div class="half"><input type="number" data-tlx="'+i+'" value="'+S.trackLine.points[i].x.toFixed(4)+'" step="0.01"><input type="number" data-tly="'+i+'" value="'+S.trackLine.points[i].y.toFixed(4)+'" step="0.01"></div></div>';
+    }
+    html += '<div class="propRow" style="margin-top:8px"><button id="tlDelete" class="toggleBtn" style="background:#3a1a1a;border-color:#6a2a2a;color:#e05252">清除整條履帶折線</button></div>';
+    html += '<div class="helpTip">此折線定義履帶帶子上邊界，只用於履帶滾動，不參與車體遮罩。履帶滾動層會沿此折線弧長滾動；原圖在此折線以下的部分會被擦除（若 trackMask 啟用則擦除範圍限制在 trackMask 以下，不會裁到車體）。</div>';
+    el.innerHTML = html;
+    el.querySelectorAll('[data-tlx]').forEach(inp=>{ inp.oninput = (e)=>{ const i=parseInt(inp.dataset.tlx); const v=parseFloat(e.target.value); if(isFinite(v)){ S.trackLine.points[i].x=Math.max(0,Math.min(1,v)); render(); } }; });
+    el.querySelectorAll('[data-tly]').forEach(inp=>{ inp.oninput = (e)=>{ const i=parseInt(inp.dataset.tly); const v=parseFloat(e.target.value); if(isFinite(v)){ S.trackLine.points[i].y=Math.max(0,Math.min(1,v)); render(); } }; });
+    const del = document.getElementById('tlDelete');
+    if(del) del.onclick = ()=>{ if(!confirm('清除整條履帶折線？')) return; S.trackLine.points=[]; S.selectedId=null; updateObjectList(); updatePropPanel(); render(); };
+    return;
+  }
+  const o=getObjById(S.selectedId);
+  if(!o){ el.innerHTML='<div class="emptyHint">左側選擇工具並在畫布上操作。</div>'; return; }
+  let html='';
+  html+='<div class="propRow"><label>名稱</label><input type="text" id="pName" value="'+(o.name||'').replace(/"/g,'&quot;')+'"></div>';
+  html+='<div class="propRow"><label>顯示</label><button id="pToggleHide" class="toggleBtn '+(o.hidden?'':'on')+'">'+(o.hidden?'已隱藏':'顯示中')+'</button></div>';
+  if(o.type==='wheel'&&o.wheel){
+    html+='<div class="sectionTitle">⭕ 車輪</div>';
+    html+='<div class="propRow"><label>中心 X</label><input type="number" id="pCx" value="'+o.wheel.cx.toFixed(4)+'" step="0.01"></div>';
+    html+='<div class="propRow"><label>中心 Y</label><input type="number" id="pCy" value="'+o.wheel.cy.toFixed(4)+'" step="0.01"></div>';
+    html+='<div class="propRow"><label>半徑 R</label><input type="number" id="pR" value="'+o.wheel.r.toFixed(4)+'" step="0.01"></div>';
+    html+='<div class="propRow"><label>轉速</label><input type="number" id="pRotSpd" value="'+(o.rotSpeed||1)+'" step="0.1"></div>';
+    html+='<div class="propRow"><button id="pSyncRadius" class="toggleBtn">同步半徑到所有車輪</button></div>';
+  } else if(o.type==='muzzle'&&o.muzzle){
+    html+='<div class="sectionTitle">🎯 槍口</div>';
+    html+='<div class="propRow"><label>X</label><input type="number" id="pMx" value="'+o.muzzle.x.toFixed(4)+'" step="0.01"></div>';
+    html+='<div class="propRow"><label>Y</label><input type="number" id="pMy" value="'+o.muzzle.y.toFixed(4)+'" step="0.01"></div>';
+    const weapons=getWeaponsForVehicle(S.vehicleId);
+    if(weapons.length>0){
+      html+='<div class="propRow"><label>武器</label><select id="pWeaponId"><option value="">（未綁定）</option>';
+      for(const w of weapons) html+='<option value="'+w.id+'"'+(o.weaponId===w.id?' selected':'')+'>'+w.name+'</option>';
+      html+='</select></div>';
+    }
+    html+='<div class="propRow"><label>層序</label><select id="pLayerOrder"><option value="above"'+(o.layerOrder!=='below'?' selected':'')+'>above（之上）</option><option value="below"'+(o.layerOrder==='below'?' selected':'')+'>below（之下，被遮擋）</option></select></div>';
+  } else if(o.points){
+    html+='<div class="sectionTitle">⬟ 頂點（'+o.points.length+'）</div>';
+    for(let i=0;i<o.points.length;i++){ html+='<div class="propRow"><label>P'+i+'</label><div class="half"><input type="number" data-vx="'+i+'" value="'+o.points[i].x.toFixed(4)+'" step="0.01"><input type="number" data-vy="'+i+'" value="'+o.points[i].y.toFixed(4)+'" step="0.01"></div></div>'; }
+    if(o.type==='door_upper'||o.type==='door_lower'){
+      const isUpper=o.type==='door_upper'; const maxAng=isUpper?180:110;
+      html+='<div class="propRow"><label>預覽角度</label><input type="range" id="pOpenAngle" min="0" max="'+maxAng+'" value="'+(o.openAngle||0)+'" step="1"><span class="unit" id="pOpenAngleVal">'+Math.round(o.openAngle||0)+'°</span></div>';
+      html+='<div class="propRow"><label>背面色</label><input type="text" id="pFillColor" value="'+(o.fillColor||'#000000')+'"></div>';
+    } else if(o.type==='hatch'){
+      html+='<div class="propRow"><label>鉸鏈邊</label><select id="pHingeEdge">';
+      for(let i=0;i<o.points.length;i++){ const j=(i+1)%o.points.length; const p1=o.points[i], p2=o.points[j]; const my=((p1.y+p2.y)/2).toFixed(3); const sel=o.hingeEdge===i?' selected':''; html+='<option value="'+i+'"'+sel+'>P'+i+'-P'+j+' (y≈'+my+')</option>'; }
+      html+='</select></div>';
+      html+='<div class="propRow"><label>預覽角度</label><input type="range" id="pOpenAngle" min="0" max="180" value="'+(o.openAngle||0)+'" step="1"><span class="unit" id="pOpenAngleVal">'+Math.round(o.openAngle||0)+'°</span></div>';
+      html+='<div class="propRow"><label>背面色</label><input type="text" id="pFillColor" value="'+(o.fillColor||'#000000')+'"></div>';
+    }
+  }
+  html+='<div class="propRow" style="margin-top:12px"><button id="pDelete" class="toggleBtn" style="background:#3a1a1a;border-color:#6a2a2a;color:#e05252">刪除此標注</button></div>';
+  el.innerHTML=html;
+  bindPropEvents(o);
+}
+
+function bindPropEvents(o){
+  const bind=(id,fn)=>{ const el=document.getElementById(id); if(el) el.oninput=fn; };
+  bind('pName',e=>{ o.name=e.target.value; updateObjectList(); render(); });
+  const tgl=document.getElementById('pToggleHide'); if(tgl) tgl.onclick=()=>{ o.hidden=!o.hidden; updateObjectList(); updatePropPanel(); render(); };
+  if(o.type==='wheel'&&o.wheel){
+    bind('pCx',e=>{ const v=parseFloat(e.target.value); if(isFinite(v)){ o.wheel.cx=Math.max(0,Math.min(1,v)); _wheelClipCache.clear(); render(); } });
+    bind('pCy',e=>{ const v=parseFloat(e.target.value); if(isFinite(v)){ o.wheel.cy=Math.max(0,Math.min(1,v)); _wheelClipCache.clear(); render(); } });
+    bind('pR',e=>{ const v=parseFloat(e.target.value); if(isFinite(v)&&v>0){ o.wheel.r=v; _wheelClipCache.clear(); render(); } });
+    bind('pRotSpd',e=>{ const v=parseFloat(e.target.value); if(isFinite(v)) o.rotSpeed=v; });
+    const sync=document.getElementById('pSyncRadius'); if(sync) sync.onclick=()=>{ const ws=S.objects.filter(x=>x.type==='wheel'); if(ws.length<=1){ toast('只有一個車輪'); return; } for(const w of ws) if(w.id!==o.id) w.wheel.r=o.wheel.r; _wheelClipCache.clear(); render(); toast('已同步','ok'); };
+  } else if(o.type==='muzzle'&&o.muzzle){
+    bind('pMx',e=>{ const v=parseFloat(e.target.value); if(isFinite(v)){ o.muzzle.x=Math.max(0,Math.min(1,v)); render(); } });
+    bind('pMy',e=>{ const v=parseFloat(e.target.value); if(isFinite(v)){ o.muzzle.y=Math.max(0,Math.min(1,v)); render(); } });
+    const ws=document.getElementById('pWeaponId'); if(ws) ws.onchange=e=>{ const id=e.target.value||null; if(id&&!isValidWeaponId(id)){ toast('無效','err'); return; } o.weaponId=id; renderWeaponList(); render(); };
+    const lo=document.getElementById('pLayerOrder'); if(lo) lo.onchange=e=>{ o.layerOrder=e.target.value==='below'?'below':'above'; render(); };
+  } else if(o.points){
+    document.querySelectorAll('[data-vx]').forEach(inp=>{ inp.oninput=e=>{ const i=parseInt(inp.dataset.vx); const v=parseFloat(e.target.value); if(isFinite(v)){ o.points[i].x=Math.max(0,Math.min(1,v)); _doorClipCache.clear(); render(); } }; });
+    document.querySelectorAll('[data-vy]').forEach(inp=>{ inp.oninput=e=>{ const i=parseInt(inp.dataset.vy); const v=parseFloat(e.target.value); if(isFinite(v)){ o.points[i].y=Math.max(0,Math.min(1,v)); _doorClipCache.clear(); render(); } }; });
+    const oa=document.getElementById('pOpenAngle'); if(oa) oa.oninput=e=>{ o.openAngle=parseFloat(e.target.value)||0; const v=document.getElementById('pOpenAngleVal'); if(v)v.textContent=Math.round(o.openAngle)+'°'; render(); };
+    bind('pFillColor',e=>{ o.fillColor=e.target.value; render(); });
+    const he=document.getElementById('pHingeEdge'); if(he) he.onchange=e=>{ o.hingeEdge=parseInt(e.target.value,10); render(); };
+  }
+  const del=document.getElementById('pDelete'); if(del) del.onclick=()=>{ if(!confirm('確定刪除？')) return; S.objects=S.objects.filter(x=>x.id!==o.id); S.selectedId=null; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); updateObjectList(); updatePropPanel(); render(); };
+}
+
+document.addEventListener('keydown',(e)=>{
+  const tag=(e.target.tagName||'').toUpperCase();
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+  if(e.key==='1') setTool('select');
+  else if(e.key==='2') setTool('wheel');
+  else if(e.key==='3') setTool('polygon');
+  else if(e.key==='4') setTool('muzzle');
+  else if(e.key==='5') setTool('trackline');
+  else if(e.key==='Escape'){ if(S.draftTrackLine.length>0){ S.draftTrackLine=[]; render(); } else if(S.draftPolygon.length>0){ S.draftPolygon=[]; render(); } else if(S.selectedId){ S.selectedId=null; updateObjectList(); updatePropPanel(); render(); } }
+  else if(e.key==='Enter'){ if(S.tool==='trackline'&&S.draftTrackLine.length>=2) finishTrackLine(); else if(S.tool==='polygon'&&S.draftPolygon.length>=3) finishPolygon(); }
+  else if(e.key==='Delete'||e.key==='Backspace'){
+    if(S.selectedId === TRACKLINE_ID){ if(confirm('清除履帶折線？')){ S.trackLine.points=[]; S.selectedId=null; updateObjectList(); updatePropPanel(); render(); } return; }
+    if(S.selectedId){ const o=getObjById(S.selectedId); if(o&&confirm('刪除「'+(o.name||'未命名')+'」？')){ S.objects=S.objects.filter(x=>x.id!==S.selectedId); S.selectedId=null; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); updateObjectList(); updatePropPanel(); render(); } }
+  }
+});
+
+function setTool(t){
+  if(S.draftPolygon.length>0){ if(!confirm('放棄當前繪製？')) return; S.draftPolygon=[]; }
+  if(S.draftTrackLine.length>0){ if(!confirm('放棄當前繪製？')) return; S.draftTrackLine=[]; }
+  S.tool=t;
+  document.querySelectorAll('.toolBtn').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));
+  render();
+}
+document.querySelectorAll('.toolBtn').forEach(b=>{ b.onclick=()=>setTool(b.dataset.tool); });
+
+function triggerFirePreview(){
+  const muzzles=S.objects.filter(o=>o.type==='muzzle'&&o.muzzle&&o.weaponId);
+  if(muzzles.length===0){ toast('沒有綁定武器的槍口','err'); return; }
+  const now=performance.now();
+  for(const o of muzzles){
+    const wd=getWeaponById(o.weaponId); const type=wd?wd.type:'機槍';
+    let bs=3.5,bv=450,fs=26,fo='rgba(255,200,80,0.7)';
+    if(type==='主炮'){ bs=6; bv=300; fs=40; fo='rgba(255,140,60,0.85)'; }
+    else if(type==='機炮'){ bs=4.5; bv=380; fs=32; fo='rgba(255,180,80,0.8)'; }
+    S.fireEffects.push({ x:o.muzzle.x, y:o.muzzle.y, startTime:now, duration:600, bulletSize:bs, bulletSpeed:bv, flashSize:fs, flashOuter:fo, layerOrder:o.layerOrder||'above' });
+  }
+  render();
+}
+document.getElementById('btnFirePreview').onclick=triggerFirePreview;
+
+document.getElementById('pTrackMaskEnabled').onclick=function(){ S.trackMask.enabled=!S.trackMask.enabled; this.textContent=S.trackMask.enabled?'啟用':'停用'; this.className='toggleBtn'+(S.trackMask.enabled?' on':''); _maskCache.clear(); _wheelClipCache.clear(); render(); };
+document.getElementById('btnAddMaskPoint').onclick=function(){ const pts=S.trackMask.points; const mid=Math.floor(pts.length/2); const a=pts[mid-1]||pts[0], b=pts[mid]||pts[pts.length-1]; pts.splice(mid,0,{x:(a.x+b.x)/2,y:(a.y+b.y)/2}); _maskCache.clear(); _wheelClipCache.clear(); renderTrackMaskPoints(); render(); };
+document.getElementById('pTrackScrollEnabled').onclick=function(){ S.trackScroll.enabled=!S.trackScroll.enabled; renderTrackScrollProps(); render(); };
+
+document.getElementById('btnSim').onclick=function(){
+  S.shakeEnabled=!S.shakeEnabled;
+  this.classList.toggle('on',S.shakeEnabled);
+  if(S.shakeEnabled){ S.playing=true; document.getElementById('btnPlay').textContent='⏸ 暫停'; document.getElementById('btnPlay').classList.add('on'); if(S.simFireTimer) clearInterval(S.simFireTimer); S.simFireTimer=setInterval(()=>{ if(S.shakeEnabled&&S.playing) triggerFirePreview(); },300); toast('支援期模擬','ok'); }
+  else { if(S.simFireTimer){ clearInterval(S.simFireTimer); S.simFireTimer=null; } toast('已停止支援期模擬'); }
+  render();
+};
+
+document.getElementById('btnXray').onclick=function(){ S.xrayMode=!S.xrayMode; this.classList.toggle('on',S.xrayMode); toast(S.xrayMode?'透視開啟':'透視關閉'); render(); };
+
+document.getElementById('btnLoadImg').onclick=()=>{ document.getElementById('fileImg').value=''; document.getElementById('fileImg').click(); };
+document.getElementById('fileImg').onchange=(e)=>{ const f=e.target.files[0]; if(f) loadImageFromFile(f); };
+document.getElementById('btnLoadCfg').onclick=()=>{ document.getElementById('fileCfg').value=''; document.getElementById('fileCfg').click(); };
+document.getElementById('fileCfg').onchange=(e)=>{ const f=e.target.files[0]; if(f) loadConfig(f); };
+document.getElementById('btnExpJson').onclick=()=>exportConfig();
+document.getElementById('btnExpJs').onclick=()=>exportJS();
+document.getElementById('btnReset').onclick=()=>{ if(!confirm('重置所有標注？')) return; S.objects=[]; S.selectedId=null; S.draftPolygon=[]; S.draftTrackLine=[]; S.fireEffects=[]; S.trackMask={enabled:false,points:[{x:0,y:0.6},{x:1,y:0.6}]}; S.trackLine={points:[]}; S.trackScroll={enabled:false,direction:-1,spacing:0.06,darkAlpha:0.28,lightAlpha:0.12,followWheel:0,useTexture:true,textureX0:0.15,textureX1:0.40,textureY0:null,textureY1:null,bandHeight:0.08,textureOpacity:0.85,useStripes:true,stripeStrength:0.25}; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); renderTrackMaskPoints(); renderTrackScrollProps(); renderWeaponList(); updateObjectList(); updatePropPanel(); render(); };
+document.getElementById('vehicleId').oninput=(e)=>{ S.vehicleId=e.target.value.trim()||'unnamed'; renderWeaponList(); const sel=getObjById(S.selectedId); if(sel&&sel.type==='muzzle') updatePropPanel(); };
+document.getElementById('anchorGroundY').oninput=(e)=>{ const v=parseFloat(e.target.value); if(isFinite(v)&&v>=0&&v<=1){ S.anchor.groundY=v; render(); } };
+document.getElementById('anchorCenterX').oninput=(e)=>{ const v=parseFloat(e.target.value); if(isFinite(v)&&v>=0&&v<=1){ S.anchor.centerX=v; render(); } };
+document.getElementById('animSpeed').oninput=(e)=>{ S.animSpeed=parseFloat(e.target.value)||1; document.getElementById('animSpeedVal').textContent=S.animSpeed.toFixed(1)+'x'; };
+
+document.getElementById('btnPlay').onclick=function(){ S.playing=!S.playing; this.textContent=S.playing?'⏸ 暫停':'▶ 播放'; this.classList.toggle('on',S.playing); if(!S.playing){ S.animTime=0; if(S.simFireTimer){ clearInterval(S.simFireTimer); S.simFireTimer=null; } updatePhaseInfo(); } render(); };
+document.getElementById('btnClear').onclick=()=>{ if(S.objects.length===0){ toast('沒有標注'); return; } if(!confirm('清空所有標注？')) return; S.objects=[]; S.selectedId=null; S.fireEffects=[]; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); updateObjectList(); updatePropPanel(); renderWeaponList(); render(); };
+document.getElementById('btnZoomIn').onclick=()=>{ S.view.scale=Math.min(5,S.view.scale*1.2); updateZoomInfo(); render(); };
+document.getElementById('btnZoomOut').onclick=()=>{ S.view.scale=Math.max(0.1,S.view.scale/1.2); updateZoomInfo(); render(); };
+document.getElementById('btnFit').onclick=()=>{ fitView(); render(); };
+
+canvas.addEventListener('wheel',(e)=>{ e.preventDefault(); const before=screenToInternal(e.clientX,e.clientY); S.view.scale=Math.max(0.1,Math.min(5,S.view.scale*(e.deltaY<0?1.1:0.9))); const after=screenToInternal(e.clientX,e.clientY); S.view.tx+=(after.x-before.x)*S.view.scale; S.view.ty+=(after.y-before.y)*S.view.scale; updateZoomInfo(); render(); },{passive:false});
+
+let panState=null;
+canvas.addEventListener('pointerdown',(e)=>{ if(e.button===1||e.button===2){ panState={startX:e.clientX,startY:e.clientY,initTx:S.view.tx,initTy:S.view.ty}; e.preventDefault(); } });
+canvas.addEventListener('pointermove',(e)=>{ if(panState){ const r=canvas.getBoundingClientRect(); S.view.tx=panState.initTx+(e.clientX-panState.startX)*(canvas.width/r.width); S.view.ty=panState.initTy+(e.clientY-panState.startY)*(canvas.height/r.height); render(); } });
+canvas.addEventListener('pointerup',()=>{ panState=null; });
+canvas.addEventListener('contextmenu',(e)=>e.preventDefault());
+
+function loadConfig(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const data=JSON.parse(r.result);
+      if(!data.objects){ toast('無效配置','err'); return; }
+      S.vehicleId=data.vehicleId||'unnamed';
+      document.getElementById('vehicleId').value=S.vehicleId;
+      if(data.anchor){ S.anchor={groundY:data.anchor.groundY!=null?data.anchor.groundY:0.85,centerX:data.anchor.centerX!=null?data.anchor.centerX:0.5}; document.getElementById('anchorGroundY').value=S.anchor.groundY; document.getElementById('anchorCenterX').value=S.anchor.centerX; }
+      const dfltScroll = {enabled:false,direction:-1,spacing:0.06,darkAlpha:0.28,lightAlpha:0.12,followWheel:0,useTexture:true,textureX0:0.15,textureX1:0.40,textureY0:null,textureY1:null,textureOpacity:0.85,useStripes:true,stripeStrength:0.25};
+      if(data.trackMask && Array.isArray(data.trackMask.points)) S.trackMask = { enabled: !!data.trackMask.enabled, points: data.trackMask.points.map(p=>({x:p.x,y:p.y})) };
+      else S.trackMask = { enabled:false, points:[{x:0,y:0.6},{x:1,y:0.6}] };
+      if(data.trackScroll && typeof data.trackScroll === 'object') S.trackScroll = Object.assign({}, dfltScroll, data.trackScroll);
+      else S.trackScroll = Object.assign({}, dfltScroll);
+      if(data.trackLine && Array.isArray(data.trackLine.points)) S.trackLine = { points: data.trackLine.points.map(p=>({x:p.x,y:p.y})) };
+      else if(data.trackMask && data.trackMask.scroll && data.trackMask.scroll.enabled) S.trackScroll = Object.assign({}, dfltScroll, data.trackMask.scroll || {});
+      S.objects=data.objects.map(o=>{
+        const b={id:o.id||uid(),type:o.type||'weapon',name:o.name||'未命名',hidden:!!o.hidden};
+        if(o.type==='wheel') return {...b,wheel:{cx:o.wheel.cx,cy:o.wheel.cy,r:o.wheel.r},rotSpeed:o.rotSpeed||1};
+        if(o.type==='muzzle'){ const wid=o.weaponId||null; return {...b,muzzle:{x:o.muzzle.x,y:o.muzzle.y},weaponId:(wid&&isValidWeaponId(wid))?wid:null,layerOrder:o.layerOrder==='below'?'below':'above'}; }
+        const obj={...b,points:o.points,openAngle:o.openAngle||0,fillColor:o.fillColor||'#000000'};
+        if(typeof o.hingeEdge==='number') obj.hingeEdge=o.hingeEdge;
+        return obj;
+      });
+      if(data.image&&data.image.dataUrl){
+        S.image={dataUrl:data.image.dataUrl,w:data.image.width,h:data.image.height};
+        const img=new Image(); img.onload=()=>{ canvas.width=img.naturalWidth; canvas.height=img.naturalHeight; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); fitView(); render(); };
+        img.src=data.image.dataUrl;
+      }
+      S.selectedId=null; S.fireEffects=[];
+      renderTrackMaskPoints(); renderTrackScrollProps(); renderWeaponList(); updateObjectList(); updatePropPanel(); render();
+      toast('配置已載入','ok');
+    }catch(e){ console.error(e); toast('解析失敗：'+e.message,'err'); }
+  };
+  r.readAsText(file);
+}
+
+function serializeObjects(){
+  return S.objects.map(o=>{
+    const b={id:o.id,type:o.type,name:o.name,hidden:!!o.hidden};
+    if(o.type==='wheel') return {...b,wheel:{cx:+o.wheel.cx.toFixed(4),cy:+o.wheel.cy.toFixed(4),r:+o.wheel.r.toFixed(4)},rotSpeed:o.rotSpeed||1};
+    if(o.type==='muzzle') return {...b,muzzle:{x:+o.muzzle.x.toFixed(4),y:+o.muzzle.y.toFixed(4)},weaponId:o.weaponId||null,layerOrder:o.layerOrder==='below'?'below':'above'};
+    const obj={...b,points:o.points.map(p=>({x:+p.x.toFixed(4),y:+p.y.toFixed(4)})),openAngle:+(o.openAngle||0).toFixed(1),fillColor:o.fillColor||'#000000'};
+    if(o.type==='hatch'&&typeof o.hingeEdge==='number') obj.hingeEdge=o.hingeEdge;
+    return obj;
+  });
+}
+
+function serializeTrackScroll(sc){
+  return {
+    enabled: !!sc.enabled, direction: sc.direction === 1 ? 1 : -1,
+    spacing: +sc.spacing.toFixed(4), darkAlpha: +sc.darkAlpha.toFixed(3), lightAlpha: +sc.lightAlpha.toFixed(3),
+    followWheel: sc.followWheel|0, useTexture: !!sc.useTexture,
+    textureX0: +sc.textureX0.toFixed(4), textureX1: +sc.textureX1.toFixed(4),
+    textureY0: (sc.textureY0 == null || !isFinite(sc.textureY0)) ? null : +sc.textureY0.toFixed(4),
+    textureY1: (sc.textureY1 == null || !isFinite(sc.textureY1)) ? null : +sc.textureY1.toFixed(4),
+    bandHeight: +((sc.bandHeight||0.08)).toFixed(4),
+    textureOpacity: +sc.textureOpacity.toFixed(3),
+    useStripes: !!sc.useStripes, stripeStrength: +sc.stripeStrength.toFixed(3)
+  };
+}
+
+function buildConfigJSON(){
+  return {
+    version:'1.9', vehicleId:S.vehicleId, orientation:'right',
+    image:S.image?{width:S.image.w,height:S.image.h,dataUrl:S.image.dataUrl}:null,
+    anchor:{groundY:S.anchor.groundY,centerX:S.anchor.centerX},
+    trackMask:{enabled:!!S.trackMask.enabled, points:S.trackMask.points.map(p=>({x:+p.x.toFixed(4),y:+p.y.toFixed(4)}))},
+    trackLine: (S.trackLine.points.length >= 2) ? { points: S.trackLine.points.map(p=>({x:+p.x.toFixed(4),y:+p.y.toFixed(4)})) } : null,
+    trackScroll: serializeTrackScroll(S.trackScroll),
+    objects:serializeObjects(), animSpeed:S.animSpeed,
+    renderOrder: ['image','eraseOriginalTrack','trackScroll','wheels','trackMask','doors','muzzles','effects'],
+    btrDoorTimeline:{
+      cycle:BTR_PREVIEW_CYCLE,
+      segments:[
+        {t0:0,t1:1.0,mode:'closed'},{t0:1.0,t1:2.0,mode:'open'},{t0:2.0,t1:3.5,mode:'holdOpen'},{t0:3.5,t1:4.5,mode:'close'},
+        {t0:4.5,t1:12.0,mode:'closed'},{t0:12.0,t1:13.0,mode:'open'},{t0:13.0,t1:14.5,mode:'holdOpen'},{t0:14.5,t1:15.5,mode:'close'},{t0:15.5,t1:20.0,mode:'closed'}
+      ]
+    }
+  };
+}
+
+function exportConfig(){
+  const data=buildConfigJSON();
+  const str=JSON.stringify(data,null,2);
+  const blob=new Blob([str],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=S.vehicleId+'_config.json'; a.click(); URL.revokeObjectURL(a.href);
+  toast('已匯出 JSON（'+(str.length/1024).toFixed(1)+' KB）','ok');
+}
+
+function exportJS(){
+  const data=buildConfigJSON();
+  const upperDoors=data.objects.filter(o=>o.type==='door_upper');
+  const lowerDoors=data.objects.filter(o=>o.type==='door_lower');
+  const hatches=data.objects.filter(o=>o.type==='hatch');
+  const weaponAreas=data.objects.filter(o=>o.type==='weapon');
+  const muzzles=data.objects.filter(o=>o.type==='muzzle');
+  const wheels=data.objects.filter(o=>o.type==='wheel');
+  function hingeOf(pts,type){
+    if(type==='door_upper'){ const s=pts.slice().sort((a,b)=>b.x-a.x); let p1=s[0],p2=s[1]; if(p1.y>p2.y){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
+    if(type==='door_lower'){ const s=pts.slice().sort((a,b)=>b.y-a.y); let p1=s[0],p2=s[1]; if(p1.x>p2.x){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
+    if(type==='hatch'){ const s=pts.slice().sort((a,b)=>b.y-a.y); let p1=s[0],p2=s[1]; if(p1.x>p2.x){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
+    return null;
+  }
+  const gameData={
+    id:S.vehicleId, orientation:'right', imageSize:S.image?{w:S.image.w,h:S.image.h}:null,
+    anchor:data.anchor, trackMask:data.trackMask, trackLine:data.trackLine, trackScroll:data.trackScroll, renderOrder:data.renderOrder,
+    weapons:getWeaponsForVehicle(S.vehicleId).map(w=>({id:w.id,name:w.name,type:w.type,caliber:w.caliber})),
+    wheels:wheels.map(o=>({cx:o.wheel.cx,cy:o.wheel.cy,r:o.wheel.r,rotSpeed:o.rotSpeed})),
+    doors:{
+      upper:upperDoors.map(o=>{ const h=hingeOf(o.points,'door_upper'); return {polygon:o.points,fillColor:o.fillColor,hingeP1:h.p1,hingeP2:h.p2,openRotation:180,frontUses:'image_crop',backUses:'solid_color'}; }),
+      lower:lowerDoors.map(o=>{ const h=hingeOf(o.points,'door_lower'); return {polygon:o.points,fillColor:o.fillColor,hingeP1:h.p1,hingeP2:h.p2,openRotation:110,frontUses:'image_crop',backUses:'solid_color'}; }),
+      hatch:hatches.map(o=>{ const h=hingeOf(o.points,'hatch'); return {polygon:o.points,fillColor:o.fillColor,hingeP1:h.p1,hingeP2:h.p2,hingeEdgeIdx:typeof o.hingeEdge==='number'?o.hingeEdge:0,openRotation:90,frontUses:'image_crop',backUses:'solid_color',flipDirection:'outward'}; }),
+    },
+    weaponAreas:weaponAreas.map(o=>({id:o.id,polygon:o.points,name:o.name})),
+    muzzles:muzzles.map(o=>({x:o.muzzle.x,y:o.muzzle.y,name:o.name,weaponId:o.weaponId||null,layerOrder:o.layerOrder==='below'?'below':'above'})),
+    btrDoorTimeline:{cycle:BTR_PREVIEW_CYCLE,segments:[{t0:0,t1:1.0,mode:'closed'},{t0:1.0,t1:2.0,mode:'open'},{t0:2.0,t1:3.5,mode:'holdOpen'},{t0:3.5,t1:4.5,mode:'close'},{t0:4.5,t1:12.0,mode:'closed'},{t0:12.0,t1:13.0,mode:'open'},{t0:13.0,t1:14.5,mode:'holdOpen'},{t0:14.5,t1:15.5,mode:'close'},{t0:15.5,t1:20.0,mode:'closed'}]}
+  };
+  const vn='VEHICLE_ANNOTATION_'+S.vehicleId.toUpperCase().replace(/[^A-Z0-9]/g,'_');
+  const js='/* 載具配置：'+S.vehicleId+' (由載具標注編輯器 v1.9 生成) */\n'+
+    '/* - 車輪完整圓形旋轉 + 遮罩下緣鏡像補全\n'+
+    ' * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關\n'+
+    ' * - trackLine：履帶帶子上邊界折線（履帶滾動 + 原圖擦除用），只用於履帶\n'+
+    ' * - trackScroll：沿 trackLine 弧長參數化滾動（A 層原圖紋理 + B 層條紋，v = ω·r）\n'+
+    ' * - 渲染順序：image → eraseOriginalTrack → trackScroll → wheels → trackMask → doors → muzzles → effects\n'+
+    ' *   （原圖 trackLine 以下且 trackMask 以下被擦除，保護車體；履帶在輪子下層）\n'+
+    ' */\n'+
+    'const '+vn+' = '+JSON.stringify(gameData,null,2)+';\n';
+  const blob=new Blob([js],{type:'text/javascript'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=S.vehicleId+'_annotation.js'; a.click(); URL.revokeObjectURL(a.href);
+  toast('已匯出 JS（'+(js.length/1024).toFixed(1)+' KB）','ok');
+}
+
+function loop(t){
+  if(!lastFrameTime) lastFrameTime=t;
+  const dt=(t-lastFrameTime)/1000; lastFrameTime=t;
+  if(S.playing){ S.animTime+=dt; updatePhaseInfo(); }
+  if(S.playing||S.fireEffects.length>0) render();
+  rafId=requestAnimationFrame(loop);
+}
+
+window.addEventListener('resize',()=>{ if(S.image) fitView(); render(); });
+
+renderWeaponList(); renderTrackMaskPoints(); renderTrackScrollProps(); updateObjectList(); updatePropPanel(); render();
+rafId=requestAnimationFrame(loop);
+console.log('載具標注編輯器 v1.9 已啟動');
+</script>
+</body>
+</html>

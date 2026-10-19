@@ -487,6 +487,774 @@ function _bindBaseSwipe(z2){
   }, {passive: true, signal: sig});
 }
 
+/* ===== rev565: 車場 + 載具系統 ===== */
+/* 載具數據（現實參照；tier 只影響 UI 顯示，數值不加成） */
+const VEHICLES = {
+  btr80: {
+    id: 'btr80', name: 'BTR-80', tier: 1, line: 'btr',
+    weapon: '14.5mm KPVT + 7.62mm PKT',
+    armor: '10mm', speedRoad: 80, speedOffroad: '40-50',
+    supportDuration: 30,
+    next: ['btr80a', 't80'],
+    researchCost: null
+  },
+  btr80a: {
+    id: 'btr80a', name: 'BTR-80A', tier: 2, line: 'btr',
+    weapon: '30mm 2A72 + 7.62mm PKT',
+    armor: '10mm', speedRoad: 80, speedOffroad: '40-50',
+    supportDuration: 35,
+    next: ['btr82a'],
+    researchCost: { ammoCal: '5.45', ammoCount: 2000, liquor: 200, exp: 1000 }
+  },
+  btr82a: {
+    id: 'btr82a', name: 'BTR-82A', tier: 3, line: 'btr',
+    weapon: '30mm 2A72 + 7.62mm PKT',
+    armor: '加強', speedRoad: 100, speedOffroad: '50-60',
+    supportDuration: 40,
+    next: [],
+    researchCost: { ammoCal: '7.62', ammoCount: 2000, liquor: 500, exp: 3000 }
+  },
+  t80: {
+    id: 't80', name: 'T-80', tier: 2, line: 't80',
+    weapon: '125mm 2A46 + 7.62mm PKT, 12.7mm NSVT',
+    armor: '複合', speedRoad: 70, speedOffroad: 48,
+    supportDuration: 40,
+    next: ['t80u'],
+    researchCost: { ammoCal: '9x39', ammoCount: 3000, liquor: 1000, exp: 5000 }
+  },
+  t80u: {
+    id: 't80u', name: 'T-80U', tier: 3, line: 't80',
+    weapon: '125mm 2A46M-1 + 7.62mm PKT, 12.7mm NSVT',
+    armor: '複合 + ERA', speedRoad: 70, speedOffroad: 48,
+    supportDuration: 45,
+    next: ['t80um'],
+    researchCost: { ammoCal: '7.62x54', ammoCount: 3000, liquor: 2000, exp: 10000 }
+  },
+  t80um: {
+    id: 't80um', name: 'T-80UM', tier: 4, line: 't80',
+    weapon: '125mm 2A46M-1 + 7.62mm PKT, 12.7mm NSVT',
+    armor: 'ERA', speedRoad: 70, speedOffroad: 48,
+    supportDuration: 50,
+    next: [],
+    researchCost: { ammoCal: '12.7', ammoCount: 2000, liquor: 4000, exp: 20000 }
+  }
+};;
+
+function _garageInitState(){
+  if(!state.garage || typeof state.garage !== 'object'){
+    state.garage = { currentVehicle: 'btr80', ownedVehicles: ['btr80'], vehicleExp: { btr80: 0 }, researchTarget: null, camo: {}, extraExp: {} };
+  }
+  const g = state.garage;
+  if(!Array.isArray(g.ownedVehicles)) g.ownedVehicles = ['btr80'];
+  if(!g.vehicleExp || typeof g.vehicleExp !== 'object') g.vehicleExp = { btr80: 0 };
+  if(!('currentVehicle' in g) || !VEHICLES[g.currentVehicle]) g.currentVehicle = 'btr80';
+  if(!('researchTarget' in g)) g.researchTarget = null;
+  if(!g.camo || typeof g.camo !== 'object') g.camo = {};
+  if(!g.extraExp || typeof g.extraExp !== 'object') g.extraExp = {};
+  return g;
+}
+
+/* 按等價值消耗私酒（後院 storage） */
+function _consumeLiquorByValue(targetValue){
+  const s = _gardenStorageInit();
+  let remaining = targetValue;
+  const order = ['破舊','一般','庫存','精品','傳奇'];
+  for(const rar of order){
+    if(remaining <= 0.01) break;
+    const k = 'liquor@' + rar;
+    const cnt = s[k] || 0;
+    if(cnt <= 0) continue;
+    const mult = RARITY_MULT[rar] || 1;
+    const maxUse = Math.min(cnt, Math.ceil(remaining / mult));
+    s[k] -= maxUse;
+    if(s[k] <= 0) delete s[k];
+    remaining -= maxUse * mult;
+  }
+  return remaining <= 0.01;
+}
+
+/* 按等價值消耗彈藥（背包） */
+function _consumeAmmoByValue(targetValue){
+  let remaining = targetValue;
+  const order = ['破舊','一般','庫存','精品','傳奇'];
+  for(const rar of order){
+    if(remaining <= 0.01) break;
+    const keys = [];
+    for(const k in state.inventory){
+      const p = k.split('@');
+      if(p[1] !== rar) continue;
+      if(!AMMO[p[0]]) continue;
+      keys.push(k);
+    }
+    keys.sort();
+    for(const k of keys){
+      if(remaining <= 0.01) break;
+      const cnt = state.inventory[k] || 0;
+      if(cnt <= 0) continue;
+      const mult = RARITY_MULT[rar] || 1;
+      const maxUse = Math.min(cnt, Math.ceil(remaining / mult));
+      state.inventory[k] -= maxUse;
+      if(state.inventory[k] <= 0) delete state.inventory[k];
+      remaining -= maxUse * mult;
+    }
+  }
+  return remaining <= 0.01;
+}
+
+function _garageGetUpgradeCost(lv){
+  return {
+    metal: 50 * lv,
+    gears: 20 * lv,
+    screws: 20 * lv,
+    liquorValue: 5 * lv,
+    ammoValue: 100 * lv
+  };
+}
+
+function _garageCanUpgrade(lv){
+  const cost = _garageGetUpgradeCost(lv);
+  if(materialEquivalent('metal') < cost.metal) return false;
+  if(materialEquivalent('gears') < cost.gears) return false;
+  if(materialEquivalent('screws') < cost.screws) return false;
+  if((typeof _gardenLiquorValue === 'function') && _gardenLiquorValue() + 0.01 < cost.liquorValue) return false;
+  /* 彈藥等價 */
+  let ammoEq = 0;
+  for(const k in state.inventory){
+    const p = k.split('@');
+    if(!AMMO[p[0]]) continue;
+    ammoEq += (state.inventory[k] || 0) * (RARITY_MULT[p[1]] || 1);
+  }
+  if(ammoEq + 0.01 < cost.ammoValue) return false;
+  return true;
+}
+
+function _garageTryUpgrade(){
+  const lv = getBuildingLv('garage');
+  if(lv <= 0 || lv >= 50) return false;
+  if(!_garageCanUpgrade(lv)) return false;
+  const cost = _garageGetUpgradeCost(lv);
+  consumeMaterial('metal', cost.metal);
+  consumeMaterial('gears', cost.gears);
+  consumeMaterial('screws', cost.screws);
+  _consumeLiquorByValue(cost.liquorValue);
+  _consumeAmmoByValue(cost.ammoValue);
+  /* 找到該建築並升級 */
+  for(const s of state.base.slots){
+    if(s && s.id === 'garage'){ s.lv = Math.min(50, (s.lv || 1) + 1); break; }
+  }
+  /* 電台次數上限 +1：由 _radioEnsureInit 自動檢測 */
+  if(typeof _radioEnsureInit === 'function'){
+    const max = getBuildingLv('garage');
+    if(state.radioUses < max) state.radioUses = max;
+  }
+  refreshPlayerStats();
+  save();
+  return true;
+}
+
+/* ---------- 車場頁面 ---------- */
+function _openGarageInfoModal(idx){
+  const lv = getBuildingLv('garage');
+  const b = BUILDINGS.garage;
+  const isMax = lv >= 50;
+  const cost = _garageGetUpgradeCost(lv);
+  const canUp = _garageCanUpgrade(lv);
+  const metal = materialEquivalent('metal');
+  const gears = materialEquivalent('gears');
+  const screws = materialEquivalent('screws');
+  const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
+  const ammo = _garageAmmoEquiv();
+
+  let body = '<div class="detail-title">🏭 ' + b.name + ' Lv.' + lv + (isMax ? ' (MAX)' : '') + '</div>'
+    + '<div class="detail-sub">' + b.desc + '</div>'
+    + '<div class="stat-line"><span class="k">當前效果</span><span class="v">電台次數上限 ' + lv + '</span></div>';
+  if(!isMax){
+    body += '<div class="stat-line"><span class="k">升級後</span><span class="v">電台次數上限 ' + (lv + 1) + '</span></div>'
+      + '<div class="divider"></div>'
+      + '<div style="font-size:11px;color:#e8a33d;margin-bottom:4px">升級需求（等值一般）</div>'
+      + '<div class="stat-line"><span class="k">金屬廢料</span><span class="v" style="color:' + (metal >= cost.metal ? '#4caf50' : '#e05252') + '">' + Math.floor(metal) + '/' + cost.metal + '</span></div>'
+      + '<div class="stat-line"><span class="k">齒輪</span><span class="v" style="color:' + (gears >= cost.gears ? '#4caf50' : '#e05252') + '">' + Math.floor(gears) + '/' + cost.gears + '</span></div>'
+      + '<div class="stat-line"><span class="k">螺絲</span><span class="v" style="color:' + (screws >= cost.screws ? '#4caf50' : '#e05252') + '">' + Math.floor(screws) + '/' + cost.screws + '</span></div>'
+      + '<div class="stat-line"><span class="k">私酒</span><span class="v" style="color:' + (liq >= cost.liquorValue ? '#4caf50' : '#e05252') + '">' + Math.round(liq) + '/' + cost.liquorValue + '</span></div>'
+      + '<div class="stat-line"><span class="k">彈藥</span><span class="v" style="color:' + (ammo >= cost.ammoValue ? '#4caf50' : '#e05252') + '">' + Math.floor(ammo) + '/' + cost.ammoValue + '</span></div>';
+  }
+  const ft = el('div', 'modal-ft');
+  ft.innerHTML = '<button class="btn primary" id="m-enter">進入</button>'
+    + (isMax ? '' : '<button class="btn" id="m-up" ' + (canUp ? '' : 'disabled') + '>升級</button>');
+  openModal({ title: '車場', body: body, footer: ft });
+  ft.querySelector('#m-enter').onclick = function(){ closeModal(); openGaragePage(); };
+  const upBtn = ft.querySelector('#m-up');
+  if(upBtn) upBtn.onclick = function(){
+    if(_garageTryUpgrade()){
+      closeModal();
+      _openGarageInfoModal(idx);
+    }
+  };
+}
+
+function openGaragePage(){
+  let p = document.getElementById('garage-page');
+  if(!p){
+    p = document.createElement('div');
+    p.id = 'garage-page';
+    (document.getElementById('content') || document.body).appendChild(p);
+  }
+  p.innerHTML = _garageRenderHtml();
+  p.classList.add('on');
+  requestAnimationFrame(_garageBind);
+}
+
+function closeGaragePage(){
+  const p = document.getElementById('garage-page');
+  if(p) p.classList.remove('on');
+  if(typeof renderBase === 'function' && currentTab === 'base'){ renderBase(); }
+}
+
+function _garageGetResearchInfo(){
+  const g = _garageInitState();
+  const target = g.researchTarget;
+  if(!target) return null;
+  if(g.ownedVehicles.indexOf(target) >= 0){ g.researchTarget = null; return null; }
+  const tgt = VEHICLES[target];
+  if(!tgt){ g.researchTarget = null; return null; }
+  const prereqs = Object.keys(VEHICLES).filter(function(vid){
+    return (VEHICLES[vid].next || []).indexOf(target) >= 0;
+  });
+  let have = 0;
+  for(const pid of prereqs) have += (g.vehicleExp[pid] || 0);
+  if(g.extraExp && g.extraExp[target]) have += g.extraExp[target];
+  have = Math.floor(have);
+  const need = (tgt.researchCost && tgt.researchCost.exp) || 0;
+  return { targetId: target, target: tgt, have: have, need: need, prereqs: prereqs };
+}
+
+function _garageOpenCamo(){
+  const g = _garageInitState();
+  const cur = VEHICLES[g.currentVehicle];
+  if(!cur) return;
+  const body = '<div class="detail-sub">' + cur.name + '</div>'
+    + '<div class="empty-hint">塗裝系統開發中，敬請期待。</div>';
+  openModal({ title: '🎨 塗裝 · ' + cur.name, body: body });
+}
+
+function _splitVehicleWeapon(v){
+  if(!v) return { mainGun:'-', machineGun:'-', special:'-' };
+  const parts = (v.weapon || '').split(' + ').map(s => s.trim()).filter(Boolean);
+  return {
+    mainGun: parts[0] || '-',
+    machineGun: parts[1] || '-',
+    special: parts[2] || '-'
+  };
+}
+
+function _garageDetailRow(k, curVal, tgtVal){
+  let h = '<div class="garage-stat-row">';
+  h += '<span class="k">' + k + '</span>';
+  if(tgtVal !== null && tgtVal !== undefined){
+    h += '<span class="v-cur">' + curVal + '</span>';
+    h += '<span class="v-arrow">→</span>';
+    let cls = 'v-new';
+    const curNum = parseFloat(curVal);
+    const tgtNum = parseFloat(tgtVal);
+    if(!isNaN(curNum) && !isNaN(tgtNum)){
+      if(tgtNum > curNum) cls += ' up';
+      else if(tgtNum < curNum) cls += ' down';
+    } else if(String(tgtVal) !== String(curVal)){
+      cls += ' diff';
+    }
+    h += '<span class="' + cls + '">' + tgtVal + '</span>';
+  } else {
+    h += '<span class="v-cur-only">' + curVal + '</span>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function _splitVehicleWeaponList(v){
+  if(!v) return { mainGun: [], machineGun: [], special: [] };
+  const parts = (v.weapon || '').split(' + ').map(function(s){ return s.trim(); }).filter(Boolean);
+  const result = { mainGun: [], machineGun: [], special: [] };
+  if(parts[0]) result.mainGun = [parts[0]];
+  if(parts[1]) result.machineGun = parts[1].split(/[,，、]/).map(function(s){ return s.trim(); }).filter(Boolean);
+  if(parts[2]) result.special = [parts[2]];
+  return result;
+}
+
+function _garageDetailRowMulti(k, curArr, tgtArr){
+  curArr = curArr || [];
+  const tgtLen = tgtArr ? tgtArr.length : 0;
+  const len = Math.max(curArr.length, tgtLen);
+  if(len === 0) return '';
+  let h = '';
+  for(let i = 0; i < len; i++){
+    const cv = curArr[i] || '';
+    const tv = tgtArr ? (tgtArr[i] || '') : null;
+    if(!cv && (tv === null || !tv)) continue;
+    h += '<div class="garage-stat-row">';
+    h += '<span class="k">' + (i === 0 ? k : '') + '</span>';
+    if(tv !== null){
+      h += '<span class="v-cur">' + (cv || '—') + '</span>';
+      h += '<span class="v-arrow">→</span>';
+      let cls = 'v-new';
+      if(tv && !cv) cls += ' up';
+      else if(!tv && cv) cls += ' down';
+      else if(tv !== cv) cls += ' diff';
+      h += '<span class="' + cls + '">' + (tv || '—') + '</span>';
+    } else {
+      h += '<span class="v-cur-only">' + cv + '</span>';
+    }
+    h += '</div>';
+  }
+  return h;
+}
+
+function _garageDetailHtml(cur, tgt, curUses, maxUses){
+  const curW = _splitVehicleWeaponList(cur);
+  const tgtW = tgt ? _splitVehicleWeaponList(tgt) : null;
+  let h = '';
+  h += _garageDetailRowMulti('主炮', curW.mainGun, tgtW ? tgtW.mainGun : null);
+  h += _garageDetailRowMulti('機槍', curW.machineGun, tgtW ? tgtW.machineGun : null);
+  h += _garageDetailRowMulti('特殊', curW.special, tgtW ? tgtW.special : null);
+  h += _garageDetailRow('裝甲', cur.armor, tgt ? tgt.armor : null);
+  h += _garageDetailRow('公路', cur.speedRoad + ' km/h', tgt ? tgt.speedRoad + ' km/h' : null);
+  h += _garageDetailRow('越野', cur.speedOffroad + ' km/h', tgt ? tgt.speedOffroad + ' km/h' : null);
+  h += _garageDetailRow('支援', cur.supportDuration + 's', tgt ? tgt.supportDuration + 's' : null);
+  if(curUses !== null && curUses !== undefined && maxUses > 0){
+    h += '<div class="garage-stat-row"><span class="k">電台</span><span class="v-cur-only">' + curUses + ' / ' + maxUses + '</span></div>';
+  }
+  return h;
+}
+
+function _garageRenderHtml(){
+  const lv = getBuildingLv('garage');
+  _garageInitState();
+  const g = state.garage;
+  const cur = VEHICLES[g.currentVehicle] || VEHICLES.btr80;
+  const maxUses = lv;
+  const curUses = state.radioUses || 0;
+  const research = _garageGetResearchInfo();
+  const tgt = research ? research.target : null;
+
+  let h = "";
+  h += "<div class='garage-header'>";
+  h += "<div class='garage-title'><img src='icons/buildings/garage.png" + assetSuffix() + "' class='garage-title-icon' alt=''> 車場 <span class='garage-lv'>Lv." + lv + "</span></div>";
+  h += "<div class='garage-x' id='garage-x'>✕</div>";
+  h += "</div>";
+
+  h += "<div class='garage-main'>";
+
+  h += "<div class='garage-showcase'>";
+  h += "<img id='garage-vehicle-img' src='icons/vehicles/" + cur.id + ".png" + assetSuffix() + "' alt=''>";
+  h += "<div class='garage-vehicle-name-bar'>" + cur.name + "</div>";
+  h += "</div>";
+
+  h += "<div class='garage-bottom'>";
+
+  h += "<div class='garage-bottom-left'>";
+  h += _garageDetailHtml(cur, tgt, curUses, maxUses);
+  h += "</div>";
+
+  h += "<div class='garage-bottom-right'>";
+  if(research){
+    h += "<div class='garage-research-img-wrap'>";
+    h += "<img src='icons/vehicles/" + research.targetId + ".png" + assetSuffix() + "' alt=''>";
+    h += "<div class='garage-research-name'>" + tgt.name + "</div>";
+    h += "</div>";
+    const pct = research.need > 0 ? Math.min(100, Math.round(research.have / research.need * 100)) : 0;
+    h += "<div class='garage-research-bar'><div class='fill' style='width:" + pct + "%'></div></div>";
+    h += "<div class='garage-research-exp'>" + research.have + " / " + research.need + "</div>";
+    if(tgt && tgt.researchCost){
+      const ammo = _garageAmmoEquiv();
+      const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
+      const cal = tgt.researchCost.ammoCal;
+      const ammoIcon = (typeof AMMO_ICON_BY_CAL !== 'undefined' && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : '545.png';
+      h += "<div class='garage-req-row'>";
+      h += "<span class='" + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + "'><img src='icons/items/" + ammoIcon + assetSuffix() + "' class='req-icon' alt=''> " + Math.floor(ammo) + "/" + tgt.researchCost.ammoCount + "</span>";
+      h += "<span class='" + (liq >= tgt.researchCost.liquor ? 'ok' : 'bad') + "'><img src='icons/garden/liquor.png" + assetSuffix() + "' class='req-icon' alt=''> " + Math.floor(liq) + "/" + tgt.researchCost.liquor + "</span>";
+      h += "</div>";
+    }
+  } else {
+    h += "<div class='garage-research-empty'>未選定研發目標</div>";
+  }
+  h += "<div class='garage-actions'>";
+  h += "<button class='garage-tech-btn' id='garage-tech'>🌳 科技樹</button>";
+  h += "<button class='garage-camo-btn' id='garage-camo'>🎨 塗裝</button>";
+  h += "</div>";
+  h += "</div>";
+
+  h += "</div>";
+
+  h += "</div>";
+  return h;
+}
+
+function _garageAmmoEquiv(){
+  let eq = 0;
+  for(const k in state.inventory){
+    const p = k.split('@');
+    if(!AMMO[p[0]]) continue;
+    eq += (state.inventory[k] || 0) * (RARITY_MULT[p[1]] || 1);
+  }
+  return eq;
+}
+
+function _garageBind(){
+  const p = document.getElementById('garage-page');
+  if(!p) return;
+
+  const x = p.querySelector('#garage-x');
+  if(x) x.onclick = closeGaragePage;
+
+  const tech = p.querySelector('#garage-tech');
+  if(tech) tech.onclick = function(){ _garageOpenTechTree(); };
+
+  const camo = p.querySelector('#garage-camo');
+  if(camo) camo.onclick = function(){ _garageOpenCamo(); };
+}
+
+function _garageAvailableExpFor(targetId){
+  const g = _garageInitState();
+  const prereqs = Object.keys(VEHICLES).filter(function(vid){
+    return (VEHICLES[vid].next || []).indexOf(targetId) >= 0;
+  });
+  let usable = 0;
+  for(const pid of prereqs) usable += (g.vehicleExp[pid] || 0);
+  if(g.extraExp && g.extraExp[targetId]) usable += g.extraExp[targetId];
+  return Math.floor(usable);
+}
+
+function _garageTransferExp5(targetId){
+  const g = _garageInitState();
+  const tgt = VEHICLES[targetId];
+  if(!tgt) return { transferred: 0 };
+  const prereqs = Object.keys(VEHICLES).filter(function(vid){
+    return (VEHICLES[vid].next || []).indexOf(targetId) >= 0;
+  });
+  if(!g.extraExp || typeof g.extraExp !== 'object') g.extraExp = {};
+  let total = 0;
+  for(const vid of g.ownedVehicles){
+    if(vid === targetId) continue;
+    if(prereqs.indexOf(vid) >= 0) continue;
+    const exp = g.vehicleExp[vid] || 0;
+    if(exp <= 0) continue;
+    const take = Math.floor(exp * 0.05);
+    if(take <= 0) continue;
+    g.vehicleExp[vid] = exp - take;
+    total += take;
+  }
+  if(total > 0){
+    g.extraExp[targetId] = (g.extraExp[targetId] || 0) + total;
+    save();
+  }
+  return { transferred: total };
+}
+
+function _garageResearch(vid){
+  const g = _garageInitState();
+  const v = VEHICLES[vid];
+  if(!v || !v.researchCost) return { err: 'no_cost' };
+  if(g.ownedVehicles.indexOf(vid) >= 0) return { err: 'owned' };
+  const prereqs = Object.keys(VEHICLES).filter(function(pvid){
+    return (VEHICLES[pvid].next || []).indexOf(vid) >= 0;
+  });
+  for(const pid of prereqs){
+    if(g.ownedVehicles.indexOf(pid) < 0) return { err: 'need_prereq', prereq: VEHICLES[pid].name };
+  }
+  const cost = v.researchCost;
+  const ammo = _garageAmmoEquiv();
+  if(ammo < cost.ammoCount) return { err: 'no_ammo', need: cost.ammoCount, have: Math.floor(ammo) };
+  const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
+  if(liq < cost.liquor) return { err: 'no_liquor', need: cost.liquor, have: Math.floor(liq) };
+  const exp = _garageAvailableExpFor(vid);
+  if(exp < cost.exp) return { err: 'no_exp', need: cost.exp, have: exp };
+
+  _consumeAmmoByValue(cost.ammoCount);
+  _consumeLiquorByValue(cost.liquor);
+  let remain = cost.exp;
+  if(g.extraExp && g.extraExp[vid]){
+    const use = Math.min(g.extraExp[vid], remain);
+    g.extraExp[vid] -= use;
+    remain -= use;
+    if(g.extraExp[vid] <= 0) delete g.extraExp[vid];
+  }
+  for(const pid of prereqs){
+    if(remain <= 0) break;
+    const have = g.vehicleExp[pid] || 0;
+    const use = Math.min(have, remain);
+    g.vehicleExp[pid] = have - use;
+    remain -= use;
+  }
+  g.ownedVehicles.push(vid);
+  if(g.researchTarget === vid) g.researchTarget = null;
+  save();
+  return { ok: true };
+}
+
+function _garageResearchErrMsg(r){
+  if(!r) return '研發失敗';
+  if(r.err === 'no_ammo') return '彈藥不足（需 ' + r.need + '，現有 ' + r.have + '）';
+  if(r.err === 'no_liquor') return '私酒不足（需 ' + r.need + '，現有 ' + r.have + '）';
+  if(r.err === 'no_exp') return '經驗不足（需 ' + r.need + '，現有 ' + r.have + '）';
+  if(r.err === 'need_prereq') return '需先研發 ' + r.prereq;
+  if(r.err === 'owned') return '已擁有';
+  return '研發失敗';
+}
+
+function _techArrow(){
+  return "<div class='garage-tech-arrow'>▼</div>";
+}
+
+function _techNodeHtml(vid){
+  const g = _garageInitState();
+  const v = VEHICLES[vid];
+  const owned = g.ownedVehicles.indexOf(vid) >= 0;
+  const isCurrent = g.currentVehicle === vid;
+  const prereqs = Object.keys(VEHICLES).filter(function(pvid){
+    return (VEHICLES[pvid].next || []).indexOf(vid) >= 0;
+  });
+  const hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+  let cls = 'garage-tech-node';
+  let statusText = '';
+  let statusCls = '';
+  let btnHtml = '';
+  if(owned && isCurrent){
+    cls += ' owned current';
+    statusText = '✓ 使用中';
+    statusCls = 'ok';
+  } else if(owned){
+    cls += ' owned';
+    statusText = '✓ 已擁有';
+    statusCls = 'ok';
+    btnHtml = "<button class='garage-tech-node-btn' data-tech-node='" + vid + "' data-action='switch'>切換</button>";
+  } else if(!hasAllPrereq){
+    cls += ' locked';
+    statusText = '🔒 需 ' + prereqs.map(function(p){ return VEHICLES[p].name; }).join(' / ');
+    statusCls = 'bad';
+  } else if(v.researchCost){
+    cls += ' researchable';
+    const ammo = _garageAmmoEquiv();
+    const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
+    const exp = _garageAvailableExpFor(vid);
+    const needAmmo = v.researchCost.ammoCount;
+    const needLiq = v.researchCost.liquor;
+    const needExp = v.researchCost.exp;
+    const ammoOk = ammo >= needAmmo;
+    const liqOk = liq >= needLiq;
+    const expOk = exp >= needExp;
+    statusText = '🔬 ' + v.researchCost.ammoCal + '×' + needAmmo + ' · 🍶' + needLiq + ' · 📊' + Math.floor(exp) + '/' + needExp;
+    statusCls = (ammoOk && liqOk && expOk) ? 'ok' : 'bad';
+    btnHtml = "<button class='garage-tech-node-btn' data-tech-node='" + vid + "' data-action='research'" + ((ammoOk && liqOk && expOk) ? '' : ' disabled') + ">研發</button>";
+  }
+  let h = "<div class='" + cls + "'>";
+  h += "<div class='garage-tech-node-img'><img src='icons/vehicles/" + vid + ".png" + assetSuffix() + "' data-fallback='1' alt=''></div>";
+  h += "<div class='garage-tech-node-info'>";
+  h += "<div class='garage-tech-node-name'>" + v.name + "</div>";
+  h += "<div class='garage-tech-node-status " + statusCls + "'>" + statusText + "</div>";
+  h += "</div>";
+  h += btnHtml;
+  h += "</div>";
+  return h;
+}
+
+function _garageBindTechImgs(container){
+  // 保留 img 原生破图行为，不做替换
+}
+
+function _garageOpenTechTree(){
+  const NW = 100, NH = 84;
+  const nodes = [
+    { vid:'btr80',  x:20,  y:10  },
+    { vid:'btr80a', x:20,  y:118 },
+    { vid:'btr82a', x:20,  y:226 },
+    { vid:'t80',    x:200, y:118 },
+    { vid:'t80u',   x:200, y:226 },
+    { vid:'t80um',  x:200, y:334 }
+  ];
+  let svg = '<svg width="320" height="438" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<line x1="70" y1="94" x2="70" y2="118" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<line x1="70" y1="202" x2="70" y2="226" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<path d="M 70 94 L 70 106 L 250 106 L 250 118" stroke="#8a5f18" stroke-width="2" fill="none" stroke-linejoin="round"/>';
+  svg += '<line x1="250" y1="202" x2="250" y2="226" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<line x1="250" y1="310" x2="250" y2="334" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '</svg>';
+
+  const g = _garageInitState();
+  const research = _garageGetResearchInfo();
+  const researchId = research ? research.targetId : null;
+  let nodesHtml = '';
+  for(const n of nodes){
+    const v = VEHICLES[n.vid];
+    if(!v) continue;
+    const owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+    const isCurrent = g.currentVehicle === n.vid;
+    const isResearch = (researchId === n.vid);
+    const prereqs = Object.keys(VEHICLES).filter(function(pvid){
+      return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+    });
+    const hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+    let cls = 'wt-node';
+    let mark = '';
+    if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+    else if(owned){ cls += ' owned'; mark = '✓'; }
+    else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+    else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+    else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+    else { cls += ' locked'; mark = '?'; }
+    nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+      + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+      + '<div class="wt-node-name">' + v.name + '</div>'
+      + '<div class="wt-node-mark">' + mark + '</div>'
+      + '</div>';
+  }
+
+  const body = '<div class="wt-tech-wrap"><div class="wt-tech-canvas">' + svg + nodesHtml + '</div></div>';
+  const bd = openModal({ title: '🌳 科技樹', body: body });
+  if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+  const btns = bd.querySelectorAll('[data-tech-node]');
+  for(let i = 0; i < btns.length; i++){
+    (function(btn){
+      btn.onclick = function(){
+        const vid = btn.getAttribute('data-tech-node');
+        _garageShowTechDetail(vid);
+      };
+    })(btns[i]);
+  }
+}
+
+function _garageShowTechDetail(vid){
+  const v = VEHICLES[vid];
+  if(!v) return;
+  const g = _garageInitState();
+  const cur = VEHICLES[g.currentVehicle] || VEHICLES.btr80;
+  const owned = g.ownedVehicles.indexOf(vid) >= 0;
+  const isCurrent = g.currentVehicle === vid;
+  const isTarget = (g.researchTarget === vid);
+  const prereqs = Object.keys(VEHICLES).filter(function(pvid){
+    return (VEHICLES[pvid].next || []).indexOf(vid) >= 0;
+  });
+  const hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+
+  let body = '';
+
+  body += '<div class="garage-tech-detail-img-wrap">'
+    + '<img src="icons/vehicles/' + vid + '.png' + assetSuffix() + '" alt="">'
+    + '<div class="garage-tech-detail-name">' + v.name + ' <span style="color:#7a6f60;font-weight:normal">Tier ' + v.tier + '</span></div>'
+    + '</div>';
+
+  body += '<div class="garage-tech-detail-cols">';
+
+  body += '<div class="garage-tech-detail-left">';
+  body += '<div class="garage-tech-detail-col-title">詳情' + (isCurrent ? '' : '（當前 → 目標）') + '</div>';
+  body += _garageDetailHtml(cur, isCurrent ? null : v, null, null);
+  body += '</div>';
+
+  body += '<div class="garage-tech-detail-right">';
+  if(owned && isCurrent){
+    body += '<div class="garage-tech-detail-col-title">狀態</div>';
+    body += '<div class="tech-detail-status" style="color:#7ee07e">使用中</div>';
+  } else if(owned){
+    body += '<div class="garage-tech-detail-col-title">狀態</div>';
+    body += '<div class="tech-detail-status" style="color:#7ee07e">已擁有</div>';
+    body += '<button class="btn primary tech-detail-action" id="m-switch">切換</button>';
+  } else if(!hasAllPrereq){
+    const reqNames = prereqs.map(function(p){ return VEHICLES[p].name; }).join(' / ');
+    body += '<div class="garage-tech-detail-col-title">研發需求</div>';
+    body += '<div class="tech-detail-status" style="color:#e05252">需先研發<br>' + reqNames + '</div>';
+  } else if(v.researchCost){
+    const ammo = _garageAmmoEquiv();
+    const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
+    const exp = _garageAvailableExpFor(vid);
+    const researchDone = exp >= v.researchCost.exp;
+    const canBuy = researchDone && ammo >= v.researchCost.ammoCount && liq >= v.researchCost.liquor;
+    const cal = v.researchCost.ammoCal;
+    const ammoIcon = (typeof AMMO_ICON_BY_CAL !== 'undefined' && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : '545.png';
+    body += '<div class="garage-tech-detail-col-title">研發需求</div>';
+    body += '<div class="tech-detail-row"><span class="k"><img src="icons/items/' + ammoIcon + assetSuffix() + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
+    body += '<div class="tech-detail-row"><span class="k"><img src="icons/garden/liquor.png' + assetSuffix() + '" class="req-icon" alt=""> 私酒</span><span class="v ' + (liq >= v.researchCost.liquor ? 'ok' : 'bad') + '">' + Math.floor(liq) + '/' + v.researchCost.liquor + '</span></div>';
+    body += '<div class="tech-detail-row"><span class="k">經驗</span><span class="v ' + (researchDone ? 'ok' : 'bad') + '">' + exp + '/' + v.researchCost.exp + '</span></div>';
+    body += '<div class="tech-detail-btn-col">';
+    if(isTarget && researchDone){
+      body += '<button class="btn primary tech-detail-action" id="m-buy" ' + (canBuy ? '' : 'disabled') + '>購買</button>';
+    } else if(isTarget){
+      body += '<button class="btn tech-detail-action" disabled>研發中</button>';
+      const hasTransfer = (function(){
+        let sum = 0;
+        for(const ovid of g.ownedVehicles){
+          if(ovid === vid) continue;
+          if(prereqs.indexOf(ovid) >= 0) continue;
+          sum += Math.floor((g.vehicleExp[ovid] || 0) * 0.05);
+        }
+        return sum > 0;
+      })();
+      if(hasTransfer){
+        body += '<button class="btn tech-detail-action" id="m-transfer">轉入</button>';
+      }
+    } else {
+      body += '<button class="btn tech-detail-action" id="m-research">研發</button>';
+    }
+    body += '</div>';
+  } else {
+    body += '<div class="garage-tech-detail-col-title">狀態</div>';
+    body += '<div class="tech-detail-status" style="color:#7a6f60">—</div>';
+  }
+  body += '</div>';
+
+  body += '</div>';
+
+  const bd = openModal({ title: '科技樹詳情', body: body, onClose: function(){
+    if(typeof modalEl !== 'undefined' && modalEl) modalEl.style.maxHeight = '';
+    closeModal();
+    _garageOpenTechTree();
+  }});
+  if(typeof modalEl !== 'undefined' && modalEl) modalEl.style.maxHeight = '90vh';
+
+  function _refreshGaragePage(){
+    const p = document.getElementById('garage-page');
+    if(p){ p.innerHTML = _garageRenderHtml(); _garageBind(); }
+  }
+
+  const sw = bd.querySelector('#m-switch');
+  if(sw) sw.onclick = function(){
+    g.currentVehicle = vid;
+    save();
+    _garageShowTechDetail(vid);
+    _refreshGaragePage();
+  };
+
+  const rs = bd.querySelector('#m-research');
+  if(rs) rs.onclick = function(){
+    g.researchTarget = vid;
+    save();
+    _garageShowTechDetail(vid);
+    _refreshGaragePage();
+  };
+
+  const buy = bd.querySelector('#m-buy');
+  if(buy) buy.onclick = function(){
+    const r = _garageResearch(vid);
+    if(r && r.ok){
+      _garageShowTechDetail(vid);
+      _refreshGaragePage();
+    } else {
+      notify(_garageResearchErrMsg(r));
+    }
+  };
+
+  const tr = bd.querySelector('#m-transfer');
+  if(tr) tr.onclick = function(){
+    const r = _garageTransferExp5(vid);
+    if(r.transferred > 0){
+      notify('已轉入 ' + r.transferred + ' 經驗');
+      _garageShowTechDetail(vid);
+      _refreshGaragePage();
+    } else {
+      notify('無可轉入經驗');
+    }
+  };
+}
+
+/* ===== end rev565 ===== */
+
 function renderBase(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
   let html='<div class="build-grid">';
@@ -641,6 +1409,7 @@ function onBuildCell(i){
   if(slot){
     if(slot.id==='merchant'){ openMerchant(); return; }
     if(slot.id==='garden'){ openGarden(); return; }
+    if(slot.id==='garage'){ _openGarageInfoModal(i); return; }
     const b=BUILDINGS[slot.id];
     const upCost=(slot.id==='forge')?{metal:150*slot.lv,screws:50*slot.lv}:{wood:15*slot.lv,metal:15*slot.lv,screws:5*slot.lv};
     const curBonus=buildingBonusText(slot.id,slot.lv);

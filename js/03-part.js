@@ -1201,6 +1201,7 @@ function defaultState(){
     servants:[],
     unlockedEquip:{},
     seals:{},defeatedBosses:[],unlockedRegions:['廢棄工廠'],
+    radioUses:0,radioLastResetDay:0,radioCooldownUntil:0,
     lastSeen:Date.now(),radioLastTick:0,armoryLastTick:0,crafting:[],
     stats:{kills:0,deaths:0,bossKills:0},
   };
@@ -1385,7 +1386,10 @@ function _cleanGardenStorageRarity(){
     if(idx < 0){ toDel.push(k); continue; }
     const id = k.slice(0, idx);
     const rar = k.slice(idx + 1);
-    const validId = (typeof SEEDS !== 'undefined' && SEEDS[id]) || (typeof CROPS !== 'undefined' && CROPS[id]);
+    /* rev564: 用 _gardenStorageKind 判断，涵盖 SEEDS/CROPS/GARDEN_EXTRAS，避免未来新物品被误删 */
+    const validId = (typeof _gardenStorageKind === 'function')
+      ? !!_gardenStorageKind(id)
+      : ((typeof SEEDS !== 'undefined' && SEEDS[id]) || (typeof CROPS !== 'undefined' && CROPS[id]));
     if(!validId){ toDel.push(k); continue; }
     if(validRar.indexOf(rar) === -1){ toDel.push(k); continue; }
   }
@@ -1793,6 +1797,11 @@ function renderZone3Log(){
       line.style.cursor='pointer';
       line.title='點擊檢視獲得物資';
       line.onclick=()=>openOfflineDetail(l);
+    }
+    if(l.type==='btr'){
+      line.style.cursor='pointer';
+      line.title='點擊檢視支援報告';
+      line.onclick=()=>window._openBTRSupportDetail(l);
     }
     box.appendChild(line);
   }
@@ -2766,73 +2775,265 @@ function renderExplore(){
   $('#log-history-btn').onclick=openLogHistory;
 }
 
+/* ===== rev563: 電台次數系統 ===== */
+const RADIO_COOLDOWN_MS = 5 * 60 * 1000;
+const RADIO_DAY_MS = 24 * 3600 * 1000;
+
+function _radioEnsureInit(){
+  const max = (typeof getBuildingLv === 'function') ? getBuildingLv('garage') : 0;
+  const today = Math.floor(Date.now() / RADIO_DAY_MS);
+  if(typeof state.radioUses !== 'number' || !isFinite(state.radioUses)) state.radioUses = max;
+  if(typeof state.radioLastResetDay !== 'number' || !isFinite(state.radioLastResetDay)) state.radioLastResetDay = today;
+  if(typeof state.radioCooldownUntil !== 'number' || !isFinite(state.radioCooldownUntil)) state.radioCooldownUntil = 0;
+  let _changed = false;
+  if(today > state.radioLastResetDay){
+    state.radioUses = max;
+    state.radioLastResetDay = today;
+    _changed = true;
+  }
+  if(state.radioUses > max){ state.radioUses = max; _changed = true; }
+  if(state.radioUses < 0){ state.radioUses = 0; _changed = true; }
+  if(_changed && typeof save === 'function') save();
+}
+
+function _radioGetStatus(){
+  _radioEnsureInit();
+  const now = Date.now();
+  const cdUntil = state.radioCooldownUntil || 0;
+  if(now < cdUntil){
+    return { state: 'cooldown', remain: Math.ceil((cdUntil - now) / 1000) };
+  }
+  if(state.radioUses <= 0){
+    return { state: 'empty', uses: 0 };
+  }
+  return { state: 'ready', uses: state.radioUses };
+}
+
+function _radioTryConsume(){
+  _radioEnsureInit();
+  const st = _radioGetStatus();
+  if(st.state !== 'ready') return false;
+  state.radioUses -= 1;
+  state.radioCooldownUntil = Date.now() + RADIO_COOLDOWN_MS;
+  if(typeof save === 'function') save();
+  return true;
+}
+
+function _radioTriggerBTR(){
+  if(typeof window._radioBTRTrigger === 'function'){
+    window._radioBTRTrigger();
+    return;
+  }
+  /* Stub：模組 5 实现后覆盖 _radioBTRTrigger */
+  notify('BTR 支援演出即將推出');
+  state.radioUses += 1;
+  state.radioCooldownUntil = 0;
+  if(typeof save === 'function') save();
+}
+
+function _radioShowConfirm(){
+  _radioEnsureInit();
+  const st = _radioGetStatus();
+  if(st.state === 'cooldown'){
+    notify('冷卻中，剩 ' + st.remain + ' 秒');
+    return;
+  }
+  if(st.state === 'empty'){
+    notify('今日次數已用盡，每日 00:00 重置');
+    return;
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn primary" id="rc-ok">確認</button><button class="btn ghost" id="rc-cancel">取消</button>';
+  const body = '<div class="detail-title">📻 召喚 BTR 支援</div>'
+    + '<div class="detail-sub">消耗 1 次電台次數</div>'
+    + '<div class="stat-line"><span class="k">剩餘次數</span><span class="v">' + st.uses + ' → ' + (st.uses - 1) + '</span></div>'
+    + '<div class="stat-line"><span class="k">下次重置</span><span class="v">每日 00:00（上限 ' + ((typeof getBuildingLv === 'function') ? getBuildingLv('garage') : 0) + '）</span></div>'
+    + '<div style="font-size:10px;color:#7a6f60;margin-top:8px;line-height:1.5">BTR 將從左側駛入，橫衝直撞約 30 秒，期間自動戰鬥並獲得掉落。</div>';
+  openModal({ title: '確認', body: body, footer: ft });
+  ft.querySelector('#rc-cancel').onclick = closeModal;
+  ft.querySelector('#rc-ok').onclick = function(){
+    closeModal();
+    if(_radioTryConsume()){
+      _radioTriggerBTR();
+      if(typeof renderEquipZone === 'function'){
+        const _z2 = document.getElementById('zone2');
+        if(_z2) renderEquipZone(_z2);
+      }
+    }
+  };
+}
+/* ===== end rev563 ===== */
+
 function renderEquipZone(z2){
-  const slots=[
-    {key:'backpack',label:'背包',pos:{left:'3%',top:'40%'}},
-    {key:'primary',label:'主武器',pos:{right:'3%',top:'6%'}},
-    {key:'secondary',label:'副武器',pos:{right:'3%',top:'28%'}},
-    {key:'melee',label:'近戰',pos:{right:'3%',top:'50%'}},
-    {key:'throwable',label:'投擲',pos:{right:'3%',top:'72%'}},
-    {key:'head',label:'頭部',pos:{left:'38%',top:'4%'}},
-    {key:'face',label:'臉部',pos:{left:'38%',top:'22%'}},
-    {key:'top',label:'上衣',pos:{left:'38%',top:'40%'}},
-    {key:'pants',label:'褲子',pos:{left:'38%',top:'60%'}},
-    {key:'shoes',label:'鞋子',pos:{left:'38%',top:'80%'}},
+  /* rev566d-radiotick */
+  if(!window._radioTickTimer){
+    window._radioTickTimer = setInterval(function(){
+      if(typeof currentTab === 'undefined' || currentTab !== 'explore') return;
+      const _rb = document.querySelector('#zone2 .radio-btn');
+      if(!_rb) return;
+      if(typeof _radioGetStatus !== 'function') return;
+      const _st = _radioGetStatus();
+      let _txt, _cls;
+      if(_st.state === 'cooldown'){ _txt = '📻 ' + _st.remain + 's'; _cls = 'radio-btn cooldown'; }
+      else if(_st.state === 'empty'){ _txt = '📻 用盡'; _cls = 'radio-btn empty'; }
+      else { _txt = '📻 ' + _st.uses; _cls = 'radio-btn ready'; }
+      _rb.textContent = _txt;
+      _rb.className = _cls;
+      _rb.setAttribute('data-state', _st.state);
+    }, 1000);
+  }
+
+  const W = z2.clientWidth;
+  const H = z2.clientHeight;
+  if(!W || !H){
+    requestAnimationFrame(() => { renderEquipZone(z2); });
+    return;
+  }
+
+  const pad = 6;
+  const availW = W - pad * 2;
+  const availH = H - pad * 2;
+
+  /* rev561c: 格子大小由高度主导；宽度作为上限，避免窄屏溢出 */
+  const cellByHeight = Math.floor((availH / 5) * 0.92);
+  const cellByWidth  = Math.floor((availW / 3) * 0.98);
+  const cellSize = Math.min(cellByHeight, cellByWidth);
+  if(cellSize < 20) return;
+
+  /* 剩余空间均分为 gap（水平 4 段、垂直 6 段） */
+  const gapX = (W - cellSize * 3) / 4;
+  const gapY = (H - cellSize * 5) / 6;
+
+  const colX = [
+    gapX,
+    gapX + cellSize + gapX,
+    gapX + (cellSize + gapX) * 2
   ];
-  let html=''; /* v17.5 移除剪影 */
-  for(const s of slots){
-    let id=state.player.equipped[s.key];
-    let def=id?itemDef(id):null;
-    /* rev533: throwable 库存耗尽时视为空槽 */
-    if(s.key === 'throwable' && id && getThrowableCount() <= 0){
+  const rowY = [
+    gapY,
+    gapY + cellSize + gapY,
+    gapY + (cellSize + gapY) * 2,
+    gapY + (cellSize + gapY) * 3,
+    gapY + (cellSize + gapY) * 4
+  ];
+
+  const fontSize = Math.max(7, Math.floor(cellSize * 0.12));
+
+  const slotLayout = {
+    head:      { col: 1, row: 0 },
+    face:      { col: 1, row: 1 },
+    top:       { col: 1, row: 2 },
+    pants:     { col: 1, row: 3 },
+    shoes:     { col: 1, row: 4 },
+    backpack:  { col: 0, row: 2 },
+    primary:   { col: 2, row: 0 },
+    secondary: { col: 2, row: 1 },
+    melee:     { col: 2, row: 2 },
+    throwable: { col: 2, row: 3 }
+  };
+
+  const labels = {
+    head: '頭部', face: '臉部', top: '上衣', pants: '褲子', shoes: '鞋子',
+    backpack: '背包', primary: '主武器', secondary: '副武器', melee: '近戰', throwable: '投擲'
+  };
+
+  let html = '';
+  for(const key in slotLayout){
+    const L = slotLayout[key];
+    const x = colX[L.col];
+    const y = rowY[L.row];
+    let id = state.player.equipped[key];
+    let def = id ? itemDef(id) : null;
+    if(key === 'throwable' && id && getThrowableCount() <= 0){
       state.player.equipped.throwable = null;
       delete state.player.equippedRarity.throwable;
       state.player.throwableStock = 0;
       id = null;
       def = null;
     }
-    const style=Object.entries(s.pos).map(([k,v])=>`${k}:${v}`).join(';');
-    const isFixed=def&&def.fixed;
-    let inner='';
+    const isFixed = def && def.fixed;
+    let inner = '';
     if(def){
       if(PANTS_SHOES_EMOJI[id]){
-        inner=`<span style="font-size:34px;line-height:1">${PANTS_SHOES_EMOJI[id]}</span><div class="lbl">${s.label}</div>`;
+        inner = '<span style="font-size:' + Math.floor(cellSize * 0.5) + 'px;line-height:1">' + PANTS_SHOES_EMOJI[id] + '</span><div class="lbl">' + labels[key] + '</div>';
       } else {
-        inner=`<img class="slot-img" src="icons/items/${resolveIconId(id)}.png${assetSuffix()}" alt=""><div class="lbl">${s.label}</div>`;
+        inner = '<img class="slot-img" src="icons/items/' + resolveIconId(id) + '.png' + assetSuffix() + '" alt=""><div class="lbl">' + labels[key] + '</div>';
       }
     } else {
-      inner=`<div class="nm">${s.label}</div>`;
+      inner = '<div class="nm">' + labels[key] + '</div>';
     }
-    const rar=def?(state.player.equippedRarity[s.key]||'一般'):'';
-    const bgStyle=def?`background:${rarityBg(rar)};`:'';
-    html+=`<div class="slot ${def?'filled':'empty'} ${isFixed?'fixed':''}" style="${style};${bgStyle}" data-slot="${s.key}">${inner}</div>`;
+    const rar = def ? (state.player.equippedRarity[key] || '一般') : '';
+    const bgStyle = def ? 'background:' + rarityBg(rar) + ';' : '';
+    const style = 'left:' + x + 'px;top:' + y + 'px;width:' + cellSize + 'px;height:' + cellSize + 'px;font-size:' + fontSize + 'px;' + bgStyle;
+    html += '<div class="slot ' + (def ? 'filled' : 'empty') + ' ' + (isFixed ? 'fixed' : '') + '" style="' + style + '" data-slot="' + key + '">' + inner + '</div>';
   }
-  /* v51: 移除未使用變數 */
-  const _fmt = (v) => { v = Math.round(v); if(v >= 1e7) return Math.round(v/1e6) + "M"; if(v >= 1e6) return (v/1e6).toFixed(1) + "M"; if(v >= 1e4) return Math.round(v/1e3) + "K"; return v.toString(); };
-  html+=`<div class="player-stat-panel" style="left:3%;top:4%;text-align:right">
-    <div class="row lv-row"><b class="lv-v">Lv.${state.player.level}</b></div>
-    <div class="row"><span>❤️</span><b class="hp-v">${_fmt(state.player.hp)}</b></div>
-    <div class="row"><span></span><b class="hp-m" style="color:#7a6f60">${_fmt(state.player.maxHp)}</b></div>
-    <div class="row"><span>🛡️</span><b class="ap-v">${_fmt(state.player.armor)}</b></div>
-    <div class="row"><span></span><b class="ap-m" style="color:#7a6f60">${_fmt(state.player.maxArmor)}</b></div>
-  </div>`;
-  z2.innerHTML=html;
-  {
-    const _wEl = document.createElement('div');
-    _wEl.className = 'weight-display';
-    const _wt = getTotalWeight();
-    _wEl.innerHTML = '⚖️ <b style="color:' + getWeightColor(_wt) + '">' + Math.round(_wt) + ' kg</b><br>🧭 <b>' + Math.round(getExploreInterval()/1000) + 's</b>';
-    z2.appendChild(_wEl);
-    requestAnimationFrame(() => {
-      const _bp = z2.querySelector('.slot[data-slot="backpack"]');
-      if(_bp){
-        _wEl.style.top = (_bp.offsetTop + _bp.offsetHeight + 4) + 'px';
-        _wEl.style.left = '3%';
+
+  const _fmt = (v) => { v = Math.round(v); if(v >= 1e7) return Math.round(v/1e6) + 'M'; if(v >= 1e6) return (v/1e6).toFixed(1) + 'M'; if(v >= 1e4) return Math.round(v/1e3) + 'K'; return v.toString(); };
+  const statH = cellSize * 2 + gapY;
+  /* rev561d: 生命欄精簡為 3 行、字體與體重框統一 */
+  const _statFont = Math.max(9, fontSize);
+  html += '<div class="player-stat-panel" style="left:' + colX[0] + 'px;top:' + rowY[0] + 'px;width:' + cellSize + 'px;height:' + statH + 'px;font-size:' + _statFont + 'px;text-align:right">'
+    + '<div class="row lv-row"><b class="lv-v">Lv.' + state.player.level + '</b></div>'
+    + '<div class="row"><span>❤️</span><b class="hp-v">' + _fmt(state.player.hp) + '</b><b class="hp-m" style="color:#7a6f60">' + _fmt(state.player.maxHp) + '</b></div>'
+    + '<div class="row"><span>🛡️</span><b class="ap-v">' + _fmt(state.player.armor) + '</b><b class="ap-m" style="color:#7a6f60">' + _fmt(state.player.maxArmor) + '</b></div>'
+    + '</div>';
+
+  const wt = getTotalWeight();
+  html += '<div class="weight-display" style="left:' + colX[0] + 'px;top:' + rowY[3] + 'px;width:' + cellSize + 'px;height:' + cellSize + 'px;font-size:' + Math.max(9, fontSize) + 'px">'
+    + '<div>⚖️ <b style="color:' + getWeightColor(wt) + '">' + Math.round(wt) + ' kg</b></div>'
+    + '<div>🧭 <b>' + Math.round(getExploreInterval()/1000) + 's</b></div>'
+    + '</div>';
+
+  /* rev563: 电台按钮（依 tab 分流） */
+  if(typeof getBuildingLv === 'function' && getBuildingLv('garage') > 0){
+    if(typeof _radioEnsureInit === 'function') _radioEnsureInit();
+    if(currentTab === 'combat'){
+      const _mode = state.preferences.bossMode || 'challenge';
+      const _label = _mode === 'challenge' ? '挑战' : '扫荡';
+      html += '<div class="radio-btn" id="radio-btn" data-mode="' + _mode + '" style="left:' + colX[0] + 'px;top:' + rowY[4] + 'px;width:' + cellSize + 'px;height:' + cellSize + 'px;font-size:' + fontSize + 'px">📻 ' + _label + '</div>';
+    } else {
+      const _st = (typeof _radioGetStatus === 'function') ? _radioGetStatus() : { state: 'empty', uses: 0 };
+      let _radioLabel = '';
+      let _radioCls = '';
+      if(_st.state === 'cooldown'){ _radioLabel = _st.remain + 's'; _radioCls = 'cooldown'; }
+      else if(_st.state === 'empty'){ _radioLabel = '用盡'; _radioCls = 'empty'; }
+      else { _radioLabel = String(_st.uses); _radioCls = 'ready'; }
+      html += '<div class="radio-btn ' + _radioCls + '" id="radio-btn" data-state="' + _st.state + '" style="left:' + colX[0] + 'px;top:' + rowY[4] + 'px;width:' + cellSize + 'px;height:' + cellSize + 'px;font-size:' + fontSize + 'px">📻 ' + _radioLabel + '</div>';
+    }
+  }
+
+  z2.innerHTML = html;
+
+  $$('.slot', z2).forEach(e => { e.onclick = () => openSlotDetail(e.dataset.slot); });
+
+  const _rb = z2.querySelector('#radio-btn');
+  if(_rb){
+    _rb.onclick = function(){
+      if(currentTab === 'combat'){
+        const _cur = state.preferences.bossMode || 'challenge';
+        state.preferences.bossMode = _cur === 'challenge' ? 'sweep' : 'challenge';
+        save();
+        renderCombat();
+      } else {
+        if(typeof _radioShowConfirm === 'function') _radioShowConfirm();
       }
+    };
+  }
+
+  if(!window._zone2ResizeBound){
+    window._zone2ResizeBound = true;
+    let _resizeTimer = null;
+    window.addEventListener('resize', function(){
+      if(_resizeTimer) clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(function(){
+        const _z2 = document.getElementById('zone2');
+        if(_z2 && currentTab === 'explore'){
+          renderEquipZone(_z2);
+        }
+      }, 200);
     });
   }
-  $$('.slot',z2).forEach(e=>{e.onclick=()=>openSlotDetail(e.dataset.slot);});
-  /* v17.5 剪影已移除 */
 }
 
 let _inventoryScrollPos = 0;

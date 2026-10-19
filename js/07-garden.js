@@ -10,6 +10,7 @@ const GARDEN_PLOT_TYPES = {
   compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物', bg: 'compost_bg' }
 ,
   fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h', bg: 'fridge_bg' },
+  distillery: { name: '蒸餾室', icon: '🍶', desc: '作物釀成私酒', bg: 'distillery_bg' },
   black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 <span style="color:#e05252">↓20%</span> ｜ 產量 <span style="color:#4caf50">↑20%</span>' },
   red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 <span style="color:#e05252">↓40%</span> ｜ 產量 <span style="color:#4caf50">↑30%</span>' }};
 const SPECIAL_SOIL_BONUS = {
@@ -353,6 +354,7 @@ function onGardenPlotClick(idx){
   if(_isSoilType(plot.type)){ openGardenSoilAction(idx); }
   else if(plot.type === 'tower'){ _gardenTowerOpen(idx); }
   else if(plot.type === 'compost'){ openCompostDetail(idx); }
+  else if(plot.type === 'distillery'){ openDistilleryDetail(idx); }
   else { openGardenPlotDetail(idx); }
 }
 
@@ -431,7 +433,8 @@ function _gardenPickServantForPlot(idx, type){
         const plots = _gardenGetPlots();
         const targetPlot = plots[idx];
         if(!targetPlot) return;
-        const isCompostTarget = (targetPlot.type === 'compost');
+        const isExclusiveTarget = (targetPlot.type === 'compost' || targetPlot.type === 'distillery');
+        const _targetLabel = targetPlot.type === 'distillery' ? '蒸餾室' : '堆肥區';
         const otherList = (srv.assignedPlots || []).filter(function(x){ return x !== idx; });
         const hasCompostAlready = otherList.some(function(x){ return plots[x] && plots[x].type === 'compost'; });
         const hasOtherPlots = otherList.some(function(x){ return plots[x] && plots[x].type !== 'compost'; });
@@ -445,10 +448,10 @@ function _gardenPickServantForPlot(idx, type){
             if(!Array.isArray(o.assignedPlots)) continue;
             o.assignedPlots = o.assignedPlots.filter(function(x){ return x !== idx; });
           }
-          if(isCompostTarget){
+          if(isExclusiveTarget){
             srv.assignedPlots = [idx];
           } else {
-            srv.assignedPlots = otherList.filter(function(x){ return plots[x] && plots[x].type !== 'compost'; });
+            srv.assignedPlots = otherList.filter(function(x){ return plots[x] && plots[x].type !== 'compost' && plots[x].type !== 'distillery'; });
             if(srv.assignedPlots.indexOf(idx) === -1) srv.assignedPlots.push(idx);
           }
           if(plots[idx]) plots[idx].assignedServant = sid;
@@ -459,12 +462,12 @@ function _gardenPickServantForPlot(idx, type){
           if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
           setTimeout(function(){ if(typeof onGardenPlotClick === 'function') onGardenPlotClick(idx); }, 100);
         }
-        if(isCompostTarget && otherList.length > 0){
-          openConfirm('指派至堆肥區將解除此農民的其他 ' + otherList.length + ' 個地塊綁定。確認？', doAssign);
+        if(isExclusiveTarget && otherList.length > 0){
+          openConfirm('指派至' + _targetLabel + '將解除此農民的其他 ' + otherList.length + ' 個地塊綁定。確認？', doAssign);
           return;
         }
-        if(!isCompostTarget && hasCompostAlready){
-          openConfirm('此農民為堆肥農民，指派至其他地塊將解除堆肥區綁定。確認？', doAssign);
+        if(!isExclusiveTarget && hasCompostAlready){
+          openConfirm('此農民已在蒸餾室/堆肥區，指派至其他地塊將解除綁定。確認？', doAssign);
           return;
         }
         doAssign();
@@ -503,7 +506,7 @@ function openGardenPlotPicker(idx, returnFn){
   const body = document.createElement('div');
   body.innerHTML = '<div style="font-size:11px;color:#e8a33d;margin-bottom:8px">選擇要建造的設施</div>';
   /* rev326: 堆肥區 / 工棚為唯一建築，已存在則不再列出 */
-  const _UNIQUE_TYPES = { compost: true, shed: true };
+  const _UNIQUE_TYPES = { compost: true, shed: true, distillery: true };
   for(const key in GARDEN_PLOT_TYPES){
     const t = GARDEN_PLOT_TYPES[key];
     if(t.special) continue;
@@ -524,6 +527,7 @@ function openGardenPlotPicker(idx, returnFn){
         const type = row.getAttribute('data-type');
         if(!GARDEN_PLOT_TYPES[type]) return;
         plots[idx] = { type: type, lv: 1, crop: null };
+        if(type === 'distillery') plots[idx].lastDistillAt = Math.floor(Date.now() / DISTILL_PERIOD_MS) * DISTILL_PERIOD_MS;
         save();
         closeModal();
         renderGardenGrid();
@@ -788,14 +792,9 @@ function _gsBlockEx(title, colKey, items, minCells, fallbackIcon, cellSize, font
       if(idx < total){
         const it = items[idx];
         if(it){
-          let icon;
-          if(typeof SEEDS !== 'undefined' && SEEDS[it.id]){
-            icon = seedImgHtml(it.id, Math.floor(cellSize * 0.7));
-          } else if(typeof CROPS !== 'undefined' && CROPS[it.id]){
-            icon = cropImgHtml(it.id, Math.floor(cellSize * 0.7));
-          } else {
-            icon = fallbackIcon || (it.def && it.def.icon) || '?';
-          }
+          const icon = (typeof _gardenStorageItemIcon === 'function')
+            ? _gardenStorageItemIcon(it.id, Math.floor(cellSize * 0.7), fallbackIcon || (it.def && it.def.icon) || '?')
+            : ((typeof SEEDS !== 'undefined' && SEEDS[it.id]) ? seedImgHtml(it.id, Math.floor(cellSize * 0.7)) : ((typeof CROPS !== 'undefined' && CROPS[it.id]) ? cropImgHtml(it.id, Math.floor(cellSize * 0.7)) : (fallbackIcon || (it.def && it.def.icon) || '?')));
           html += '<div class="gs-cell filled" data-id="' + it.id + '" data-rar="' + it.rarity + '" style="background:' + rarityBg(it.rarity) + ';' + cellStyle + fontStyle + '">' +
             '<div class="gs-cell-icon">' + icon + '</div>' +
             '<div class="gs-cell-cnt">' + it.count + '</div>' +
@@ -813,17 +812,42 @@ function _gsBlockEx(title, colKey, items, minCells, fallbackIcon, cellSize, font
   return html;
 }
 
+/* rev562o: 手动生成私酒用于测试 */
+window._testLiquor = function(){
+  try {
+    gardenStorageAdd('liquor', '一般', 5);
+    gardenStorageAdd('liquor', '精品', 3);
+    if(typeof save === 'function') save();
+    if(typeof renderGardenContent === 'function') renderGardenContent();
+    console.log('[test] 已生成 私酒@一般×5、私酒@精品×3');
+    console.log('[test] storage:', JSON.parse(JSON.stringify(state.garden.storage)));
+  } catch(e){ console.error('[test] failed:', e); }
+};
+
 function renderGardenStorage(box){
   if(!box) return;
   const storage = _gardenStorageInit();
+  /* rev562o: 诊断 */
+  try {
+    const _lk = Object.keys(storage).filter(function(k){ return k.indexOf('liquor@') === 0; });
+    console.log('[garden-storage] 全部 key:', Object.keys(storage), '私酒 key:', _lk);
+    if(_lk.length){
+      _lk.forEach(function(k){ console.log('  ' + k + ' = ' + storage[k]); });
+    }
+  } catch(e){}
   const seeds = [], crops = [];
   for(const k in storage){
     const p = k.split('@');
     const id = p[0], rar = p[1];
     const cnt = storage[k];
     if(cnt <= 0) continue;
-    if(SEEDS[id]) seeds.push({id: id, rarity: rar, count: cnt, def: SEEDS[id]});
-    else if(CROPS[id]) crops.push({id: id, rarity: rar, count: cnt, def: CROPS[id]});
+    const kind = (typeof _gardenStorageKind === 'function') ? _gardenStorageKind(id) : null;
+    if(kind === 'seed'){
+      seeds.push({id: id, rarity: rar, count: cnt, def: SEEDS[id]});
+    } else if(kind === 'crop'){
+      const _def = CROPS[id] || (typeof GARDEN_EXTRAS !== 'undefined' && GARDEN_EXTRAS[id]) || { name: id };
+      crops.push({id: id, rarity: rar, count: cnt, def: _def});
+    }
   }
   const sortFn = function(a, b){
     const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
@@ -4240,6 +4264,7 @@ function _gardenActorTick(){
   _gardenMerchantTick();
   _gardenUpdateFoodInfo();
   _gardenSyncActors();
+  if(typeof _gardenDistilleryTick === 'function') _gardenDistilleryTick(Date.now());
   if(!_gardenActors.length) return;
   const grid = p.querySelector('#gp-grid');
   const wrap = p.querySelector('.gp-grid-wrap');
@@ -4518,6 +4543,47 @@ if(a.stamina <= 0){
 
     if(now < a.idleUntil) continue;
 
+    if(a.type === 'farmer' && a.stamina > 0 && !a.task
+       && typeof _isAssignedToDistillery === 'function' && _isAssignedToDistillery(a._srv)){
+      const _plots2 = _gardenGetPlots();
+      const _idx2 = (a.assignedPlots || [])[0];
+      const _plot2 = _idx2 != null ? _plots2[_idx2] : null;
+      if(_plot2 && _plot2.type === 'distillery' && now - (_plot2.lastDistillAt || 0) < DISTILL_PERIOD_MS){
+        const _pEl = grid.querySelector('.gp-plot[data-idx="' + _idx2 + '"]');
+        if(_pEl){
+          const _pr = _pEl.getBoundingClientRect();
+          const _baseX = _pr.left - wrapRect.left + _pr.width / 2;
+          const _baseY = _pr.top - wrapRect.top + _pr.height - 4;
+          if(typeof a._distillState === 'undefined'){
+            a._distillState = 'idle';
+            a._distillTimer = now + 2000 + Math.random() * 3000;
+            a.tx = _baseX; a.ty = _baseY;
+          }
+          const _moving = Math.abs(a.tx - a.x) > 0.5;
+          if(a._distillState === 'idle'){
+            if(now > a._distillTimer){
+              a._distillState = 'walk';
+              a._distillTimer = now + 1500 + Math.random() * 2000;
+              let _nx = _baseX + (Math.random() - 0.5) * _pr.width * 0.4;
+              if(Math.abs(_nx - a.x) < 8){
+                const _d = Math.random() > 0.5 ? 1 : -1;
+                _nx = a.x + _d * (8 + Math.random() * 6);
+                _nx = Math.max(_pr.left - wrapRect.left + 8, Math.min(_pr.left - wrapRect.left + _pr.width - 8, _nx));
+              }
+              a.tx = _nx; a.ty = _baseY;
+            }
+          } else if(a._distillState === 'walk'){
+            if(!_moving || now > a._distillTimer){
+              a._distillState = 'idle';
+              a._distillTimer = now + 2000 + Math.random() * 3000;
+              a.tx = a.x; a.ty = _baseY;
+            }
+          }
+          a.state = 'idle';
+          continue;
+        }
+      }
+    }
     if(a.type === 'farmer'){
       const task = _gardenFarmerFindTask(a, a._srv);
       if(task){
@@ -4769,13 +4835,15 @@ function _gardenStopActorLoop(){
 }
 
 function openGardenStorageDetail(id, rarity){
-  const isSeed = !!SEEDS[id];
-  const isCrop = !!CROPS[id];
+  const _kind = (typeof _gardenStorageKind === 'function') ? _gardenStorageKind(id) : null;
+  const isSeed = (_kind === 'seed') || (!_kind && !!SEEDS[id]);
+  const isCrop = (_kind === 'crop') || (!_kind && !!CROPS[id]);
   if(!isSeed && !isCrop) return;
   const count = gardenStorageCount(id, rarity);
   if(count <= 0){  return; }
-  const def = isSeed ? SEEDS[id] : CROPS[id];
-  const icon = isSeed ? seedImgHtml(id, 28) : cropImgHtml(id, 28);
+  const def = isSeed ? SEEDS[id] : (CROPS[id] || (typeof GARDEN_EXTRAS !== 'undefined' && GARDEN_EXTRAS[id]) || null);
+  if(!def) return;
+  const icon = (typeof _gardenStorageItemIcon === 'function') ? _gardenStorageItemIcon(id, 28) : (isSeed ? seedImgHtml(id, 28) : cropImgHtml(id, 28));
   const nm = def.name || id;
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
@@ -4797,14 +4865,19 @@ function openGardenStorageDetail(id, rarity){
     body += '<div class="stat-line"><span class="k">成熟後腐爛</span><span class="v">' + Math.round(def.rotMs / 1000) + ' 秒</span></div>';
     body += '<div class="stat-line"><span class="k">收穫食物值</span><span class="v" style="color:#4caf50">' + _fv + ' / 個</span></div>';
   } else {
-    const _fv = cropFoodValue(id, rarity);
-    body += '<div class="stat-line"><span class="k">類型</span><span class="v">作物</span></div>';
-    let _belongSeed = null;
-    for(const _sid in SEEDS){ if(SEEDS[_sid].cropId === id){ _belongSeed = SEEDS[_sid]; break; } }
-    if(_belongSeed){
-      body += '<div class="stat-line"><span class="k">來源種子</span><span class="v">🌰 ' + _belongSeed.name + '</span></div>';
+    const _isExtra = (typeof GARDEN_EXTRAS !== 'undefined' && GARDEN_EXTRAS[id]);
+    if(_isExtra){
+      body += '<div class="stat-line"><span class="k">類型</span><span class="v">' + (GARDEN_EXTRAS[id].desc || '花園物品') + '</span></div>';
+    } else {
+      const _fv = cropFoodValue(id, rarity);
+      body += '<div class="stat-line"><span class="k">類型</span><span class="v">作物</span></div>';
+      let _belongSeed = null;
+      for(const _sid in SEEDS){ if(SEEDS[_sid].cropId === id){ _belongSeed = SEEDS[_sid]; break; } }
+      if(_belongSeed){
+        body += '<div class="stat-line"><span class="k">來源種子</span><span class="v">🌰 ' + _belongSeed.name + '</span></div>';
+      }
+      body += '<div class="stat-line"><span class="k">食物值</span><span class="v" style="color:#4caf50">' + _fv + '</span></div>';
     }
-    body += '<div class="stat-line"><span class="k">食物值</span><span class="v" style="color:#4caf50">' + _fv + '</span></div>';
   }
   openModal({ title: '儲備詳情', body: body, footer: ft });
 }
@@ -5424,6 +5497,9 @@ function _gardenOfflineSettle(now, baseTime){
       while(lastMealHour < curHour){ _gardenDoOneMeal(g); lastMealHour++; }
       if(typeof _gardenCompostDecayTick === 'function'){
         try{ _gardenCompostDecayTick(cursor); }catch(e){}
+      }
+      if(typeof _gardenDistilleryTick === 'function'){
+        try{ _gardenDistilleryTick(cursor); }catch(e){}
       }
       if(typeof _gardenMerchantLineProcess === 'function'){
         const _oldBatch = window._merchantTickBatch;
@@ -6154,6 +6230,457 @@ function _gardenCompostFindTask(a, srv){
   if((state.garden.compostValue || 0) < 8) return null;
   return { type: "fetch_compost", plotIdx: -1 };
 }
+/* ===== rev562: 蒸餾室 + 私酒 ===== */
+const DISTILL_PERIOD_MS = 5 * 60 * 1000;
+const DISTILL_COST = 50;
+const DISTILL_STAMINA = 20;
+
+function _isAssignedToDistillery(srv){
+  if(!srv || !srv.assignedPlots || !srv.assignedPlots.length) return false;
+  const plots = _gardenGetPlots();
+  for(const idx of srv.assignedPlots){
+    const p = plots[idx];
+    if(p && p.type === 'distillery') return true;
+  }
+  return false;
+}
+
+function _gardenLiquorValue(){
+  const s = _gardenStorageInit();
+  let total = 0;
+  for(const k in s){
+    if(k.indexOf('liquor@') !== 0) continue;
+    const rarity = k.split('@')[1];
+    total += s[k] * (RARITY_MULT[rarity] || 1);
+  }
+  return total;
+}
+
+function _findCropForDistill(plot, minusKey){
+  const s = _gardenStorageInit();
+  const order = (plot && plot.rarityOrder === 'asc')
+    ? ['破舊','一般','庫存','精品','傳奇']
+    : ['傳奇','精品','庫存','一般','破舊'];
+
+  const getCount = (id, r) => {
+    const k = id + '@' + r;
+    let n = s[k] || 0;
+    if(minusKey === k) n = Math.max(0, n - DISTILL_COST);
+    return n;
+  };
+
+  if(plot && plot.preferredSeed){
+    const p = plot.preferredSeed.split('@');
+    const cId = p[0], rId = p[1];
+    if(cId && rId && getCount(cId, rId) >= DISTILL_COST){
+      return { cropId: cId, rarity: rId };
+    }
+  }
+
+  if(plot && !plot.preferredSeed && plot.preferredCrop){
+    for(const rarity of order){
+      if(getCount(plot.preferredCrop, rarity) >= DISTILL_COST){
+        return { cropId: plot.preferredCrop, rarity: rarity };
+      }
+    }
+  }
+
+  const candidates = [];
+  for(const k in s){
+    const parts = k.split('@');
+    const id = parts[0], rarity = parts[1];
+    if(typeof CROPS === 'undefined' || !CROPS[id]) continue;
+    const cnt = getCount(id, rarity);
+    if(cnt < DISTILL_COST) continue;
+    candidates.push({ cropId: id, rarity: rarity, count: cnt, name: CROPS[id].name || id });
+  }
+  if(!candidates.length) return null;
+  for(const rarity of order){
+    const list = candidates.filter(c => c.rarity === rarity);
+    if(!list.length) continue;
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-Hant'));
+    return list[0];
+  }
+  return null;
+}
+
+/* rev562f: 蒸餾室獨立 tick（不依賴農民 task，倒計時結束即生產） */
+function _gardenDistilleryTick(t){
+  t = t || Date.now();
+  const plots = _gardenGetPlots();
+  let _changed = false;
+  for(let i = 0; i < plots.length; i++){
+    const p = plots[i];
+    if(!p || p.type !== 'distillery') continue;
+    if(p.enabled === false) continue;
+
+    if(!p.lastDistillAt){
+      p.lastDistillAt = Math.floor(t / DISTILL_PERIOD_MS) * DISTILL_PERIOD_MS;
+    } else {
+      const _aligned = Math.floor(p.lastDistillAt / DISTILL_PERIOD_MS) * DISTILL_PERIOD_MS;
+      if(p.lastDistillAt !== _aligned) p.lastDistillAt = _aligned;
+    }
+
+    /* rev562l: 若 currentCrop 為空，嘗試鎖定當前作物 */
+    if(!p.currentCrop){
+      const c = _findCropForDistill(p);
+      if(c){ p.currentCrop = c; _changed = true; }
+    }
+
+    const curBoundary = Math.floor(t / DISTILL_PERIOD_MS) * DISTILL_PERIOD_MS;
+    if(p.lastDistillAt >= curBoundary) continue;
+
+    const times = Math.min(Math.floor((curBoundary - p.lastDistillAt) / DISTILL_PERIOD_MS), 500);
+    if(times <= 0) continue;
+
+    const farmer = (state.servants || []).find(function(s){
+      return s.type === 'farmer' && s.assignedPlots && s.assignedPlots.indexOf(i) !== -1;
+    });
+    if(!farmer) continue;
+    if((farmer.stamina || 0) < DISTILL_STAMINA) continue;
+
+    let did = 0;
+    for(let k = 0; k < times; k++){
+      if((farmer.stamina || 0) < DISTILL_STAMINA) break;
+      if(!p.currentCrop){
+        const c = _findCropForDistill(p);
+        if(c) p.currentCrop = c;
+        else break;
+      }
+      const crop = p.currentCrop;
+      const cnt = gardenStorageCount(crop.cropId, crop.rarity);
+      if(cnt < DISTILL_COST){
+        p.currentCrop = null;
+        continue;
+      }
+      gardenStorageRemove(crop.cropId, crop.rarity, DISTILL_COST);
+      gardenStorageAdd('liquor', crop.rarity, 1);
+      farmer.stamina = Math.max(0, farmer.stamina - DISTILL_STAMINA);
+      p.lastDistillAt += DISTILL_PERIOD_MS;
+      _gardenLog('<span class="r-' + farmer.rarity + '">' + servantLabel(farmer) + '</span> 蒸餾 ' + fmtItemSpan(crop.cropId, crop.rarity, DISTILL_COST) + ' 獲得 <span class="r-' + crop.rarity + ' itm" data-iid="liquor" data-irar="' + crop.rarity + '">私酒*1</span>', 'distill');
+      p.currentCrop = _findCropForDistill(p);
+      did++;
+    }
+    if(did > 0) _changed = true;
+  }
+  if(_changed && typeof save === 'function') save();
+}
+
+function _gardenDistilleryFindTask(a, srv){
+  if(!srv) return null;
+  const plots = _gardenGetPlots();
+  const idx = (a.assignedPlots || [])[0];
+  if(idx == null) return null;
+  const plot = plots[idx];
+  if(!plot || plot.type !== 'distillery') return null;
+  const now = Date.now();
+  const lastAt = plot.lastDistillAt || 0;
+  if(now - lastAt < DISTILL_PERIOD_MS) return null;
+  if((srv.stamina || 0) < DISTILL_STAMINA) return null;
+  const crop = _findCropForDistill(plot);
+  if(!crop) return null;
+  return { type: 'distill', plotIdx: idx, cropId: crop.cropId, rarity: crop.rarity };
+}
+
+function _gardenDistilleryExecute(a, srv, task){
+  const plots = _gardenGetPlots();
+  const plot = plots[task.plotIdx];
+  if(!plot || plot.type !== 'distillery') return;
+  if(gardenStorageCount(task.cropId, task.rarity) < DISTILL_COST) return;
+  gardenStorageRemove(task.cropId, task.rarity, DISTILL_COST);
+  gardenStorageAdd('liquor', task.rarity, 1);
+  srv.stamina = Math.max(0, (srv.stamina || 0) - DISTILL_STAMINA);
+  plot.lastDistillAt = Date.now();
+  const _cropName = (typeof CROPS !== 'undefined' && CROPS[task.cropId]) ? CROPS[task.cropId].name : task.cropId;
+  _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 蒸餾 ' + fmtItemSpan(task.cropId, task.rarity, DISTILL_COST) + ' 獲得 <span class="r-' + task.rarity + ' itm" data-iid="liquor" data-irar="' + task.rarity + '">私酒*1</span>', 'distill');
+  save();
+  renderGardenGrid();
+  renderGardenContent();
+}
+
+function _offlineDistillFindTask(srv, t){
+  const plots = _gardenGetPlots();
+  const idx = (srv.assignedPlots || [])[0];
+  if(idx == null) return null;
+  const plot = plots[idx];
+  if(!plot || plot.type !== 'distillery') return null;
+  if(t - (plot.lastDistillAt || 0) < DISTILL_PERIOD_MS) return null;
+  if((srv.stamina || 0) < DISTILL_STAMINA) return null;
+  const crop = _findCropForDistill(plot);
+  if(!crop) return null;
+  return { type: 'distill', plotIdx: idx, cropId: crop.cropId, rarity: crop.rarity };
+}
+
+function _offlineDoDistill(srv, task, t){
+  const plots = _gardenGetPlots();
+  const plot = plots[task.plotIdx];
+  if(!plot || plot.type !== 'distillery') return { ok: false };
+  if(gardenStorageCount(task.cropId, task.rarity) < DISTILL_COST) return { ok: false };
+  gardenStorageRemove(task.cropId, task.rarity, DISTILL_COST);
+  gardenStorageAdd('liquor', task.rarity, 1);
+  srv.stamina = Math.max(0, (srv.stamina || 0) - DISTILL_STAMINA);
+  plot.lastDistillAt = t;
+  return { ok: true, distill: true };
+}
+
+function _openDistilleryCropPicker(plotIdx, onSelect){
+  const plots = _gardenGetPlots();
+  const plot = plots[plotIdx];
+  if(!plot || plot.type !== 'distillery') return;
+  const s = _gardenStorageInit();
+  const curSeed = plot.preferredSeed || '';
+  const curLegacy = (!curSeed && plot.preferredCrop) ? plot.preferredCrop : '';
+  const rarOrder = ['破舊','一般','庫存','精品','傳奇'];
+
+  const entries = [];
+  for(const k in s){
+    const p = k.split('@');
+    const id = p[0], rar = p[1];
+    if(typeof CROPS === 'undefined' || !CROPS[id]) continue;
+    if(s[k] <= 0) continue;
+    entries.push({ cropId: id, rarity: rar, count: s[k] });
+  }
+  entries.sort(function(a, b){
+    const an = (CROPS[a.cropId] || {}).name || a.cropId;
+    const bn = (CROPS[b.cropId] || {}).name || b.cropId;
+    const nc = an.localeCompare(bn, 'zh-Hant');
+    if(nc !== 0) return nc;
+    return rarOrder.indexOf(a.rarity) - rarOrder.indexOf(b.rarity);
+  });
+
+  const isAny = (!curSeed && !curLegacy);
+  let body = '';
+  body += '<div class="item-row" data-crop-id="" style="' + (isAny ? 'border-color:#e8a33d;background:#2a1f10;' : '') + '">';
+  body += '<div class="icon" style="font-size:20px;color:#e8a33d">✦</div>';
+  body += '<div class="info"><div class="nm">（任意 · 按稀有度）</div><div class="sub">不指定作物</div></div>';
+  body += '</div>';
+
+  if(!entries.length){
+    body += '<div class="empty-hint">後院倉庫中沒有作物</div>';
+  } else {
+    body += '<div style="font-size:10px;color:#7a6f60;margin:8px 0 6px;line-height:1.4">選中後套用至下一輪；當前生產不被中斷</div>';
+    for(const e of entries){
+      const cdef = CROPS[e.cropId] || { name: e.cropId };
+      const key = e.cropId + '@' + e.rarity;
+      const sel = (key === curSeed) ? ' style="border-color:#e8a33d;background:#2a1f10;"' : '';
+      body += '<div class="item-row" data-crop-id="' + key + '"' + sel + '>';
+      body += '<div class="icon" style="background:' + rarityBg(e.rarity) + '">' + itemIcon(e.cropId, 30) + '</div>';
+      body += '<div class="info"><div class="nm ' + rarityClass(e.rarity) + '">' + cdef.name + '</div><div class="sub">' + e.rarity + '</div></div>';
+      body += '<div class="cnt">*' + e.count + '</div>';
+      body += '</div>';
+    }
+  }
+
+  const bd = openModal({ title: '作物偏好', body: body, onClose: function(){ if(typeof onSelect === 'function') onSelect(); } });
+  const rows = bd.querySelectorAll('.item-row[data-crop-id]');
+  for(let i = 0; i < rows.length; i++){
+    (function(row){
+      row.onclick = function(){
+        const _val = row.getAttribute('data-crop-id') || '';
+        if(_val){
+          plot.preferredSeed = _val;
+          delete plot.preferredCrop;
+        } else {
+          delete plot.preferredSeed;
+          delete plot.preferredCrop;
+        }
+        save();
+        closeModal();
+        if(typeof onSelect === 'function') onSelect();
+      };
+    })(rows[i]);
+  }
+}
+
+function openDistilleryDetail(idx, returnFn){
+  const plots = _gardenGetPlots();
+  const plot = plots[idx];
+  if(!plot || plot.type !== 'distillery') return;
+
+  if(window._dsTimer){ clearInterval(window._dsTimer); window._dsTimer = null; }
+
+  if(!plot.lastDistillAt || plot.lastDistillAt % DISTILL_PERIOD_MS !== 0){
+    plot.lastDistillAt = Math.floor(Date.now() / DISTILL_PERIOD_MS) * DISTILL_PERIOD_MS;
+  }
+
+  function _getFarmer(){
+    return (state.servants || []).find(function(s){
+      return s.type === 'farmer' && s.assignedPlots && s.assignedPlots.indexOf(idx) !== -1;
+    });
+  }
+
+  function _getStatus(){
+    if(plot.enabled === false){
+      return { text: '已停用', color: '#7a6f60', pct: 0 };
+    }
+    const now = Date.now();
+    const lastAt = plot.lastDistillAt || 0;
+    const elapsed = now - lastAt;
+    if(elapsed < DISTILL_PERIOD_MS){
+      const remain = Math.ceil((DISTILL_PERIOD_MS - elapsed) / 1000);
+      const pct = Math.min(100, Math.max(0, (elapsed / DISTILL_PERIOD_MS) * 100));
+      return { text: remain + 's', color: '#e8a33d', pct: pct };
+    }
+    const farmer = _getFarmer();
+    if(!farmer) return { text: '未指派農民', color: '#e05252', pct: 100 };
+    if((farmer.stamina || 0) < DISTILL_STAMINA) return { text: '體力不足', color: '#e05252', pct: 100 };
+    if(!plot.currentCrop){
+      const c = _findCropForDistill(plot);
+      if(!c) return { text: '缺作物', color: '#e05252', pct: 100 };
+    }
+    return { text: '就緒', color: '#7ee07e', pct: 100 };
+  }
+
+  function _getRenderState(){
+    const currentCrop = plot.currentCrop || _findCropForDistill(plot);
+    let queueCrop = null;
+    if(plot.currentCrop){
+      queueCrop = _findCropForDistill(plot, plot.currentCrop.cropId + '@' + plot.currentCrop.rarity);
+    }
+    return { currentCrop: currentCrop, queueCrop: queueCrop };
+  }
+
+  function _cellStyle(crop){
+    const bg = crop ? ('background:' + rarityBg(crop.rarity) + ';') : 'background:#241d16;';
+    return 'position:relative;flex:0 0 auto;width:56px;height:56px;display:flex;align-items:center;justify-content:center;border:1px solid #3a2f25;border-radius:6px;overflow:hidden;' + bg;
+  }
+
+  function _cellInner(kind, crop){
+    let h = '';
+    if(kind === 'crop'){
+      if(crop) h += cropImgHtml(crop.cropId, 42);
+      else h += '<span style="font-size:24px;color:#5a5040">✦</span>';
+      h += '<div style="position:absolute;bottom:1px;right:2px;font-size:10px;font-weight:bold;color:#fff;background:rgba(0,0,0,.78);padding:0 3px;border-radius:3px;line-height:1.35">' + DISTILL_COST + '</div>';
+    } else {
+      h += '<img src="icons/garden/liquor.png' + assetSuffix() + '" style="width:42px;height:42px;object-fit:contain" alt="">';
+    }
+    return h;
+  }
+
+  function _renderBody(){
+    const rs = _getRenderState();
+    const rarOrder = plot.rarityOrder || 'desc';
+    const _st0 = _getStatus();
+    const _enabled = plot.enabled !== false;
+
+    let h = '';
+    h += '<div style="display:flex;align-items:center;gap:6px;font-size:15px;color:#e8a33d;font-weight:bold">';
+    h += _getPlotTypeIconHtml('distillery', 24);
+    h += '<span>蒸餾室</span>';
+    h += '<button class="btn" id="ds-toggle" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">' + (_enabled ? '暫停' : '開始') + '</button>';
+    h += '<button class="btn danger" id="ds-del" style="padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button>';
+    h += '</div>';
+    h += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv || 1) + '</div>';
+    h += _gardenPlotOwnersHtml(idx, 'farmer');
+
+    h += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px">配方</div>';
+    h += '<div style="padding:12px;background:#1a1510;border:1px solid #3a2f25;border-radius:6px">';
+    h += '<div style="display:flex;align-items:center;gap:10px">';
+    h += '<div id="ds-crop-current" style="' + _cellStyle(rs.currentCrop) + ';cursor:pointer">' + _cellInner('crop', rs.currentCrop) + '</div>';
+    h += '<span style="flex:0 0 auto;font-size:20px;color:#e8a33d">→</span>';
+    h += '<div id="ds-liquor-current" style="' + _cellStyle(rs.currentCrop) + '">' + _cellInner('liquor', rs.currentCrop) + '</div>';
+    h += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;align-items:flex-end">';
+    h += '<div id="ds-cd-num" style="font-size:13px;font-weight:bold;color:' + _st0.color + ';font-family:Menlo,Consolas,monospace;letter-spacing:0.5px;text-align:right;line-height:1.2">' + _st0.text + '</div>';
+    h += '<div style="width:100%;height:6px;background:#0e0c0a;border-radius:3px;overflow:hidden;border:1px solid #2a231c"><div id="ds-cd-fill" style="height:100%;width:' + _st0.pct + '%;background:linear-gradient(90deg,#8a5f18,#e8a33d,#ffd680);transition:width 0.2s linear"></div></div>';
+    h += '</div>';
+    h += '</div>';
+    h += '<div id="ds-queue-row" style="display:' + (rs.queueCrop ? 'flex' : 'none') + ';align-items:center;gap:10px;margin-top:8px;opacity:0.5;filter:grayscale(1);pointer-events:none">';
+    h += '<div id="ds-crop-queue" style="' + _cellStyle(rs.queueCrop) + '">' + _cellInner('crop', rs.queueCrop) + '</div>';
+    h += '<span style="flex:0 0 auto;font-size:20px;color:#a89a85">→</span>';
+    h += '<div id="ds-liquor-queue" style="' + _cellStyle(rs.queueCrop) + '">' + _cellInner('liquor', rs.queueCrop) + '</div>';
+    h += '</div>';
+    h += '</div>';
+
+    h += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px">用罄時提取</div>';
+    h += '<select id="ds-rar" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:6px;font-size:12px">';
+    h += '<option value="desc"' + (rarOrder === 'desc' ? ' selected' : '') + '>傳奇 → 破舊</option>';
+    h += '<option value="asc"' + (rarOrder === 'asc' ? ' selected' : '') + '>破舊 → 傳奇</option>';
+    h += '</select>';
+
+    return h;
+  }
+
+  const _dsOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
+  const bd = openModal({ title: '蒸餾室', body: _renderBody(), onClose: _dsOnClose });
+
+  function _onCropClick(){
+    closeModal();
+    _openDistilleryCropPicker(idx, function(){
+      openDistilleryDetail(idx, returnFn);
+    });
+  }
+
+  function _refresh(){
+    const _info = _getStatus();
+    const _num = document.getElementById('ds-cd-num');
+    if(_num){ _num.textContent = _info.text; _num.style.color = _info.color; }
+    const _fill = document.getElementById('ds-cd-fill');
+    if(_fill) _fill.style.width = _info.pct + '%';
+    const rs = _getRenderState();
+    const _curEl = document.getElementById('ds-crop-current');
+    if(_curEl){
+      _curEl.innerHTML = _cellInner('crop', rs.currentCrop);
+      _curEl.style.cssText = _cellStyle(rs.currentCrop) + ';cursor:pointer';
+    }
+    const _liqEl = document.getElementById('ds-liquor-current');
+    if(_liqEl){
+      _liqEl.innerHTML = _cellInner('liquor', rs.currentCrop);
+      _liqEl.style.cssText = _cellStyle(rs.currentCrop);
+    }
+    const _qRow = document.getElementById('ds-queue-row');
+    if(_qRow) _qRow.style.display = rs.queueCrop ? 'flex' : 'none';
+    if(rs.queueCrop){
+      const _qCropEl = document.getElementById('ds-crop-queue');
+      if(_qCropEl){ _qCropEl.innerHTML = _cellInner('crop', rs.queueCrop); _qCropEl.style.cssText = _cellStyle(rs.queueCrop); }
+      const _qLiqEl = document.getElementById('ds-liquor-queue');
+      if(_qLiqEl){ _qLiqEl.innerHTML = _cellInner('liquor', rs.queueCrop); _qLiqEl.style.cssText = _cellStyle(rs.queueCrop); }
+    }
+  }
+
+  function _bind(){
+    const _del = bd.querySelector('#ds-del');
+    if(_del) _del.onclick = function(){
+      plots[idx] = null;
+      _clearPlotAssignments(idx);
+      save();
+      closeModal();
+      renderGardenGrid();
+    };
+
+    const _toggle = bd.querySelector('#ds-toggle');
+    if(_toggle) _toggle.onclick = function(){
+      if(plot.enabled === false){
+        plot.enabled = true;
+        plot.lastDistillAt = Math.floor(Date.now() / DISTILL_PERIOD_MS) * DISTILL_PERIOD_MS;
+        plot.currentCrop = _findCropForDistill(plot);
+      } else {
+        plot.enabled = false;
+      }
+      save();
+      _toggle.textContent = plot.enabled === false ? '開始' : '暫停';
+      _refresh();
+    };
+
+    const _cropEl = bd.querySelector('#ds-crop-current');
+    if(_cropEl) _cropEl.onclick = _onCropClick;
+
+    const _rarSel = bd.querySelector('#ds-rar');
+    if(_rarSel) _rarSel.onchange = function(){
+      plot.rarityOrder = _rarSel.value || 'desc';
+      save();
+    };
+
+    _gardenPlotOwnersBind(bd);
+  }
+  _bind();
+
+  window._dsTimer = setInterval(function(){
+    if(!document.getElementById('ds-cd-num')){ clearInterval(window._dsTimer); window._dsTimer = null; return; }
+    _refresh();
+  }, 1000);
+}
+/* ===== end rev562 ===== */
+
 function openCompostDetail(idx, returnFn){
   const plots = _gardenGetPlots();
   const plot = plots[idx];

@@ -138,7 +138,7 @@ function _scheduleNextTick(){
       _scheduleNextTick();
       return;
     }
-    if(BossModule.isActive()){
+    if(BossModule.isActive() || (window.BTRSupport && window.BTRSupport.active)){
       _scheduleNextTick();
       return;
     }
