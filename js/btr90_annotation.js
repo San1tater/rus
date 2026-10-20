@@ -1,12 +1,10 @@
-/* 載具配置：btr90 (由載具標注編輯器 v2.0 生成) */
+/* 載具配置：btr90 (由載具標注編輯器 v1.9 生成) */
 /* - 車輪完整圓形旋轉 + 遮罩下緣鏡像補全
  * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關
  * - trackLine：履帶帶子上邊界折線（履帶滾動 + 原圖擦除用），只用於履帶
  * - trackScroll：沿 trackLine 弧長參數化滾動（A 層原圖紋理 + B 層條紋，v = ω·r）
  * - 渲染順序：image → eraseOriginalTrack → trackScroll → wheels → trackMask → doors → muzzles → effects
  *   （原圖 trackLine 以下且 trackMask 以下被擦除，保護車體；履帶在輪子下層）
- * - 已移除炮射導彈（9M112 / 9M119 / 9M119M / 9M113）
- * - T-80BVD / T-80BU 合併至 t80bv 作為未開放塗裝，不獨立成科技樹節點
  */
 const VEHICLE_ANNOTATION_BTR90 = {
   "id": "btr90",
@@ -14,31 +12,6 @@ const VEHICLE_ANNOTATION_BTR90 = {
   "imageSize": {
     "w": 598,
     "h": 241
-  },
-  "vehicleMeta": {
-    "name": "BTR-90",
-    "tier": 5,
-    "line": "btr",
-    "weapons": [
-      {
-        "id": "pkt",
-        "name": "7.62mm PKT",
-        "type": "機槍",
-        "caliber": "7.62mm"
-      },
-      {
-        "id": "2a42",
-        "name": "30mm 2A42",
-        "type": "機炮",
-        "caliber": "30mm"
-      },
-      {
-        "id": "ags17",
-        "name": "30mm AGS-17",
-        "type": "榴彈發射器",
-        "caliber": "30mm"
-      }
-    ]
   },
   "anchor": {
     "groundY": 1,
@@ -99,10 +72,10 @@ const VEHICLE_ANNOTATION_BTR90 = {
       "caliber": "30mm"
     },
     {
-      "id": "ags17",
-      "name": "30mm AGS-17",
-      "type": "榴彈發射器",
-      "caliber": "30mm"
+      "id": "atgm",
+      "name": "ATGM 發射筒",
+      "type": "反坦克導彈",
+      "caliber": "—"
     }
   ],
   "wheels": [
@@ -215,14 +188,14 @@ const VEHICLE_ANNOTATION_BTR90 = {
       "x": 0.7203,
       "y": 0.2424,
       "name": "槍口 2",
-      "weaponId": "ags17",
+      "weaponId": "pkt",
       "layerOrder": "above"
     },
     {
-      "x": 0.6415,
-      "y": 0.0534,
+      "x": 0.6367,
+      "y": 0.0554,
       "name": "槍口 3",
-      "weaponId": "ags17",
+      "weaponId": "atgm",
       "layerOrder": "above"
     }
   ],

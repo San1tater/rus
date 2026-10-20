@@ -962,7 +962,6 @@ function _rollSweepLoot(bid){
 function _openSweepDialog(bid){
   const sw = _sweepMaxCount(bid);
   if(sw.max <= 0){
-    if(typeof notify === 'function') notify(sw.reason || '資源不足', 'err');
     return;
   }
   const b = BOSSES[bid];
@@ -1032,7 +1031,6 @@ function _openSweepDialog(bid){
 function _executeSweep(bid, count){
   const sw = _sweepMaxCount(bid);
   if(count < 1 || sw.max < count){
-    if(typeof notify === 'function') notify('資源不足', 'err');
     return;
   }
   const b = BOSSES[bid];
@@ -1070,7 +1068,10 @@ function _executeSweep(bid, count){
         const srv = grantRandomServant();
         if(srv) servantGained = srv;
       }
-      if(typeof _garageInitState === 'function'){
+      /* rev635: 用 _garageAddVehicleExp 加經驗，已完結載具的 5% 自動進全局池 */
+      if(typeof _garageAddVehicleExp === 'function'){
+        _garageAddVehicleExp(expTarget, level * 100);
+      } else if(typeof _garageInitState === 'function'){
         const gg = _garageInitState();
         if(gg){
           gg.vehicleExp[expTarget] = (gg.vehicleExp[expTarget] || 0) + level * 100;

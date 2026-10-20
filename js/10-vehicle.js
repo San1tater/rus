@@ -3,13 +3,19 @@
   if(window._vehicleRendererInstalled) return;
   window._vehicleRendererInstalled = true;
 
+  /* rev622: ANN 补全到 11 款（原缺 btr82 / btr90 / t80b / t80bv / t80uk） */
   if(!window.VEHICLE_ANNOTATIONS){
     window.VEHICLE_ANNOTATIONS = {
       btr80:  typeof VEHICLE_ANNOTATION_BTR80  !== 'undefined' ? VEHICLE_ANNOTATION_BTR80  : null,
       btr80a: typeof VEHICLE_ANNOTATION_BTR80A !== 'undefined' ? VEHICLE_ANNOTATION_BTR80A : null,
+      btr82:  typeof VEHICLE_ANNOTATION_BTR82  !== 'undefined' ? VEHICLE_ANNOTATION_BTR82  : null,
       btr82a: typeof VEHICLE_ANNOTATION_BTR82A !== 'undefined' ? VEHICLE_ANNOTATION_BTR82A : null,
+      btr90:  typeof VEHICLE_ANNOTATION_BTR90  !== 'undefined' ? VEHICLE_ANNOTATION_BTR90  : null,
       t80:    typeof VEHICLE_ANNOTATION_T80    !== 'undefined' ? VEHICLE_ANNOTATION_T80    : null,
+      t80b:   typeof VEHICLE_ANNOTATION_T80B   !== 'undefined' ? VEHICLE_ANNOTATION_T80B   : null,
+      t80bv:  typeof VEHICLE_ANNOTATION_T80BV  !== 'undefined' ? VEHICLE_ANNOTATION_T80BV  : null,
       t80u:   typeof VEHICLE_ANNOTATION_T80U   !== 'undefined' ? VEHICLE_ANNOTATION_T80U   : null,
+      t80uk:  typeof VEHICLE_ANNOTATION_T80UK  !== 'undefined' ? VEHICLE_ANNOTATION_T80UK  : null,
       t80um:  typeof VEHICLE_ANNOTATION_T80UM  !== 'undefined' ? VEHICLE_ANNOTATION_T80UM  : null
     };
   }
@@ -381,13 +387,13 @@
     ctx.translate(x, y);
 
     if(hasTrack && hasTrackScroll){
+      /* rev624: 原 clip 用 trackLine（倒U形）作下邊界，兩端斜線連到 (0,0)/(cw,0)，
+         把車尾下方、車頭下方（含炮口）裁掉。改為水平矩形 clip，只裁 y > maxY 的部分。 */
       ctx.save();
+      let _maxY = 0;
+      for(const _p of ann.trackLine.points){ if(_p.y > _maxY) _maxY = _p.y; }
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      const pts = ann.trackLine.points.slice().sort(function(a,b){ return a.x-b.x; });
-      for(const p of pts) ctx.lineTo(p.x*cw, p.y*ch);
-      ctx.lineTo(cw, 0);
-      ctx.closePath();
+      ctx.rect(0, 0, cw, _maxY * ch);
       ctx.clip();
       ctx.drawImage(img, 0, 0, cw, ch);
       ctx.restore();
@@ -504,13 +510,18 @@ const BTRSupport = {
   start(vid) {
     if(this.active) return;
     this.vehicleId = vid || 'btr80';
-    if(!ANN[this.vehicleId]) this.vehicleId = 'btr80';
+    if(!ANN[this.vehicleId]){
+      console.warn('[BTRSupport] annotation not loaded for', this.vehicleId, '- fallback to btr80');
+      this.vehicleId = 'btr80';
+    }
     /* rev595: 依載具動態覆寫 BTR_TIMELINE.supportDur */
     if(typeof VEHICLES !== 'undefined' && VEHICLES[this.vehicleId] && typeof VEHICLES[this.vehicleId].supportDuration === 'number' && VEHICLES[this.vehicleId].supportDuration > 0){
       BTR_TIMELINE.supportDur = VEHICLES[this.vehicleId].supportDuration;
     } else {
       BTR_TIMELINE.supportDur = 30;
     }
+    
+    
     this.active = true;
     this.startTime = performance.now();
     this.phase = 'enter'; this.phaseT = 0;
@@ -610,13 +621,76 @@ const BTRSupport = {
     this.width = w; this.height = h; this.dpr = dpr;
     const ann = ANN[this.vehicleId];
     if(ann){
-      // ★ 依真實比例：BTR 含炮塔 ≈ 3.0m，人物 1.75m，人物在畫布中占 0.58h
-      //   => BTR 約 3.0/1.75*0.58 = 0.994h；這裡取 0.99h 讓溢出自然可見
-      this.targetH = h * 0.99;
+      /* rev626: 扫描 PNG alpha 通道，用 content bounds 修正视觉高度。
+         之前 targetH = h×0.99 只是 PNG 高度，若 PNG 有透明留白，视觉高度会缩水。*/
+      let _contentMinY = 0;
+      let _contentMaxY = 1;
+      let _contentH = 1.0;
+      try {
+        const _measImg = _loadVehicleImg(this.vehicleId);
+        if(_measImg && _measImg.complete && _measImg.naturalWidth && typeof _measureImgContentBounds === 'function'){
+          const _b = _measureImgContentBounds(_measImg);
+          if(_b){
+            _contentMinY = _b.minY;
+            _contentMaxY = _b.maxY;
+            _contentH = _b.maxY - _b.minY;
+          }
+        }
+      } catch(_e){ /* ignore */ }
+      if(!isFinite(_contentH) || _contentH < 0.1){ _contentH = 1.0; _contentMinY = 0; _contentMaxY = 1; }
+      this._contentMinYRatio = _contentMinY;
+      this._contentBottomRatio = _contentMaxY;
+      this._contentH = _contentH;
+      console.info('[BTRSupport] content bounds for', this.vehicleId,
+        '| minY:', _contentMinY.toFixed(3),
+        '| maxY:', _contentMaxY.toFixed(3),
+        '| contentH:', _contentH.toFixed(3));
+      /* 载具视觉高度 = h × 0.99，所以 PNG 高度 = 视觉高度 / contentH */
+      this.targetH = (h * 0.99) / _contentH;
       this.targetW = this.targetH * (ann.imageSize.w / ann.imageSize.h);
       const playerCenterX = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
-      const doorPx = playerCenterX - this.doorOffsetRatio * this.targetW;
-      this.doorX = doorPx / w;
+      /* rev625: 從 annotation 動態計算艙口中心（優先铰链中心） */
+      /* rev630: 門洞中心 = 門板多邊形 X 平均（铰链是旋轉軸，不是門洞中心） */
+      /* rev632: _doorCenterRatio 塊（單一版本，去重） */
+    let _doorCenterRatio = 0.48;
+    let _doorCenterSrc = 'fallback';
+    if(ann.doors){
+      let _sumX = 0, _sumN = 0;
+      const _collect = function(_list){
+        if(!_list || !_list.length) return;
+        for(const _d of _list){
+          if(_d.polygon){
+            for(const _p of _d.polygon){ _sumX += _p.x; _sumN++; }
+          }
+        }
+      };
+      _collect(ann.doors.upper);
+      _collect(ann.doors.lower);
+      if(_sumN > 0){
+        _doorCenterRatio = _sumX / _sumN;
+        _doorCenterSrc = 'upper+lower polygon avg';
+      } else {
+        _collect(ann.doors.hatch);
+        if(_sumN > 0){
+          _doorCenterRatio = _sumX / _sumN;
+          _doorCenterSrc = 'hatch polygon avg';
+        } else {
+          let _hingeDoor = null;
+          if(ann.doors.upper && ann.doors.upper.length) _hingeDoor = ann.doors.upper[0];
+          else if(ann.doors.hatch && ann.doors.hatch.length) _hingeDoor = ann.doors.hatch[0];
+          else if(ann.doors.lower && ann.doors.lower.length) _hingeDoor = ann.doors.lower[0];
+          if(_hingeDoor && _hingeDoor.hingeP1 && _hingeDoor.hingeP2){
+            _doorCenterRatio = (_hingeDoor.hingeP1.x + _hingeDoor.hingeP2.x) / 2;
+            _doorCenterSrc = 'hinge center (fallback)';
+          }
+        }
+      }
+    }
+    this.doorOffsetRatio = _doorCenterRatio;
+    console.info('[BTRSupport] doorOffsetRatio for', this.vehicleId,
+      '=', _doorCenterRatio.toFixed(4), '| source:', _doorCenterSrc);
+    const doorPx = playerCenterX - this.doorOffsetRatio * this.targetW;
+    this.doorX = doorPx / w;
 
       // ★ support 階段中心位置：優先保證炮口在屏幕內（尤其長炮管如 T-80）
       let maxMuzzleX = 0;
@@ -635,7 +709,8 @@ const BTRSupport = {
 
       // ★ 下沉量不是硬編碼 15%，而是「完整顯示頂部所需偏移量」的結果：
       const groundY = h * 0.95;
-      const py0 = groundY - this.targetH;
+      /* rev626: sinkOffset 用 _contentBottomRatio */
+      const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
       const TOP_MARGIN = 4;
       this.sinkOffset = py0 < TOP_MARGIN ? (TOP_MARGIN - py0) : 0;
     }
@@ -699,6 +774,11 @@ const BTRSupport = {
       this.yOffset = (1 - this._easeInOut(p)) * this.sinkOffset;
       this.doorOpen = 0;
     } else if(curPhase === 'exit'){
+      /* rev636: exit 階段診斷 —— 若 doorX 異常會明示原因 */
+      if(!isFinite(this.doorX)){
+        console.warn('[BTRSupport] doorX is invalid:', this.doorX, '| doorOffsetRatio:', this.doorOffsetRatio, '| targetW:', this.targetW, '| vehicleId:', this.vehicleId);
+        this.doorX = 0.25;
+      }
       this.x = this.doorX;
       const p = Math.min(1, phaseT / BTR_TIMELINE.exitDur);
       if(p < 0.25) this.doorOpen = p / 0.25;
@@ -848,7 +928,8 @@ const BTRSupport = {
     if(!ann) return;
     const groundY = this.height * 0.95;
     const px = this.x * this.width + this.shakeX;
-    const py = groundY - this.targetH + this.yOffset + this.shakeY;
+    /* rev626: 用 _contentBottomRatio 而非 1，让载具底边对齐地面线 */
+    const py = groundY - (this._contentBottomRatio || 1) * this.targetH + this.yOffset + this.shakeY;
 
     /* 1. below 火光 + 弹幕（在 BTR 之前绘制，被车体遮挡） */
     for(const fx of this.fireFx){
@@ -970,12 +1051,15 @@ const BTRSupport = {
 
   _finishSupportAndLog() {
     const exp = this.killCount * 10;
-    if(exp > 0 && typeof _garageInitState === 'function'){
-      const g = _garageInitState();
-      if(g){
-        g.vehicleExp[this.vehicleId] = (g.vehicleExp[this.vehicleId] || 0) + exp;
-        if(typeof save === 'function') save();
+    if(exp > 0){
+      /* rev635: 用 _garageAddVehicleExp 加經驗，已完結載具的 5% 自動進全局池 */
+      if(typeof _garageAddVehicleExp === 'function'){
+        _garageAddVehicleExp(this.vehicleId, exp);
+      } else if(typeof _garageInitState === 'function'){
+        const g = _garageInitState();
+        if(g) g.vehicleExp[this.vehicleId] = (g.vehicleExp[this.vehicleId] || 0) + exp;
       }
+      if(typeof save === 'function') save();
     }
     const vehName = (VEHICLES[this.vehicleId] && VEHICLES[this.vehicleId].name) || this.vehicleId;
     // ★ 載具名用 .pl，點擊提示用藍色虛線

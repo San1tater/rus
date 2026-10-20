@@ -2013,7 +2013,8 @@ function _crossfadeExploreBg(newUrl){
   newScroll.style.opacity = '0';
   newScroll.style.transition = 'opacity 600ms ease-in-out';
   newScroll.style.willChange = 'opacity';
-  newScroll.style.zIndex = '1';
+  /* rev637: z-index 1→0，让新背景层沉到 BTR canvas（z-index 1）之下，不再遮挡载具 */
+  newScroll.style.zIndex = '0';
   oldScroll.style.position = 'absolute';
   oldScroll.style.inset = '0';
   oldScroll.style.zIndex = '0';
@@ -2800,6 +2801,7 @@ function _radioEnsureInit(){
 
 function _radioGetStatus(){
   _radioEnsureInit();
+  
   const now = Date.now();
   const cdUntil = state.radioCooldownUntil || 0;
   if(now < cdUntil){
@@ -2813,6 +2815,7 @@ function _radioGetStatus(){
 
 function _radioTryConsume(){
   _radioEnsureInit();
+  
   const st = _radioGetStatus();
   if(st.state !== 'ready') return false;
   state.radioUses -= 1;

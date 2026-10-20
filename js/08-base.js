@@ -604,9 +604,13 @@ function _garageInitState(){
   if(!Array.isArray(g.ownedVehicles)) g.ownedVehicles = ['btr80'];
   if(!g.vehicleExp || typeof g.vehicleExp !== 'object') g.vehicleExp = { btr80: 0 };
   if(!('currentVehicle' in g) || !VEHICLES[g.currentVehicle]) g.currentVehicle = 'btr80';
-  if(!('researchTarget' in g)) g.researchTarget = null;
+  /* rev640: researchTarget 已廢棄，研發改為消耗前置車經驗 */
   if(!g.camo || typeof g.camo !== 'object') g.camo = {};
-  if(!g.extraExp || typeof g.extraExp !== 'object') g.extraExp = {};
+    /* rev642: 每車研發進度 */
+  if(!g.researchProgress || typeof g.researchProgress !== 'object') g.researchProgress = {};
+  
+    /* rev635: 全局經驗池 —— 已完結載具的 5% 經驗自動進入，可分配到任意載具 */
+  if(typeof g.globalExp !== 'number' || !isFinite(g.globalExp) || g.globalExp < 0) g.globalExp = 0;
   return g;
 }
 
@@ -656,6 +660,52 @@ function _consumeAmmoByValue(targetValue){
   }
   return remaining <= 0.01;
 }
+
+/* rev635: 判斷載具是否已完結（next 全部擁有或 next 為空） */
+function _isVehicleFinished(vid){
+  const v = VEHICLES[vid];
+  if(!v) return false;
+  if(!v.next || !v.next.length) return true;
+  const g = _garageInitState();
+  return v.next.every(function(n){ return g.ownedVehicles.indexOf(n) >= 0; });
+}
+
+/* rev635: 加載具經驗 —— 若已完結，5% 自動分流到全局經驗池 */
+function _garageAddVehicleExp(vid, exp){
+  /* rev643: 前置車經驗即時流入當前研發目標的進度條（不經過 vehicleExp）；
+     非前置車或無目標或進度已滿 → 進 vehicleExp；額外 5%/10% 進全局池 */
+  if(!exp || exp <= 0) return;
+  const g = _garageInitState();
+  const rate = _isVehicleFinished(vid) ? 0.10 : 0.05;
+  const bonus = Math.floor(exp * rate);
+  if(bonus > 0) g.globalExp = (g.globalExp || 0) + bonus;
+  const target = g.researchTarget;
+  if(target && VEHICLES[target] && VEHICLES[target].researchCost && g.ownedVehicles.indexOf(target) < 0){
+    const prereqs = Object.keys(VEHICLES).filter(function(pvid){
+      return (VEHICLES[pvid].next || []).indexOf(target) >= 0;
+    });
+    if(prereqs.indexOf(vid) >= 0){
+      const need = VEHICLES[target].researchCost.exp;
+      if(!g.researchProgress) g.researchProgress = {};
+      const prog = g.researchProgress[target] || 0;
+      const remain = Math.max(0, need - prog);
+      if(remain > 0){
+        const toProgress = Math.min(exp, remain);
+        g.researchProgress[target] = prog + toProgress;
+        const leftover = exp - toProgress;
+        if(leftover > 0) g.vehicleExp[vid] = (g.vehicleExp[vid] || 0) + leftover;
+        return;
+      }
+    }
+  }
+  g.vehicleExp[vid] = (g.vehicleExp[vid] || 0) + exp;
+}
+
+/* rev635: 從全局經驗池分配 X 到目標載具的 extraExp */
+
+
+/* rev635: 全局經驗分配面板 —— 內聯展開滑塊，實時預覽 */
+
 
 function _garageGetUpgradeCost(lv){
   return {
@@ -780,21 +830,16 @@ function closeGaragePage(){
 }
 
 function _garageGetResearchInfo(){
+  /* rev642: 返回當前研發目標的進度 */
   const g = _garageInitState();
   const target = g.researchTarget;
   if(!target) return null;
   if(g.ownedVehicles.indexOf(target) >= 0){ g.researchTarget = null; return null; }
   const tgt = VEHICLES[target];
-  if(!tgt){ g.researchTarget = null; return null; }
-  const prereqs = Object.keys(VEHICLES).filter(function(vid){
-    return (VEHICLES[vid].next || []).indexOf(target) >= 0;
-  });
-  let have = 0;
-  for(const pid of prereqs) have += (g.vehicleExp[pid] || 0);
-  if(g.extraExp && g.extraExp[target]) have += g.extraExp[target];
-  have = Math.floor(have);
-  const need = (tgt.researchCost && tgt.researchCost.exp) || 0;
-  return { targetId: target, target: tgt, have: have, need: need, prereqs: prereqs };
+  if(!tgt || !tgt.researchCost) return null;
+  const have = (g.researchProgress && g.researchProgress[target]) || 0;
+  const need = tgt.researchCost.exp || 0;
+  return { targetId: target, target: tgt, have: Math.floor(have), need: need, prereqs: [] };
 }
 
 function _garageOpenCamo(){
@@ -921,8 +966,10 @@ function _garageRenderHtml(){
   let h = "";
   h += "<div class='garage-header'>";
   /* rev596: 標題行 Lv.XX 右側加「升級」按鈕 */
+  const _globalExpVal = (typeof _garageInitState === 'function') ? (_garageInitState().globalExp || 0) : 0;
   h += "<div class='garage-title'><img src='icons/buildings/garage.png" + assetSuffix() + "' class='garage-title-icon' alt=''> 車場 <span class='garage-lv'>Lv." + lv + "</span>"
     + "<button class='garage-upgrade-inline' id='garage-upgrade'" + (lv >= 50 ? ' disabled' : '') + ">" + (lv >= 50 ? '已滿級' : '升級') + "</button>"
+    + "<span class='garage-global-exp' id='garage-global-exp' title='全局經驗'><span class='glb-icon'>🌐</span>" + _globalExpVal + "</span>"
     + "</div>";
   h += "<div class='garage-x' id='garage-x'>✕</div>";
   h += "</div>";
@@ -942,7 +989,7 @@ function _garageRenderHtml(){
 
   h += "<div class='garage-bottom-right'>";
   if(research){
-    h += "<div class='garage-research-img-wrap'>";
+    h += "<div class='garage-research-img-wrap' id='garage-research-target' data-vid='" + research.targetId + "' style='cursor:pointer'>";
     h += "<img src='icons/vehicles/" + research.targetId + ".png" + assetSuffix() + "' alt=''>";
     h += "<div class='garage-research-name'>" + tgt.name + "</div>";
     h += "</div>";
@@ -962,7 +1009,7 @@ function _garageRenderHtml(){
   } else {
     h += "<div class='garage-research-empty'>未選定研發目標</div>";
   }
-  h += "<div class='garage-actions'>";
+h += "<div class='garage-actions'>";
   h += "<button class='garage-tech-btn' id='garage-tech'>🌳 科技樹</button>";
   h += "<button class='garage-camo-btn' id='garage-camo'>🎨 塗裝</button>";
   h += "</div>";
@@ -994,7 +1041,13 @@ function _garageBind(){
   const tech = p.querySelector('#garage-tech');
   if(tech) tech.onclick = function(){ _garageOpenTechTree(); };
 
-  const camo = p.querySelector('#garage-camo');
+    /* rev649: 研发目标展示区点击跳转 */
+  const _rt = p.querySelector('#garage-research-target');
+  if(_rt) _rt.onclick = function(){
+    const _vid = _rt.getAttribute('data-vid');
+    if(_vid) _garageShowTechDetail(_vid);
+  };
+const camo = p.querySelector('#garage-camo');
   if(camo) camo.onclick = function(){ _garageOpenCamo(); };
 
   /* rev596: 車場頁面內的升級按鈕 → 打開升級彈窗（無「進入」按鈕，防疊層） */
@@ -1005,44 +1058,48 @@ function _garageBind(){
   };
 }
 
-function _garageAvailableExpFor(targetId){
+function _garageAvailableExpFor(vid){
+  /* rev643: 返回該車已投入的研發進度（= researchProgress） */
   const g = _garageInitState();
-  const prereqs = Object.keys(VEHICLES).filter(function(vid){
-    return (VEHICLES[vid].next || []).indexOf(targetId) >= 0;
-  });
-  let usable = 0;
-  for(const pid of prereqs) usable += (g.vehicleExp[pid] || 0);
-  if(g.extraExp && g.extraExp[targetId]) usable += g.extraExp[targetId];
-  return Math.floor(usable);
+  if(!g.researchProgress) g.researchProgress = {};
+  return Math.floor(g.researchProgress[vid] || 0);
 }
 
-function _garageTransferExp5(targetId){
+
+
+/* rev643: 點「研發」→ 設目標 + 前置車已有 vehicleExp 一次性流入進度 */
+function _garageStartResearch(vid){
   const g = _garageInitState();
-  const tgt = VEHICLES[targetId];
-  if(!tgt) return { transferred: 0 };
-  const prereqs = Object.keys(VEHICLES).filter(function(vid){
-    return (VEHICLES[vid].next || []).indexOf(targetId) >= 0;
+  const v = VEHICLES[vid];
+  if(!v || !v.researchCost) return { err: "no_cost" };
+  if(g.ownedVehicles.indexOf(vid) >= 0) return { err: "owned" };
+  const prereqs = Object.keys(VEHICLES).filter(function(pvid){
+    return (VEHICLES[pvid].next || []).indexOf(vid) >= 0;
   });
-  if(!g.extraExp || typeof g.extraExp !== 'object') g.extraExp = {};
-  let total = 0;
-  for(const vid of g.ownedVehicles){
-    if(vid === targetId) continue;
-    if(prereqs.indexOf(vid) >= 0) continue;
-    const exp = g.vehicleExp[vid] || 0;
-    if(exp <= 0) continue;
-    const take = Math.floor(exp * 0.05);
-    if(take <= 0) continue;
-    g.vehicleExp[vid] = exp - take;
-    total += take;
+  for(const pid of prereqs){
+    if(g.ownedVehicles.indexOf(pid) < 0) return { err: "need_prereq", prereq: VEHICLES[pid].name };
   }
-  if(total > 0){
-    g.extraExp[targetId] = (g.extraExp[targetId] || 0) + total;
-    save();
+  g.researchTarget = vid;
+  const need = v.researchCost.exp;
+  if(!g.researchProgress) g.researchProgress = {};
+  let prog = g.researchProgress[vid] || 0;
+  /* 前置車已積累的 vehicleExp 一次性流入 */
+  for(const pid of prereqs){
+    if(prog >= need) break;
+    const have = g.vehicleExp[pid] || 0;
+    if(have <= 0) continue;
+    const remain = need - prog;
+    const transfer = Math.min(have, remain);
+    g.vehicleExp[pid] = have - transfer;
+    prog += transfer;
   }
-  return { transferred: total };
+  g.researchProgress[vid] = prog;
+  if(typeof save === "function") save();
+  return { ok: true, progress: prog, need: need };
 }
 
 function _garageResearch(vid){
+  /* rev643: 購買 —— 進度已滿 + 彈藥/私酒足 → 擁有；不扣經驗（已流入進度） */
   const g = _garageInitState();
   const v = VEHICLES[vid];
   if(!v || !v.researchCost) return { err: 'no_cost' };
@@ -1053,35 +1110,22 @@ function _garageResearch(vid){
   for(const pid of prereqs){
     if(g.ownedVehicles.indexOf(pid) < 0) return { err: 'need_prereq', prereq: VEHICLES[pid].name };
   }
-  const cost = v.researchCost;
+  const prog = (g.researchProgress && g.researchProgress[vid]) || 0;
+  if(prog < v.researchCost.exp) return { err: 'no_exp', need: v.researchCost.exp, have: Math.floor(prog) };
   const ammo = _garageAmmoEquiv();
-  if(ammo < cost.ammoCount) return { err: 'no_ammo', need: cost.ammoCount, have: Math.floor(ammo) };
+  if(ammo < v.researchCost.ammoCount) return { err: 'no_ammo', need: v.researchCost.ammoCount, have: Math.floor(ammo) };
   const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
-  if(liq < cost.liquor) return { err: 'no_liquor', need: cost.liquor, have: Math.floor(liq) };
-  const exp = _garageAvailableExpFor(vid);
-  if(exp < cost.exp) return { err: 'no_exp', need: cost.exp, have: exp };
-
-  _consumeAmmoByValue(cost.ammoCount);
-  _consumeLiquorByValue(cost.liquor);
-  let remain = cost.exp;
-  if(g.extraExp && g.extraExp[vid]){
-    const use = Math.min(g.extraExp[vid], remain);
-    g.extraExp[vid] -= use;
-    remain -= use;
-    if(g.extraExp[vid] <= 0) delete g.extraExp[vid];
-  }
-  for(const pid of prereqs){
-    if(remain <= 0) break;
-    const have = g.vehicleExp[pid] || 0;
-    const use = Math.min(have, remain);
-    g.vehicleExp[pid] = have - use;
-    remain -= use;
-  }
+  if(liq < v.researchCost.liquor) return { err: 'no_liquor', need: v.researchCost.liquor, have: Math.floor(liq) };
+  if(typeof _consumeAmmoByValue === 'function') _consumeAmmoByValue(v.researchCost.ammoCount);
+  if(typeof _consumeLiquorByValue === 'function') _consumeLiquorByValue(v.researchCost.liquor);
   g.ownedVehicles.push(vid);
   if(g.researchTarget === vid) g.researchTarget = null;
-  save();
+  if(g.researchProgress) delete g.researchProgress[vid];
+  if(typeof save === 'function') save();
+  console.info('[garage] 購買完成:', vid);
   return { ok: true };
 }
+
 
 function _garageResearchErrMsg(r){
   if(!r) return '研發失敗';
@@ -1236,21 +1280,18 @@ function _garageShowTechDetail(vid){
   const cur = VEHICLES[g.currentVehicle] || VEHICLES.btr80;
   const owned = g.ownedVehicles.indexOf(vid) >= 0;
   const isCurrent = g.currentVehicle === vid;
-  const isTarget = (g.researchTarget === vid);
   const prereqs = Object.keys(VEHICLES).filter(function(pvid){
     return (VEHICLES[pvid].next || []).indexOf(vid) >= 0;
   });
   const hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
 
-  let body = '';
-
+  let body = "";
   body += '<div class="garage-tech-detail-img-wrap">'
     + '<img src="icons/vehicles/' + vid + '.png' + assetSuffix() + '" alt="">'
     + '<div class="garage-tech-detail-name">' + v.name + ' <span style="color:#7a6f60;font-weight:normal">Tier ' + v.tier + '</span></div>'
     + '</div>';
 
   body += '<div class="garage-tech-detail-cols">';
-
   body += '<div class="garage-tech-detail-left">';
   body += '<div class="garage-tech-detail-col-title">詳情' + (isCurrent ? '' : '（當前 → 目標）') + '</div>';
   body += _garageDetailHtml(cur, isCurrent ? null : v, null, null);
@@ -1262,43 +1303,33 @@ function _garageShowTechDetail(vid){
     body += '<div class="tech-detail-status" style="color:#7ee07e">使用中</div>';
   } else if(owned){
     body += '<div class="garage-tech-detail-col-title">狀態</div>';
-    body += '<div class="tech-detail-status" style="color:#7ee07e">已擁有</div>';
+    body += '<div class="tech-detail-status" style="color:#7ee07e">已研發</div>';
     body += '<button class="btn primary tech-detail-action" id="m-switch">切換</button>';
   } else if(!hasAllPrereq){
-    const reqNames = prereqs.map(function(p){ return VEHICLES[p].name; }).join(' / ');
+    const reqNames = prereqs.map(function(p){ return VEHICLES[p].name; }).join(" / ");
     body += '<div class="garage-tech-detail-col-title">研發需求</div>';
     body += '<div class="tech-detail-status" style="color:#e05252">需先研發<br>' + reqNames + '</div>';
   } else if(v.researchCost){
     const ammo = _garageAmmoEquiv();
-    const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
-    const exp = _garageAvailableExpFor(vid);
-    const researchDone = exp >= v.researchCost.exp;
-    const canBuy = researchDone && ammo >= v.researchCost.ammoCount && liq >= v.researchCost.liquor;
+    const liq = (typeof _gardenLiquorValue === "function") ? _gardenLiquorValue() : 0;
+    const prog = _garageAvailableExpFor(vid);
+    const need = v.researchCost.exp;
+    const expDone = prog >= need;
+    const canBuy = expDone && ammo >= v.researchCost.ammoCount && liq >= v.researchCost.liquor;
     const cal = v.researchCost.ammoCal;
-    const ammoIcon = (typeof AMMO_ICON_BY_CAL !== 'undefined' && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : '545.png';
+    const ammoIcon = (typeof AMMO_ICON_BY_CAL !== "undefined" && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : "545.png";
+    const isTarget = (g.researchTarget === vid);
     body += '<div class="garage-tech-detail-col-title">研發需求</div>';
     body += '<div class="tech-detail-row"><span class="k"><img src="icons/items/' + ammoIcon + assetSuffix() + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
     body += '<div class="tech-detail-row"><span class="k"><img src="icons/garden/liquor.png' + assetSuffix() + '" class="req-icon" alt=""> 私酒</span><span class="v ' + (liq >= v.researchCost.liquor ? 'ok' : 'bad') + '">' + Math.floor(liq) + '/' + v.researchCost.liquor + '</span></div>';
-    body += '<div class="tech-detail-row"><span class="k">經驗</span><span class="v ' + (researchDone ? 'ok' : 'bad') + '">' + exp + '/' + v.researchCost.exp + '</span></div>';
+    body += '<div class="tech-detail-row"><span class="k">經驗</span><span class="v ' + (expDone ? 'ok' : 'bad') + '">' + prog + '/' + need + '</span></div>';
     body += '<div class="tech-detail-btn-col">';
-    if(isTarget && researchDone){
-      body += '<button class="btn primary tech-detail-action" id="m-buy" ' + (canBuy ? '' : 'disabled') + '>購買</button>';
+    if(expDone){
+      body += '<button class="btn primary tech-detail-action" id="m-buy"' + (canBuy ? '' : ' disabled') + '>購買</button>';
     } else if(isTarget){
-      body += '<button class="btn tech-detail-action" disabled>研發中</button>';
-      const hasTransfer = (function(){
-        let sum = 0;
-        for(const ovid of g.ownedVehicles){
-          if(ovid === vid) continue;
-          if(prereqs.indexOf(ovid) >= 0) continue;
-          sum += Math.floor((g.vehicleExp[ovid] || 0) * 0.05);
-        }
-        return sum > 0;
-      })();
-      if(hasTransfer){
-        body += '<button class="btn tech-detail-action" id="m-transfer">轉入</button>';
-      }
+      body += '<button class="btn primary tech-detail-action" id="m-research" data-mode="cancel">研發中</button>';
     } else {
-      body += '<button class="btn tech-detail-action" id="m-research">研發</button>';
+      body += '<button class="btn primary tech-detail-action" id="m-research" data-mode="start">研發</button>';
     }
     body += '</div>';
   } else {
@@ -1306,59 +1337,92 @@ function _garageShowTechDetail(vid){
     body += '<div class="tech-detail-status" style="color:#7a6f60">—</div>';
   }
   body += '</div>';
-
   body += '</div>';
 
-  const bd = openModal({ title: '科技樹詳情', body: body, onClose: function(){
-    if(typeof modalEl !== 'undefined' && modalEl) modalEl.style.maxHeight = '';
+  const _ge = Math.floor(g.globalExp || 0);
+  const _prog = _garageAvailableExpFor(vid);
+  const _need = (v.researchCost && v.researchCost.exp) || 0;
+  const _remain = Math.max(0, _need - _prog);
+  const _maxT = Math.min(_remain, _ge);
+  const _showTransfer = !owned && hasAllPrereq && !!v.researchCost && _ge > 0 && _prog < _need && _maxT > 0;
+  if(_showTransfer){
+    body += '<div class="garage-transfer-row" id="garage-transfer-row" style="margin-top:10px;flex-direction:column;align-items:stretch;gap:6px">';
+    body += '<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="color:#7a6f60;font-size:11px">🌐 全局經驗</span><span style="color:#a45ede;font-weight:bold;font-family:Menlo,Consolas,monospace;font-size:14px">' + _ge + '</span></div>';
+    body += '<div class="garage-transfer-slider-wrap">';
+    body += '<div class="garage-transfer-slider-info"><span>轉入數量</span><span><b id="gt-x">0</b> / ' + _maxT + '</span></div>';
+    body += '<input type="range" id="gt-slider" min="0" max="' + _maxT + '" value="0">';
+    body += '<div class="garage-transfer-slider-info"><span>轉入後全局經驗</span><b id="gt-after-ge">' + _ge + '</b></div>';
+    body += '<div class="garage-transfer-slider-info"><span>轉入後研發進度</span><b id="gt-after-prog">' + Math.floor(_prog) + ' / ' + _need + '</b></div>';
+    body += '<div class="garage-transfer-slider-actions"><button class="btn primary" id="gt-confirm" disabled>確認轉入</button></div>';
+    body += '</div></div>';
+  }
+
+  const bd = openModal({ title: "科技樹詳情", body: body, onClose: function(){
+    if(typeof modalEl !== "undefined" && modalEl) modalEl.style.maxHeight = "";
     closeModal();
     _garageOpenTechTree();
   }});
-  if(typeof modalEl !== 'undefined' && modalEl) modalEl.style.maxHeight = '90vh';
+  if(typeof modalEl !== "undefined" && modalEl) modalEl.style.maxHeight = "90vh";
 
   function _refreshGaragePage(){
-    const p = document.getElementById('garage-page');
+    const p = document.getElementById("garage-page");
     if(p){ p.innerHTML = _garageRenderHtml(); _garageBind(); }
   }
 
-  const sw = bd.querySelector('#m-switch');
-  if(sw) sw.onclick = function(){
-    g.currentVehicle = vid;
-    save();
-    _garageShowTechDetail(vid);
-    _refreshGaragePage();
-  };
+  const sw = bd.querySelector("#m-switch");
+  if(sw) sw.onclick = function(){ g.currentVehicle = vid; save(); _garageShowTechDetail(vid); _refreshGaragePage(); };
 
-  const rs = bd.querySelector('#m-research');
-  if(rs) rs.onclick = function(){
-    g.researchTarget = vid;
-    save();
-    _garageShowTechDetail(vid);
-    _refreshGaragePage();
-  };
+  const rs = bd.querySelector("#m-research");
+  if(rs){
+    const mode = rs.getAttribute('data-mode');
+    if(mode === 'start'){
+      rs.onclick = function(){
+        _garageStartResearch(vid);
+        _garageShowTechDetail(vid); _refreshGaragePage();
+      };
+    } else if(mode === 'cancel'){
+      rs.onclick = function(){
+        g.researchTarget = null;
+        if(typeof save === 'function') save();
+        _garageShowTechDetail(vid); _refreshGaragePage();
+      };
+    }
+  }
 
-  const buy = bd.querySelector('#m-buy');
-  if(buy) buy.onclick = function(){
+  const buy = bd.querySelector("#m-buy");
+  if(buy && !buy.disabled) buy.onclick = function(){
     const r = _garageResearch(vid);
-    if(r && r.ok){
-      _garageShowTechDetail(vid);
-      _refreshGaragePage();
-    } else {
-      notify(_garageResearchErrMsg(r));
-    }
+    if(r && r.ok){ _garageShowTechDetail(vid); _refreshGaragePage(); }
+    else if(typeof notify === "function") notify(_garageResearchErrMsg(r));
   };
 
-  const tr = bd.querySelector('#m-transfer');
-  if(tr) tr.onclick = function(){
-    const r = _garageTransferExp5(vid);
-    if(r.transferred > 0){
-      notify('已轉入 ' + r.transferred + ' 經驗');
-      _garageShowTechDetail(vid);
-      _refreshGaragePage();
-    } else {
-      notify('無可轉入經驗');
+  if(_showTransfer){
+    const slider = bd.querySelector("#gt-slider");
+    const xEl = bd.querySelector("#gt-x");
+    const afterGeEl = bd.querySelector("#gt-after-ge");
+    const afterProgEl = bd.querySelector("#gt-after-prog");
+    const confirmBtn = bd.querySelector("#gt-confirm");
+    if(slider && confirmBtn){
+      var _upd = function(){
+        var x = parseInt(slider.value, 10) || 0;
+        xEl.textContent = x;
+        afterGeEl.textContent = _ge - x;
+        afterProgEl.textContent = Math.floor(_prog + x) + " / " + _need;
+        confirmBtn.disabled = (x <= 0);
+      };
+      slider.oninput = _upd; _upd();
+      confirmBtn.onclick = function(){
+        var x = parseInt(slider.value, 10) || 0;
+        if(x <= 0) return;
+        g.globalExp = Math.max(0, (g.globalExp || 0) - x);
+        if(!g.researchProgress) g.researchProgress = {};
+        g.researchProgress[vid] = (g.researchProgress[vid] || 0) + x;
+        if(typeof save === "function") save();
+        console.info("[garage] 轉入", x, "全局經驗 →", vid);
+        _garageShowTechDetail(vid); _refreshGaragePage();
+      };
     }
-  };
+  }
 }
 
 /* ===== end rev565 ===== */

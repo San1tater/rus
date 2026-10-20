@@ -1174,3 +1174,81 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
   background-position:center;
   background-repeat:no-repeat;
 }
+
+/* rev635: 全局經驗 + 轉入面板 */
+.garage-transfer-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 10px;
+  margin-top:8px;
+  background:#1a1510;
+  border:1px solid #3a2f25;
+  border-radius:6px;
+  min-height:40px;
+}
+.garage-transfer-info{
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  flex:1;
+  min-width:0;
+}
+.garage-transfer-label{
+  font-size:11px;
+  color:#7a6f60;
+  white-space:nowrap;
+}
+.garage-transfer-value{
+  font-size:14px;
+  font-weight:bold;
+  color:#a45ede;
+  font-family:Menlo,Consolas,monospace;
+}
+.garage-transfer-btn{
+  flex:0 0 auto;
+  padding:6px 16px;
+  background:#8a5f18;
+  color:#fff;
+  border:none;
+  border-radius:5px;
+  font-size:12px;
+  font-weight:bold;
+  cursor:pointer;
+}
+.garage-transfer-btn:active:not(:disabled){ background:#a57118; }
+.garage-transfer-btn:disabled{ background:#2c2419; color:#7a6f60; cursor:not-allowed; }
+.garage-transfer-slider-wrap{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  width:100%;
+}
+.garage-transfer-slider-info{
+  display:flex;
+  justify-content:space-between;
+  font-size:11px;
+  color:#a89a85;
+}
+.garage-transfer-slider-info b{
+  color:#e8a33d;
+  font-family:Menlo,Consolas,monospace;
+}
+.garage-transfer-slider-wrap input[type=range]{
+  width:100%;
+  accent-color:#e8a33d;
+  margin:0;
+}
+.garage-transfer-slider-actions{
+  display:flex;
+  gap:6px;
+  justify-content:flex-end;
+}
+.garage-transfer-slider-actions .btn{
+  flex:0 0 auto;
+  padding:5px 16px;
+  font-size:11px;
+  border-radius:5px;
+}
