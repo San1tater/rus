@@ -1252,3 +1252,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
   font-size:11px;
   border-radius:5px;
 }
+
+/* rev646: 標題欄空隙 —— 升級按鈕與全局經驗之間 */
+.garage-title > .garage-global-exp{margin-left:12px !important;}
