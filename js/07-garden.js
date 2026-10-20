@@ -5823,10 +5823,23 @@ function _openOfflineGardenDetail(entry){
     let h = '<div class="cat-header" data-gcat="og_' + key + '" style="cursor:pointer"><span>' + title + ' (' + items.length + ')</span><span>' + (col ? '▶' : '▼') + '</span></div>';
     if(!col){
       for(const it of items){
-        const def = itemDef(it.id) || { name: it.id };
         const _isFood = (it.id === 'food');
-        const _iconHtml = _isFood ? '🍲' : itemIcon(it.id, 30);
-        h += '<div class="item-row"' + (_isFood ? ' style="cursor:default"' : (' data-iid="' + it.id + '" data-irar="' + it.rarity + '"')) + '><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + _iconHtml + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + def.name + '</div><div class="sub">' + it.rarity + '</div></div><div class="cnt">×' + it.count + '</div></div>';
+        const _isGardenExtra = (typeof GARDEN_EXTRAS !== 'undefined' && GARDEN_EXTRAS[it.id]);
+        let def, _iconHtml, _clickable;
+        if(_isFood){
+          def = { name: '食物' };
+          _iconHtml = '🍲';
+          _clickable = false;
+        } else if(_isGardenExtra){
+          def = GARDEN_EXTRAS[it.id];
+          _iconHtml = '<img src="icons/garden/' + def.img + '.png' + assetSuffix() + '" style="width:30px;height:30px;object-fit:contain;display:block" alt="">';
+          _clickable = false;
+        } else {
+          def = itemDef(it.id) || { name: it.id };
+          _iconHtml = itemIcon(it.id, 30);
+          _clickable = true;
+        }
+        h += '<div class="item-row"' + (_clickable ? (' data-iid="' + it.id + '" data-irar="' + it.rarity + '"') : ' style="cursor:default"') + '><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + _iconHtml + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + def.name + '</div><div class="sub">' + it.rarity + '</div></div><div class="cnt">×' + it.count + '</div></div>';
       }
     }
     return h;

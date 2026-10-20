@@ -1327,7 +1327,7 @@ function _garageShowTechDetail(vid){
     if(expDone){
       body += '<button class="btn primary tech-detail-action" id="m-buy"' + (canBuy ? '' : ' disabled') + '>購買</button>';
     } else if(isTarget){
-      body += '<button class="btn primary tech-detail-action" id="m-research" data-mode="cancel">研發中</button>';
+      body += '<button class="btn tech-detail-action" disabled>研發中</button>';
     } else {
       body += '<button class="btn primary tech-detail-action" id="m-research" data-mode="start">研發</button>';
     }
