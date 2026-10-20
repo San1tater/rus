@@ -282,36 +282,89 @@
     return { canvas: c, minX: minX, minY: minY, bw: bw, bh: bh };
   }
 
-  function _renderDoor(ctx, img, ann, door, cw, ch, openAngle){
-    if(!door || !door.polygon || door.polygon.length < 3) return;
-    const pts = door.polygon;
-    const x1 = door.hingeP1.x * cw, y1 = door.hingeP1.y * ch;
-    const x2 = door.hingeP2.x * cw, y2 = door.hingeP2.y * ch;
-    const ang = (openAngle || 0) * Math.PI / 180;
-    const cosA = Math.cos(ang);
-    const showBack = cosA < 0;
-    const alpha = Math.atan2(y2 - y1, x2 - x1);
+  function _renderDoor(ctx, img, ann, door, cw, ch, openAngle, backColor){
+  /* rev606: 門板描邊（正面/背面） + 鉸鏈軸雙層描邊（厚度錯覺） */
+  if(!door || !door.polygon || door.polygon.length < 3) return;
+  const pts = door.polygon;
+  const x1 = door.hingeP1.x * cw, y1 = door.hingeP1.y * ch;
+  const x2 = door.hingeP2.x * cw, y2 = door.hingeP2.y * ch;
+  const ang = (openAngle || 0) * Math.PI / 180;
+  const cosA = Math.cos(ang);
+  const showBack = cosA < 0;
+  const showEdges = Math.abs(cosA) < 0.98;
+  const alpha = Math.atan2(y2 - y1, x2 - x1);
+  ctx.save();
+  ctx.translate(x1, y1);
+  ctx.rotate(alpha);
+  ctx.scale(1, cosA);
+  ctx.rotate(-alpha);
+  ctx.translate(-x1, -y1);
+  if(showBack){
+    /* 背面：深黑内衬 + 内阴影 + 多边形描边 */
+    ctx.fillStyle = backColor || door.fillColor || '#0c0c0c';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x*cw, pts[0].y*ch);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*cw, pts[i].y*ch);
+    ctx.closePath();
+    ctx.fill();
+    /* 内阴影：中心透明 → 边缘压暗，模拟凹陷 */
     ctx.save();
-    ctx.translate(x1, y1);
-    ctx.rotate(alpha);
-    ctx.scale(1, cosA);
-    ctx.rotate(-alpha);
-    ctx.translate(-x1, -y1);
-    if(showBack){
-      ctx.fillStyle = door.fillColor || '#000000';
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x*cw, pts[0].y*ch);
-      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*cw, pts[i].y*ch);
-      ctx.closePath();
-      ctx.fill();
-    } else {
-      const clip = _makeDoorClip(img, pts, cw, ch);
-      if(clip){
-        ctx.drawImage(clip.canvas, clip.minX, clip.minY, clip.bw, clip.bh);
-      }
+    ctx.clip();
+    let _bMnX=Infinity, _bMnY=Infinity, _bMxX=-Infinity, _bMxY=-Infinity;
+    for(const p of pts){
+      const _px = p.x*cw, _py = p.y*ch;
+      if(_px < _bMnX) _bMnX = _px;
+      if(_py < _bMnY) _bMnY = _py;
+      if(_px > _bMxX) _bMxX = _px;
+      if(_py > _bMxY) _bMxY = _py;
     }
+    const _bCx = (_bMnX + _bMxX) / 2, _bCy = (_bMnY + _bMxY) / 2;
+    const _bR = Math.max(_bMxX - _bMnX, _bMxY - _bMnY) / 2 || 1;
+    const _bG = ctx.createRadialGradient(_bCx, _bCy, _bR * 0.15, _bCx, _bCy, _bR);
+    _bG.addColorStop(0, 'rgba(0,0,0,0)');
+    _bG.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = _bG;
+    ctx.fillRect(_bMnX, _bMnY, _bMxX - _bMnX, _bMxY - _bMnY);
+    ctx.restore();
+  } else {
+    /* 正面：圖片裁切 */
+    const clip = _makeDoorClip(img, pts, cw, ch);
+    if(clip){
+      ctx.drawImage(clip.canvas, clip.minX, clip.minY, clip.bw, clip.bh);
+    }
+  }
+  /* 多邊形描邊（正面/背面共用，隨門板一起旋轉） */
+  if(showEdges){
+    ctx.strokeStyle = 'rgba(100,100,100,0.6)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x*cw, pts[0].y*ch);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*cw, pts[i].y*ch);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+  /* 鉸鏈軸雙層描邊（在變換外，固定位置，不被門板壓扁） */
+  if(showEdges){
+    ctx.save();
+    ctx.lineCap = 'round';
+    /* 外層暗線：厚度感 */
+    ctx.strokeStyle = 'rgba(25,25,25,0.9)';
+    ctx.lineWidth = 2.8;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    /* 內層亮線：金屬反光 */
+    ctx.strokeStyle = 'rgba(150,150,150,0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
     ctx.restore();
   }
+}
 
   function renderVehicle(ctx, id, x, y, w, h, animTime, opts){
     opts = opts || {};
@@ -388,13 +441,13 @@
         ctx.restore();
       }
       if(ann.doors.lower && ann.doors.lower.length){
-        for(const d of ann.doors.lower) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * (110 / 180));
+        for(const d of ann.doors.lower) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * (110 / 180), '#0c0c0c');
       }
       if(ann.doors.upper && ann.doors.upper.length){
-        for(const d of ann.doors.upper) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen);
+        for(const d of ann.doors.upper) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen, '#0c0c0c');
       }
       if(ann.doors.hatch && ann.doors.hatch.length){
-        for(const d of ann.doors.hatch) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * 0.5);
+        for(const d of ann.doors.hatch) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * 0.5, '#0c0c0c');
       }
     }
 
@@ -809,20 +862,24 @@ const BTRSupport = {
                     : ((this.phase === 'enter' || this.phase === 'leave') ? 0.5
                     : (this.phase === 'center' ? 0.3 : 0));
     if(ann.wheels && intensity > 0 && Math.random() < intensity){
-      const wheel = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
-      const wheelCenterX = px + wheel.cx * this.targetW;
-      const wheelRadiusPx = wheel.r * this.targetW;
-      const wheelBottomY = py + wheel.cy * this.targetH + wheelRadiusPx * 0.98;
-      if(wheelCenterX > -60 && wheelCenterX < this.width + 60){
-        this.dustParticles.push({
-          x: wheelCenterX + (Math.random() - 0.5) * wheelRadiusPx * 1.4,
-          y: wheelBottomY + (Math.random() - 0.4) * 6,
-          vx: -(1 + Math.random() * 2.5),
-          vy: -(0.2 + Math.random() * 0.8),
-          life: 1,
-          size: 4 + Math.random() * 7,
-          hue: 28 + Math.random() * 18
-        });
+      /* rev604: 揚塵加大 —— 高強度 spawn 2 顆，size/速度/範圍都放大 */
+      const _dustCount = intensity >= 0.7 ? 2 : 1;
+      for(let _di = 0; _di < _dustCount; _di++){
+        const wheel = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
+        const wheelCenterX = px + wheel.cx * this.targetW;
+        const wheelRadiusPx = wheel.r * this.targetW;
+        const wheelBottomY = py + wheel.cy * this.targetH + wheelRadiusPx * 0.98;
+        if(wheelCenterX > -80 && wheelCenterX < this.width + 80){
+          this.dustParticles.push({
+            x: wheelCenterX + (Math.random() - 0.5) * wheelRadiusPx * 1.6,
+            y: wheelBottomY + (Math.random() - 0.4) * 8,
+            vx: -(1.2 + Math.random() * 3.2),
+            vy: -(0.3 + Math.random() * 1.2),
+            life: 1,
+            size: 6 + Math.random() * 10,
+            hue: 28 + Math.random() * 18
+          });
+        }
       }
     }
 
@@ -849,8 +906,9 @@ const BTRSupport = {
       p.vx *= 0.98;
       p.life -= 0.014;
       if(p.life <= 0){ this.dustParticles.splice(i, 1); continue; }
-      const alpha = Math.max(0, p.life) * 0.5;
-      const sz = p.size * (1.4 - p.life * 0.5);
+      /* rev604: 揚塵更明顯 —— alpha 0.5→0.65，末期尺寸不縮太小 */
+      const alpha = Math.max(0, p.life) * 0.65;
+      const sz = p.size * (1.5 - p.life * 0.45);
       ctx.fillStyle = 'hsla(' + p.hue + ',35%,48%,' + alpha + ')';
       ctx.beginPath();
       ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);

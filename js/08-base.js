@@ -725,8 +725,8 @@ function _openGarageInfoModal(idx, opts){
 
   /* rev596: 標題行左右對齊；「進入」按鈕靠右，與其他建築標題一致 */
   let body = '<div class="detail-title" style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
-    + '<span>' + buildingIcon('garage') + ' ' + b.name + ' Lv.' + lv + (isMax ? ' (MAX)' : '') + '</span>'
-    + (fromGarage ? '' : '<button class="btn primary" id="m-enter" style="flex:0 0 auto;padding:4px 12px;font-size:11px;width:auto">進入</button>')
+    + '<span style="display:inline-flex;align-items:center;gap:4px">' + buildingIcon('garage') + '<span>' + b.name + ' Lv.' + lv + (isMax ? ' (MAX)' : '') + '</span></span>'
+    + (fromGarage ? '' : '<button class="btn primary" id="m-enter" style="flex:0 0 auto;width:auto;background:#2e7d32;padding:10px 24px;min-width:88px">進入</button>')
     + '</div>'
     + '<div class="detail-sub">' + b.desc + '</div>'
     + '<div class="stat-line"><span class="k">當前效果</span><span class="v">電台次數上限 ' + lv + '</span></div>';

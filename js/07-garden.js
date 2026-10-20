@@ -2568,6 +2568,48 @@ function drawHandItemUnit(ctx, u){
     ctx.fillStyle = '#3a78c8';
     ctx.fillRect(cx - w/2, cy - h/2, w, h);
     ctx.restore();
+  } else if(u.handItemType === 'flask'){
+    /* rev618: 圓底燒瓶 —— 合併路徑（瓶頸 + 球體下半弧一次 fill/stroke，無重疊斷層） */
+    const positions = u.flaskPositions || [];
+    const R = 37;         /* 球體半徑 */
+    const NECK_W = 26;    /* 頸寬 */
+    const NECK_H = 52;    /* 頸高 */
+    const halfNeck = NECK_W / 2;
+    const BODY_OFFSET = R + NECK_H/2 - 3;
+    for(const pos of positions){
+      const cx = pos.x;
+      const cy = pos.y + BODY_OFFSET;
+      const neckTopY = cy - R - NECK_H;
+      const neckBottomY = cy - R + 5;  /* 瓶頸底部稍插入球體 5px */
+      const _dy = neckBottomY - cy;
+      const _angleRight = Math.atan2(_dy, halfNeck);
+      const _angleLeft = Math.atan2(_dy, -halfNeck);
+      ctx.save();
+      ctx.fillStyle = 'rgba(80,138,100,0.92)';
+      ctx.strokeStyle = '#1f3a2a';
+      ctx.lineWidth = 8;
+      ctx.lineJoin = 'round';
+      /* 合併路徑：瓶頸左上 → 左下 → 球體下半弧（經過底）→ 右上 → closePath */
+      ctx.beginPath();
+      ctx.moveTo(cx - halfNeck, neckTopY);
+      ctx.lineTo(cx - halfNeck, neckBottomY);
+      ctx.arc(cx, cy, R, _angleLeft, _angleRight, true);
+      ctx.lineTo(cx + halfNeck, neckTopY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      /* 頸口小橫線（開口，左右各延伸 8） */
+      ctx.beginPath();
+      ctx.moveTo(cx - halfNeck - 8, neckTopY);
+      ctx.lineTo(cx + halfNeck + 8, neckTopY);
+      ctx.stroke();
+      /* 球形液面高光 */
+      ctx.fillStyle = 'rgba(180,230,200,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(cx - R*0.32, cy - R*0.25, R*0.32, R*0.14, -0.4, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 }
 function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType, flipX, hasBucket, handItem){
@@ -2665,7 +2707,7 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
     }
   }
   /* rev306: 手持農具 —— 農民木棍 / 監工藍板 */
-  if(handItem === 'stick' || handItem === 'clipboard'){
+  if(handItem === 'stick' || handItem === 'clipboard' || handItem === 'flask'){
     const _fa = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
     const _ba = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
     if(_fa && _ba){
@@ -2693,6 +2735,16 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
         units.push({ z: 58, kind: 'handitem', handItemType: 'clipboard',
                      armMidX: (_fMidX + _bMidX) / 2,
                      armMidY: (_fMidY + _bMidY) / 2 });
+      } else if(handItem === 'flask'){
+        /* rev615: 蒸餾農民 —— 左右手各一個燒瓶
+           z=61：右手在前臂(62)之下，形成「手握瓶頸」視覺
+                 左手在後臂(55)之上，仍可見 */
+        const _flaskRX = _fCx + _fW * (0.85 - _fa.pivot.x);
+        const _flaskRY = _fCy + _fH * (0.5 - _fa.pivot.y);
+        const _flaskLX = _bCx + _bW * (0.2 - _ba.pivot.x);
+        const _flaskLY = _bCy + _bH * (0.5 - _ba.pivot.y);
+        units.push({ z: 61, kind: 'handitem', handItemType: 'flask',
+                     flaskPositions: [{x:_flaskLX, y:_flaskLY}, {x:_flaskRX, y:_flaskRY}] });
       }
     }
   }
@@ -4755,6 +4807,8 @@ const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
     /* rev306: 手持農具 —— 堆肥農民灰桶 / 一般農民木棍 / 監工藍板 */
     let _handItem = null;
     if(_hasBucket) _handItem = 'bucket';
+    /* rev612: 蒸餾室農民 → 雙手各持一個燒瓶 */
+    else if(a.type === 'farmer' && a._srv && typeof _isAssignedToDistillery === 'function' && _isAssignedToDistillery(a._srv)) _handItem = 'flask';
     else if(a.type === 'farmer') _handItem = 'stick';
     else if(a.type === 'foreman') _handItem = 'clipboard';
     /* rev361: 朝向記憶，只在有明顯位移時才更新，防止原地抽搐 */
@@ -5455,6 +5509,16 @@ function _gardenOfflineSettle(now, baseTime){
       }
     }
   }
+  /* rev611: 記錄私酒初始數量，用於離線產出統計 */
+  const _liquorBefore = {};
+  {
+    const _s = _gardenStorageInit();
+    for(const _k in _s){
+      if(_k.indexOf('liquor@') === 0 && _s[_k] > 0){
+        _liquorBefore[_k] = _s[_k];
+      }
+    }
+  }
   let lastMealHour = Math.floor(baseTime / GARDEN_MEAL_INTERVAL_MS);
   const farmers = (state.servants || []).filter(function(s){
     return s.type === 'farmer' && s.assignedPlots && s.assignedPlots.length > 0;
@@ -5491,6 +5555,11 @@ function _gardenOfflineSettle(now, baseTime){
       for(const p of plots){
         if(p && p.type === 'soil' && p.crop && p.crop.matureAt > cursor && p.crop.matureAt < nextT){
           nextT = p.crop.matureAt;
+        }
+        /* rev611: 蒸餾室週期加入 nextT 候選 */
+        if(p && p.type === 'distillery' && p.enabled !== false && typeof DISTILL_PERIOD_MS === 'number'){
+          const _nextDistill = (Math.floor(cursor / DISTILL_PERIOD_MS) + 1) * DISTILL_PERIOD_MS;
+          if(_nextDistill > cursor && _nextDistill < nextT) nextT = _nextDistill;
         }
       }
       if(nextT <= cursor){ cursor += 1000; continue; }
@@ -5561,6 +5630,11 @@ function _gardenOfflineSettle(now, baseTime){
         for(const k in lr.seeds) seedsOut[k] = (seedsOut[k] || 0) + lr.seeds[k];
         for(const k in lr.mats) matsOut[k] = (matsOut[k] || 0) + lr.mats[k];
       }
+      /* rev612: 同步 a.stamina ← a.srv.stamina —— 修復蒸餾扣體力後監工叫醒判斷看不到 */
+      for(const _sid in actorMap){
+        const _a = actorMap[_sid];
+        _a.stamina = Math.min(_a.srv.stamina || 0, servantEffectiveMaxStamina(_a.srv));
+      }
     }
     /* 離線防禦戰結算（在產線/農業結算之後） */
     try {
@@ -5568,6 +5642,21 @@ function _gardenOfflineSettle(now, baseTime){
     } catch(e){ console.warn('[offline raid]', e); }
   } catch(e){
     console.warn('[garden offline sim] err', e);
+  }
+  /* rev611: 主循環結束後兜底補一次蒸餾（應對 MAX_ITER 用完、cursor 未推到 now） */
+  if(cursor < now){
+    try { if(typeof _gardenDistilleryTick === 'function') _gardenDistilleryTick(now); } catch(e){}
+  }
+  /* rev611: 計算私酒離線產出 */
+  const liquorOut = {};
+  {
+    const _s = _gardenStorageInit();
+    for(const _k in _s){
+      if(_k.indexOf('liquor@') !== 0) continue;
+      const _before = _liquorBefore[_k] || 0;
+      const _after = _s[_k] || 0;
+      if(_after > _before) liquorOut[_k] = _after - _before;
+    }
   }
   g.lastMealAt = Math.floor(now / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
   const _mSeed = Object.keys(merchantAccum.seed).reduce(function(s,k){ return s + merchantAccum.seed[k].count; }, 0);
@@ -5580,7 +5669,7 @@ function _gardenOfflineSettle(now, baseTime){
     type: 'offline_garden',
     hours: hours,
     harvest: totalHarvest, plant: totalPlant, clean: totalClean, leaves: totalLeaves, fertilize: totalFert,
-    crops: cropsOut, seeds: seedsOut, mats: matsOut,
+    crops: cropsOut, seeds: seedsOut, mats: matsOut, liquor: liquorOut,
     merchant: merchantAccum
   };
   const parts = [];
@@ -5597,6 +5686,9 @@ function _gardenOfflineSettle(now, baseTime){
     if(_mAmmo) _mp.push('🎖️+' + _mAmmo);
     parts.push('產線 ' + _mp.join(' '));
   }
+  /* rev611: summary 加私酒 */
+  const _liqTotal = Object.keys(liquorOut).reduce(function(s, k){ return s + liquorOut[k]; }, 0);
+  if(_liqTotal) parts.push('🍶+' + _liqTotal);
   const summary = parts.length
     ? ('離線 ' + hours + ' 小時，後院：' + parts.join('、') + '。 點擊查看 →')
     : ('離線 ' + hours + ' 小時，後院無活動。');
@@ -5740,13 +5832,16 @@ function _openOfflineGardenDetail(entry){
     return h;
   }
   /* 後院作物/種子/材料（放最上方） */
-  const _cArr = [], _sArr = [], _mArr = [];
+  const _cArr = [], _sArr = [], _mArr = [], _lqArr = [];
   if(d.crops){ for(const k in d.crops){ const sp = k.split('@'); _cArr.push({ id: sp[0], rarity: sp[1], count: d.crops[k] }); } }
   if(d.seeds){ for(const k in d.seeds){ const sp = k.split('@'); _sArr.push({ id: sp[0], rarity: sp[1], count: d.seeds[k] }); } }
   if(d.mats){ for(const k in d.mats){ _mArr.push({ id: k, rarity: '一般', count: d.mats[k] }); } }
+  /* rev611: 私酒 */
+  if(d.liquor){ for(const k in d.liquor){ const sp = k.split('@'); _lqArr.push({ id: sp[0], rarity: sp[1], count: d.liquor[k] }); } }
   body += _catHtml('crops', '🌾 作物', _cArr);
   body += _catHtml('seeds', '🌰 種子', _sArr);
   body += _catHtml('mats', '🔩 材料', _mArr);
+  body += _catHtml('liquor', '🍶 私酒', _lqArr);
   /* 產線產出（放最後） */
   if(d.merchant){
     if(d.merchant.foodBatches > 0){
