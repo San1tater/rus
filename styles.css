@@ -807,6 +807,11 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
   margin-bottom:0;
 }
 
+/* rev596: 車場標題行升級按鈕（inline 風格） */
+.garage-upgrade-inline{display:inline-block;vertical-align:middle;background:#8a5f18;color:#fff;border:none;padding:3px 10px;font-size:11px;font-weight:bold;border-radius:4px;cursor:pointer;flex:0 0 auto;margin-left:8px;line-height:1.3}
+.garage-upgrade-inline:active:not(:disabled){background:#a57118}
+.garage-upgrade-inline:disabled{background:#2c2419;color:#7a6f60;cursor:not-allowed}
+
 /* rev561: 電台按鈕 */
 .radio-btn{position:absolute;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:5px;color:#e8a33d;font-weight:bold;cursor:pointer;user-select:none;z-index:4;box-sizing:border-box;display:flex;justify-content:center;align-items:center;text-align:center;padding:0}
 .radio-btn:active{transform:scale(0.94)}
@@ -931,12 +936,12 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 
 /* ===== 縱向 WT 科技樹 ===== */
 .wt-tech-wrap{overflow-y:auto;overflow-x:hidden;padding:8px 4px;-webkit-overflow-scrolling:touch;display:flex;justify-content:center}
-.wt-tech-canvas{position:relative;width:320px;height:438px;flex:0 0 auto}
+.wt-tech-canvas{position:relative;width:340px;height:438px;flex:0 0 auto}
 .wt-node{position:absolute;background:#1a1510;border:2px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px 3px;box-sizing:border-box;cursor:pointer;user-select:none;overflow:hidden;transition:transform .1s,border-color .15s,box-shadow .15s}
 .wt-node:active{transform:scale(.95)}
 .wt-node-img{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .wt-node-img img{max-width:100%;max-height:100%;object-fit:contain;display:block}
-.wt-node-name{flex:0 0 auto;font-size:10px;font-weight:bold;color:#ddd;text-align:center;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:1px 2px}
+.wt-node-name{flex:0 0 auto;font-size:9px;font-weight:bold;color:#ddd;text-align:center;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:1px 2px}
 .wt-node.owned{border-color:#4caf50;background:#152a15}
 .wt-node.owned .wt-node-name{color:#7ee07e}
 .wt-node.current{border-color:#7ee07e;background:#1a3a1a;box-shadow:0 0 8px rgba(126,224,126,.5)}
@@ -1155,3 +1160,14 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 
 /* rev570: no horizontal scrollbar on tech tree */
 .wt-tech-wrap{overflow-x:hidden !important;overflow-y:auto !important}
+
+/* rev600: 載具卡片統一背景圖（科技樹節點 / 車場展示 / 研發目標） */
+.wt-node-img,
+.garage-showcase,
+.garage-research-img-wrap,
+.garage-tech-detail-img-wrap{
+  background-image:url('icons/vehicles/card_bg.png');
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+}

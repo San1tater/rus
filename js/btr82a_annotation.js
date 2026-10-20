@@ -1,11 +1,17 @@
 /* 載具配置：btr82a (由載具標注編輯器 v1.9 生成) */
-/* 車輪完整圓形旋轉 + 遮罩下緣鏡像補全；履帶遮罩為全局折線；艙門以底邊為軸向外翻（朝向觀眾）；槍口支持層序 */
+/* - 車輪完整圓形旋轉 + 遮罩下緣鏡像補全
+ * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關
+ * - trackLine：履帶帶子上邊界折線（履帶滾動 + 原圖擦除用），只用於履帶
+ * - trackScroll：沿 trackLine 弧長參數化滾動（A 層原圖紋理 + B 層條紋，v = ω·r）
+ * - 渲染順序：image → eraseOriginalTrack → trackScroll → wheels → trackMask → doors → muzzles → effects
+ *   （原圖 trackLine 以下且 trackMask 以下被擦除，保護車體；履帶在輪子下層）
+ */
 const VEHICLE_ANNOTATION_BTR82A = {
   "id": "btr82a",
   "orientation": "right",
   "imageSize": {
-    "w": 623,
-    "h": 220
+    "w": 636,
+    "h": 240
   },
   "anchor": {
     "groundY": 1,
@@ -24,6 +30,34 @@ const VEHICLE_ANNOTATION_BTR82A = {
       }
     ]
   },
+  "trackLine": null,
+  "trackScroll": {
+    "enabled": false,
+    "direction": -1,
+    "spacing": 0.06,
+    "darkAlpha": 0.28,
+    "lightAlpha": 0.12,
+    "followWheel": 0,
+    "useTexture": true,
+    "textureX0": 0.15,
+    "textureX1": 0.4,
+    "textureY0": null,
+    "textureY1": null,
+    "bandHeight": 0.08,
+    "textureOpacity": 0.85,
+    "useStripes": true,
+    "stripeStrength": 0.25
+  },
+  "renderOrder": [
+    "image",
+    "eraseOriginalTrack",
+    "trackScroll",
+    "wheels",
+    "trackMask",
+    "doors",
+    "muzzles",
+    "effects"
+  ],
   "weapons": [
     {
       "id": "pkt",
@@ -40,26 +74,26 @@ const VEHICLE_ANNOTATION_BTR82A = {
   ],
   "wheels": [
     {
-      "cx": 0.1815,
-      "cy": 0.784,
+      "cx": 0.1973,
+      "cy": 0.8008,
       "r": 0.0776,
       "rotSpeed": 1
     },
     {
-      "cx": 0.3584,
-      "cy": 0.7748,
+      "cx": 0.3741,
+      "cy": 0.8024,
       "r": 0.0776,
       "rotSpeed": 1
     },
     {
-      "cx": 0.5906,
-      "cy": 0.7885,
+      "cx": 0.5986,
+      "cy": 0.8039,
       "r": 0.0776,
       "rotSpeed": 1
     },
     {
-      "cx": 0.7698,
-      "cy": 0.7959,
+      "cx": 0.7738,
+      "cy": 0.8073,
       "r": 0.0776,
       "rotSpeed": 1
     }
@@ -69,30 +103,30 @@ const VEHICLE_ANNOTATION_BTR82A = {
       {
         "polygon": [
           {
-            "x": 0.428,
-            "y": 0.3447
+            "x": 0.4371,
+            "y": 0.3953
           },
           {
-            "x": 0.4205,
-            "y": 0.5023
+            "x": 0.4281,
+            "y": 0.5435
           },
           {
-            "x": 0.5147,
-            "y": 0.5083
+            "x": 0.5223,
+            "y": 0.5495
           },
           {
-            "x": 0.5055,
-            "y": 0.3491
+            "x": 0.5216,
+            "y": 0.3967
           }
         ],
         "fillColor": "#000000",
         "hingeP1": {
-          "x": 0.5055,
-          "y": 0.3491
+          "x": 0.5216,
+          "y": 0.3967
         },
         "hingeP2": {
-          "x": 0.5147,
-          "y": 0.5083
+          "x": 0.5223,
+          "y": 0.5495
         },
         "openRotation": 180,
         "frontUses": "image_crop",
@@ -103,30 +137,30 @@ const VEHICLE_ANNOTATION_BTR82A = {
       {
         "polygon": [
           {
-            "x": 0.4205,
-            "y": 0.5083
+            "x": 0.428,
+            "y": 0.5412
           },
           {
-            "x": 0.4462,
-            "y": 0.7629
+            "x": 0.4599,
+            "y": 0.7902
           },
           {
-            "x": 0.4864,
-            "y": 0.772
+            "x": 0.4996,
+            "y": 0.7943
           },
           {
-            "x": 0.5152,
-            "y": 0.5083
+            "x": 0.521,
+            "y": 0.5442
           }
         ],
         "fillColor": "#000000",
         "hingeP1": {
-          "x": 0.4462,
-          "y": 0.7629
+          "x": 0.4599,
+          "y": 0.7902
         },
         "hingeP2": {
-          "x": 0.4864,
-          "y": 0.772
+          "x": 0.4996,
+          "y": 0.7943
         },
         "openRotation": 110,
         "frontUses": "image_crop",
@@ -138,18 +172,68 @@ const VEHICLE_ANNOTATION_BTR82A = {
   "weaponAreas": [],
   "muzzles": [
     {
-      "x": 0.6637,
-      "y": 0.0598,
+      "x": 0.6362,
+      "y": 0.1575,
       "name": "槍口 1",
       "weaponId": "pkt",
       "layerOrder": "above"
     },
     {
-      "x": 0.7765,
-      "y": 0.1097,
+      "x": 0.8668,
+      "y": 0.1593,
       "name": "槍口 2",
       "weaponId": "2a72",
       "layerOrder": "above"
     }
-  ]
+  ],
+  "btrDoorTimeline": {
+    "cycle": 20,
+    "segments": [
+      {
+        "t0": 0,
+        "t1": 1,
+        "mode": "closed"
+      },
+      {
+        "t0": 1,
+        "t1": 2,
+        "mode": "open"
+      },
+      {
+        "t0": 2,
+        "t1": 3.5,
+        "mode": "holdOpen"
+      },
+      {
+        "t0": 3.5,
+        "t1": 4.5,
+        "mode": "close"
+      },
+      {
+        "t0": 4.5,
+        "t1": 12,
+        "mode": "closed"
+      },
+      {
+        "t0": 12,
+        "t1": 13,
+        "mode": "open"
+      },
+      {
+        "t0": 13,
+        "t1": 14.5,
+        "mode": "holdOpen"
+      },
+      {
+        "t0": 14.5,
+        "t1": 15.5,
+        "mode": "close"
+      },
+      {
+        "t0": 15.5,
+        "t1": 20,
+        "mode": "closed"
+      }
+    ]
+  }
 };

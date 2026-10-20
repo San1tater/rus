@@ -1089,10 +1089,20 @@ function _spawnExploreCorpses(enemies){
   }
 
   const startTime = performance.now();
+  let _lastTickTime = startTime;
+  let _accumShift = 0;
   function tick(){
     if(!batch.parentNode) return;
-    const elapsed = (performance.now() - startTime) / 1000;
-    const shift = scrollSpeed * elapsed;
+    const _now = performance.now();
+    const _dt = Math.max(0, Math.min(0.1, (_now - _lastTickTime) / 1000));
+    _lastTickTime = _now;
+    /* rev596: BTR 加速階段（enter / support / leave）尸體 1 秒內移出，
+       避免與「BTR 全速駛過」的視覺脫節 */
+    const _btr = window.BTRSupport;
+    const _btrFast = _btr && _btr.active && (_btr.phase === 'enter' || _btr.phase === 'support' || _btr.phase === 'leave');
+    const _speed = _btrFast ? (fxW * 3) : scrollSpeed;
+    _accumShift += _speed * _dt;
+    const shift = _accumShift;
     let allOut = true;
     for(let i = 0; i < corpseEls.length; i++){
       const c = corpseEls[i];
@@ -2754,7 +2764,13 @@ function renderExplore(){
       <div class="zone-title">🧭 ${_displayRegion} · ${cur.node}</div>
       <div class="zone-badge">${state.preferences.actionMode==='attack'?'⚔ 攻擊前進':'🥷 潛行蒐集'}</div>
     </div>`;
-  requestAnimationFrame(()=>{ renderExploreHeroCanvas(); });
+  requestAnimationFrame(()=>{ 
+    renderExploreHeroCanvas(); 
+    /* rev596: 切頁回來時重掛 BTR canvas / streamBg，不丟失進行中的動畫 */
+    if(window.BTRSupport && window.BTRSupport.active){
+      try{ window.BTRSupport._setupCanvas(); window.BTRSupport._setupStreamBg(); }catch(e){ console.warn('[btr remount]', e); }
+    }
+  });
   renderEquipZone(z2);
   z3.innerHTML=`<div class="z3-head"><div class="z3-title">📜 日誌</div><div class="z3-btn" id="log-history-btn">查看記錄</div></div><div class="logbox" id="logbox"></div>`;
   renderZone3Log();
@@ -2808,34 +2824,26 @@ function _radioTryConsume(){
 function _radioTriggerBTR(){
   if(typeof window._radioBTRTrigger === 'function'){
     window._radioBTRTrigger();
-    return;
   }
-  /* Stub：模組 5 实现后覆盖 _radioBTRTrigger */
-  notify('BTR 支援演出即將推出');
-  state.radioUses += 1;
-  state.radioCooldownUntil = 0;
-  if(typeof save === 'function') save();
 }
 
 function _radioShowConfirm(){
   _radioEnsureInit();
   const st = _radioGetStatus();
   if(st.state === 'cooldown'){
-    notify('冷卻中，剩 ' + st.remain + ' 秒');
     return;
   }
   if(st.state === 'empty'){
-    notify('今日次數已用盡，每日 00:00 重置');
     return;
   }
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '<button class="btn primary" id="rc-ok">確認</button><button class="btn ghost" id="rc-cancel">取消</button>';
-  const body = '<div class="detail-title">📻 召喚 BTR 支援</div>'
+  const body = '<div class="detail-title">📻 召喚載具支援</div>'
     + '<div class="detail-sub">消耗 1 次電台次數</div>'
     + '<div class="stat-line"><span class="k">剩餘次數</span><span class="v">' + st.uses + ' → ' + (st.uses - 1) + '</span></div>'
     + '<div class="stat-line"><span class="k">下次重置</span><span class="v">每日 00:00（上限 ' + ((typeof getBuildingLv === 'function') ? getBuildingLv('garage') : 0) + '）</span></div>'
-    + '<div style="font-size:10px;color:#7a6f60;margin-top:8px;line-height:1.5">BTR 將從左側駛入，橫衝直撞約 30 秒，期間自動戰鬥並獲得掉落。</div>';
+    + '<div style="font-size:10px;color:#7a6f60;margin-top:8px;line-height:1.5">載具將從左側駛入，橫衝直撞約 30 秒，期間自動戰鬥並獲得掉落。</div>';
   openModal({ title: '確認', body: body, footer: ft });
   ft.querySelector('#rc-cancel').onclick = closeModal;
   ft.querySelector('#rc-ok').onclick = function(){

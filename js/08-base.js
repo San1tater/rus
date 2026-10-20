@@ -497,6 +497,7 @@ function _bindBaseSwipe(z2){
 /* ===== rev565: 車場 + 載具系統 ===== */
 /* 載具數據（現實參照；tier 只影響 UI 顯示，數值不加成） */
 const VEHICLES = {
+  /* ---------- BTR 線 ---------- */
   btr80: {
     id: 'btr80', name: 'BTR-80', tier: 1, line: 'btr',
     weapon: '14.5mm KPVT + 7.62mm PKT',
@@ -508,42 +509,90 @@ const VEHICLES = {
   btr80a: {
     id: 'btr80a', name: 'BTR-80A', tier: 2, line: 'btr',
     weapon: '30mm 2A72 + 7.62mm PKT',
-    armor: '10mm', speedRoad: 80, speedOffroad: '40-50',
+    armor: '10mm', speedRoad: 87, speedOffroad: '40-50',
     supportDuration: 35,
-    next: ['btr82a'],
+    next: ['btr82'],
     researchCost: { ammoCal: '5.45', ammoCount: 2000, liquor: 200, exp: 1000 }
   },
+  btr82: {
+    id: 'btr82', name: 'BTR-82', tier: 3, line: 'btr',
+    weapon: '14.5mm KPVT + 7.62mm PKT',
+    armor: '10mm（加強）', speedRoad: 100, speedOffroad: '50-60',
+    supportDuration: 35,
+    next: ['btr82a'],
+    researchCost: { ammoCal: '7.62', ammoCount: 1500, liquor: 300, exp: 2000 }
+  },
   btr82a: {
-    id: 'btr82a', name: 'BTR-82A', tier: 3, line: 'btr',
+    id: 'btr82a', name: 'BTR-82A', tier: 4, line: 'btr',
     weapon: '30mm 2A72 + 7.62mm PKT',
     armor: '加強', speedRoad: 100, speedOffroad: '50-60',
     supportDuration: 40,
-    next: [],
-    researchCost: { ammoCal: '7.62', ammoCount: 2000, liquor: 500, exp: 3000 }
+    next: ['btr90'],
+    researchCost: { ammoCal: '7.62', ammoCount: 2500, liquor: 800, exp: 5000 }
   },
+  btr90: {
+    id: 'btr90', name: 'BTR-90', tier: 5, line: 'btr',
+    weapon: '30mm 2A42 + 7.62mm PKT + ATGM',
+    armor: '加強（可加 ERA）', speedRoad: 100, speedOffroad: '50-60',
+    supportDuration: 45,
+    next: [],
+    researchCost: { ammoCal: '12.7', ammoCount: 1500, liquor: 1500, exp: 12000 }
+  },
+  /* ---------- T-80 線 ---------- */
   t80: {
     id: 't80', name: 'T-80', tier: 2, line: 't80',
-    weapon: '125mm 2A46 + 7.62mm PKT, 12.7mm NSVT',
+    weapon: '125mm 2A46 + 7.62mm PKT + 12.7mm NSVT',
     armor: '複合', speedRoad: 70, speedOffroad: 48,
     supportDuration: 40,
-    next: ['t80u'],
+    next: ['t80b'],
     researchCost: { ammoCal: '9x39', ammoCount: 3000, liquor: 1000, exp: 5000 }
   },
-  t80u: {
-    id: 't80u', name: 'T-80U', tier: 3, line: 't80',
-    weapon: '125mm 2A46M-1 + 7.62mm PKT, 12.7mm NSVT',
-    armor: '複合 + ERA', speedRoad: 70, speedOffroad: 48,
-    supportDuration: 45,
-    next: ['t80um'],
-    researchCost: { ammoCal: '7.62x54', ammoCount: 3000, liquor: 2000, exp: 10000 }
+  t80b: {
+    id: 't80b', name: 'T-80B', tier: 3, line: 't80',
+    weapon: '125mm 2A46 + 7.62mm PKT + 12.7mm NSVT',
+    armor: '複合 + 30mm 首上', speedRoad: 78, speedOffroad: 48,
+    supportDuration: 42,
+    next: ['t80bv'],
+    researchCost: { ammoCal: '7.62', ammoCount: 3000, liquor: 1200, exp: 7000 }
   },
-  t80um: {
-    id: 't80um', name: 'T-80UM', tier: 4, line: 't80',
-    weapon: '125mm 2A46M-1 + 7.62mm PKT, 12.7mm NSVT',
-    armor: 'ERA', speedRoad: 70, speedOffroad: 48,
+  t80bv: {
+    id: 't80bv', name: 'T-80BV', tier: 4, line: 't80',
+    weapon: '125mm 2A46 + 7.62mm PKT + 12.7mm NSVT',
+    armor: '複合 + Kontakt-1 ERA', speedRoad: 70, speedOffroad: 48,
+    supportDuration: 45,
+    next: ['t80u'],
+    researchCost: { ammoCal: '7.62x54', ammoCount: 2500, liquor: 1800, exp: 9000 },
+    camo: {
+      locked: ['t80bvd', 't80bu'],
+      variants: {
+        t80bvd: { name: 'T-80BVD', desc: '柴油機版本（塗裝）', armor: '複合 + ERA', speedRoad: 60, speedOffroad: 45 },
+        t80bu:  { name: 'T-80BU',  desc: '指揮型（塗裝）',   armor: '複合 + 30mm', speedRoad: 70, speedOffroad: 48 }
+      }
+    }
+  },
+  t80u: {
+    id: 't80u', name: 'T-80U', tier: 5, line: 't80',
+    weapon: '125mm 2A46M-1 + 7.62mm PKT + 12.7mm NSVT',
+    armor: '複合 + Kontakt-5 ERA', speedRoad: 70, speedOffroad: 48,
+    supportDuration: 48,
+    next: ['t80uk', 't80um'],
+    researchCost: { ammoCal: '7.62x54', ammoCount: 3000, liquor: 3000, exp: 15000 }
+  },
+  t80uk: {
+    id: 't80uk', name: 'T-80UK', tier: 6, line: 't80',
+    weapon: '125mm 2A46M-1 + 7.62mm PKT + 12.7mm NSVT',
+    armor: '複合 + Kontakt-5', speedRoad: 70, speedOffroad: 48,
     supportDuration: 50,
     next: [],
     researchCost: { ammoCal: '12.7', ammoCount: 2000, liquor: 4000, exp: 20000 }
+  },
+  t80um: {
+    id: 't80um', name: 'T-80UM', tier: 6, line: 't80',
+    weapon: '125mm 2A46M-1 + 7.62mm PKT + 12.7mm NSVT',
+    armor: '複合 + Kontakt-5 ERA', speedRoad: 70, speedOffroad: 48,
+    supportDuration: 52,
+    next: [],
+    researchCost: { ammoCal: '12.7', ammoCount: 2500, liquor: 5000, exp: 22000 }
   }
 };;
 
@@ -660,7 +709,9 @@ function _garageTryUpgrade(){
 }
 
 /* ---------- 車場頁面 ---------- */
-function _openGarageInfoModal(idx){
+function _openGarageInfoModal(idx, opts){
+  opts = opts || {};
+  const fromGarage = !!opts.fromGarage;
   const lv = getBuildingLv('garage');
   const b = BUILDINGS.garage;
   const isMax = lv >= 50;
@@ -672,7 +723,11 @@ function _openGarageInfoModal(idx){
   const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
   const ammo = _garageAmmoEquiv();
 
-  let body = '<div class="detail-title">' + buildingIcon('garage') + ' ' + b.name + ' Lv.' + lv + (isMax ? ' (MAX)' : '') + '</div>'
+  /* rev596: 標題行左右對齊；「進入」按鈕靠右，與其他建築標題一致 */
+  let body = '<div class="detail-title" style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
+    + '<span>' + buildingIcon('garage') + ' ' + b.name + ' Lv.' + lv + (isMax ? ' (MAX)' : '') + '</span>'
+    + (fromGarage ? '' : '<button class="btn primary" id="m-enter" style="flex:0 0 auto;padding:4px 12px;font-size:11px;width:auto">進入</button>')
+    + '</div>'
     + '<div class="detail-sub">' + b.desc + '</div>'
     + '<div class="stat-line"><span class="k">當前效果</span><span class="v">電台次數上限 ' + lv + '</span></div>';
   if(!isMax){
@@ -686,15 +741,22 @@ function _openGarageInfoModal(idx){
       + '<div class="stat-line"><span class="k">彈藥</span><span class="v" style="color:' + (ammo >= cost.ammoValue ? '#4caf50' : '#e05252') + '">' + Math.floor(ammo) + '/' + cost.ammoValue + '</span></div>';
   }
   const ft = el('div', 'modal-ft');
-  ft.innerHTML = '<button class="btn primary" id="m-enter">進入</button>'
-    + (isMax ? '' : '<button class="btn" id="m-up" ' + (canUp ? '' : 'disabled') + '>升級</button>');
-  openModal({ title: '車場', body: body, footer: ft });
-  ft.querySelector('#m-enter').onclick = function(){ closeModal(); openGaragePage(); };
+  ft.innerHTML = isMax
+    ? '<button class="btn" disabled>已滿級</button>'
+    : '<button class="btn primary" id="m-up" ' + (canUp ? '' : 'disabled') + '>升級</button>';
+  const bd = openModal({ title: '車場', body: body, footer: ft });
+  const enterBtn = bd.querySelector('#m-enter');
+  if(enterBtn) enterBtn.onclick = function(){ closeModal(); openGaragePage(); };
   const upBtn = ft.querySelector('#m-up');
   if(upBtn) upBtn.onclick = function(){
     if(_garageTryUpgrade()){
       closeModal();
-      _openGarageInfoModal(idx);
+      _openGarageInfoModal(idx, opts);
+      /* rev596: 從車場頁面打開時，升級後刷新車場頁面 */
+      if(fromGarage){
+        const p = document.getElementById('garage-page');
+        if(p){ p.innerHTML = _garageRenderHtml(); if(typeof _garageBind === 'function') _garageBind(); }
+      }
     }
   };
 }
@@ -739,8 +801,22 @@ function _garageOpenCamo(){
   const g = _garageInitState();
   const cur = VEHICLES[g.currentVehicle];
   if(!cur) return;
-  const body = '<div class="detail-sub">' + cur.name + '</div>'
-    + '<div class="empty-hint">塗裝系統開發中，敬請期待。</div>';
+  let body = '<div class="detail-sub">' + cur.name + '</div>';
+  if(cur.camo && cur.camo.locked && cur.camo.locked.length){
+    body += '<div class="divider"></div>';
+    body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:4px">🔒 未解鎖塗裝</div>';
+    for(const cid of cur.camo.locked){
+      const v = cur.camo.variants && cur.camo.variants[cid];
+      if(!v) continue;
+      body += '<div class="item-row" style="opacity:0.55;cursor:not-allowed">'
+        + '<div class="icon">🔒</div>'
+        + '<div class="info"><div class="nm" style="color:#7a6f60">' + v.name + '</div>'
+        + '<div class="sub">' + v.desc + ' · 甲 ' + v.armor + ' · ' + v.speedRoad + '/' + v.speedOffroad + ' km/h</div></div>'
+        + '</div>';
+    }
+  }
+  body += '<div class="divider"></div>';
+  body += '<div class="empty-hint">其他塗裝系統開發中，敬請期待。</div>';
   openModal({ title: '🎨 塗裝 · ' + cur.name, body: body });
 }
 
@@ -844,7 +920,10 @@ function _garageRenderHtml(){
 
   let h = "";
   h += "<div class='garage-header'>";
-  h += "<div class='garage-title'><img src='icons/buildings/garage.png" + assetSuffix() + "' class='garage-title-icon' alt=''> 車場 <span class='garage-lv'>Lv." + lv + "</span></div>";
+  /* rev596: 標題行 Lv.XX 右側加「升級」按鈕 */
+  h += "<div class='garage-title'><img src='icons/buildings/garage.png" + assetSuffix() + "' class='garage-title-icon' alt=''> 車場 <span class='garage-lv'>Lv." + lv + "</span>"
+    + "<button class='garage-upgrade-inline' id='garage-upgrade'" + (lv >= 50 ? ' disabled' : '') + ">" + (lv >= 50 ? '已滿級' : '升級') + "</button>"
+    + "</div>";
   h += "<div class='garage-x' id='garage-x'>✕</div>";
   h += "</div>";
 
@@ -917,6 +996,13 @@ function _garageBind(){
 
   const camo = p.querySelector('#garage-camo');
   if(camo) camo.onclick = function(){ _garageOpenCamo(); };
+
+  /* rev596: 車場頁面內的升級按鈕 → 打開升級彈窗（無「進入」按鈕，防疊層） */
+  const upgrade = p.querySelector('#garage-upgrade');
+  if(upgrade) upgrade.onclick = function(){
+    if(upgrade.disabled) return;
+    _openGarageInfoModal(0, { fromGarage: true });
+  };
 }
 
 function _garageAvailableExpFor(targetId){
@@ -1068,21 +1154,36 @@ function _garageBindTechImgs(container){
 }
 
 function _garageOpenTechTree(){
-  const NW = 100, NH = 84;
+  /* rev595: 11 節點佈局（BTR 左列 5，T-80 右列 6，t80uk 下方分叉） */
+  const NW = 100, NH = 64;
   const nodes = [
-    { vid:'btr80',  x:20,  y:10  },
-    { vid:'btr80a', x:20,  y:118 },
-    { vid:'btr82a', x:20,  y:226 },
-    { vid:'t80',    x:200, y:118 },
-    { vid:'t80u',   x:200, y:226 },
-    { vid:'t80um',  x:200, y:334 }
+    { vid:'btr80',  x:10,  y:4   },
+    { vid:'btr80a', x:10,  y:76  },
+    { vid:'btr82',  x:10,  y:148 },
+    { vid:'btr82a', x:10,  y:220 },
+    { vid:'btr90',  x:10,  y:292 },
+    { vid:'t80',    x:230, y:76  },
+    { vid:'t80b',   x:230, y:148 },
+    { vid:'t80bv',  x:230, y:220 },
+    { vid:'t80u',   x:230, y:292 },
+    { vid:'t80uk',  x:120, y:364 },
+    { vid:'t80um',  x:230, y:364 }
   ];
-  let svg = '<svg width="320" height="438" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
-  svg += '<line x1="70" y1="94" x2="70" y2="118" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
-  svg += '<line x1="70" y1="202" x2="70" y2="226" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
-  svg += '<path d="M 70 94 L 70 106 L 250 106 L 250 118" stroke="#8a5f18" stroke-width="2" fill="none" stroke-linejoin="round"/>';
-  svg += '<line x1="250" y1="202" x2="250" y2="226" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
-  svg += '<line x1="250" y1="310" x2="250" y2="334" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  let svg = '<svg width="340" height="438" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+  /* BTR 線 */
+  svg += '<line x1="60" y1="68" x2="60" y2="76" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<line x1="60" y1="140" x2="60" y2="148" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<line x1="60" y1="212" x2="60" y2="220" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<line x1="60" y1="284" x2="60" y2="292" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  /* btr80 → t80 分叉 */
+  svg += '<path d="M 60 68 L 60 72 L 280 72 L 280 76" stroke="#8a5f18" stroke-width="2" fill="none" stroke-linejoin="round"/>';
+  /* T-80 線 */
+  svg += '<line x1="280" y1="140" x2="280" y2="148" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<line x1="280" y1="212" x2="280" y2="220" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<line x1="280" y1="284" x2="280" y2="292" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  /* t80u → t80um（直線）與 t80u → t80uk（分叉） */
+  svg += '<line x1="280" y1="356" x2="280" y2="364" stroke="#8a5f18" stroke-width="2" stroke-linecap="round"/>';
+  svg += '<path d="M 280 356 L 280 360 L 170 360 L 170 364" stroke="#8a5f18" stroke-width="2" fill="none" stroke-linejoin="round"/>';
   svg += '</svg>';
 
   const g = _garageInitState();

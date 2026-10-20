@@ -19,12 +19,8 @@
   function _loadVehicleImg(id){
     if(_imgCache.has(id)) return _imgCache.get(id);
     const img = new Image();
-    img.onerror = function(){
-      if(img.src.indexOf('images/vehicles/') >= 0){
-        img.src = 'icons/vehicles/' + id + '.png' + (typeof assetSuffix === 'function' ? assetSuffix() : '');
-      }
-    };
-    img.src = 'images/vehicles/' + id + '.png' + (typeof assetSuffix === 'function' ? assetSuffix() : '');
+    /* rev601: 統一使用 icons/vehicles/（icons/vehicles/ 已刪除） */
+    img.src = 'icons/vehicles/' + id + '.png' + (typeof assetSuffix === 'function' ? assetSuffix() : '');
     _imgCache.set(id, img);
     return img;
   }
@@ -46,49 +42,67 @@
 
   const _wheelClipCache = new Map();
   function _getWheelClip(img, ann, wheel, cw, ch){
-    const cx = wheel.cx * cw;
-    const cy = wheel.cy * ch;
-    const r = wheel.r * cw;
-    const size = Math.ceil(r*2);
-    if(size < 3) return null;
-    const maskOn = ann.trackMask && ann.trackMask.enabled;
-    const maskKey = maskOn ? ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+','+p.y.toFixed(3); }).join(';') : 'off';
-    const key = (img.src||'') + '|' + cx.toFixed(1) + '|' + cy.toFixed(1) + '|' + size + '|' + maskKey;
-    if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
-    const c = document.createElement('canvas'); c.width = size; c.height = size;
-    const cc = c.getContext('2d');
-    cc.save();
-    cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
-    cc.drawImage(img, -(cx - size/2), -(cy - size/2), cw, ch);
-    cc.restore();
-    if(maskOn){
-      const maskY = _getMaskYAtX(ann, wheel.cx);
-      const maskYInCanvas = maskY * ch - (cy - size/2);
-      if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
-        const below = document.createElement('canvas'); below.width = size; below.height = size;
-        const bc = below.getContext('2d');
-        bc.drawImage(c, 0, 0);
-        bc.globalCompositeOperation = 'destination-in';
-        bc.fillRect(0, maskYInCanvas, size, size - maskYInCanvas);
-        cc.save();
-        cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
-        cc.clearRect(0, 0, size, maskYInCanvas);
-        cc.restore();
-        cc.save();
-        cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
-        cc.translate(0, maskYInCanvas*2); cc.scale(1, -1);
-        cc.drawImage(below, 0, 0);
-        cc.restore();
+  const cx = wheel.cx * cw;
+  const cy = wheel.cy * ch;
+  const r = wheel.r * cw;
+  const size = Math.ceil(r*2);
+  if(size < 3) return null;
+  const maskOn = ann.trackMask && ann.trackMask.enabled;
+  const maskKey = maskOn ? ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+','+p.y.toFixed(3); }).join(';') : 'off';
+  const key = (img.src||'') + '|' + cx.toFixed(1) + '|' + cy.toFixed(1) + '|' + size + '|' + maskKey;
+  if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
+  const c = document.createElement('canvas'); c.width = size; c.height = size;
+  const cc = c.getContext('2d');
+  cc.save();
+  cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
+  cc.drawImage(img, -(cx - size/2), -(cy - size/2), cw, ch);
+  cc.restore();
+  /* rev595: 遮罩鏡像/平鋪填充 —— 用可見部分反覆翻轉/平鋪，填滿整個圓形，
+     修復導向輪外露 < 50% 直徑時只翻轉一次導致上半部空缺（橄欖球形）的問題 */
+  if(maskOn){
+    const maskY = _getMaskYAtX(ann, wheel.cx);
+    const maskYInCanvas = maskY * ch - (cy - size/2);
+    if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
+      const belowH = size - maskYInCanvas;
+      const below = document.createElement('canvas');
+      below.width = size;
+      below.height = Math.max(1, Math.ceil(belowH));
+      const bc = below.getContext('2d');
+      bc.drawImage(c, 0, maskYInCanvas, size, belowH, 0, 0, size, belowH);
+      cc.save();
+      cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
+      cc.clearRect(0, 0, size, maskYInCanvas);
+      cc.restore();
+      cc.save();
+      cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
+      let y = maskYInCanvas;
+      let flip = true;
+      while(y > 0.5){
+        const drawH = Math.min(y, belowH);
+        const drawY = y - drawH;
+        if(flip){
+          cc.save();
+          cc.translate(0, y);
+          cc.scale(1, -1);
+          cc.drawImage(below, 0, 0, size, drawH, 0, 0, size, drawH);
+          cc.restore();
+        } else {
+          cc.drawImage(below, 0, 0, size, drawH, 0, drawY, size, drawH);
+        }
+        y = drawY;
+        flip = !flip;
       }
+      cc.restore();
     }
-    cc.save();
-    cc.globalCompositeOperation = 'destination-in';
-    cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.fill();
-    cc.restore();
-    _wheelClipCache.set(key, c);
-    if(_wheelClipCache.size > 40) _wheelClipCache.delete(_wheelClipCache.keys().next().value);
-    return c;
   }
+  cc.save();
+  cc.globalCompositeOperation = 'destination-in';
+  cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.fill();
+  cc.restore();
+  _wheelClipCache.set(key, c);
+  if(_wheelClipCache.size > 40) _wheelClipCache.delete(_wheelClipCache.keys().next().value);
+  return c;
+}
 
   const _maskCache = new Map();
   function _getMaskLayer(img, ann, cw, ch){
@@ -407,13 +421,16 @@ const BTR_TIMELINE = {
 const PHASE_ORDER = ['enter', 'arrive', 'sink', 'center', 'support', 'lift', 'exit', 'leave'];
 
 const MUZZLE_PROFILES = {
-  kpvt:    { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450 },
-  pkt:     { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480 },
-  nsvt:    { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470 },
-  '2a72':  { burst: 15, intervalMs: 200,  pauseMs: 500, flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380 },
-  '2a46':  { burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300 },
-  '2a46m1':{ burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300 },
-  default: { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 22, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450 }
+  kpvt:    { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
+  pkt:     { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
+  nsvt:    { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470, projectileType: 'bullet' },
+  '2a72':  { burst: 15, intervalMs: 200,  pauseMs: 500, flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
+  '2a42':  { burst: 15, intervalMs: 180,  pauseMs: 500, flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
+  '2a46':  { burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
+  '2a46m1':{ burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
+  ags17:   { burst: 6,  intervalMs: 300,  pauseMs: 800, flashSize: 28, flashColor: '255,200,100', bulletSize: 4,  bulletSpeed: 350, projectileType: 'bullet' },
+  atgm:    { burst: 1,  intervalMs: 5000, pauseMs: 5000, flashSize: 30, flashColor: '255,200,100', bulletSize: 5,  bulletSpeed: 280, projectileType: 'missile' },
+  default: { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 22, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' }
 };
 
 const BTRSupport = {
@@ -435,6 +452,12 @@ const BTRSupport = {
     if(this.active) return;
     this.vehicleId = vid || 'btr80';
     if(!ANN[this.vehicleId]) this.vehicleId = 'btr80';
+    /* rev595: 依載具動態覆寫 BTR_TIMELINE.supportDur */
+    if(typeof VEHICLES !== 'undefined' && VEHICLES[this.vehicleId] && typeof VEHICLES[this.vehicleId].supportDuration === 'number' && VEHICLES[this.vehicleId].supportDuration > 0){
+      BTR_TIMELINE.supportDur = VEHICLES[this.vehicleId].supportDuration;
+    } else {
+      BTR_TIMELINE.supportDur = 30;
+    }
     this.active = true;
     this.startTime = performance.now();
     this.phase = 'enter'; this.phaseT = 0;
@@ -512,6 +535,11 @@ const BTRSupport = {
       zone.appendChild(el);
     }
     this.streamBgEl = el;
+    /* rev596: 切頁回來時恢復 on 狀態 */
+    if(el){
+      if(this.phase === 'support') el.classList.add('on');
+      else el.classList.remove('on');
+    }
   },
 
   _setupCanvas() {
@@ -751,6 +779,7 @@ const BTRSupport = {
       color: m.profile.flashColor,
       bulletSize: m.profile.bulletSize,
       bulletSpeed: m.profile.bulletSpeed,
+      projectileType: m.profile.projectileType || 'bullet',
       layerOrder: m.layerOrder
     });
     m.shotsLeft--;
@@ -835,7 +864,6 @@ const BTRSupport = {
     const t = age / total;
     const x = px + fx.mx * this.targetW;
     const y = py + fx.my * this.targetH;
-    /* 炮口闪光（前 20%） */
     if(t < 0.2){
       const ft = t / 0.2;
       const flashR = fx.size * (1 - ft * 0.6);
@@ -847,19 +875,39 @@ const BTRSupport = {
       ctx.arc(x, y, flashR, 0, Math.PI * 2);
       ctx.fill();
     }
-    /* 弹幕（拖尾 + 圆点） */
+    /* rev595: 區分 bullet 與 missile */
+    const isMissile = fx.projectileType === 'missile';
     const bx = x + t * fx.bulletSpeed;
     const alpha = Math.max(0, 1 - t);
-    ctx.strokeStyle = 'rgba(' + fx.color + ',' + (alpha * 0.4) + ')';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x + t * fx.bulletSpeed * 0.3, y);
-    ctx.lineTo(bx, y);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255,220,120,' + alpha + ')';
-    ctx.beginPath();
-    ctx.arc(bx, y, fx.bulletSize, 0, Math.PI * 2);
-    ctx.fill();
+    if(isMissile){
+      ctx.strokeStyle = 'rgba(220,220,220,' + (alpha * 0.5) + ')';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + t * fx.bulletSpeed * 0.15, y);
+      ctx.lineTo(bx - 8, y);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,90,30,' + (alpha * 0.95) + ')';
+      ctx.beginPath();
+      ctx.arc(bx - 7, y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,210,120,' + alpha + ')';
+      ctx.fillRect(bx - 5, y - 1.8, 10, 3.6);
+      ctx.fillStyle = 'rgba(255,255,200,' + alpha + ')';
+      ctx.beginPath();
+      ctx.arc(bx + 4, y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(' + fx.color + ',' + (alpha * 0.4) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + t * fx.bulletSpeed * 0.3, y);
+      ctx.lineTo(bx, y);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,220,120,' + alpha + ')';
+      ctx.beginPath();
+      ctx.arc(bx, y, fx.bulletSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
   },
 
   _finishSupportAndLog() {
@@ -910,7 +958,6 @@ window._radioBTRTrigger = function(){
   const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
   const vid = g ? g.currentVehicle : 'btr80';
   BTRSupport.start(vid);
-  if(typeof notify === 'function') notify('🚁 BTR 支援來襲！', 'ok');
 };
 
 window._openBTRSupportDetail = function(log){

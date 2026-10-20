@@ -1107,7 +1107,7 @@ const BUILDINGS={
   radio:{name:'無線電',desc:'定期資源補給',cost:{electronics:5,metal:10,gears:3},maxLv:50},
   armory:{name:'軍械庫',desc:'產出主副彈藥',cost:{metal:25,gears:8,screws:10},maxLv:50},
   forge:{name:'護甲車間',desc:'護甲值加成',cost:{metal:250,gears:80,screws:100},maxLv:50},
-  garage:{name:'車場',desc:'BTR 支援 / 載具研發',cost:{metal:500,gears:100,screws:200},maxLv:50}};
+  garage:{name:'車場',desc:'載具支援 / 載具研發',cost:{metal:500,gears:100,screws:200},maxLv:50}};
 
 const GAME_LAYERS = [
   { id:'right_leg', name:'右腿', z:18, color:'#2a2a2a', pivot:{x:0.5,y:0.05},

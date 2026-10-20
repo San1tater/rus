@@ -1,10 +1,12 @@
-/* 載具配置：t80um (由載具標注編輯器 v1.9 生成) */
+/* 載具配置：t80um (由載具標注編輯器 v2.0 生成) */
 /* - 車輪完整圓形旋轉 + 遮罩下緣鏡像補全
  * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關
  * - trackLine：履帶帶子上邊界折線（履帶滾動 + 原圖擦除用），只用於履帶
  * - trackScroll：沿 trackLine 弧長參數化滾動（A 層原圖紋理 + B 層條紋，v = ω·r）
  * - 渲染順序：image → eraseOriginalTrack → trackScroll → wheels → trackMask → doors → muzzles → effects
  *   （原圖 trackLine 以下且 trackMask 以下被擦除，保護車體；履帶在輪子下層）
+ * - 已移除炮射導彈（9M112 / 9M119 / 9M119M / 9M113）
+ * - T-80BVD / T-80BU 合併至 t80bv 作為未開放塗裝，不獨立成科技樹節點
  */
 const VEHICLE_ANNOTATION_T80UM = {
   "id": "t80um",
@@ -12,6 +14,31 @@ const VEHICLE_ANNOTATION_T80UM = {
   "imageSize": {
     "w": 790,
     "h": 301
+  },
+  "vehicleMeta": {
+    "name": "T-80UM",
+    "tier": 6,
+    "line": "t80",
+    "weapons": [
+      {
+        "id": "pkt",
+        "name": "7.62mm PKT",
+        "type": "機槍",
+        "caliber": "7.62mm"
+      },
+      {
+        "id": "nsvt",
+        "name": "12.7mm NSVT",
+        "type": "機槍",
+        "caliber": "12.7mm"
+      },
+      {
+        "id": "2a46m1",
+        "name": "125mm 2A46M-1",
+        "type": "主炮",
+        "caliber": "125mm"
+      }
+    ]
   },
   "anchor": {
     "groundY": 1,
@@ -41,12 +68,12 @@ const VEHICLE_ANNOTATION_T80UM = {
   "trackLine": {
     "points": [
       {
-        "x": 0.0741,
-        "y": 0.7262
+        "x": 0.0629,
+        "y": 0.7371
       },
       {
-        "x": 0.0864,
-        "y": 0.8487
+        "x": 0.0763,
+        "y": 0.858
       },
       {
         "x": 0.1638,

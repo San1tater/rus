@@ -1130,7 +1130,7 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
 
   /* 载具：bottom:0，和 boss 同地面 */
   var veh = document.createElement("img");
-  veh.src = "images/vehicles/" + vid + ".png" + (typeof assetSuffix === "function" ? assetSuffix() : "");
+  veh.src = "icons/vehicles/" + vid + ".png" + (typeof assetSuffix === "function" ? assetSuffix() : "");
   veh.onerror = function(){
     veh.onerror = null;
     veh.src = "icons/vehicles/" + vid + ".png" + (typeof assetSuffix === "function" ? assetSuffix() : "");
