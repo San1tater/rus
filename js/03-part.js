@@ -1212,7 +1212,7 @@ function defaultState(){
     servants:[],
     unlockedEquip:{},
     seals:{},defeatedBosses:[],unlockedRegions:['廢棄工廠'],
-    radioUses:0,radioLastResetDay:0,radioCooldownUntil:0,
+    radioUses:0,radioLastResetDate:'',radioCooldownUntil:0,
     lastSeen:Date.now(),radioLastTick:0,armoryLastTick:0,crafting:[],
     stats:{kills:0,deaths:0,bossKills:0},
   };
@@ -1250,13 +1250,6 @@ function load(){
         }
       }
     }
-    delete state.preferences.autoSalvage;
-    delete state.preferences.autoConsumeThreshold;
-    if(!state.preferences.ammoOrder || typeof state.preferences.ammoOrder !== 'object'){
-      state.preferences.ammoOrder = {primary:[],secondary:[],throwable:[]};
-    }
-    state.exploreDelayUntil = parseInt(state.exploreDelayUntil||0,10);
-    state.pendingHealFull = !!state.pendingHealFull;
     state.base=Object.assign(d.base,s.base||{});
     /* rev126: 後院資料遷移 */
     if(!state.garden || typeof state.garden !== 'object') state.garden = {plots:new Array(20).fill(null)};
@@ -1271,14 +1264,11 @@ function load(){
     if(typeof _cleanGardenStorageRarity === 'function') _cleanGardenStorageRarity();
     if(typeof state.garden.food !== 'number') state.garden.food = 0;
     if(!state.garden.merchant || typeof state.garden.merchant !== 'object') state.garden.merchant = { foodLv:0, seedLv:0, throwLv:0, lastFood:0, lastSeed:0, lastThrow:0, lastFeed:0 };
-    { const _m = state.garden.merchant; if(typeof _m.foodLv !== 'number') _m.foodLv = 0; if(typeof _m.seedLv !== 'number') _m.seedLv = 0; if(typeof _m.throwLv !== 'number') _m.throwLv = 0; delete _m.foodLine; delete _m.seedLine; delete _m.throwLine; }
+    { const _m = state.garden.merchant; if(typeof _m.foodLv !== 'number') _m.foodLv = 0; if(typeof _m.seedLv !== 'number') _m.seedLv = 0; if(typeof _m.throwLv !== 'number') _m.throwLv = 0;  }
     if(!Array.isArray(state.servants)) state.servants = [];
     if(!state.unlockedEquip || typeof state.unlockedEquip !== 'object') state.unlockedEquip = {};
     if(typeof _initUnlockedFrom === 'function') _initUnlockedFrom();
     for(const _srv of state.servants){
-      if(_srv.autoPlant !== 'off' && _srv.autoPlant !== 'any' && _srv.autoPlant !== 'follow'){
-        _srv.autoPlant = (_srv.autoPlant && _srv.autoPlant !== 'off') ? 'follow' : 'off';
-      }
       if(typeof _srv.stamina !== 'number'){
         _srv.stamina = (typeof servantEffectiveMaxStamina === 'function') ? servantEffectiveMaxStamina(_srv) : 100;
       }
@@ -1289,31 +1279,15 @@ function load(){
     if(!state.garden) state.garden = {};
     if(typeof state.garden.nextServantTag !== 'number') state.garden.nextServantTag = 1;
     for(const _srv of state.servants){
-      if(typeof _srv.obtainedAt !== 'number') _srv.obtainedAt = Date.now();
-      if(typeof _srv.tag !== 'number') _srv.tag = state.garden.nextServantTag++;
-      if(typeof _srv.customName !== 'string') _srv.customName = '';
-    }
-    for(const _srv of state.servants){
-      if(!Array.isArray(_srv.assignedPlots)){
-        if(typeof _srv.assignedPlot === 'number' && _srv.assignedPlot >= 0) _srv.assignedPlots = [_srv.assignedPlot];
-        else _srv.assignedPlots = [];
-      }
-      delete _srv.assignedPlot;
+      if(!Array.isArray(_srv.assignedPlots)) _srv.assignedPlots = [];
     }
     /* rev125: 清理舊存檔中的 merchant / garden（不再是建築） */
     if(!Array.isArray(state.base.slots)) state.base.slots=[];
     while(state.base.slots.length<12) state.base.slots.push(null);
     if(!state.base.slots[0]||state.base.slots[0].id!=='control') state.base.slots[0]={id:'control',lv:1};
-    for(let _i=1;_i<12;_i++){
-      const _s=state.base.slots[_i];
-      if(_s&&(_s.id==='merchant'||_s.id==='garden')) state.base.slots[_i]=null;
-    }
     state.regionProgress=Object.assign({},s.regionProgress||{});
     state.pendingSalvageEquipped=s.pendingSalvageEquipped||{};
     state.stashedWeapons=s.stashedWeapons||{};
-    delete state.preferences.weaponPriority;
-    delete state.preferences.ammoRarity;
-    delete state.preferences.consumeRarity;
     const _prefDefaults = {
       ammoExplore:{priority:'一般',fallback:'desc',exclude:[]},
       ammoCombat:{priority:'傳奇',fallback:'desc',exclude:[]},
@@ -1332,7 +1306,6 @@ function load(){
       if(!['asc','desc'].includes(c.fallback)) c.fallback = _prefDefaults[k].fallback;
     }
     for(const k in state.seals){state.seals[k]=Math.max(0,parseInt(state.seals[k]||0,10));}
-    if(!state.player.equipped.backpack){state.player.equipped.backpack='bplarge';state.player.equippedRarity.backpack='傳奇';}
     removeInvalidInventoryItems();
     consolidateInventoryDuplicates();
     _cleanupAmmoRarity();
@@ -2548,8 +2521,8 @@ function buildingTick(){
     }
   }
   processCrafting();
-  if(typeof _gardenMealTick === 'function'){ try{ _gardenMealTick(now); }catch(e){} }
-  if(typeof _gardenFarmBackgroundTick === 'function'){ try{ _gardenFarmBackgroundTick(now); }catch(e){} }
+  if(typeof _gardenMealTick === 'function'){ try{ _gardenMealTick(now); }catch(e){ console.warn('[buildingTick meal]', e); } }
+  if(typeof _gardenFarmBackgroundTick === 'function'){ try{ _gardenFarmBackgroundTick(now); }catch(e){ console.warn('[buildingTick farm]', e); } }
 }
 function processCrafting(){
   if(!state.crafting||!state.crafting.length)return;
@@ -2780,19 +2753,19 @@ function renderExplore(){
 }
 
 /* ===== rev563: 電台次數系統 ===== */
-const RADIO_COOLDOWN_MS = 5 * 60 * 1000;
-const RADIO_DAY_MS = 24 * 3600 * 1000;
+const RADIO_COOLDOWN_MS = 2 * 60 * 1000;
 
 function _radioEnsureInit(){
   const max = (typeof getBuildingLv === 'function') ? getBuildingLv('garage') : 0;
-  const today = Math.floor(Date.now() / RADIO_DAY_MS);
+  const _d = new Date();
+  const today = _d.getFullYear() + '-' + (_d.getMonth() + 1) + '-' + _d.getDate();
   if(typeof state.radioUses !== 'number' || !isFinite(state.radioUses)) state.radioUses = max;
-  if(typeof state.radioLastResetDay !== 'number' || !isFinite(state.radioLastResetDay)) state.radioLastResetDay = today;
+  if(typeof state.radioLastResetDate !== 'string' || !state.radioLastResetDate) state.radioLastResetDate = today;
   if(typeof state.radioCooldownUntil !== 'number' || !isFinite(state.radioCooldownUntil)) state.radioCooldownUntil = 0;
   let _changed = false;
-  if(today > state.radioLastResetDay){
+  if(state.radioLastResetDate !== today){
     state.radioUses = max;
-    state.radioLastResetDay = today;
+    state.radioLastResetDate = today;
     _changed = true;
   }
   if(state.radioUses > max){ state.radioUses = max; _changed = true; }

@@ -239,13 +239,42 @@ const VEHICLE_ANNOTATION_T80U = {
       }
     ]
   },
-  "weaponAreas": [],
+  "weaponAreas": [
+    {
+      "id": "oapjqexh",
+      "polygon": [
+        {
+          "x": 0.5214,
+          "y": 0.3839
+        },
+        {
+          "x": 0.5532,
+          "y": 0.4557
+        },
+        {
+          "x": 1.0134,
+          "y": 0.3992
+        },
+        {
+          "x": 1.0118,
+          "y": 0.2896
+        },
+        {
+          "x": 0.5208,
+          "y": 0.3362
+        }
+      ],
+      "name": "武器 1",
+      "weaponId": "2a46m1",
+      "recoilDist": 0.06
+    }
+  ],
   "muzzles": [
     {
       "x": 1,
       "y": 0.3443,
       "name": "槍口 1",
-      "weaponId": "2a46",
+      "weaponId": "2a46m1",
       "layerOrder": "above"
     },
     {

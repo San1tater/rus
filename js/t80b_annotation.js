@@ -115,12 +115,6 @@ const VEHICLE_ANNOTATION_T80B = {
   ],
   "weapons": [
     {
-      "id": "kpvt",
-      "name": "14.5mm KPVT",
-      "type": "機槍",
-      "caliber": "14.5mm"
-    },
-    {
       "id": "pkt",
       "name": "7.62mm PKT",
       "type": "機槍",
@@ -133,20 +127,8 @@ const VEHICLE_ANNOTATION_T80B = {
       "caliber": "12.7mm"
     },
     {
-      "id": "2a72",
-      "name": "30mm 2A72",
-      "type": "機炮",
-      "caliber": "30mm"
-    },
-    {
       "id": "2a46",
       "name": "125mm 2A46",
-      "type": "主炮",
-      "caliber": "125mm"
-    },
-    {
-      "id": "2a46m1",
-      "name": "125mm 2A46M-1",
       "type": "主炮",
       "caliber": "125mm"
     }
@@ -309,7 +291,32 @@ const VEHICLE_ANNOTATION_T80B = {
       }
     ]
   },
-  "weaponAreas": [],
+  "weaponAreas": [
+    {
+      "id": "ov5a01d4",
+      "polygon": [
+        {
+          "x": 0.5212,
+          "y": 0.3523
+        },
+        {
+          "x": 0.5213,
+          "y": 0.4926
+        },
+        {
+          "x": 1.0095,
+          "y": 0.4736
+        },
+        {
+          "x": 1.0116,
+          "y": 0.3503
+        }
+      ],
+      "name": "武器 1",
+      "weaponId": "2a46",
+      "recoilDist": 0.06
+    }
+  ],
   "muzzles": [
     {
       "x": 1.0042,

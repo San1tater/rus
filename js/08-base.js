@@ -5,7 +5,6 @@
 /* ============================================================
    基地
    ============================================================ */
-const collapsedSections={weapons:true,types:true,other:true};
 function profDisplay(v){v=v||0;if(v>=MAX_PROF_LEVEL)return `Lv.${MAX_PROF_LEVEL} (MAX)`;const capped=Math.min(MAX_PROF_LEVEL,v);const lv=Math.floor(capped),pct=Math.round((capped-lv)*100);return `Lv.${lv} (${pct}%)`;}
 /* rev125: 家園輔助函式（偏好設定內嵌為第 4 折疊區） */
 const _ccFolded = { weapons: true, types: true, other: true, pref: true };

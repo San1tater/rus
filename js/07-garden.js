@@ -5036,7 +5036,7 @@ function closeGarden(){
       plot.crop = null;
       _gardenLog('<span class="pl">玩家</span> 收穫 ' + fmtItemSpan(seed.cropId, c.rarity, count), 'harvest');
       save();
-      try { closeModal(); } catch(e){}
+      closeModal();
       
       
       renderGardenGrid();
@@ -6190,6 +6190,28 @@ function openFoodPolicyPanel(){
   }
 }
 
+function _gardenCalcManualFeed(policy){
+  const g = _gardenMerchantInit();
+  const mult = FOOD_POLICY_MULT[policy] || 0;
+  const baseCost = FOOD_COST_BASE[policy] || 0;
+  const tasks = [];
+  let totalCost = 0;
+  if(baseCost > 0){
+    const assigned = (state.servants || []).filter(function(s){ return s.assignedPlots && s.assignedPlots.length > 0; });
+    for(const srv of assigned){
+      const max = servantMaxStamina(srv);
+      const effMax = Math.round(max * mult);
+      const cost = Math.round(baseCost * (RARITY_FOOD_MULT[srv.rarity] || 1) * 10) / 10;
+      if(cost <= 0) continue;
+      if((srv.stamina || 0) >= effMax) continue;
+      tasks.push({ srv: srv, effMax: effMax, cost: cost });
+      totalCost += cost;
+    }
+  }
+  totalCost = Math.round(totalCost * 10) / 10;
+  return { food: g.food || 0, tasks: tasks, totalCost: totalCost, eligible: tasks.length };
+}
+
 function openManualFeed(presetPolicy){
   const g = _gardenMerchantInit();
   let selected = presetPolicy || 'normal';
@@ -6201,26 +6223,15 @@ function openManualFeed(presetPolicy){
     starve: '餓著（不餵）'
   };
   function _calc(){
-    const food = g.food || 0;
-    const mult = FOOD_POLICY_MULT[selected] || 0;
-    const baseCost = FOOD_COST_BASE[selected] || 0;
-    const assigned = (state.servants || []).filter(function(s){ return s.assignedPlots && s.assignedPlots.length > 0; });
-    let eligible = 0;
-    let totalCost = 0;
-    if(baseCost > 0){
-      for(const srv of assigned){
-        const max = servantMaxStamina(srv);
-        const effMax = Math.round(max * mult);
-        const cost = Math.round(baseCost * (RARITY_FOOD_MULT[srv.rarity] || 1) * 10) / 10;
-        if(cost <= 0) continue;
-        if((srv.stamina || 0) >= effMax) continue;
-        eligible++;
-        totalCost += cost;
-      }
-    }
-    totalCost = Math.round(totalCost * 10) / 10;
-    return { food: food, eligible: eligible, totalCost: totalCost, canFeed: eligible > 0 && totalCost > 0 && food + 0.001 >= totalCost };
+    const r = _gardenCalcManualFeed(selected);
+    return {
+      food: r.food,
+      eligible: r.eligible,
+      totalCost: r.totalCost,
+      canFeed: r.eligible > 0 && r.totalCost > 0 && r.food + 0.001 >= r.totalCost
+    };
   }
+
   function _renderBody(){
     const r = _calc();
     let body = '';
@@ -6288,38 +6299,23 @@ function openManualFeed(presetPolicy){
 }
 function _gardenManualFeed(policy){
   const g = _gardenMerchantInit();
-  const mult = FOOD_POLICY_MULT[policy] || 0;
   const baseCost = FOOD_COST_BASE[policy] || 0;
   if(baseCost <= 0) return;
-  const assigned = (state.servants || []).filter(function(s){ return s.assignedPlots && s.assignedPlots.length > 0; });
-  const tasks = [];
-  let totalCost = 0;
-  for(const srv of assigned){
-    const max = servantMaxStamina(srv);
-    const effMax = Math.round(max * mult);
-    const cost = Math.round(baseCost * (RARITY_FOOD_MULT[srv.rarity] || 1) * 10) / 10;
-    if(cost <= 0) continue;
-    if((srv.stamina || 0) >= effMax) continue;
-    tasks.push({ srv: srv, effMax: effMax, cost: cost });
-    totalCost += cost;
-  }
-  totalCost = Math.round(totalCost * 10) / 10;
-  if(tasks.length === 0 || totalCost <= 0) return;
-  if(g.food + 0.001 < totalCost) return;
-  let _totalHeal = 0;
-  for(const t of tasks){
+  const calc = _gardenCalcManualFeed(policy);
+  if(calc.tasks.length === 0 || calc.totalCost <= 0) return;
+  if(g.food + 0.001 < calc.totalCost) return;
+  for(const t of calc.tasks){
     g.food -= t.cost;
-    const _before = t.srv.stamina || 0;
     t.srv.stamina = t.effMax;
     t.srv._starve = false;
-    _totalHeal += (t.effMax - _before);
   }
   save();
-  _gardenLog('手動放飯（' + POLICY_NAMES_FEED(policy) + '）：' + tasks.length + ' 人 · 消耗 ' + totalCost + ' 食物', 'clean');
+  _gardenLog('手動放飯（' + POLICY_NAMES_FEED(policy) + '）：' + calc.tasks.length + ' 人 · 消耗 ' + calc.totalCost + ' 食物', 'clean');
   renderGardenGrid();
   renderGardenContent();
   if(typeof _gardenUpdateFoodInfo === 'function') _gardenUpdateFoodInfo();
 }
+
 function POLICY_NAMES_FEED(p){
   return { full:'吃到撐', normal:'吃飽', half:'半飽', lick:'舔舔', starve:'餓著' }[p] || p;
 }

@@ -169,7 +169,32 @@ const VEHICLE_ANNOTATION_BTR80A = {
     ],
     "hatch": []
   },
-  "weaponAreas": [],
+  "weaponAreas": [
+    {
+      "id": "oonvm1dj",
+      "polygon": [
+        {
+          "x": 0.6832,
+          "y": 0.1168
+        },
+        {
+          "x": 0.6833,
+          "y": 0.15
+        },
+        {
+          "x": 0.8661,
+          "y": 0.1496
+        },
+        {
+          "x": 0.8656,
+          "y": 0.1091
+        }
+      ],
+      "name": "武器 1",
+      "weaponId": "2a72",
+      "recoilDist": 0.035
+    }
+  ],
   "muzzles": [
     {
       "x": 0.6997,

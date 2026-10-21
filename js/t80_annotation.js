@@ -291,7 +291,32 @@ const VEHICLE_ANNOTATION_T80 = {
       }
     ]
   },
-  "weaponAreas": [],
+  "weaponAreas": [
+    {
+      "id": "o7zry83t",
+      "polygon": [
+        {
+          "x": 0.5218,
+          "y": 0.3619
+        },
+        {
+          "x": 0.5221,
+          "y": 0.4837
+        },
+        {
+          "x": 1.0034,
+          "y": 0.4787
+        },
+        {
+          "x": 1.0038,
+          "y": 0.3605
+        }
+      ],
+      "name": "武器 1",
+      "weaponId": "2a46",
+      "recoilDist": 0.06
+    }
+  ],
   "muzzles": [
     {
       "x": 1.0042,
