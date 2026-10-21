@@ -1099,7 +1099,8 @@ function _spawnExploreCorpses(enemies){
     /* rev596: BTR 加速階段（enter / support / leave）尸體 1 秒內移出，
        避免與「BTR 全速駛過」的視覺脫節 */
     const _btr = window.BTRSupport;
-    const _btrFast = _btr && _btr.active && (_btr.phase === 'enter' || _btr.phase === 'support' || _btr.phase === 'leave');
+    /* rev649: 僅 support 階段（載具全速運轉、每秒切換地圖）加速屍體 */
+    const _btrFast = _btr && _btr.active && (_btr.phase === 'support');
     const _speed = _btrFast ? (fxW * 3) : scrollSpeed;
     _accumShift += _speed * _dt;
     const shift = _accumShift;

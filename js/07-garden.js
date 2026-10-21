@@ -11,12 +11,13 @@ const GARDEN_PLOT_TYPES = {
 ,
   fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h', bg: 'fridge_bg' },
   distillery: { name: '蒸餾室', icon: '🍶', desc: '作物釀成私酒', bg: 'distillery_bg' },
-  black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 <span style="color:#e05252">↓20%</span> ｜ 產量 <span style="color:#4caf50">↑20%</span>' },
-  red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 <span style="color:#e05252">↓40%</span> ｜ 產量 <span style="color:#4caf50">↑30%</span>' }};
+  black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 <span style="color:#4caf50">↑10%</span> ｜ 產量 <span style="color:#4caf50">↑30%</span>' },
+  red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 <span style="color:#e05252">↓25%</span> ｜ 產量 <span style="color:#4caf50">↑60%</span>' }};
+/* rev653: 黑土肥沃（快+高產），紅土貧瘠（慢但高產補償） */
 const SPECIAL_SOIL_BONUS = {
-  soil:       { grow: 0,    yield: 0 },
-  black_soil: { grow: 0.20, yield: 0.20 },
-  red_soil:   { grow: 0.40, yield: 0.30 }
+  soil:       { grow: 0,     yield: 0 },
+  black_soil: { grow: 0.10,  yield: 0.30 },
+  red_soil:   { grow: -0.25, yield: 0.60 }
 };
 function _isSoilType(t){ return t === 'soil' || t === 'black_soil' || t === 'red_soil'; }
 function _getSoilBonus(t){ return SPECIAL_SOIL_BONUS[t] || SPECIAL_SOIL_BONUS.soil; }
@@ -54,6 +55,8 @@ function _applySpecialSoil(typeId){
       cnt++;
     }
   }
+  /* rev651: 記錄全局土地類型，供新建土地繼承 */
+  if(state.garden) state.garden.currentSoilType = typeId;
   save();
   renderGardenGrid();
   renderGardenContent();
@@ -62,6 +65,7 @@ function _applySpecialSoil(typeId){
 }
 function _openApplySoilDialog(typeId){
   const names = { black_soil: '黑土地', red_soil: '紅土地' };
+  /* rev650: desc 已由 GARDEN_PLOT_TYPES 提供，此處不重複 */
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '<button class="btn primary" id="m-apply">立即套用</button><button class="btn ghost" id="m-later">稍後</button>';
@@ -251,6 +255,14 @@ function _gardenGetPlots(){
   if(!Array.isArray(state.garden.plots)) state.garden.plots = new Array(20).fill(null);
   while(state.garden.plots.length < 20) state.garden.plots.push(null);
   if(state.garden.plots.length > 20) state.garden.plots.length = 20;
+  /* rev651: 遷移 / 初始化 currentSoilType */
+  if(typeof state.garden.currentSoilType !== 'string' || !_isSoilType(state.garden.currentSoilType)){
+    let _inferred = 'soil';
+    for(const _p of state.garden.plots){
+      if(_p && _isSoilType(_p.type)){ _inferred = _p.type; break; }
+    }
+    state.garden.currentSoilType = _inferred;
+  }
   return state.garden.plots;
 }
 
@@ -514,7 +526,8 @@ function openGardenPlotPicker(idx, returnFn){
   const body = document.createElement('div');
   body.innerHTML = '<div style="font-size:11px;color:#e8a33d;margin-bottom:8px">選擇要建造的設施</div>';
   /* rev326: 堆肥區 / 工棚為唯一建築，已存在則不再列出 */
-  const _UNIQUE_TYPES = { compost: true, shed: true, distillery: true };
+  /* rev650: 移除 distillery，允許同時存在多個蒸餾室 */
+  const _UNIQUE_TYPES = { compost: true, shed: true };
   for(const key in GARDEN_PLOT_TYPES){
     const t = GARDEN_PLOT_TYPES[key];
     if(t.special) continue;
@@ -534,8 +547,13 @@ function openGardenPlotPicker(idx, returnFn){
       row.onclick = function(){
         const type = row.getAttribute('data-type');
         if(!GARDEN_PLOT_TYPES[type]) return;
-        plots[idx] = { type: type, lv: 1, crop: null };
-        if(type === 'distillery') plots[idx].lastDistillAt = Math.floor(Date.now() / DISTILL_PERIOD_MS) * DISTILL_PERIOD_MS;
+        /* rev651: 新建 soil 時用全局 currentSoilType（所有土壤地塊永遠同類型） */
+        let _actualType = type;
+        if(type === 'soil'){
+          _actualType = state.garden.currentSoilType || 'soil';
+        }
+        plots[idx] = { type: (_actualType === 'soil' ? (state.garden.currentSoilType || 'soil') : _actualType), lv: 1, crop: null };
+        if(_actualType === 'distillery') plots[idx].lastDistillAt = Math.floor(Date.now() / DISTILL_PERIOD_MS) * DISTILL_PERIOD_MS;
         save();
         closeModal();
         renderGardenGrid();

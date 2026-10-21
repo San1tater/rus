@@ -297,7 +297,8 @@
   const ang = (openAngle || 0) * Math.PI / 180;
   const cosA = Math.cos(ang);
   const showBack = cosA < 0;
-  const showEdges = Math.abs(cosA) < 0.98;
+  /* rev648: 打開後一直顯示描邊（openAngle > 3°），直到關閉 */
+  const showEdges = Math.abs(openAngle || 0) > 3;
   const alpha = Math.atan2(y2 - y1, x2 - x1);
   ctx.save();
   ctx.translate(x1, y1);
@@ -341,8 +342,9 @@
   }
   /* 多邊形描邊（正面/背面共用，隨門板一起旋轉） */
   if(showEdges){
-    ctx.strokeStyle = 'rgba(100,100,100,0.6)';
-    ctx.lineWidth = 1.2;
+    /* rev648: 描邊隨載具寬度縮放，亮灰高對比 */
+    ctx.strokeStyle = 'rgba(180,180,180,0.88)';
+    ctx.lineWidth = Math.max(3, cw * 0.0035);
     ctx.beginPath();
     ctx.moveTo(pts[0].x*cw, pts[0].y*ch);
     for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*cw, pts[i].y*ch);
@@ -355,15 +357,17 @@
     ctx.save();
     ctx.lineCap = 'round';
     /* 外層暗線：厚度感 */
-    ctx.strokeStyle = 'rgba(25,25,25,0.9)';
-    ctx.lineWidth = 2.8;
+    /* rev648: 铰链轴描边随載具寬度縮放 */
+    const _hingeW = Math.max(3, cw * 0.0035);
+    ctx.strokeStyle = 'rgba(20,20,20,0.92)';
+    ctx.lineWidth = _hingeW * 2;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
     /* 內層亮線：金屬反光 */
-    ctx.strokeStyle = 'rgba(150,150,150,0.55)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(190,190,190,0.75)';
+    ctx.lineWidth = _hingeW * 0.7;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
