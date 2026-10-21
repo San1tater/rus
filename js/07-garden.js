@@ -4071,7 +4071,7 @@ function _gardenUpdateFoodInfo(){
 function _gardenSyncActors(){
   const servants = (state.servants || []).filter(function(s){
     return s.assignedPlots && s.assignedPlots.length > 0;
-  }).slice(0, 8);
+  }).slice(0, 20);
   const targetIds = {};
   for(const s of servants) targetIds[s.id] = true;
   _gardenActors = _gardenActors.filter(function(a){ return targetIds[a.id]; });
@@ -5107,8 +5107,15 @@ function closeGarden(){
       const _plots = _gardenGetPlots();
       const _hasCompost = newList.some(function(x){ return _plots[x] && _plots[x].type === 'compost'; });
       const _hasOther = newList.some(function(x){ return _plots[x] && _plots[x].type !== 'compost'; });
+      const _exclusiveIdxs = newList.filter(function(x){ return _plots[x] && (_plots[x].type === 'compost' || _plots[x].type === 'distillery'); });
       let _finalList = newList;
-      /* rev327: 混选冲突改由 cell click 弹确认处理 */
+      if(_exclusiveIdxs.length > 1){
+        const _keep = _exclusiveIdxs[_exclusiveIdxs.length - 1];
+        _finalList = [_keep];
+        console.warn('[servant assign] multiple exclusive plots detected, kept', _keep);
+      } else if(_exclusiveIdxs.length === 1){
+        _finalList = [_exclusiveIdxs[0]];
+      }
       for(const other of (state.servants || [])){
         if(other.id === srvId) continue;
         if(!Array.isArray(other.assignedPlots)) continue;
@@ -5144,51 +5151,45 @@ function closeGarden(){
             if(!plot) return;
             if(selected[idx]){ delete selected[idx]; applyAndSave(); refresh(); return; }
             if(countSel() >= maxSlots){ return; }
-
-            const _wouldBeExclusive = (plot.type === 'compost' || plot.type === 'distillery');
-            let _conflictType = null;
+            const _isExclusive = function(p){ return p && (p.type === 'compost' || p.type === 'distillery'); };
+            const _wouldBeExclusive = _isExclusive(plot);
+            const owner = plot.assignedServant;
+            const _ownerConflict = (owner && owner !== srvId);
+            if(_wouldBeExclusive){
+              const _doAddExclusive = function(){
+                for(const _k in selected) delete selected[_k];
+                selected[idx] = true;
+                applyAndSave(); refresh();
+              };
+              if(_ownerConflict){
+                openConfirm('此格已被其他僕人指派，是否取代？', _doAddExclusive);
+                return;
+              }
+              _doAddExclusive();
+              return;
+            }
+            let _hasExclusiveSelected = false;
             for(const _k in selected){
               if(!selected[_k]) continue;
               const _p = plots[parseInt(_k, 10)];
-              if(!_p) continue;
-              const _pIsExclusive = (_p.type === 'compost' || _p.type === 'distillery');
-              if(_wouldBeExclusive && !_pIsExclusive){ _conflictType = 'toCompost'; break; }
-              if(!_wouldBeExclusive && _pIsExclusive){ _conflictType = 'toNormal'; break; }
+              if(_isExclusive(_p)){ _hasExclusiveSelected = true; break; }
             }
-            const owner = plot.assignedServant;
-            const _ownerConflict = (owner && owner !== srvId);
-
-            const _doAdd = function(){ selected[idx] = true; applyAndSave(); refresh(); };
-            const _clearConflict = function(){
-              if(_conflictType === 'toCompost'){
-                for(const _k in selected) delete selected[_k];
-              } else {
+            const _doAddNormal = function(){ selected[idx] = true; applyAndSave(); refresh(); };
+            if(_hasExclusiveSelected){
+              openConfirm('指派至普通地塊將解除蒸餾室/堆肥區綁定。確認？', function(){
                 for(const _k in selected){
                   const _p = plots[parseInt(_k, 10)];
-                  if(_p && (_p.type === 'compost' || _p.type === 'distillery')) delete selected[_k];
+                  if(_isExclusive(_p)) delete selected[_k];
                 }
-              }
-            };
-
-            if(_conflictType && _ownerConflict){
-              const _msg = (_conflictType === 'toCompost')
-                ? '指派至堆肥區將解除其他地塊綁定；且此格已被他人指派。是否取代？'
-                : '指派至普通地塊將解除堆肥區綁定；且此格已被他人指派。是否取代？';
-              openConfirm(_msg, function(){ _clearConflict(); _doAdd(); });
-              return;
-            }
-            if(_conflictType){
-              const _msg = (_conflictType === 'toCompost')
-                ? '指派至堆肥區將解除此僕人在其他所有地塊的綁定（僅保留堆肥區）。確認？'
-                : '指派至普通地塊將解除此僕人在堆肥區的綁定。確認？';
-              openConfirm(_msg, function(){ _clearConflict(); _doAdd(); });
+                _doAddNormal();
+              });
               return;
             }
             if(_ownerConflict){
-              openConfirm('此格已被其他僕人指派，是否取代？', _doAdd);
+              openConfirm('此格已被其他僕人指派，是否取代？', _doAddNormal);
               return;
             }
-            _doAdd();
+            _doAddNormal();
           };
         })(cells[i]);
       }

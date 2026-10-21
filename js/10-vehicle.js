@@ -288,6 +288,45 @@
     return { canvas: c, minX: minX, minY: minY, bw: bw, bh: bh };
   }
 
+  /* rev696: 舱门描边径向渐变 —— 外缘实色，向内逐渐变淡（nonzero 规则形成环带） */
+  function _drawDoorBorderGradient(ctx, pts, cw, ch){
+    if(!pts || pts.length < 3) return;
+    const pxPts = pts.map(function(p){ return { x: p.x * cw, y: p.y * ch }; });
+    let cxV = 0, cyV = 0;
+    for(const p of pxPts){ cxV += p.x; cyV += p.y; }
+    cxV /= pxPts.length;
+    cyV /= pxPts.length;
+    let maxDist = 0;
+    for(const p of pxPts){
+      const d = Math.hypot(p.x - cxV, p.y - cyV);
+      if(d > maxDist) maxDist = d;
+    }
+    if(maxDist < 1) return;
+    const lw = Math.max(3, cw * 0.0035);
+    const inner = pxPts.map(function(p){
+      const dx = cxV - p.x, dy = cyV - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const shrink = Math.min(lw, d * 0.85);
+      return { x: p.x + (dx / d) * shrink, y: p.y + (dy / d) * shrink };
+    });
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pxPts[0].x, pxPts[0].y);
+    for(let i = 1; i < pxPts.length; i++) ctx.lineTo(pxPts[i].x, pxPts[i].y);
+    ctx.closePath();
+    ctx.moveTo(inner[inner.length - 1].x, inner[inner.length - 1].y);
+    for(let i = inner.length - 2; i >= 0; i--) ctx.lineTo(inner[i].x, inner[i].y);
+    ctx.closePath();
+    ctx.clip();
+    const g = ctx.createRadialGradient(cxV, cyV, Math.max(0, maxDist - lw * 1.2), cxV, cyV, maxDist);
+    g.addColorStop(0, 'rgba(180,180,180,0.05)');
+    g.addColorStop(0.5, 'rgba(180,180,180,0.42)');
+    g.addColorStop(1, 'rgba(180,180,180,0.88)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-cw, -ch, cw * 3, ch * 3);
+    ctx.restore();
+  }
+
   function _renderDoor(ctx, img, ann, door, cw, ch, openAngle, backColor){
   if(!door || !door.polygon || door.polygon.length < 3) return;
   const pts = door.polygon;
@@ -335,13 +374,7 @@
     }
   }
   if(Math.abs(openAngle || 0) > 3){
-    ctx.strokeStyle = 'rgba(180,180,180,0.88)';
-    ctx.lineWidth = Math.max(3, cw * 0.0035);
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x*cw, pts[0].y*ch);
-    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*cw, pts[i].y*ch);
-    ctx.closePath();
-    ctx.stroke();
+    _drawDoorBorderGradient(ctx, pts, cw, ch);
   }
   ctx.restore();
 }
@@ -613,7 +646,7 @@ const BTRSupport = {
       const style = document.createElement('style');
       style.id = 'btr-stream-bg-style';
       style.textContent = [
-        '.btr-stream-bg{position:absolute;inset:0;z-index:0;opacity:0;transition:opacity 0.45s ease-out;pointer-events:none;overflow:hidden;background:#08080a;}',
+        '.btr-stream-bg{position:absolute;inset:0;z-index:0;opacity:0;transition:opacity 0.45s ease-out;pointer-events:none;overflow:hidden;background:#1a1a22;}',
         '.btr-stream-bg.on{opacity:1;}',
         '.btr-streak{position:absolute;left:100%;height:2px;border-radius:1px;background:linear-gradient(to right,transparent 0%,rgba(200,200,200,0.65) 25%,rgba(245,245,245,0.95) 50%,rgba(200,200,200,0.65) 75%,transparent 100%);box-shadow:0 0 6px rgba(255,255,255,0.35);animation-name:btrStreakMove;animation-timing-function:linear;animation-iteration-count:infinite;will-change:transform;}',
         '@keyframes btrStreakMove{from{transform:translateX(0);}to{transform:translateX(-200vw);}}'
@@ -1078,22 +1111,65 @@ const BTRSupport = {
     const bx = x + t * fx.bulletSpeed;
     const alpha = Math.max(0, 1 - t);
     if(isMissile){
-      ctx.strokeStyle = 'rgba(220,220,220,' + (alpha * 0.5) + ')';
-      ctx.lineWidth = 3;
+      /* rev696: 真正的导弹视觉 —— 细长弹体 + 尾焰 + 烟雾尾迹 + 高光 + 识别带 */
+      const len = 22;
+      const hh = 3;
+      const noseX = bx + len / 2;
+      const tailX = bx - len / 2;
+      const headStart = noseX - 6;
+      /* 1. 烟雾尾迹（从发射点到弹体后方，越远越宽越淡） */
+      const trailAlpha = alpha * 0.4;
+      const trailW = 5 + (1 - alpha) * 10;
+      const trailGrad = ctx.createLinearGradient(x + 4, y, tailX, y);
+      trailGrad.addColorStop(0, 'rgba(200,200,200,0)');
+      trailGrad.addColorStop(0.55, 'rgba(200,200,200,' + (trailAlpha * 0.55) + ')');
+      trailGrad.addColorStop(1, 'rgba(210,210,210,' + trailAlpha + ')');
+      ctx.strokeStyle = trailGrad;
+      ctx.lineWidth = trailW;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(x + t * fx.bulletSpeed * 0.15, y);
-      ctx.lineTo(bx - 8, y);
+      ctx.moveTo(x + 4, y);
+      ctx.lineTo(tailX, y);
       ctx.stroke();
-      ctx.fillStyle = 'rgba(255,90,30,' + (alpha * 0.95) + ')';
+      /* 2. 尾焰（橙红三角，从弹体尾部向后喷） */
+      const flameLen = 16;
+      const flameGrad = ctx.createLinearGradient(tailX, y, tailX - flameLen, y);
+      flameGrad.addColorStop(0, 'rgba(255,240,180,' + alpha + ')');
+      flameGrad.addColorStop(0.35, 'rgba(255,150,60,' + (alpha * 0.92) + ')');
+      flameGrad.addColorStop(1, 'rgba(255,50,20,0)');
+      ctx.fillStyle = flameGrad;
       ctx.beginPath();
-      ctx.arc(bx - 7, y, 4.5, 0, Math.PI * 2);
+      ctx.moveTo(tailX, y - 2.8);
+      ctx.lineTo(tailX - flameLen, y);
+      ctx.lineTo(tailX, y + 2.8);
+      ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,210,120,' + alpha + ')';
-      ctx.fillRect(bx - 5, y - 1.8, 10, 3.6);
-      ctx.fillStyle = 'rgba(255,255,200,' + alpha + ')';
+      /* 3. 弹体（灰白渐变胶囊，头部尖三角） */
+      const bodyGrad = ctx.createLinearGradient(0, y - hh, 0, y + hh);
+      bodyGrad.addColorStop(0, 'rgba(235,235,235,' + alpha + ')');
+      bodyGrad.addColorStop(0.5, 'rgba(180,180,180,' + alpha + ')');
+      bodyGrad.addColorStop(1, 'rgba(120,120,120,' + alpha + ')');
+      ctx.fillStyle = bodyGrad;
       ctx.beginPath();
-      ctx.arc(bx + 4, y, 1.5, 0, Math.PI * 2);
+      ctx.moveTo(noseX, y);
+      ctx.lineTo(headStart, y - hh);
+      ctx.lineTo(tailX + 2, y - hh);
+      ctx.lineTo(tailX, y - hh + 1);
+      ctx.lineTo(tailX, y + hh - 1);
+      ctx.lineTo(tailX + 2, y + hh);
+      ctx.lineTo(headStart, y + hh);
+      ctx.closePath();
       ctx.fill();
+      /* 4. 弹体顶部高光 */
+      ctx.strokeStyle = 'rgba(255,255,255,' + (alpha * 0.75) + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(headStart + 1, y - hh + 1.1);
+      ctx.lineTo(tailX + 2, y - hh + 1.1);
+      ctx.stroke();
+      /* 5. 红色识别带 */
+      ctx.fillStyle = 'rgba(210,40,40,' + (alpha * 0.9) + ')';
+      ctx.fillRect(tailX + 5, y - hh + 0.5, 2, hh * 2 - 1);
     } else {
       ctx.strokeStyle = 'rgba(' + fx.color + ',' + (alpha * 0.4) + ')';
       ctx.lineWidth = 2;

@@ -30,50 +30,7 @@ const VEHICLE_ANNOTATION_BTR90 = {
       }
     ]
   },
-  "trackLine": {
-    "points": [
-      {
-        "x": 0.0759,
-        "y": 0.6724
-      },
-      {
-        "x": 0.078,
-        "y": 0.785
-      },
-      {
-        "x": 0.0925,
-        "y": 0.8575
-      },
-      {
-        "x": 0.1743,
-        "y": 1.005
-      },
-      {
-        "x": 0.6075,
-        "y": 0.9938
-      },
-      {
-        "x": 0.6573,
-        "y": 0.9052
-      },
-      {
-        "x": 0.7045,
-        "y": 0.7902
-      },
-      {
-        "x": 0.7114,
-        "y": 0.7061
-      },
-      {
-        "x": 0.705,
-        "y": 0.6554
-      },
-      {
-        "x": 0.6917,
-        "y": 0.7105
-      }
-    ]
-  },
+  "trackLine": null,
   "trackScroll": {
     "enabled": false,
     "direction": -1,
@@ -261,7 +218,7 @@ const VEHICLE_ANNOTATION_BTR90 = {
       "y": 0.2424,
       "name": "槍口 2",
       "weaponId": "pkt",
-      "layerOrder": "above"
+      "layerOrder": "below"
     },
     {
       "x": 0.6367,
