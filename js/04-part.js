@@ -76,7 +76,7 @@ function pickAimPartFromClick(canvasX, canvasY){
 /* ★ 像素級圖形邊界 helper（用於射程判定、碰撞、推動） */
 const HERO_SPRITE_W = 88;
 function getSceneW(){const fxEl=document.getElementById('battle-fx');return fxEl?fxEl.clientWidth:400;}
-function getPlayerSpriteWidthPx(){return HERO_SPRITE_W;}
+function getPlayerSpriteWidthPx(){return (battle && battle.playerSpriteW) ? battle.playerSpriteW : HERO_SPRITE_W;}
 /* ★ 計算 BOSS 圖形在 sprite 內的實際像素邊界（依動畫 + sprite 尺寸快取） */
 function getBossGfxBounds(){
   if(!battle) return null;
@@ -293,9 +293,9 @@ function renderCombat(){
       _btnLabel = _can ? ('掃蕩 ×' + _sw.max) : (_sw.reason || '資源不足');
     } else {
         _can = _curTier === 2 ? _seals2 > 0 : _seals1 > 0;
-        _btnLabel = _can ? '挑戰' : '無信物';
+        _btnLabel = _can ? '挑戰' : '信物不足';
     }
-    listHtml+=`<div class="boss-card ${_can?'':'locked'}"><div class="boss-avatar">${bossIcon(_bid)}</div><div class="boss-info"><div class="bn">${_b.name}${_defeated?' ✅':''}</div><div class="bd">甲 ${_b.armor} ｜ 生命 ${_b.hp}</div></div><div class="boss-tier-selector"><div class="boss-tier-btn ${_curTier===1?'on':''}" data-boss-key="${_g.baseKey}" data-tier="1"><div class="bt-label">I</div><div class="bt-seal">×${_seals1}</div></div>${_t2Exists?`<div class="boss-tier-btn ${_curTier===2?'on':''} ${_t2Unlocked?'':'locked'}" data-boss-key="${_g.baseKey}" data-tier="2"><div class="bt-label">${_t2Unlocked?'II':'🔒'}</div><div class="bt-seal">${_t2Unlocked?'×'+_seals2:'-'}</div></div>`:''}</div><button class="btn ${_can?'primary':''}" data-bid="${_bid}" ${_can?'':'disabled'} style="padding:8px 10px;font-size:11px;flex:0 0 auto">${_btnLabel}</button></div>`;
+    listHtml+=`<div class="boss-card ${_can?'':'locked'}"><div class="boss-avatar">${bossIcon(_bid)}</div><div class="boss-info"><div class="bn">${_b.name}${_defeated?' ✅':''}</div><div class="bd"><div>甲 ${_b.armor}</div><div>生命 ${_b.hp}</div></div></div><div class="boss-tier-selector"><div class="boss-tier-btn ${_curTier===1?'on':''}" data-boss-key="${_g.baseKey}" data-tier="1"><div class="bt-label">I</div><div class="bt-seal">×${_seals1}</div></div>${_t2Exists?`<div class="boss-tier-btn ${_curTier===2?'on':''} ${_t2Unlocked?'':'locked'}" data-boss-key="${_g.baseKey}" data-tier="2"><div class="bt-label">${_t2Unlocked?'II':'🔒'}</div><div class="bt-seal">${_t2Unlocked?'×'+_seals2:'-'}</div></div>`:''}</div><button class="btn ${_can?'primary':''}" data-bid="${_bid}" ${_can?'':'disabled'} style="padding:8px 10px;font-size:11px;flex:0 0 auto">${_btnLabel}</button></div>`;
   }
   listHtml+='</div>';
   z1.innerHTML=listHtml;
@@ -1092,77 +1092,40 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
   var ZW = z1.clientWidth || 400;
   var ZH = z1.clientHeight || 500;
   var BOSS_START_PCT = 65;
-
-  /* ---------- 载具：玩家视觉高 × 探索模式 BTR 比例 ---------- */
-  /* 挑战玩家 sprite = BATTLE_HERO_SPRITE_H(118)，内容高 = 118 × 0.667 = 78.7px */
-  /* 探索 BTR / 玩家 = (H × 0.99) / (H × 0.58) = 1.707 */
-  /* 载具视觉高 = 78.7 × 1.707 ≈ 134px（固定，不随画布变） */
-  var PLAYER_SPRITE_H = (typeof BATTLE_HERO_SPRITE_H !== "undefined") ? BATTLE_HERO_SPRITE_H : 118;
-  var PLAYER_FACTOR = (typeof CHAR_HEIGHT_FACTOR_BATTLE !== "undefined") ? CHAR_HEIGHT_FACTOR_BATTLE : 0.667;
+  var PLAYER_SPRITE_H = 118;
+  var PLAYER_FACTOR = 0.667;
   var RATIO_EXPLORE = 0.99 / 0.58;
   var vehH = PLAYER_SPRITE_H * PLAYER_FACTOR * RATIO_EXPLORE;
   var ann = (typeof ANN !== "undefined") ? ANN[vid] : null;
   var imgW = (ann && ann.imageSize) ? ann.imageSize.w : 640;
   var imgH = (ann && ann.imageSize) ? ann.imageSize.h : 240;
   var vehW = vehH * (imgW / imgH);
-
-  /* ---------- Boss sprite：挑战模式规则（battleLoop 一致） ---------- */
   var bossSize = Math.round(ZH * 0.75);
   var maxHalfW = Math.floor(ZW * Math.min(BOSS_START_PCT / 100, 1 - BOSS_START_PCT / 100) * 0.98);
   var bossWide = Math.max(bossSize, Math.min(Math.round(bossSize * 1.5), maxHalfW * 2));
   var BOSS_W = bossWide;
   var BOSS_H = bossSize;
-
-  /* ---------- 场景 ---------- */
   var scene = document.createElement("div");
   scene.style.cssText = "position:absolute;inset:0;overflow:hidden;background:#0a0605;";
   var bg = document.createElement("div");
   bg.style.cssText = "position:absolute;inset:0;background-image:url('" + getBossBgPath(bid) + "');background-size:cover;background-position:center bottom;background-repeat:no-repeat;opacity:0;transition:opacity 0.25s ease-out;";
-
-  /* Boss canvas：挑战模式同一套（drawBlockBoss + bottom:0） */
   var bossCanvas = document.createElement("canvas");
-  bossCanvas.width = BOSS_W;
-  bossCanvas.height = BOSS_H;
+  bossCanvas.width = BOSS_W; bossCanvas.height = BOSS_H;
   bossCanvas.style.cssText = "position:absolute;bottom:0;left:" + BOSS_START_PCT + "%;transform:translateX(-50%);width:" + BOSS_W + "px;height:" + BOSS_H + "px;opacity:0;transition:opacity 0.25s ease-out;will-change:left,transform;";
-  try {
-    var bctx = bossCanvas.getContext("2d");
-    drawBlockBoss(bctx, BOSS_W, BOSS_H, bid, "idle", 0);
-  } catch(e){}
-
-  /* 载具：bottom:0，和 boss 同地面 */
+  try { var bctx = bossCanvas.getContext("2d"); drawBlockBoss(bctx, BOSS_W, BOSS_H, bid, "idle", 0); } catch(e){}
   var veh = document.createElement("img");
   veh.src = "icons/vehicles/" + vid + ".png" + (typeof assetSuffix === "function" ? assetSuffix() : "");
-  veh.onerror = function(){
-    veh.onerror = null;
-    veh.src = "icons/vehicles/" + vid + ".png" + (typeof assetSuffix === "function" ? assetSuffix() : "");
-  };
   veh.style.cssText = "position:absolute;bottom:0;left:-50%;width:" + vehW + "px;height:" + vehH + "px;transform:translateX(-50%);will-change:left;";
-
-  /* 火光 canvas */
   var fireCanvas = document.createElement("canvas");
   fireCanvas.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:5;";
-  fireCanvas.width = ZW;
-  fireCanvas.height = ZH;
+  fireCanvas.width = ZW; fireCanvas.height = ZH;
   var fcCtx = fireCanvas.getContext("2d");
-
-  /* 进度条 */
   var progress = document.createElement("div");
   progress.style.cssText = "position:absolute;top:8px;left:50%;transform:translateX(-50%);color:#e8a33d;font-size:12px;font-weight:bold;background:rgba(14,12,10,.85);border:1px solid #8a5f18;padding:3px 12px;border-radius:10px;z-index:10;white-space:nowrap;";
-  progress.textContent = "\u6383\u8569 " + currentIdx + " / " + totalCount;
-
-  scene.appendChild(bg);
-  scene.appendChild(bossCanvas);
-  scene.appendChild(veh);
-  scene.appendChild(fireCanvas);
-  scene.appendChild(progress);
+  progress.textContent = "掃蕩 " + currentIdx + " / " + totalCount;
+  scene.appendChild(bg); scene.appendChild(bossCanvas); scene.appendChild(veh); scene.appendChild(fireCanvas); scene.appendChild(progress);
   z1.appendChild(scene);
-
-  requestAnimationFrame(function(){
-    bg.style.opacity = "1";
-    bossCanvas.style.opacity = "1";
-  });
-
-  /* rev585: 接触点直接用 boss canvas 中心（不再算内容 bbox） */
+  requestAnimationFrame(function(){ bg.style.opacity = "1"; bossCanvas.style.opacity = "1"; });
   var bossHalfPct = (BOSS_W / ZW) * 50;
   var vehHalfPct = (vehW / ZW) * 50;
   var VEH_CONTACT = BOSS_START_PCT - vehHalfPct;
@@ -1172,86 +1135,143 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
   var moveDistPct = Math.max(distBossPct, distVehPct, 40);
   var VEH_END = VEH_CONTACT + moveDistPct;
   var BOSS_END = BOSS_START_PCT + moveDistPct;
-
-  /* 火光 */
   var FADE_IN_MS = 250;
-  var CONTACT_MS = 1600;
-  var TOTAL_MS = 3400;
- var SWEEP_SPEED_PX_PER_SEC = 1200;
-  /* BTR 炮口 Y：图片炮口在 BTR 顶部约 17% 位置 */
+  var SWEEP_SPEED_PX_PER_SEC = 1200;
   var vehTopY = ZH - vehH;
   var muzzleYPx = vehTopY + vehH * 0.17;
-  var WEAPON_PROFILE = (typeof MUZZLE_PROFILES !== "undefined") ? MUZZLE_PROFILES.kpvt : { flashSize: 26, flashColor: "255,200,80", bulletSize: 3.5, bulletSpeed: 450 };
-  var fireEffects = [];
-  var lastFireAt = 0;
   var FIRE_INTERVAL = 150;
   var startTime = performance.now();
+  var lastFireAt = 0;
+  var sweepSmoke = [], sweepTracers = [];
+  var _getSweepTex = function() {
+    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    var cx = c.getContext('2d');
+    for(var i = 0; i < 8; i++) {
+      var ox = (Math.random()-0.5)*30, oy = (Math.random()-0.5)*30, r = 20+Math.random()*30;
+      var g = cx.createRadialGradient(64+ox, 64+oy, 0, 64+ox, 64+oy, r);
+      g.addColorStop(0, 'rgba(235,235,240,0.7)'); g.addColorStop(0.5, 'rgba(220,220,225,0.4)'); g.addColorStop(1, 'rgba(200,200,205,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.arc(64+ox, 64+oy, r, 0, Math.PI*2); cx.fill();
+    }
+    return c;
+  };
+  var sweepTex = _getSweepTex();
+  var _sweepDone = false;
+  var _safeDone = function(){ if(_sweepDone) return; _sweepDone = true; onComplete(); };
+  var _safety = setTimeout(_safeDone, 15000);
+
   function tick(now){
-    var t = now - startTime;
-    var elapsed = Math.max(0, t - FADE_IN_MS);
-    var vehX, bossX, bossRot = 0;
-    /* rev586: single linear sweep, constant velocity */
-    var totalMovePx = (VEH_END - VEH_START) / 100 * ZW;
- var totalMoveMs = Math.max(150, totalMovePx / SWEEP_SPEED_PX_PER_SEC * 1000);
-    var pTotal = Math.min(1, elapsed / totalMoveMs);
-    vehX = VEH_START + (VEH_END - VEH_START) * pTotal;
-    bossX = BOSS_START_PCT;
-    if(vehX > VEH_CONTACT){
-      var pushed = vehX - VEH_CONTACT;
-      bossX = BOSS_START_PCT + pushed;
-      var pushTotal = Math.max(0.001, VEH_END - VEH_CONTACT);
-      bossRot = Math.min(1, pushed / pushTotal) * 25;
-    }
-    veh.style.left = vehX + "%";
-    bossCanvas.style.left = bossX + "%";
-    if(bossRot > 0){
-      bossCanvas.style.transform = "translateX(-50%) rotate(" + bossRot + "deg)";
-    }
-    if(t >= FADE_IN_MS && elapsed < totalMoveMs && now - lastFireAt >= FIRE_INTERVAL){
-      lastFireAt = now;
-      var vehCenterPx = (vehX / 100) * ZW;
-      var muzzleXPx = vehCenterPx + vehW * 0.35;
-      fireEffects.push({ startTime: now, x: muzzleXPx, y: muzzleYPx, profile: WEAPON_PROFILE });
-    }
-    fcCtx.clearRect(0, 0, ZW, ZH);
-    for(var i = fireEffects.length - 1; i >= 0; i--){
-      var fx = fireEffects[i];
-      var age = now - fx.startTime;
-      var total = 600;
-      if(age > total){ fireEffects.splice(i, 1); continue; }
-      var ft = age / total;
-      var prof = fx.profile;
-      if(ft < 0.2){
-        var ff = ft / 0.2;
-        var r = prof.flashSize * (1 - ff * 0.6);
-        var grad = fcCtx.createRadialGradient(fx.x, fx.y, 0, fx.x, fx.y, r);
-        grad.addColorStop(0, "rgba(" + prof.flashColor + "," + (1 - ff) + ")");
-        grad.addColorStop(1, "rgba(" + prof.flashColor + ",0)");
-        fcCtx.fillStyle = grad;
-        fcCtx.beginPath();
-        fcCtx.arc(fx.x, fx.y, r, 0, Math.PI * 2);
-        fcCtx.fill();
+    try {
+      if(_sweepDone) return;
+      var t = now - startTime; 
+      var elapsed = Math.max(0, t - FADE_IN_MS); 
+      var totalMovePx = (VEH_END - VEH_START) / 100 * ZW; 
+      var totalMoveMs = Math.max(150, totalMovePx / SWEEP_SPEED_PX_PER_SEC * 1000);
+      if (!isFinite(totalMoveMs) || totalMoveMs <= 0) totalMoveMs = 2000;
+      if (elapsed >= totalMoveMs) {
+          clearTimeout(_safety);
+          _safeDone();
+          return;
       }
-      var bx = fx.x + ft * prof.bulletSpeed;
-      var alpha = Math.max(0, 1 - ft);
-      fcCtx.strokeStyle = "rgba(" + prof.flashColor + "," + (alpha * 0.4) + ")";
-      fcCtx.lineWidth = 2;
-      fcCtx.beginPath();
-      fcCtx.moveTo(fx.x + ft * prof.bulletSpeed * 0.3, fx.y);
-      fcCtx.lineTo(bx, fx.y);
-      fcCtx.stroke();
-      fcCtx.fillStyle = "rgba(255,220,120," + alpha + ")";
-      fcCtx.beginPath();
-      fcCtx.arc(bx, fx.y, prof.bulletSize, 0, Math.PI * 2);
-      fcCtx.fill();
-    }
-    if(elapsed < totalMoveMs){
+      var pTotal = Math.min(1, elapsed / totalMoveMs);
+      var vehX = VEH_START + (VEH_END - VEH_START) * pTotal; 
+      var bossX = BOSS_START_PCT;
+      var bossRot = 0;
+      if(vehX > VEH_CONTACT){ 
+          var pushed = vehX - VEH_CONTACT; 
+          bossX = BOSS_START_PCT + pushed; 
+          var pushTotal = Math.max(0.001, VEH_END - VEH_CONTACT); 
+          bossRot = Math.min(1, pushed / pushTotal) * 25; 
+      }
+      veh.style.left = vehX + "%"; 
+      bossCanvas.style.left = bossX + "%";
+      if(bossRot > 0){ bossCanvas.style.transform = "translateX(-50%) rotate(" + bossRot + "deg)"; }
+      var dt = Math.min(0.05, (now - (window._sweepLastTick || now)) / 1000); 
+      window._sweepLastTick = now;
+      var vehCenterPx = (vehX / 100) * ZW; 
+      var muzzleXPx = vehCenterPx + vehW * 0.35; 
+      var muzzleYPx = ZH - vehH + vehH * 0.17;
+      var worldSpeed = SWEEP_SPEED_PX_PER_SEC;
+                                    if(t >= FADE_IN_MS && elapsed < totalMoveMs && now - lastFireAt >= FIRE_INTERVAL){
+        lastFireAt = now;
+        sweepTracers.push({ startX: muzzleXPx, startY: muzzleYPx, born: now, speed: 2500, len: 100, width: 3 });
+        
+        const _base = vehW || 300;
+        // 1. 锥形发射烟
+        sweepSmoke.push({ 
+          x: muzzleXPx, y: muzzleYPx, 
+          vx: _base * 25, vy: (Math.random()-0.5)*10, 
+          life: 1, rate: 1/0.3, 
+          sizeX: _base * 0.15, sizeY: _base * 0.03, 
+          growX: _base * 5.0, growY: _base * 1.0, 
+          alpha0: 0.95, friction: 0.65, isJet: true, angle: 0, spin: 0, worldFactor: 0.1
+        });
+        // 2. 弥散烟
+        for(let i=0; i<4; i++) {
+          sweepSmoke.push({ 
+            x: muzzleXPx + _base * 0.15, y: muzzleYPx + (Math.random()-0.5)*20, 
+            vx: _base * 4 + Math.random()*_base*2, vy: (Math.random()-0.5)*30, 
+            life: 1, rate: 1/(1.2 + Math.random()*0.6), 
+            sizeX: _base * 0.15, sizeY: _base * 0.15, 
+            growX: _base * 0.8, growY: _base * 0.8, 
+            alpha0: 0.15, friction: 0.94, isJet: false, angle: Math.random()*6.28, spin: (Math.random()-0.5)*0.5, worldFactor: 1.0
+          });
+        }
+      }
+
+      for(var i = sweepSmoke.length - 1; i >= 0; i--){
+        var p = sweepSmoke[i]; 
+        const driftSpeed = worldSpeed * (p.worldFactor || 0);
+        p.x += (p.vx - driftSpeed) * dt; 
+        p.y += p.vy * dt;
+        p.vx *= p.friction; p.vy = p.vy * 0.95; 
+        p.sizeX += p.growX * dt; p.sizeY += p.growY * dt;
+        p.life -= p.rate * dt; p.angle += p.spin * dt;
+        if(p.life <= 0) sweepSmoke.splice(i, 1);
+      }
+      fcCtx.clearRect(0, 0, ZW, ZH);
+      for(var i = 0; i < sweepSmoke.length; i++){
+        var p = sweepSmoke[i]; 
+        var a = p.isJet ? (p.alpha0 * Math.pow(Math.max(0, p.life), 2.0)) : (p.alpha0 * Math.pow(Math.max(0, p.life), 3.0));
+        if(a < 0.005) continue;
+        fcCtx.globalAlpha = a; 
+        fcCtx.save(); fcCtx.translate(p.x, p.y); 
+        if (p.isJet) {
+          fcCtx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
+          const g = fcCtx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
+          g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+          g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)');
+          g.addColorStop(1, 'rgba(200, 210, 220, 0)');
+          fcCtx.fillStyle = g;
+          fcCtx.beginPath(); fcCtx.arc(0, 0, p.sizeY, 0, Math.PI * 2); fcCtx.fill();
+        } else {
+          fcCtx.rotate(p.angle);
+          const g = fcCtx.createRadialGradient(0, 0, 0, 0, 0, p.sizeX);
+          g.addColorStop(0, 'rgba(235, 235, 240, 0.9)');
+          g.addColorStop(0.5, 'rgba(210, 210, 215, 0.2)');
+          g.addColorStop(1, 'rgba(190, 190, 195, 0)');
+          fcCtx.fillStyle = g;
+          fcCtx.beginPath(); fcCtx.arc(0, 0, p.sizeX, 0, Math.PI * 2); fcCtx.fill();
+        }
+        fcCtx.restore();
+      }
+fcCtx.globalAlpha = 1; fcCtx.save(); fcCtx.shadowColor = 'rgba(255,200,50,0.8)'; fcCtx.shadowBlur = 10;
+      for(var i = sweepTracers.length - 1; i >= 0; i--){
+        var tr = sweepTracers[i]; var tipX = tr.startX + (now - tr.born)/1000 * tr.speed;
+        if(tipX - tr.len > ZW + 200) { sweepTracers.splice(i, 1); continue; }
+        var tailX = Math.max(tr.startX, tipX - tr.len);
+        var grad = fcCtx.createLinearGradient(tailX, tr.startY, tipX, tr.startY);
+        grad.addColorStop(0, 'rgba(255,200,50,0)'); grad.addColorStop(0.8, 'rgba(255,255,200,0.9)'); grad.addColorStop(1, '#fff');
+        fcCtx.strokeStyle = grad; fcCtx.lineWidth = tr.width; fcCtx.beginPath(); fcCtx.moveTo(tailX, tr.startY); fcCtx.lineTo(tipX, tr.startY); fcCtx.stroke();
+      }
+      fcCtx.restore();
       requestAnimationFrame(tick);
-    } else {
-      onComplete();
+    } catch(err) {
+      console.error('[sweep tick error]', err);
+      clearTimeout(_safety);
+      _safeDone();
     }
   }
-  requestAnimationFrame(tick);
+  requestAnimationFrame(tick); // 启动循环
 }
 
 function _finishBatchSweep(bid, vid, level, count, allLoot, servantGained, expTarget){
@@ -1399,5 +1419,3 @@ function _getBossContentHorizontalBounds(bid, px){
     return null;
   }
 }
-
-

@@ -540,8 +540,21 @@ function battleLoop(now){
         bossSprite.style.height = bossSize + 'px';
       }
       const groundY = BATTLE_GROUND_TOP_RATIO;
-      const playerFootPx = BATTLE_HERO_SPRITE_H * BATTLE_HERO_FOOT_Y_RATIO;
+      // 玩家視覺高 = 0.35H
+      battle.playerCanvasH = H * 0.4519;
+      battle.playerCanvasW = H * 0.8423;
+      battle.playerSpriteW = H * 0.3370;
+      battle.playerSpriteH = H * 0.4519;
+      const playerFootPx = battle.playerCanvasH * 0.95;
       battle.py = clamp(groundY - playerFootPx / H, 0, 1);
+      {
+        const _hc = document.getElementById('hero-battle-canvas');
+        if(_hc){ _hc.style.width = battle.playerCanvasW + 'px'; _hc.style.height = battle.playerCanvasH + 'px'; }
+        const _hs = document.querySelector('.hero-f .sprite');
+        if(_hs){ _hs.style.width = battle.playerSpriteW + 'px'; _hs.style.height = battle.playerSpriteH + 'px'; }
+        const _hb = document.querySelector('.hero-f .hpbar-wrap');
+        if(_hb){ _hb.style.width = Math.round(battle.playerSpriteW * 0.68) + 'px'; }
+      }
       battle.by = clamp(groundY - bossSize / H, 0, 1);
       updateFighterPos();
     }
@@ -733,7 +746,8 @@ function getPlayerMuzzlePos(){
   const fx = document.getElementById('battle-fx');
   const W = fx ? fx.clientWidth : 400;
   const H = fx ? fx.clientHeight : 500;
-  const spriteW = 220, spriteH = BATTLE_HERO_SPRITE_H;
+  const spriteW = (battle && battle.playerCanvasW) ? battle.playerCanvasW : 220;
+  const spriteH = (battle && battle.playerCanvasH) ? battle.playerCanvasH : BATTLE_HERO_SPRITE_H;
 
   const ORIG_CHAR_H = 386;
   const ORIG_FOOT_X = 200;
