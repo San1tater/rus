@@ -56,7 +56,7 @@ const VEHICLE_ANNOTATION_T80 = {
         "y": 1
       },
       {
-        "x": 0.5997,
+        "x": 0.6095,
         "y": 1
       },
       {

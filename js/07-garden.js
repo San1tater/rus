@@ -127,7 +127,7 @@ function _ensureGardenPage(){
       '<div class="gp-content" id="gp-content"></div>' +
     '</div>';
   (document.getElementById('content') || document.body).appendChild(p);
-  /* rev295: 事件委托，避免 _gardenUpdateFoodInfo 重写 innerHTML 时丢失点击 */
+  /* rev295: 事件委托，避免 _gardenUpdateFoodInfo 重寫 innerHTML 時丢失點擊 */
   p.addEventListener('click', function(e){
     let node = e.target;
     while(node && node !== p){
@@ -187,7 +187,7 @@ function _ensureGardenPage(){
   window.addEventListener('resize', function(){
     if(p.classList.contains('on')) _fitGardenGrid();
   });
-  /* rev560: 后院整页支持主 tab 滑动切换（capture 阶段独立绑定，避免仅日誌區生效的问题） */
+  /* rev560: 後院整頁支持主 tab 滑動切換（capture 阶段独立绑定，避免仅日誌區生效的问题） */
   (function(){
     if(p._mainTabSwipeBound) return;
     p._mainTabSwipeBound = true;
@@ -1364,7 +1364,7 @@ function _gardenMerchantTick(){
   }
 }
 
-/* rev555: 食物每小时总消耗（僕人吃饭 + 各产线食物消耗）。新增消耗方只改此函数 */
+/* rev555: 食物每小時總消耗（僕人吃饭 + 各产線食物消耗）。新增消耗方只改此函數 */
 function _gardenFoodConsumePerHour(){
   const g = _gardenMerchantInit();
   const m = g.merchant;
@@ -1395,7 +1395,7 @@ function _gardenFoodStats(){
     if(!s.assignedPlots || !s.assignedPlots.length) continue;
     consume += (FOOD_COST_PER_HOUR[s.foodPolicy || 'normal'] || 0) * 60;
   }
-  /* rev324: 产线食物消耗（传奇投掷物 + 传奇弹药线） */
+  /* rev324: 产線食物消耗（傳奇投掷物 + 傳奇彈藥線） */
   let lineConsume = 0;
   if(m.throwLv > 0){
     const _t = MERCHANT_THROW_TABLE[m.throwLv];
@@ -1528,8 +1528,8 @@ const MERCHANT_TRADE_ITEMS = [
     { id: 'seed_legend',  name: '傳奇種子包', desc: '傳奇種子×1', price: 1000, rarity: '傳奇', icon: '🌰', stackable: true }
   ]},
   { category: '特殊地塊', items: [
-    { id: 'black_soil', name: '黑土地', desc: '生长<span style="color:#e05252">↓20%</span> 产量<span style="color:#4caf50">↑20%</span>', price: 10000, rarity: '傳奇', imgIcon: 'black_soil', oneTime: true },
-    { id: 'red_soil',   name: '紅土地', desc: '生长<span style="color:#e05252">↓40%</span> 产量<span style="color:#4caf50">↑30%</span>', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
+    { id: 'black_soil', name: '黑土地', desc: '生長<span style="color:#e05252">↓20%</span> 產量<span style="color:#4caf50">↑20%</span>', price: 10000, rarity: '傳奇', imgIcon: 'black_soil', oneTime: true },
+    { id: 'red_soil',   name: '紅土地', desc: '生長<span style="color:#e05252">↓40%</span> 產量<span style="color:#4caf50">↑30%</span>', price: 30000, rarity: '傳奇', imgIcon: 'red_soil',   oneTime: true }
   ]},
   { category: '補給', items: [
     { id: 'ammo_supply_stock',   name: '庫存彈藥包', desc: '庫存彈藥×30', price: 100, rarity: '庫存', imgIcon: 'ammo_pack', stackable: true },
@@ -1779,7 +1779,7 @@ function _openTradeResultDialog(gotItems, title, extraActions){
 function renderGardenMerchant(box){
   if(!window._merchantMainTab) window._merchantMainTab = 'lines';
   const curTab = window._merchantMainTab;
-  /* rev348: 保存滚动位置，避免定时重绘时丢失 */
+  /* rev348: 保存滚動位置，避免定時重绘時丢失 */
   const _prevScroll = { _box: box ? box.scrollTop : 0 };
   if(box){
     ['.mrc-trade-left','.mrc-trade-right','.mrc-cols','.mrc-wrap'].forEach(function(sel){
@@ -1790,7 +1790,7 @@ function renderGardenMerchant(box){
   const g = _gardenMerchantInit();
   const m = g.merchant;
   const now = Date.now();
-  /* rev349: 签名守卫——结构未变则跳过全量重建，避免闪烁 */
+  /* rev349: 签名守衛——結构未变则跳過全量重建，避免闪烁 */
   let _sig;
   if(curTab === 'lines'){
     _sig = 'L|' + (m.foodLv||0) + '|' + (m.seedLv||0) + '|' + (m.throwLv||0) + '|' + (m.ammoLv||0);
@@ -1803,7 +1803,7 @@ function renderGardenMerchant(box){
   window._merchantLastTab = curTab;
   const _domOk = box && box.querySelector('.mrc-page');
   if(!_forceRebuild && window._merchantSig === _sig && _domOk){
-    /* 结构未变——只做局部更新，不动 DOM 树 */
+    /* 結构未变——只做局部更新，不動 DOM 树 */
     if(curTab === 'lines'){
       try { _gardenMerchantRefreshUI(); } catch(e){ console.warn('[merchant refresh]', e); }
     } else if(window._tradeSelectedId){
@@ -1895,7 +1895,7 @@ function renderGardenMerchant(box){
     }
     renderTradeDetail();
   }
-  /* rev348: 恢复滚动位置（在所有 innerHTML 替换之后） */
+  /* rev348: 恢複滚動位置（在所有 innerHTML 替換之後） */
   if(box){
     if(_prevScroll._box > 0) box.scrollTop = _prevScroll._box;
     ['.mrc-trade-left','.mrc-trade-right','.mrc-cols','.mrc-wrap'].forEach(function(sel){
@@ -2788,14 +2788,14 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
 
 
 function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
-  /* rev514: REGIONS.enemies 用 ghoul/raider/raider_vet；HUMAN_ENEMY_DATA 键为 human_ghoul 等 */
+  /* rev514: REGIONS.enemies 用 ghoul/raider/raider_vet；HUMAN_ENEMY_DATA 键為 human_ghoul 等 */
   var _realId = enemyId;
   if(typeof HUMAN_ENEMY_DATA !== "undefined"){
     if(!HUMAN_ENEMY_DATA[enemyId] && HUMAN_ENEMY_DATA["human_" + enemyId]){
       _realId = "human_" + enemyId;
     }
   }
-  /* 人形敌人：走 _rev506_drawHumanCorpse（带装备/武器，支持任意动画） */
+  /* 人形敌人：走 _rev506_drawHumanCorpse（帶裝備/武器，支持任意動畫） */
   if(typeof HUMAN_ENEMY_DATA !== "undefined" && HUMAN_ENEMY_DATA[_realId]){
     const def = HUMAN_ENEMY_DATA[_realId];
     const anims = def.anims;
@@ -2803,7 +2803,7 @@ function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
     const anim = anims[animName] || anims.idle;
     if(!anim) return;
     const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-    /* 装备缓存：每种敌人固定一套（避免每帧随机） */
+    /* 裝備缓存：每种敌人固定一套（避免每帧随机） */
     if(!window._rev510_raidEquipCache) window._rev510_raidEquipCache = {};
     if(!window._rev510_raidEquipCache[_realId]){
       window._rev510_raidEquipCache[_realId] = (typeof _rev506_getRandomEquip === "function")
@@ -2886,12 +2886,12 @@ function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
 
 
 
-/* ===== rev238: 腐烂 / 堆肥 / 弹药回退 ===== */
+/* ===== rev238: 腐烂 / 堆肥 / 彈藥回退 ===== */
 
-/* rev553: 守卫枪口世界坐标（用于 raid 子弹起点）
-   参数 u：guardUnit（含 x, y, equipped, weaponSlot, animName, animFrame）
-   参数 scale：raid 中的 SCALE
-   返回 { x, y }（画布内世界坐标）；无武器时返回 null，调用方用旧偏移 fallback */
+/* rev553: 守衛槍口世界坐标（用於 raid 子彈起點）
+   参數 u：guardUnit（含 x, y, equipped, weaponSlot, animName, animFrame）
+   参數 scale：raid 中的 SCALE
+   返回 { x, y }（畫布內世界坐标）；無武器時返回 null，调用方用舊偏移 fallback */
 function _getRaidMuzzleWorld(u, scale){
   if(!u || !u.equipped || !u.weaponSlot) return null;
   const wpId = u.equipped[u.weaponSlot];
@@ -3235,7 +3235,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
   window._raidLiveLog = [];
   window._raidLiveActive = true;
   if(typeof _gardenUpdateBattleCol === 'function') setTimeout(_gardenUpdateBattleCol, 50);
-  // 保险：如果页面里已经有 [object HTMLDivElement] 文本节点，先清掉
+  // 保险：如果頁面裡已经有 [object HTMLDivElement] 文本节點，先清掉
   try {
     const _txtNodes = [];
     const _walk = function(node){
@@ -3267,7 +3267,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
     overlay.innerHTML = '<canvas class="raid-canvas" id="raid-canvas"></canvas>';
     wrap.appendChild(overlay);
     
-    // 隐藏原本的仆人画布，防止固定守卫重叠
+    // 隱藏原本的僕人畫布，防止固定守衛重叠
     
 
     const canvas = overlay.querySelector('#raid-canvas');
@@ -3676,11 +3676,11 @@ function drawUnit(u, now){
       try {
         addLog('⚔️ 戰鬥開始 · ' + region, 'round');
         
-        // rev398: 触发怪物滑入
+        // rev398: 触發怪物滑入
         for(const u of enemyUnits) { u.slideIn = true; }
         await sleep(700); // 等待滑入完成
         
-        // 重置回合计时，防止滑入期间过早攻击
+        // 重置回合計時，防止滑入期間過早攻擊
         battleStartTime = Date.now();
         let round = 0;
         const maxRounds = 30;
@@ -3760,7 +3760,7 @@ function drawUnit(u, now){
         const ov = page.querySelector('#raid-overlay');
         if(ov) ov.remove();
         
-        // 恢复原本的仆人画布
+        // 恢複原本的僕人畫布
         
         if(typeof renderGardenContent === 'function') renderGardenContent();
       }
@@ -4445,7 +4445,7 @@ function _gardenActorTick(){
         save();
       }
     }
-    // 守衛：体力 > 0 站哨塔，体力 = 0 偷懒
+    // 守衛：體力 > 0 站哨塔，體力 = 0 偷懒
     if(a.type === 'guard'){
 if(a.stamina <= 0){
         if(!a.restPos){
@@ -4479,7 +4479,7 @@ if(a.stamina <= 0){
                 a._guardState = 'walk';
                 a._guardTimer = now + 1500 + Math.random() * 2000;
                 let _gtx = pRect.left - wrapRect.left + pRect.width / 2 + (Math.random() - 0.5) * pRect.width * 0.4;
-                /* rev361: 守衛巡邏目標太近時強制推遠 */
+                /* rev361: 守衛巡邏目標太近時強製推遠 */
                 if(Math.abs(_gtx - a.x) < 8){
                   const _dir = Math.random() > 0.5 ? 1 : -1;
                   _gtx = a.x + _dir * (8 + Math.random() * 6);
@@ -4726,7 +4726,7 @@ if(a.stamina <= 0){
       const pRect = plotEl.getBoundingClientRect();
       a.tx = pRect.left - wrapRect.left + pRect.width / 2 + (Math.random() - 0.5) * 16;
       a.ty = pRect.top - wrapRect.top + pRect.height - 2 + (Math.random() - 0.5) * 10;
-      /* rev361: 目標點太近時強制推遠，避免原地抽搐 */
+      /* rev361: 目標點太近時強製推遠，避免原地抽搐 */
       if(Math.abs(a.tx - a.x) < 12){
         const _dir = Math.random() > 0.5 ? 1 : -1;
         a.tx = a.x + _dir * (12 + Math.random() * 8);
@@ -5029,7 +5029,7 @@ function closeGarden(){
   if(window._rev255Installed) return;
   window._rev255Installed = true;
 
-  /* ── ① 收获 ── */
+  /* ── ① 收獲 ── */
   window.gardenHarvest = function(idx){
     try {
       const plots = _gardenGetPlots();
@@ -5220,7 +5220,7 @@ function closeGarden(){
     bindCells();
   };
 
-  /* ── ④ 产线进度实时刷新 ── */
+  /* ── ④ 产線進度實時刷新 ── */
   window._startMerchantLiveTimer = function(){
     if(window._merchantLiveTimer) return;
     window._merchantLiveTimer = setInterval(function(){
@@ -5317,7 +5317,7 @@ function _gardenMealTick(now){
 }
 
 function _gardenDoOneMeal(g){
-  // 守卫站岗体力消耗（每小时 -60）
+  // 守衛站岗體力消耗（每小時 -60）
   const _guards = (state.servants || []).filter(function(s){
     return s.type === 'guard' && s.assignedPlots && s.assignedPlots.length > 0;
   });
@@ -6342,7 +6342,7 @@ function POLICY_NAMES_FEED(p){
 }
 /* ===== end rev291 ===== */
 
-/* ===== rev293: 堆肥施肥系统 ===== */
+/* ===== rev293: 堆肥施肥系統 ===== */
 function _isAssignedToCompost(srv){
   if(!srv || !srv.assignedPlots || !srv.assignedPlots.length) return false;
   const plots = _gardenGetPlots();

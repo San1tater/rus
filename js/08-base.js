@@ -1,12 +1,12 @@
 // [rev824] 移除 maxHeight 并修整
-// [rev823] 完整修复
-// [rev816] 高度比例与科技树入口折叠
+// [rev823] 完整修複
+// [rev816] 高度比例與科技树入口折叠
 // [rev815] 車場高度與數字格式修復
 // [rev814] 車場保留原結構並擴展 Dock
 // [rev813] 車場重構（安全替換）
 // [rev811] 車場重構
 /* ============================================================
-   08-base.js — 基地（控制中心 / 建築 / 區域 / 統計 / 偏好）
+   08-base.js — 基地（控製中心 / 建築 / 區域 / 統計 / 偏好）
    由 06-part.js 拆解而來（rev343）
    ============================================================ */
 /* ============================================================
@@ -105,7 +105,7 @@ function getControlCenterBody(){
 function openControlCenter(){
   const ft = el('div','modal-ft');
   ft.innerHTML = '<button class="btn ghost" id="m-close-cc">關閉</button>';
-  const bd = openModal({title:'控制中心', body:getControlCenterBody(), footer:ft});
+  const bd = openModal({title:'控製中心', body:getControlCenterBody(), footer:ft});
   const _heads = bd.querySelectorAll('[data-cc-sec]');
   for(let _i = 0; _i < _heads.length; _i++){
     (function(h){
@@ -301,7 +301,7 @@ function renderBaseStats(){
   }
   const g = _gardenMerchantInit();
   const m = g.merchant;
-  /* rev555: 食物净产 = 产能 - 总消耗（僕人+投掷线+弹药线），统一走 _gardenFoodConsumePerHour */
+  /* rev555: 食物净产 = 产能 - 總消耗（僕人+投掷線+彈藥線），統一走 _gardenFoodConsumePerHour */
   const _totalFoodConsume = (typeof _gardenFoodConsumePerHour === 'function') ? _gardenFoodConsumePerHour() : 0;
   const _foodProd = m.foodLv > 0 ? MERCHANT_FOOD_TABLE[m.foodLv].cropValue * 12 : 0;
   if(_foodProd > 0 || _totalFoodConsume > 0){
@@ -464,7 +464,7 @@ function _openSoilDetail(){
   openModal({ title: '田地', body: body, footer: ft });
 }
 
-/* rev555: 基地子分页签左右滑动切换（stats ↔ room） */
+/* rev555: 基地子分頁签左右滑動切換（stats ↔ room） */
 function _bindBaseSwipe(z2){
   if(!z2) return;
   if(z2._baseSwipeAbort) z2._baseSwipeAbort.abort();
@@ -1062,7 +1062,7 @@ function _renderGarageDockList(){
   const research = _garageGetResearchInfo();
   const rTarget = research ? research.targetId : null;
   
-  let ids = g.ownedVehicles.slice(); // 只显示已研发的载具
+  let ids = g.ownedVehicles.slice(); // 只顯示已研發的載具
   if(filter !== "all"){
     ids = ids.filter(function(id){ return VEHICLES[id].line === filter; });
   }
@@ -1292,7 +1292,7 @@ function _techNodeHtml(vid){
 }
 
 function _garageBindTechImgs(container){
-  // 保留 img 原生破图行为，不做替换
+  // 保留 img 原生破圖行為，不做替換
 }
 
 function _garageOpenTechTree(){
@@ -1533,7 +1533,7 @@ function renderBase(){
   let html='<div class="build-grid">';
   for(let i=0;i<12;i++){
     const slot=state.base.slots[i];
-    if(i===0)html+=`<div class="cell core" data-i="${i}"><div class="cico">${buildingIcon('control')}</div><div class="cnm">控制中心</div><div class="clv">Lv.1</div></div>`;
+    if(i===0)html+=`<div class="cell core" data-i="${i}"><div class="cico">${buildingIcon('control')}</div><div class="cnm">控製中心</div><div class="clv">Lv.1</div></div>`;
     else if(slot){const b=BUILDINGS[slot.id]||{name:'未知'};html+=`<div class="cell built" data-i="${i}"><div class="cico">${buildingIcon(slot.id)}</div><div class="cnm">${b.name}</div><div class="clv">Lv.${slot.lv}</div></div>`;}
     else html+=`<div class="cell" data-i="${i}"><div class="cico">＋</div><div class="cnm">空地</div></div>`;
   }
@@ -1561,7 +1561,7 @@ function renderBase(){
     };
   });
 
-  /* rev555: 左右滑动切换子分页签 */
+  /* rev555: 左右滑動切換子分頁签 */
   _bindBaseSwipe(z2);
 
   renderRegionArea(z3);
@@ -1997,7 +1997,7 @@ function _openLiquorDetail(){
       var el = btns[i];
       var t = el.textContent || '';
       if(t.indexOf('挑戰') !== -1 || t.indexOf('掃蕩') !== -1){
-        el.textContent = t.replace(/挑战/g, '挑戰').replace(/扫荡/g, '掃蕩');
+        el.textContent = t.replace(/挑戰/g, '挑戰').replace(/掃蕩/g, '掃蕩');
         fixed++;
       }
     }

@@ -1612,15 +1612,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
   flex: 1 1 0 !important; /* 自動填滿剩餘高度 */
 }
 
-/* [rev816] 弹性高度分配 */
-.garage-main {
-  flex: 1 1 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  padding: 6px 8px !important;
-  gap: 6px !important;
-  min-height: 0 !important;
-}
 .garage-showcase {
   flex: 1.5 !important; /* 大图比例最大 */
 }
@@ -1697,75 +1688,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
   display: block !important;
 }
 
-/* [rev819] 已移除滚动条样式，恢复隐藏 */
-
-/* [rev820] 统一卡片背景与状态 */
-/* 强制所有卡片使用背景图，移除纯色覆盖 */
-.garage-dock-card {
-  background: #1a1510 url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
-}
-
-/* 当前装备：金色边框 + 轻微高亮遮罩 */
-.garage-dock-card.current {
-  border-color: #e8a33d !important;
-  box-shadow: inset 0 0 20px rgba(232, 163, 61, 0.3) !important;
-  background: linear-gradient(rgba(232, 163, 61, 0.15), rgba(232, 163, 61, 0.15)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
-}
-
-/* 已拥有但未装备：绿色边框 */
-.garage-dock-card.owned {
-  border-color: #4caf50 !important;
-}
-
-/* 研发中：紫色边框 + 紫色高亮遮罩 */
-.garage-dock-card.researching {
-  border-color: #a45ede !important;
-  background: linear-gradient(rgba(164, 94, 222, 0.2), rgba(164, 94, 222, 0.2)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
-}
-
-/* 未解锁：半透明 */
-.garage-dock-card.locked {
-  opacity: 0.4 !important;
-}
-
-/* [rev821] 彻底隐藏滚动条 */
-.garage-dock-list::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-.garage-dock-list {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-}
-
-/* [rev821] 统一卡片背景与状态 */
-/* 所有卡片基础背景 */
-.garage-dock-card {
-  background: #1a1510 url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
-}
-
-/* 当前装备：金色边框 + 高亮遮罩 */
-.garage-dock-card.current {
-  border-color: #e8a33d !important;
-  background: linear-gradient(rgba(232, 163, 61, 0.15), rgba(232, 163, 61, 0.15)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
-}
-
-/* 已拥有：绿色边框 */
-.garage-dock-card.owned {
-  border-color: #4caf50 !important;
-}
-
-/* 研发中：紫色边框 + 紫色遮罩 */
-.garage-dock-card.researching {
-  border-color: #a45ede !important;
-  background: linear-gradient(rgba(164, 94, 222, 0.2), rgba(164, 94, 222, 0.2)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
-}
-
-/* 未解锁：半透明 */
-.garage-dock-card.locked {
-  opacity: 0.4 !important;
-}
 
 /* [rev823] 彻底隐藏滚动条 */
 .garage-dock-list::-webkit-scrollbar {
@@ -1893,3 +1815,37 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 
 /* [rev874] 强制电台字体 */
 .radio-btn { font-size: 9px !important; font-weight: bold; }
+
+/* [rev889] 車場車輛選擇區域與上方區域對齊 */
+#garage-page .garage-dock {
+  margin: 0 8px 6px !important;
+  border: 1px solid #2a231c !important;
+  border-radius: 8px !important;
+}
+
+/* [rev890] 車場卡片改上下兩列（橫向滾動） */
+#garage-page .garage-dock {
+  flex: 0 0 22vh !important;
+}
+#garage-page .garage-dock-list {
+  display: grid !important;
+  grid-template-rows: 1fr 1fr !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: 84px !important;
+  align-items: stretch !important;
+  padding: 4px 8px !important;
+  gap: 6px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+#garage-page .garage-dock-card {
+  height: 100% !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  flex: none !important;
+}
+
+/* [rev891] 還原 dock 高度，僅保留兩列卡片 */
+#garage-page .garage-dock {
+  flex: 0 0 30vh !important;
+}

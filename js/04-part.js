@@ -1,10 +1,3 @@
-// [rev875] 繁化与共用
-// [rev873] 掃蕩共用扬尘
-// [rev868] 掃蕩颜色与共用扬尘
-// [rev867] 掃蕩共用揚塵
-// [rev866] 掃蕩共用揚塵
-// [rev865] 掃蕩颜色修复
-// [rev864] 掃蕩扬尘
 /* ============================================================
    ★★★ BOSS MODULE — 戰鬥邏輯區 ★★★
    ============================================================ */
@@ -178,7 +171,7 @@ function isAimPartInRange(){
   const world=resolveBossWorld(def,anim,fi);
   const wp=world[part];
   if(!wp) return true;
-  /* rev520: 手动点击瞄准点优先（u,v 归一化局部坐标），否则用层中心 */
+  /* rev520: 手動點擊瞄准點優先（u,v 归一化局部坐标），否则用層中心 */
   let localX, localY;
   if(battle.aimLocal && battle.aimLocal.part === part && w > 0 && h > 0){
     localX = battle.aimLocal.u * w;
@@ -226,7 +219,7 @@ function getAimTargetPos(){
   const world = anim ? resolveBossWorld(def, anim, fi) : null;
   const wp = world ? world[part] : null;
   if(!wp) return {x:battle.bx, y:battle.by};
-  /* rev520: 手动点击瞄准点优先（u,v 归一化局部坐标），否则用层中心 */
+  /* rev520: 手動點擊瞄准點優先（u,v 归一化局部坐标），否则用層中心 */
   let localX, localY;
   if(battle.aimLocal && battle.aimLocal.part === part && w > 0 && h > 0){
     localX = battle.aimLocal.u * w;
@@ -400,11 +393,11 @@ function getAmmoShortName(id, slot){
 function renderAmmoOrderRow(slot, label){
   const equipped = state.player.equipped[slot];
   const order = getAmmoOrder(slot);
-  /* rev537: 过滤背包中已不存在的弹种 */
+  /* rev537: 過滤背包中已不存在的彈种 */
   const available = equipped ? getAvailableAmmoForSlot(slot) : [];
   const availableSet = {};
   for(const _a of available) availableSet[_a.id] = true;
-  /* rev120: 标签与 3 个格子一起参与 space-between，均分 3 个间距 */
+  /* rev120: 标签與 3 個格子一起参與 space-between，均分 3 個間距 */
   let html = '<div class="ammo-order-row" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;padding-right:18px">';
   html += '<div class="lbl" style="flex:0 0 18px;font-size:10px;color:#e8a33d;font-weight:bold;padding-top:10px;text-align:center;writing-mode:vertical-rl;text-orientation:upright;line-height:1;letter-spacing:1px">' + label + '</div>';
   for(let i = 0; i < 3; i++){
@@ -514,7 +507,7 @@ function renderBattleScene(z1){
     const part = pickAimPartFromClick(canvasX, canvasY);
     if(part){
       battle.aimPart = part;
-      /* rev520: 记录点击局部归一化位置（手动瞄准打点击处，而非区块中心） */
+      /* rev520: 记录點擊局部归一化位置（手動瞄准打點擊處，而非区塊中心） */
       try {
         const _def = BOSS_LAYERS[battle.bossId];
         const _anims = BOSS_ANIMS[battle.bossId];
@@ -558,7 +551,7 @@ function renderBattleScene(z1){
   
   });
 }
-/* rev543: 按 idle 顶部像素动态调整血条 / 盾条位置（贴合角色头顶） */
+/* rev543: 按 idle 頂部像素動態调整血条 / 盾条位置（貼合角色頭頂） */
 function updateBossHpbarPos(){
   if(!battle) return;
   const sp = document.getElementById('boss-sprite');
@@ -601,12 +594,12 @@ function updateBossHpbarPos(){
     battle._bossIdleTopPx = topPx;
   }
   if(topPx == null) return;
-  /* hpbar 底部距 fighter 底部 = spriteH - topPx + 4（4px 间隙） */
-  /* rev544: 血条与角色头顶间距 4px → 14px，避免遮挡 Boss 头顶元素 */
+  /* hpbar 底部距 fighter 底部 = spriteH - topPx + 4（4px 間隙） */
+  /* rev544: 血条與角色頭頂間距 4px → 14px，避免遮挡 Boss 頭頂元素 */
   const _hpBottom = Math.max(14, spriteH - topPx + 14);
   const hpWrap = document.getElementById('boss-hpbar-wrap');
   if(hpWrap) hpWrap.style.bottom = _hpBottom + 'px';
-  /* rev546: 盾条 / nm 均在 hpbar-wrap 内部 normal flow，由 flex 排版，无需单独定位 */
+  /* rev546: 盾条 / nm 均在 hpbar-wrap 內部 normal flow，由 flex 排版，無需單独定位 */
 }
 
 function updateFighterPos(){
@@ -620,7 +613,7 @@ function updateFighterPos(){
   if(dmgBar){const totalHp=battle.bossMaxHp+battle.bossMaxArmor;dmgBar.style.width=Math.min(100,(battle.damageDealt/totalHp)*100)+'%';}
   const dmgHd=$('.damage-header');
   if(dmgHd){dmgHd.querySelector('.num').textContent=Math.round(battle.damageDealt);}
-  /* rev543: 血条 / 盾条跟随角色顶部 */
+  /* rev543: 血条 / 盾条跟随角色頂部 */
   if(typeof updateBossHpbarPos === 'function') updateBossHpbarPos();
 }
 function renderBattleJoystick(z2){
@@ -838,7 +831,7 @@ function defaultAimPartForBoss(bossId){
   if(!def) return null;
   const torso = def.layers.find(l => l.id === 'torso');
   if(torso) return 'torso';
-  /* rev518: 优先 body（生物本体），避免面积最大的地面装饰层（如 swamp）被选为默认瞄准点 */
+  /* rev518: 優先 body（生物本體），避免面积最大的地面裝饰層（如 swamp）被選為默認瞄准點 */
   const body = def.layers.find(l => l.id === 'body');
   if(body) return 'body';
   let best = null, bestArea = 0;
@@ -894,7 +887,7 @@ function startBossBattle(bid){
 
 
 /* ============================================================
-   Boss 掃蕩系统（rev575：zone1 内演出 + 直观弹窗）
+   Boss 掃蕩系統（rev575：zone1 內演出 + 直观彈窗）
    ============================================================ */
 
 function _bossLevel(bid){
@@ -965,7 +958,7 @@ function _rollSweepLoot(bid){
   return result;
 }
 
-/* ★ 掃蕩弹窗：参考建筑升级页 style */
+/* ★ 掃蕩彈窗：参考建築升級頁 style */
 function _openSweepDialog(bid){
   const sw = _sweepMaxCount(bid);
   if(sw.max <= 0){
@@ -1091,7 +1084,7 @@ function _executeSweep(bid, count){
   next();
 }
 
-/* ★ zone1 内演出（背景 + 绘制 boss + 载具推 boss 一起出画面） */
+/* ★ zone1 內演出（背景 + 绘製 boss + 載具推 boss 一起出畫面） */
 function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
   var z1 = document.getElementById("zone1");
   if(!z1){ onComplete(); return; }
@@ -1099,7 +1092,9 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
   var ZW = z1.clientWidth || 400;
   var ZH = z1.clientHeight || 500;
   var BOSS_START_PCT = 65;
-  var PLAYER_SPRITE_H = 118;
+  /* [rev-sweepHeight] 依戰鬥模式玩家 canvas 高度動態計算，與 battleLoop 中 battle.playerCanvasH = H * 0.4519 保持一致；
+     原硬編碼 118 會導致小螢幕載具過大、大螢幕過小的比例失真 */
+  var PLAYER_SPRITE_H = ZH * 0.4519;
   var PLAYER_FACTOR = 0.667;
   var RATIO_EXPLORE = 0.99 / 0.58;
   var vehH = PLAYER_SPRITE_H * PLAYER_FACTOR * RATIO_EXPLORE;
@@ -1294,7 +1289,7 @@ if(typeof window._vsDrawSmoke === 'function'){
       _safeDone();
     }
   }
-  requestAnimationFrame(tick); // 启动循环
+  requestAnimationFrame(tick); // 启動循环
 }
 
 function _finishBatchSweep(bid, vid, level, count, allLoot, servantGained, expTarget){

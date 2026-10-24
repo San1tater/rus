@@ -110,7 +110,7 @@
   }
 
   const _wheelClipCache = new Map();
-  function _getWheelClip(img, ann, wheel, cw, ch){
+function _getWheelClip(img, ann, wheel, cw, ch){
   const cx = wheel.cx * cw;
   const cy = wheel.cy * ch;
   const r = wheel.r * cw;
@@ -118,14 +118,16 @@
   if(size < 3) return null;
   const maskOn = ann.trackMask && ann.trackMask.enabled;
   const maskKey = maskOn ? ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+","+p.y.toFixed(3); }).join(";") : "off";
-  const key = (img.src||"") + "|" + cx.toFixed(1) + "|" + cy.toFixed(1) + "|" + size + "|" + maskKey;
+  const key = (img.src||"") + "|" + cw + "x" + ch + "|" + cx.toFixed(1) + "|" + cy.toFixed(1) + "|" + size + "|" + maskKey;
   if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
+  
   const c = document.createElement("canvas"); c.width = size; c.height = size;
   const cc = c.getContext("2d");
   cc.save();
   cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
   cc.drawImage(img, -(cx - size/2), -(cy - size/2), cw, ch);
   cc.restore();
+  
   if(maskOn){
     const pts = ann.trackMask.points.slice().sort(function(a,b){ return a.x-b.x; });
     cc.save();
@@ -139,6 +141,7 @@
     cc.closePath();
     cc.fill();
     cc.restore();
+    
     const maskY = _getMaskYAtX(ann, wheel.cx);
     const maskYInCanvas = maskY * ch - (cy - size/2);
     if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
@@ -167,49 +170,57 @@
         }
         cc.restore();
       } else {
-        const patch = document.createElement("canvas");
-        patch.width = size; patch.height = size;
-        const pc = patch.getContext("2d");
-        pc.drawImage(c, 0, 0);
+        const temp = document.createElement("canvas");
+        temp.width = size; temp.height = size;
+        const tc = temp.getContext("2d");
+        tc.drawImage(c, 0, 0);
         cc.save();
         cc.globalCompositeOperation = "destination-over";
-        cc.translate(0, maskYInCanvas * 2);
-        cc.scale(1, -1);
-        cc.drawImage(patch, 0, 0);
+        const angles = [15,-15,30,-30,45,-45,60,-60,90,-90];
+        for(let k = 0; k < angles.length; k++){
+          cc.save();
+          cc.translate(size/2, size/2);
+          cc.rotate(angles[k] * Math.PI/180);
+          cc.translate(-size/2, -size/2);
+          cc.drawImage(temp, 0, 0);
+          cc.restore();
+        }
         cc.restore();
       }
     }
   }
+  
   cc.save();
   cc.globalCompositeOperation = "destination-in";
   cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.fill();
   cc.restore();
+  
   _wheelClipCache.set(key, c);
   if(_wheelClipCache.size > 40) _wheelClipCache.delete(_wheelClipCache.keys().next().value);
   return c;
 }
 
-  const _maskCache = new Map();
-  function _getMaskLayer(img, ann, cw, ch){
-    if(!ann.trackMask || !ann.trackMask.enabled || ann.trackMask.points.length < 2) return null;
-    const key = (img.src||'') + '|' + ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+','+p.y.toFixed(3); }).join(';');
-    if(_maskCache.has(key)) return _maskCache.get(key);
-    const c = document.createElement('canvas'); c.width = cw; c.height = ch;
-    const cc = c.getContext('2d');
-    const pts = ann.trackMask.points.slice().sort(function(a,b){ return a.x-b.x; });
-    cc.beginPath();
-    cc.moveTo(pts[0].x*cw, 0);
-    for(const p of pts) cc.lineTo(p.x*cw, p.y*ch);
-    cc.lineTo(pts[pts.length-1].x*cw, 0);
-    cc.closePath();
-    cc.clip();
-    cc.drawImage(img, 0, 0, cw, ch);
-    _maskCache.set(key, c);
-    if(_maskCache.size > 20) _maskCache.delete(_maskCache.keys().next().value);
-    return c;
-  }
+const _maskCache = new Map();
+function _getMaskLayer(img, ann, cw, ch){
+  if(!ann.trackMask || !ann.trackMask.enabled || ann.trackMask.points.length < 2) return null;
+  const key = (img.src||"") + "|" + ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+","+p.y.toFixed(3); }).join(";") + "|" + cw + "x" + ch;
+  if(_maskCache.has(key)) return _maskCache.get(key);
+  const c = document.createElement("canvas"); c.width = cw; c.height = ch;
+  const cc = c.getContext("2d");
+  const pts = ann.trackMask.points.slice().sort(function(a,b){ return a.x-b.x; });
+  cc.beginPath();
+  cc.moveTo(pts[0].x*cw, 0);
+  for(const p of pts) cc.lineTo(p.x*cw, p.y*ch);
+  cc.lineTo(pts[pts.length-1].x*cw, 0);
+  cc.closePath();
+  cc.clip();
+  cc.drawImage(img, 0, 0, cw, ch);
+  _maskCache.set(key, c);
+  if(_maskCache.size > 20) _maskCache.delete(_maskCache.keys().next().value);
+  return c;
+}
 
-  function _buildTrackPath(ann, cw, ch){
+function _buildTrackPath(ann, cw, ch){
     if(!ann.trackLine || !ann.trackLine.points || ann.trackLine.points.length < 2) return null;
     const pts = ann.trackLine.points.map(function(p){ return { x: p.x*cw, y: p.y*ch }; });
     const segs = []; let totalLen = 0;

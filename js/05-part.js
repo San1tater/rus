@@ -174,7 +174,7 @@ function updateBossAI(dt, now){
   let bossMoving = false;
 
   if(b.bossId === 'swamp_hydra' || b.bossId === 'swamp_hydra_ii'){
-    /* rev533: 近战触发距离与 doBossMeleeSwipe 内部判定一致（0.30） */
+    /* rev533: 近戰触發距离與 doBossMeleeSwipe 內部判定一致（0.30） */
     if(playerRightN >= b.bx - 0.30){
       if(now - (b.lastMeleeAt || 0) > 1500){
         b.lastMeleeAt = now;
@@ -576,8 +576,8 @@ function battleLoop(now){
       battle.px = newPx;
     }
 
-    /* 走路帧独立推进：只要玩家推着摇杆且非射击/换弹/治疗，就推进。
-       fire → walk → fire 往复时 walk 帧不从 0 重来，实现「走一步停一步」的连贯腿动画。 */
+    /* 走路帧独立推進：只要玩家推着摇杆且非射擊/換彈/治療，就推進。
+       fire → walk → fire 往複時 walk 帧不從 0 重来，實現「走一步停一步」的连贯腿動畫。 */
     if(battle._walkFrame === undefined) battle._walkFrame = 0;
     if(battle._walkTick === undefined) battle._walkTick = performance.now();
     {
@@ -617,7 +617,7 @@ function battleLoop(now){
         battleHeroAnim.name = _wantAnim;
         battleHeroAnim.lastUpdate = performance.now();
         if(_wantAnim === 'walk' || _wantAnim === 'run'){
-          /* 用独立走路帧，保留连续性 */
+          /* 用独立走路帧，保留连續性 */
           battleHeroAnim.frame = battle._walkFrame;
         } else {
           battleHeroAnim.frame = 0;
@@ -668,7 +668,7 @@ function startPlayerFire(){
   if(battle.reloading) return;
   /* rev354-fire-range：射程外點擊射擊按鈕 → 直接返回，不設置 firing/burstLeft。
      避免 battleLoop 把動畫切成 fire_primary，導致射程外仍播射擊動畫。
-     射程外點擊亦不打断治疗、不扣子彈、不進入交战。 */
+     射程外點擊亦不打断治療、不扣子彈、不進入交戰。 */
   {
     const _pr = battle.px + battle.playerWeaponRange;
     const _bl = getBossLeftBoundaryN();
@@ -882,7 +882,7 @@ function playerShoot(){
   if(battle.settling)return false;
   let w=battle.weapon;
   if(!w||battle.reloading||battle.consuming)return false;
-  /* rev108: 允許移動中射擊（射擊時搖桿暫停由 canMove 控制） */
+  /* rev108: 允許移動中射擊（射擊時搖桿暫停由 canMove 控製） */
   let def=w.def;
   const playerRightPx=battle.px+battle.playerWeaponRange;
   const bossLeftPx=getBossLeftBoundaryN();
@@ -987,7 +987,7 @@ function playerShoot(){
       if(battle.weaponStates[battle.weaponSlot])battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;
       if(state.player.throwableStock<=0){if(ensureThrowableFromBackpack()){const nw=equippedWeapon('throwable');if(nw){battle.weapon=nw;w=nw;def=nw.def;}battle.ammoInMag=getThrowableCount();if(battle.weaponStates[battle.weaponSlot])battle.weaponStates[battle.weaponSlot].ammoInMag=battle.ammoInMag;}}
     }
-    /* rev531: Boss战投掷物走破片机制 + 补 _pdB 熟练度加成 */
+    /* rev531: Boss戰投掷物走破片机製 + 补 _pdB 熟練度加成 */
     if(def.slot==='throwable' && def.explosive && (def.fragments || 0) > 0){
       const _hitRate = getHitRate(def.type, battle.fireMode) + 10;
       const _pdB = 0.6 + clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL, 0, 1) * 0.9;
@@ -1535,7 +1535,7 @@ function showBattleResult(bossDef, b, victory, loot){
     ${loot.length?loot.map(l=>`<div class="item-row" data-iid="${l.id}" data-irar="${l.rarity}"><div class="icon" style="background:${rarityBg(l.rarity)}">${itemIcon(l.id,30)}</div><div class="info"><div class="nm ${rarityClass(l.rarity)}">${(itemDef(l.id)||{name:l.id}).name}</div><div class="sub">${l.rarity}</div></div><div class="cnt">*${l.count}</div></div>`).join(''):'<div class="empty-hint">無</div>'}`;
   const ft=el('div','modal-ft');ft.innerHTML=`<button class="btn primary" id="m-ok">確認</button>`;
   const bd=openModal({title:'戰鬥結算',body,footer:ft});
-  /* rev541: battle 由调用方（endBattle / finishBattleSettle）清理，此处不再重复 */
+  /* rev541: battle 由调用方（endBattle / finishBattleSettle）清理，此處不再重複 */
   ft.querySelector('#m-ok').onclick=()=>{closeModal();save();renderCombat();};
   $$('.item-row',bd).forEach(r=>{r.onclick=()=>openItemDetail(r.dataset.iid,r.dataset.irar);});
 }

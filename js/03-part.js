@@ -148,8 +148,8 @@ function computeBossFit(def, bossId, canvasW, canvasH){
   const allW = aMaxX - aMinX, allH = aMaxY - aMinY;
   const idleW = iMaxX - iMinX;
   const idleH = iMaxY - iMinY;
-  /* rev543: forceFit 改用 idleW 主控（允许攻击帧溢出约 15%），避免 idle 被 allW 压得太小 */
-  /* rev546: 加入 allW * 0.97 约束，保证攻击帧溢出 ≤ 3%（每侧 1.5%） */
+  /* rev543: forceFit 改用 idleW 主控（允许攻擊帧溢出约 15%），避免 idle 被 allW 压得太小 */
+  /* rev546: 加入 allW * 0.97 约束，保证攻擊帧溢出 ≤ 3%（每侧 1.5%） */
   const fitScale = def.forceFit
     ? Math.min(canvasH / idleH, canvasW / (idleW * 1.2), canvasW / (allW * 0.97))
     : Math.min(canvasH / idleH, canvasH / allH, canvasW / allW);
@@ -157,7 +157,7 @@ function computeBossFit(def, bossId, canvasW, canvasH){
     def._fitCached = null;
     return null;
   }
-  /* rev543: offsetX 仅保证 idle 居中；forceFit 时不再拉回，攻击帧允许溢出 */
+  /* rev543: offsetX 仅保证 idle 居中；forceFit 時不再拉回，攻擊帧允许溢出 */
   const idleCX = (iMinX + iMaxX) / 2;
   const offsetX = canvasW / 2 - idleCX * fitScale;
   const offsetY = canvasH - iMaxY * fitScale;
@@ -198,7 +198,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   const world = resolveBossWorld(def, anim, fi);
 
   ctx.save();
-  /* rev534: core_omega death 动画用独立 fit，确保所有部件在画布内 */
+  /* rev534: core_omega death 動畫用独立 fit，確保所有部件在畫布內 */
   let _tf;
   if((bossId === 'core_omega' || bossId === 'core_omega_ii') && animName === 'death'){
     const _df = computeBossDeathFit(def, bossId, canvasW, canvasH);
@@ -281,7 +281,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
     const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
     const px = w * L.pivot.x;
     const py = h * L.pivot.y;
-    /* rev533: core_omega 死亡动画时，完全飞出画布的部件跳过绘制 */
+    /* rev533: core_omega 死亡動畫時，完全飞出畫布的部件跳過绘製 */
     if((bossId === 'core_omega' || bossId === 'core_omega_ii') && animName === 'death'){
       const _cd = Math.cos(wp.rot * BOSS_DEG2RAD);
       const _sd = Math.sin(wp.rot * BOSS_DEG2RAD);
@@ -314,7 +314,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
 }
 
 function computeBossDeathFit(def, bossId, canvasW, canvasH){
-  /* rev534: core_omega death 动画独立 fit，只按 death 包围盒缩放，确保所有部件都在画布内 */
+  /* rev534: core_omega death 動畫独立 fit，只按 death 包围盒缩放，確保所有部件都在畫布內 */
   const _ck = 'death|' + canvasW + '|' + canvasH;
   if(def._deathFitCache && def._deathFitCache._key === _ck) return def._deathFitCache;
   const anims = BOSS_ANIMS[bossId];
@@ -509,7 +509,7 @@ function drawEnemyPreview(ctx, enemyId, w, h) {
       let bounds = null;
       try { bounds = getBeastBounds(def); } catch(err) {}
       
-      // 如果边界异常，使用原画布尺寸作为兜底
+      // 如果边界异常，使用原畫布尺寸作為兜底
       if(!bounds || bounds.h <= 0 || bounds.w <= 0) {
         bounds = { minX: 0, maxX: def.canvas.w, minY: 0, maxY: def.canvas.h, w: def.canvas.w, h: def.canvas.h };
       }
@@ -568,7 +568,7 @@ function _showExploreEnemyGraphics(enemies) {
   });
   const oldGrp = document.getElementById('explore-enemy-group');
   if(oldGrp) oldGrp.remove();
-  /* rev527: 不再清空 corpse-group，保留旧尸体继续左移 */
+  /* rev527: 不再清空 corpse-group，保留舊尸體繼續左移 */
 }
 
 
@@ -588,7 +588,7 @@ function _resolveExploreEnemyGraphics(victory, survivors) {
   }
 }
 
-/* id 映射：REGIONS.enemies 用 raider/ghoul/raider_vet，09 数据用 human_raider 等 */
+/* id 映射：REGIONS.enemies 用 raider/ghoul/raider_vet，09 數据用 human_raider 等 */
 function _resolveEnemyDef(id){
   if(typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[id]) return { def: BEAST_LAYERS[id], resolvedId: id };
   if(typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA[id]) return { def: HUMAN_ENEMY_DATA[id], resolvedId: id };
@@ -596,14 +596,14 @@ function _resolveEnemyDef(id){
   return null;
 }
 
-/* anims 来源：BEAST_LAYERS 没 anims（在 BEAST_ANIMS）；HUMAN_ENEMY_DATA[id].anims 内嵌 */
+/* anims 来源：BEAST_LAYERS 沒 anims（在 BEAST_ANIMS）；HUMAN_ENEMY_DATA[id].anims 內嵌 */
 function _resolveEnemyAnims(id){
   if(typeof BEAST_ANIMS !== 'undefined' && BEAST_ANIMS[id]) return BEAST_ANIMS[id];
   if(typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA[id] && HUMAN_ENEMY_DATA[id].anims) return HUMAN_ENEMY_DATA[id].anims;
   return null;
 }
 
-/* 计算死亡末帧的包围盒（复刻 _drawEnemyAt 的 rootRot/rootDy + 层局部变换） */
+/* 計算死亡末帧的包围盒（複刻 _drawEnemyAt 的 rootRot/rootDy + 層局部变換） */
 function _measureDeathBBox(def, anim, frame){
   const cw = def.canvas.w, ch = def.canvas.h;
   const rootRot = ((anim.rootRot && anim.rootRot[frame]) || 0) * Math.PI / 180;
@@ -639,8 +639,8 @@ function _measureDeathBBox(def, anim, frame){
   return { minX, minY, maxX, maxY, w: maxX-minX, h: maxY-minY };
 }
 
-/* 尸体：从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
-/* rev506: 人形敌人尸体渲染 —— 装备 + 手臂水平 + torso 贴地 */
+/* 尸體：從右侧進入、跟畫布同速左移、從左离開；用 death 末帧绘製 */
+/* rev506: 人形敌人尸體渲染 —— 裝備 + 手臂水平 + torso 貼地 */
 
 
 
@@ -655,8 +655,8 @@ function _measureDeathBBox(def, anim, frame){
 
 
 
-/* 尸体：从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
-/* rev507: 人形敌人尸体渲染 —— 装备随机化 + back_arm 偏移 + torso 对齐 */
+/* 尸體：從右侧進入、跟畫布同速左移、從左离開；用 death 末帧绘製 */
+/* rev507: 人形敌人尸體渲染 —— 裝備随机化 + back_arm 偏移 + torso 对齐 */
 const _rev506_ANIMAL_ANCHOR = {
   mutant_bear: "torso",
   mutant_wolf: "body",
@@ -727,8 +727,8 @@ function _rev506_measureLayerMaxY(def, anim, frame, layerId){
 }
 
 function _rev506_tryDrawArmorAtLayer(ctx, armorId, lw, lh, px, py){
-  /* rev515: 装备图标为面向右的角色设计；敌人面向左 → 必须水平翻转
-     scale(-1,1) + rotate(θ) 与 rotate(-θ) + scale(-1,1) 数学等价
+  /* rev515: 裝備圖标為面向右的角色设計；敌人面向左 → 必须水平翻转
+     scale(-1,1) + rotate(θ) 與 rotate(-θ) + scale(-1,1) 數学等价
      baseW = 400 * scale * (lw/playerLayerW)（沿用 rev514）*/
   if(typeof HEAD_ARMOR_LAYOUT === "undefined") return false;
   const cfg = HEAD_ARMOR_LAYOUT[armorId];
@@ -754,7 +754,7 @@ function _rev506_tryDrawArmorAtLayer(ctx, armorId, lw, lh, px, py){
 
   ctx.save();
   ctx.translate(localX, localY);
-  /* rev515: 水平翻转（装备面向左）*/
+  /* rev515: 水平翻转（裝備面向左）*/
   ctx.scale(-1, 1);
   if(cfg.rotation) ctx.rotate(cfg.rotation * Math.PI / 180);
   ctx.drawImage(img, drawX, -baseH/2, baseW, baseH);
@@ -769,10 +769,10 @@ function _rev506_tryDrawArmorAtLayer(ctx, armorId, lw, lh, px, py){
 
 
 function _rev506_tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
-  /* rev514: 完全复用玩家 WEAPON_LAYOUT（scale/ox/oy/rotation/trim）
-     baseW = trim.w * scale（绝对尺寸和玩家一致，不补偿层宽）
-     锚点镜像：localX = px - lw*ox
-     视觉旋转一致：rotate(-rotation) + scale(-1,1) → 枪口朝左 */
+  /* rev514: 完全複用玩家 WEAPON_LAYOUT（scale/ox/oy/rotation/trim）
+     baseW = trim.w * scale（绝对尺寸和玩家一致，不补偿層寬）
+     锚點镜像：localX = px - lw*ox
+     视觉旋转一致：rotate(-rotation) + scale(-1,1) → 槍口朝左 */
   if(typeof WEAPON_LAYOUT === "undefined") return false;
   if(typeof getHeroImg !== "function" || typeof resolveIconId !== "function") return false;
   const baseId = resolveIconId(weaponId);
@@ -793,14 +793,14 @@ function _rev506_tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
     baseH = baseW / ar;
   }
 
-  /* localX：镜像后锚点（pivot 在右端 0.95，锚点向左偏移 lw*ox） */
+  /* localX：镜像後锚點（pivot 在右端 0.95，锚點向左偏移 lw*ox） */
   const localX = px - lw * (layout.ox || 0);
   /* localY：和玩家一致（py + lh*oy） */
   const localY = py + lh * (layout.oy || 0);
 
   ctx.save();
   ctx.translate(localX, localY);
-  /* rotate(-rotation) + scale(-1,1)：视觉旋转与玩家一致，枪口朝左 */
+  /* rotate(-rotation) + scale(-1,1)：视觉旋转與玩家一致，槍口朝左 */
   ctx.rotate(-(layout.rotation || 0) * Math.PI / 180);
   ctx.scale(-1, 1);
   if(hasTrim){
@@ -813,10 +813,10 @@ function _rev506_tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
   return true;
 }
 function _rev506_drawHumanCorpse(ctx, drawId, s, ox, oy, def, anim, fi, equipData, isDeath){
-  /* rev512: isDeath 可选参数
-     isDeath=true ：倒地专用（bodyBottomY 对齐 + armCorrection + 跳过 back_arm）
-     isDeath=false：正常动画（idle/attack/hurt 等，所有层按 anim.keys 绘制）
-     z 排序沿用玩家 drawBlockHero 逻辑：装备 z+0.5、武器 z-0.5（武器在手图层下方）*/
+  /* rev512: isDeath 可選参數
+     isDeath=true ：倒地专用（bodyBottomY 对齐 + armCorrection + 跳過 back_arm）
+     isDeath=false：正常動畫（idle/attack/hurt 等，所有層按 anim.keys 绘製）
+     z 排序沿用玩家 drawBlockHero 逻辑：裝備 z+0.5、武器 z-0.5（武器在手圖層下方）*/
   const cw = def.canvas.w, ch = def.canvas.h;
   const eqData = equipData || null;
   const isDeathMode = (isDeath !== false);
@@ -871,7 +871,7 @@ function _rev506_drawHumanCorpse(ctx, drawId, s, ox, oy, def, anim, fi, equipDat
   ctx.rotate(rRotRad);
   ctx.translate(-pcx, -pcy);
 
-  /* z 排序 units（和玩家 drawBlockHero 一致：装备 z+0.5，武器 z-0.5）*/
+  /* z 排序 units（和玩家 drawBlockHero 一致：裝備 z+0.5，武器 z-0.5）*/
   const units = [];
   for(const L of def.layers){
     if(isDeathMode && L.id === "back_arm") continue;
@@ -964,7 +964,7 @@ function _rev506_renderCorpseTo(c){
   }
 }
 
-/* 尸体：从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
+/* 尸體：從右侧進入、跟畫布同速左移、從左离開；用 death 末帧绘製 */
 function _spawnExploreCorpses(enemies){
   const fx = document.getElementById("explore-fx");
   if(!fx) return;
@@ -1036,12 +1036,12 @@ function _spawnExploreCorpses(enemies){
   if(!_items.length){ batch.remove(); return; }
 
   /* rev530: 金字塔布局 —— 3+2+1 */
-  /*   i<3 → 第 0 层；i<5 → 第 1 层（错开 0.5 格）；i>=5 → 第 2 层（居中） */
-  /*   每层 bottom 提升 50% 尸体高度（垂直重合 50%） */
-  /* rev530b/c: 固定间距，方便手调 */
-  const CORPSE_GAP_PX = 44;   /* 左右水平间距 */
-  const CORPSE_STEP_PX = 20;  /* rev530d: 上下层距 20px（上层 body 下缘落入下层 body 范围） */
-  const CORPSE_IN_LAYER_DOWN_PX = 12;  /* rev530c: 同层内每个比前一个偏下 12px */
+  /*   i<3 → 第 0 層；i<5 → 第 1 層（错開 0.5 格）；i>=5 → 第 2 層（居中） */
+  /*   每層 bottom 提升 50% 尸體高度（垂直重合 50%） */
+  /* rev530b/c: 固定間距，方便手调 */
+  const CORPSE_GAP_PX = 44;   /* 左右水平間距 */
+  const CORPSE_STEP_PX = 20;  /* rev530d: 上下層距 20px（上層 body 下缘落入下層 body 范围） */
+  const CORPSE_IN_LAYER_DOWN_PX = 12;  /* rev530c: 同層內每個比前一個偏下 12px */
   const _unitGap = CORPSE_GAP_PX;
   const _layerStep = CORPSE_STEP_PX;
   const _inLayerDown = CORPSE_IN_LAYER_DOWN_PX;
@@ -1050,7 +1050,7 @@ function _spawnExploreCorpses(enemies){
     if(i < 3) return { layer: 0, offsetX: i, layerIndex: i };
     if(i < 5) return { layer: 1, offsetX: (i - 3) + 0.5, layerIndex: i - 3 };
     if(i === 5) return { layer: 2, offsetX: 1, layerIndex: 0 };
-    /* 溢出（>6 具）：最上层往右排 */
+    /* 溢出（>6 具）：最上層往右排 */
     return { layer: 2, offsetX: 1 + (i - 5) * 0.8, layerIndex: i - 5 };
   }
 
@@ -1124,7 +1124,7 @@ function _spawnExploreCorpses(enemies){
 
 
 
-/* 弹幕：从右飞入，到达玩家即停 + 玩家 hurt；仅在逃跑时调用 */
+/* 彈幕：從右飞入，到达玩家即停 + 玩家 hurt；仅在逃跑時调用 */
 function _spawnEnemyBulletsToPlayer(count){
   const fx = document.getElementById('explore-fx');
   if(!fx) return;
@@ -1163,23 +1163,23 @@ function _spawnEnemyBulletsToPlayer(count){
 
 /* id 解析：
    REGIONS.enemies 用 raider / ghoul / raider_vet，
-   09 数据用 human_raider / human_ghoul / human_raider_vet。
+   09 數据用 human_raider / human_ghoul / human_raider_vet。
    有 BEAST_LAYERS 命中直接用；否则尝试 HUMAN_ENEMY_DATA[id] 或 HUMAN_ENEMY_DATA["human_" + id]。 */
 
 
-/* 尸体：从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
+/* 尸體：從右侧進入、跟畫布同速左移、從左离開；用 death 末帧绘製 */
 
 
-/* 弹幕：从右侧快速飞入，0.4s 后到达玩家位置即停并淡出；触发玩家 hurt。
-   只在 _resolveExploreEnemyGraphics(victory=false) 时调用。 */
+/* 彈幕：從右侧快速飞入，0.4s 後到达玩家位置即停并淡出；触發玩家 hurt。
+   只在 _resolveExploreEnemyGraphics(victory=false) 時调用。 */
 
 
 
 
-/* 尸体从右侧进入、跟画布同速左移、从左离开；用 death 末帧绘制 */
+/* 尸體從右侧進入、跟畫布同速左移、從左离開；用 death 末帧绘製 */
 
 
-/* 弹幕从右侧快速飞入，打到玩家即停；触发玩家 hurt 动作 */
+/* 彈幕從右侧快速飞入，打到玩家即停；触發玩家 hurt 動作 */
 
 
 
@@ -1370,7 +1370,7 @@ function _cleanGardenStorageRarity(){
     if(idx < 0){ toDel.push(k); continue; }
     const id = k.slice(0, idx);
     const rar = k.slice(idx + 1);
-    /* rev564: 用 _gardenStorageKind 判断，涵盖 SEEDS/CROPS/GARDEN_EXTRAS，避免未来新物品被误删 */
+    /* rev564: 用 _gardenStorageKind 判断，涵盖 SEEDS/CROPS/GARDEN_EXTRAS，避免未来新物品被误刪 */
     const validId = (typeof _gardenStorageKind === 'function')
       ? !!_gardenStorageKind(id)
       : ((typeof SEEDS !== 'undefined' && SEEDS[id]) || (typeof CROPS !== 'undefined' && CROPS[id]));
@@ -1522,7 +1522,7 @@ function pickThrowableByPreference(context){
   }
   if(!items.length) return null;
   const pri = ctx.priority || '一般';
-  /* rev541: items 已过滤 exclude，无需再判断 ex.includes(pri) */
+  /* rev541: items 已過滤 exclude，無需再判断 ex.includes(pri) */
   const primary = items.filter(a => a.rarity === pri);
   if(primary.length) return pick(primary);
   const fb = ctx.fallback || 'desc';
@@ -1677,7 +1677,7 @@ function calcCritMult(wr,ar){return 1.5*(RARITY_MULT[wr]||1)*(RARITY_MULT[ar]||1
    - 穿甲不足 (pen < armorLevel)：只傷裝甲，
      傷害倍率 mult(diff) = 0.1 * (0.1)^((diff-1)/5)，diff:1→10%, 6→1%
      （diff = armorLevel - pen）
-   - 護甲值清零後：沿用 ×1.2 機制 */
+   - 護甲值清零後：沿用 ×1.2 機製 */
 function applyDamage(target,rawDmg,penetration,armorLevel){
   const A=Math.round(target.armor);const pen=penetration||0;
   const al=armorLevel||0;
@@ -1722,7 +1722,7 @@ function _safeMsgText(msg){
   } catch(e){ return ''; }
 }
 
-function notify(msg,type){ /* notify disabled by user request: 不再显示任何 toast 弹窗 */ }
+function notify(msg,type){ /* notify disabled by user request: 不再顯示任何 toast 彈窗 */ }
 function hasGardenPlotType(type){
   if(!state.garden || !Array.isArray(state.garden.plots)) return false;
   for(const p of state.garden.plots){ if(p && p.type === type) return true; }
@@ -1963,12 +1963,12 @@ function _crossfadeExploreBg(newUrl){
     layers.forEach(function(l){ l.style.backgroundImage = newUrl; });
     return;
   }
-  /* 若已在过渡中 → 直接换旧层图片，跳过叠加，避免叠加 n 层 */
+  /* 若已在過渡中 → 直接換舊層圖片，跳過叠加，避免叠加 n 層 */
   if(z1.querySelector('.bg-scroll.xfade-active')){
     oldScroll.querySelectorAll('.bg-layer').forEach(function(l){ l.style.backgroundImage = newUrl; });
     return;
   }
-  /* 记录旧 track 的当前动画时间，用于同步新 track 相位 */
+  /* 记录舊 track 的當前動畫時間，用於同步新 track 相位 */
   let elapsedMs = 0;
   const oldTrack = oldScroll.querySelector('.bg-track');
   if(oldTrack && typeof oldTrack.getAnimations === 'function'){
@@ -1979,7 +1979,7 @@ function _crossfadeExploreBg(newUrl){
       }
     } catch(e){ /* 忽略 */ }
   }
-  /* 克隆 bg-scroll 作为上层新图层 */
+  /* 克隆 bg-scroll 作為上層新圖層 */
   const newScroll = oldScroll.cloneNode(true);
   newScroll.classList.add('xfade-active');
   newScroll.style.position = 'absolute';
@@ -1987,26 +1987,26 @@ function _crossfadeExploreBg(newUrl){
   newScroll.style.opacity = '0';
   newScroll.style.transition = 'opacity 600ms ease-in-out';
   newScroll.style.willChange = 'opacity';
-  /* rev637: z-index 1→0，让新背景层沉到 BTR canvas（z-index 1）之下，不再遮挡载具 */
+  /* rev637: z-index 1→0，让新背景層沉到 BTR canvas（z-index 1）之下，不再遮挡載具 */
   newScroll.style.zIndex = '0';
   oldScroll.style.position = 'absolute';
   oldScroll.style.inset = '0';
   oldScroll.style.zIndex = '0';
-  /* 新 track：animation-delay 用负值把动画快进到旧层当前相位 */
+  /* 新 track：animation-delay 用負值把動畫快進到舊層當前相位 */
   const newTrack = newScroll.querySelector('.bg-track');
   if(newTrack && elapsedMs > 0){
     newTrack.style.animationDelay = '-' + elapsedMs + 'ms';
   }
-  /* 新图写进新图层的 .bg-layer */
+  /* 新圖寫進新圖層的 .bg-layer */
   newScroll.querySelectorAll('.bg-layer').forEach(function(l){
     l.style.backgroundImage = newUrl;
   });
   z1.appendChild(newScroll);
-  /* 下一帧开始淡入 */
+  /* 下一帧開始淡入 */
   requestAnimationFrame(function(){
     newScroll.style.opacity = '1';
   });
-  /* 600ms 后：写回旧层 → 移除临时层 → 恢复旧层默认样式 */
+  /* 600ms 後：寫回舊層 → 移除临時層 → 恢複舊層默認样式 */
   setTimeout(function(){
     oldScroll.querySelectorAll('.bg-layer').forEach(function(l){
       l.style.backgroundImage = newUrl;
@@ -2050,7 +2050,7 @@ function updateExploreBg(){
     const curRaw=(layers[0].style.backgroundImage||'').replace(/["']/g,'"');
     const newNorm=newUrl.replace(/["']/g,'"');
     if(curRaw!==newNorm){
-      /* rev526: 交叉淡入淡出（600ms，无黑屏） */
+      /* rev526: 交叉淡入淡出（600ms，無黑屏） */
       _crossfadeExploreBg(newUrl);
     }
   }
@@ -2090,13 +2090,13 @@ function chooseCombatWeaponVerbose(context,enemyCount){
     /* ★ 探索模式：投擲槽改為從背包按探索偏好挑選，不碰裝備槽；
        這樣玩家留給 Boss 戰的高稀有度手雷永遠不會在探索中被消耗。 */
     if(slot === 'throwable' && context === 'explore'){
-      /* rev537: 优先使用装备槽投掷物（手动或自动补充的下一次批次） */
+      /* rev537: 優先使用裝備槽投掷物（手動或自動补充的下一次批次） */
       if(getThrowableCount() > 0){
         const _w = equippedWeapon('throwable');
         if(_w){
           const _ex = (state.preferences.throwableExplore || {}).exclude || [];
           if(_ex.indexOf(_w.rarity) === -1){
-            trace.push(`throwable(装备槽):${_w.def.name}×${getThrowableCount()}✓`);
+            trace.push(`throwable(裝備槽):${_w.def.name}×${getThrowableCount()}✓`);
             return {
               slot:'throwable',
               weapon:_w,
@@ -2105,10 +2105,10 @@ function chooseCombatWeaponVerbose(context,enemyCount){
               trace
             };
           }
-          trace.push('throwable:装备槽稀有度被探索偏好排除，回退背包');
+          trace.push('throwable:裝備槽稀有度被探索偏好排除，回退背包');
         }
       }
-      /* 装备槽空或稀有度被排除 → 从背包按偏好取 */
+      /* 裝備槽空或稀有度被排除 → 從背包按偏好取 */
       const t = pickThrowableByPreference('explore');
       if(t){
         const tdef = WEAPONS[t.id];
@@ -2153,7 +2153,7 @@ function _refreshThrowableSlot(){
   if(!z2) return;
   const slot = z2.querySelector('.slot[data-slot="throwable"]');
   if(!slot) return;
-  /* rev536: 库存耗尽自动清空装备槽 */
+  /* rev536: 庫存耗尽自動清空裝備槽 */
   if(state.player.equipped.throwable && getThrowableCount() <= 0){
     state.player.equipped.throwable = null;
     delete state.player.equippedRarity.throwable;
@@ -2174,7 +2174,7 @@ function _refreshThrowableSlot(){
   }
 }
 
-/* rev536: 每 1 秒保险刷新投掷物栏（仅 explore tab，且非战斗），涵盖所有遗漏路径 */
+/* rev536: 每 1 秒保险刷新投掷物栏（仅 explore tab，且非戰鬥），涵盖所有遗漏路径 */
 if(typeof window !== 'undefined' && !window._throwableSlotTimer){
   window._throwableSlotTimer = setInterval(function(){
     if(typeof currentTab !== 'undefined' && currentTab === 'explore'){
@@ -2279,7 +2279,7 @@ function autoCombat(region,node,enemies){
           return {victory:false,loot:[]};
         }
       } else if(choice.fromSlot){
-        /* rev537: 装备槽消耗 */
+        /* rev537: 裝備槽消耗 */
         if(getThrowableCount()<=0 && !ensureThrowableFromBackpack('explore')){
           pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');
           return {victory:false,loot:[]};
@@ -2290,7 +2290,7 @@ function autoCombat(region,node,enemies){
         }
         if(typeof _refreshThrowableSlot==='function')_refreshThrowableSlot();
       } else {
-        /* 兜底：从背包消耗 */
+        /* 兜底：從背包消耗 */
         if(!invRemove(weapon.id, weapon.rarity, 1)){
           pushLog(`<span class="pl">玩家</span> 在探索 <b>${region}·${node}</b> 遭遇敵人，但投擲物不足。`,[],'explore');
           return {victory:false,loot:[]};
@@ -2299,7 +2299,7 @@ function autoCombat(region,node,enemies){
       bulletsUsed=1;
       const hitRate=getHitRate(def.type,mode)+10;
       const _pdT=0.6+clamp(Math.floor(state.proficiency[def.type]||0)/MAX_PROF_LEVEL,0,1)*0.9;
-      /* rev531: 破片机制 —— 每片独立 roll 命中/暴击，随机分给活目标 */
+      /* rev531: 破片机製 —— 每片独立 roll 命中/暴擊，随机分给活目标 */
       const _frags=def.fragments||1;
       const _fragDmg=def.fragmentDamage||def.dmg||0;
       const _aliveN=remaining.filter(function(e){return e.hp>0;}).length;
@@ -2867,13 +2867,13 @@ function renderEquipZone(z2){
   const availW = W - pad * 2;
   const availH = H - pad * 2;
 
-  /* rev561c: 格子大小由高度主导；宽度作为上限，避免窄屏溢出 */
+  /* rev561c: 格子大小由高度主導；寬度作為上限，避免窄屏溢出 */
   const cellByHeight = Math.floor((availH / 5) * 0.92);
   const cellByWidth  = Math.floor((availW / 3) * 0.98);
   const cellSize = Math.min(cellByHeight, cellByWidth);
   if(cellSize < 20) return;
 
-  /* 剩余空间均分为 gap（水平 4 段、垂直 6 段） */
+  /* 剩餘空間均分為 gap（水平 4 段、垂直 6 段） */
   const gapX = (W - cellSize * 3) / 4;
   const gapY = (H - cellSize * 5) / 6;
 
@@ -2962,7 +2962,7 @@ function renderEquipZone(z2){
     if(typeof _radioEnsureInit === 'function') _radioEnsureInit();
     if(currentTab === 'combat'){
       const _mode = state.preferences.bossMode || 'challenge';
-      const _label = _mode === 'challenge' ? '挑战' : '扫荡';
+      const _label = _mode === 'challenge' ? '挑戰' : '掃蕩';
       html += '<div class="radio-btn" id="radio-btn" data-mode="' + _mode + '" style="left:' + colX[0] + 'px;top:' + rowY[4] + 'px;width:' + cellSize + 'px;height:' + cellSize + 'px;font-size:' + fontSize + 'px">📻 ' + _label + '</div>';
     } else {
       const _st = (typeof _radioGetStatus === 'function') ? _radioGetStatus() : { state: 'empty', uses: 0 };

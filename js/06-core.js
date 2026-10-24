@@ -50,8 +50,8 @@ $$('.tab').forEach(t=>{
   };
 });
 
-/* rev558: 主 tabbar 左右滑动切换（探索 / 战斗 / 后院 / 基地）
-   监听 document.body 而非 #content，使 garden-page overlay 也能触发 */
+/* rev558: 主 tabbar 左右滑動切換（探索 / 戰鬥 / 後院 / 基地）
+   監聽 document.body 而非 #content，使 garden-page overlay 也能触發 */
 (function(){
   if(window._mainTabSwipeVer === 558) return;
   window._mainTabSwipeVer = 558;
@@ -85,6 +85,9 @@ $$('.tab').forEach(t=>{
     if(Math.abs(dy) > Math.abs(dx) * 0.6) return;
     /* rev559: Boss 戰進行中禁用滑動翻頁 */
     if(typeof BossModule !== 'undefined' && BossModule.isActive()) return;
+    /* rev889: 車場頁開啟時禁用主 tab 滑動切換 */
+    const _gp = document.getElementById('garage-page');
+    if(_gp && _gp.classList.contains('on')) return;
     if(typeof currentTab !== 'string') return;
     const curIdx = TABS.indexOf(currentTab);
     if(curIdx < 0) return;
@@ -167,7 +170,7 @@ function _tickHeroWalkSwitch(now){
   if(heroAnim.name === 'walk'){ heroAnim.name = 'run'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
   else if(heroAnim.name === 'run'){ heroAnim.name = 'walk'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
 }
-/* rev337: HP / 护甲面板实时刷新（不依赖切 tab） */
+/* rev337: HP / 護甲面板實時刷新（不依赖切 tab） */
 function updatePlayerStatPanel(){
   const panel = document.querySelector('#zone2 .player-stat-panel');
   if(!panel) return;
@@ -187,7 +190,7 @@ function heroLoop(now){
   _tickHeroWalkSwitch(now);
   updateHeroAnim(now);
   if(currentTab === 'explore'){ renderExploreHeroCanvas(); }
-  /* rev337: 每 500ms 检测 HP/护甲/等级变化，实时刷新面板 */
+  /* rev337: 每 500ms 检测 HP/護甲/等級变化，實時刷新面板 */
   if(!heroLoop._lastHpCheck || now - heroLoop._lastHpCheck > 500){
     heroLoop._lastHpCheck = now;
     const _sig = state.player.hp + '|' + state.player.maxHp + '|' + state.player.armor + '|' + state.player.maxArmor + '|' + state.player.level;
