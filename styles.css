@@ -1849,3 +1849,25 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 #garage-page .garage-dock {
   flex: 0 0 30vh !important;
 }
+
+/* [rev-sweepHeight-fix] 科技樹窄屏水平滑動支援（無滾動條） */
+/* 原 rev570 強制 overflow-x:hidden 導致手機窄屏無法滑動查看；
+   此處放開水平滾動、改 margin:0 auto 讓畫布寬屏居中 / 窄屏左對齊可滑動；
+   保留 scrollbar-width:none + ::-webkit-scrollbar{display:none} 以隱藏滾動條 */
+.wt-tech-wrap{
+  display:block !important;
+  max-height:calc(82vh - 80px) !important;
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  -webkit-overflow-scrolling:touch !important;
+  touch-action:pan-x pan-y !important;
+  scrollbar-width:none !important;
+  -ms-overflow-style:none !important;
+  padding:8px 4px !important;
+}
+.wt-tech-wrap::-webkit-scrollbar{display:none !important;width:0 !important;height:0 !important}
+.wt-tech-wrap::-webkit-scrollbar-track{background:transparent !important}
+.wt-tech-wrap::-webkit-scrollbar-thumb{background:transparent !important;border:none !important}
+.wt-tech-wrap .wt-tech-canvas{
+  margin:0 auto !important;
+}
