@@ -1,3 +1,10 @@
+// [rev824] 移除 maxHeight 并修整
+// [rev823] 完整修复
+// [rev816] 高度比例与科技树入口折叠
+// [rev815] 車場高度與數字格式修復
+// [rev814] 車場保留原結構並擴展 Dock
+// [rev813] 車場重構（安全替換）
+// [rev811] 車場重構
 /* ============================================================
    08-base.js — 基地（控制中心 / 建築 / 區域 / 統計 / 偏好）
    由 06-part.js 拆解而來（rev343）
@@ -952,6 +959,12 @@ function _garageDetailHtml(cur, tgt, curUses, maxUses){
   return h;
 }
 
+/* [rev811] 全新車場佈局 */
+/* [rev813] 全新車場佈局修復 */
+/* [rev814] 保留原有卡片結構 */
+/* [rev815] 保留原卡片結構，修正數字格式 */
+/* [rev816] 保留原卡片結構，彈性高度分配 */
+/* [rev823] 車場佈局 */
 function _garageRenderHtml(){
   const lv = getBuildingLv('garage');
   _garageInitState();
@@ -961,31 +974,27 @@ function _garageRenderHtml(){
   const curUses = state.radioUses || 0;
   const research = _garageGetResearchInfo();
   const tgt = research ? research.target : null;
+  const _globalExpVal = typeof fmtNum === 'function' ? fmtNum(g.globalExp || 0) : (g.globalExp || 0);
 
   let h = "";
-  h += "<div class='garage-header'>";
-  /* rev596: 標題行 Lv.XX 右側加「升級」按鈕 */
-  const _globalExpVal = (typeof _garageInitState === 'function') ? (_garageInitState().globalExp || 0) : 0;
-  h += "<div class='garage-title'><img src='icons/buildings/garage.png" + assetSuffix() + "' class='garage-title-icon' alt=''> 車場 <span class='garage-lv'>Lv." + lv + "</span>"
-    + "<button class='garage-upgrade-inline' id='garage-upgrade'" + (lv >= 50 ? ' disabled' : '') + ">" + (lv >= 50 ? '已滿級' : '升級') + "</button>"
-    + "<span class='garage-global-exp' id='garage-global-exp' title='全局經驗'><span class='glb-icon'>🌐</span>" + _globalExpVal + "</span>"
-    + "</div>";
-  h += "<div class='garage-x' id='garage-x'>✕</div>";
-  h += "</div>";
-
   h += "<div class='garage-main'>";
-
-  h += "<div class='garage-showcase'>";
-  h += "<img id='garage-vehicle-img' src='icons/vehicles/" + cur.id + ".png" + assetSuffix() + "' alt=''>";
+  
+  // 大圖展示區
+  h += "<div class='garage-showcase' id='garage-showcase-img'>";
+  h += "<div class='garage-global-exp'>🌐 " + _globalExpVal + "</div>";
+  h += "<img src='icons/vehicles/" + cur.id + ".png" + assetSuffix() + "' alt=''>";
   h += "<div class='garage-vehicle-name-bar'>" + cur.name + "</div>";
   h += "</div>";
 
+  // 底部信息區
   h += "<div class='garage-bottom'>";
-
+  
+  // 左側屬性面板
   h += "<div class='garage-bottom-left'>";
-  h += _garageDetailHtml(cur, tgt, curUses, maxUses);
+  h += _garageDetailHtml(cur, null, curUses, maxUses);
   h += "</div>";
 
+  // 右側研發面板
   h += "<div class='garage-bottom-right'>";
   if(research){
     h += "<div class='garage-research-img-wrap' id='garage-research-target' data-vid='" + research.targetId + "' style='cursor:pointer'>";
@@ -994,33 +1003,42 @@ function _garageRenderHtml(){
     h += "</div>";
     const pct = research.need > 0 ? Math.min(100, Math.round(research.have / research.need * 100)) : 0;
     h += "<div class='garage-research-bar'><div class='fill' style='width:" + pct + "%'></div></div>";
-    h += "<div class='garage-research-exp'>" + research.have + " / " + research.need + "</div>";
+    h += "<div class='garage-research-exp'>" + (typeof fmtNum === 'function' ? fmtNum(research.have) : research.have) + " / " + (typeof fmtNum === 'function' ? fmtNum(research.need) : research.need) + "</div>";
     if(tgt && tgt.researchCost){
       const ammo = _garageAmmoEquiv();
       const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
       const cal = tgt.researchCost.ammoCal;
       const ammoIcon = (typeof AMMO_ICON_BY_CAL !== 'undefined' && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : '545.png';
+      const _fAmmo = typeof fmtNum === 'function' ? fmtNum(ammo) : Math.floor(ammo);
+      const _fAmmoMax = typeof fmtNum === 'function' ? fmtNum(tgt.researchCost.ammoCount) : tgt.researchCost.ammoCount;
+      const _fLiq = typeof fmtNum === 'function' ? fmtNum(liq) : Math.floor(liq);
+      const _fLiqMax = typeof fmtNum === 'function' ? fmtNum(tgt.researchCost.liquor) : tgt.researchCost.liquor;
       h += "<div class='garage-req-row'>";
-      h += "<span class='" + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + "'><img src='icons/items/" + ammoIcon + assetSuffix() + "' class='req-icon' alt=''> " + Math.floor(ammo) + "/" + tgt.researchCost.ammoCount + "</span>";
-      h += "<span class='" + (liq >= tgt.researchCost.liquor ? 'ok' : 'bad') + "'><img src='icons/garden/liquor.png" + assetSuffix() + "' class='req-icon' alt=''> " + Math.floor(liq) + "/" + tgt.researchCost.liquor + "</span>";
+      h += "<span class='" + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + "'><img src='icons/items/" + ammoIcon + assetSuffix() + "' class='req-icon' alt=''> " + _fAmmo + "/" + _fAmmoMax + "</span>";
+      h += "<span class='" + (liq >= tgt.researchCost.liquor ? 'ok' : 'bad') + "'><img src='icons/garden/liquor.png" + assetSuffix() + "' class='req-icon' alt=''> " + _fLiq + "/" + _fLiqMax + "</span>";
       h += "</div>";
     }
   } else {
-    h += "<div class='garage-research-empty'>未選定研發目標</div>";
+    h += "<div class='garage-research-empty' id='garage-research-empty'>未選定研發目標<br><span style='font-size:10px;color:#7a6f60'>點擊打開科技樹</span></div>";
   }
-h += "<div class='garage-actions'>";
-  h += "<button class='garage-tech-btn' id='garage-tech'>🌳 科技樹</button>";
-  h += "<button class='garage-camo-btn' id='garage-camo'>🎨 塗裝</button>";
+  h += "</div>";
   h += "</div>";
   h += "</div>";
 
+  // 底部選車 Dock
+  h += "<div class='garage-dock' id='garage-dock'>";
+  h += "<div class='garage-dock-tabs'>";
+  const tabs = [{k:'all',n:'全部'},{k:'btr',n:'輪戰'},{k:'t80',n:'坦克'},{k:'bmp',n:'步戰'}];
+  const curTab = window._garageFilter || 'all';
+  for(const t of tabs){
+    h += "<div class='garage-tab " + (curTab === t.k ? "on" : "") + "' data-tab='" + t.k + "'>" + t.n + "</div>";
+  }
+  h += "</div>";
+  h += "<div class='garage-dock-list' id='garage-dock-list'></div>";
   h += "</div>";
 
-  h += "</div>";
   return h;
-}
-
-function _garageAmmoEquiv(){
+}function _garageAmmoEquiv(){
   let eq = 0;
   for(const k in state.inventory){
     const p = k.split('@');
@@ -1030,34 +1048,115 @@ function _garageAmmoEquiv(){
   return eq;
 }
 
-function _garageBind(){
+/* [rev811] 渲染車庫列表 */
+/* [rev813] 渲染車庫列表 */
+/* [rev814] 渲染車庫列表 */
+/* [rev815] 渲染車庫列表 */
+/* [rev816] 渲染車庫列表 */
+/* [rev823] 渲染車庫列表 */
+function _renderGarageDockList(){
+  const listEl = document.getElementById("garage-dock-list");
+  if(!listEl) return;
+  const g = _garageInitState();
+  const filter = window._garageFilter || "all";
+  const research = _garageGetResearchInfo();
+  const rTarget = research ? research.targetId : null;
+  
+  let ids = g.ownedVehicles.slice(); // 只显示已研发的载具
+  if(filter !== "all"){
+    ids = ids.filter(function(id){ return VEHICLES[id].line === filter; });
+  }
+  
+  let h = "";
+  for(const vid of ids){
+    const v = VEHICLES[vid];
+    const owned = g.ownedVehicles.indexOf(vid) >= 0;
+    const isCurrent = g.currentVehicle === vid;
+    const isResearching = (rTarget === vid);
+    
+    let cls = "garage-dock-card";
+    if(isCurrent) cls += " current";
+    else if(owned) cls += " owned";
+    else if(isResearching) cls += " researching";
+    else cls += " locked";
+    
+    h += "<div class='" + cls + "' data-vid='" + vid + "'>";
+    h += "<div class='gd-img'><img src='icons/vehicles/" + vid + ".png" + assetSuffix() + "' alt=''></div>";
+    h += "<div class='gd-name'>" + v.name + "</div>";
+    if(isResearching) h += "<div class='gd-mark'>🔬</div>";
+    else if(isCurrent) h += "<div class='gd-mark'>✓</div>";
+    h += "</div>";
+  }
+  listEl.innerHTML = h;
+  
+  if(window._garageScrollLeft !== undefined){
+    listEl.scrollLeft = window._garageScrollLeft;
+  }
+  
+  // PC 滚轮支持
+  if(!listEl._wheelBound){
+    listEl._wheelBound = true;
+    listEl.addEventListener("wheel", function(e){
+      if(e.deltaY !== 0){
+        e.preventDefault();
+        listEl.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+  }
+  
+  const cards = listEl.querySelectorAll(".garage-dock-card");
+  for(let i=0; i<cards.length; i++){
+    (function(card){
+      card.onclick = function(){
+        const vid = card.dataset.vid;
+        const owned = g.ownedVehicles.indexOf(vid) >= 0;
+        
+        if(owned){
+          if(g.currentVehicle !== vid){
+            g.currentVehicle = vid; 
+            save();
+            const p = document.getElementById("garage-page");
+            if(p){
+              p.innerHTML = _garageRenderHtml();
+              _garageBind();
+            }
+          }
+        } else {
+          _garageShowTechDetail(vid);
+        }
+      };
+    })(cards[i]);
+  }
+  listEl.onscroll = function(){ window._garageScrollLeft = listEl.scrollLeft; };
+}function _garageBind(){
   const p = document.getElementById('garage-page');
   if(!p) return;
-
-  const x = p.querySelector('#garage-x');
-  if(x) x.onclick = closeGaragePage;
-
-  const tech = p.querySelector('#garage-tech');
-  if(tech) tech.onclick = function(){ _garageOpenTechTree(); };
-
-    /* rev649: 研发目标展示区点击跳转 */
+  
+  const showcase = p.querySelector('#garage-showcase-img');
+  if(showcase) showcase.onclick = function(){ _garageOpenCamo(); };
+  
   const _rt = p.querySelector('#garage-research-target');
-  if(_rt) _rt.onclick = function(){
-    const _vid = _rt.getAttribute('data-vid');
-    if(_vid) _garageShowTechDetail(_vid);
-  };
-const camo = p.querySelector('#garage-camo');
-  if(camo) camo.onclick = function(){ _garageOpenCamo(); };
-
-  /* rev596: 車場頁面內的升級按鈕 → 打開升級彈窗（無「進入」按鈕，防疊層） */
-  const upgrade = p.querySelector('#garage-upgrade');
-  if(upgrade) upgrade.onclick = function(){
-    if(upgrade.disabled) return;
-    _openGarageInfoModal(0, { fromGarage: true });
-  };
-}
-
-function _garageAvailableExpFor(vid){
+  if(_rt) _rt.onclick = function(){ _garageShowTechDetail(_rt.dataset.vid); };
+  
+  const _re = p.querySelector('#garage-research-empty');
+  if(_re) _re.onclick = function(){ _garageOpenTechTree(); };
+  
+  const tabs = p.querySelectorAll('.garage-tab');
+  for(let i=0; i<tabs.length; i++){
+    (function(t){
+      t.onclick = function(){
+        window._garageFilter = t.dataset.tab;
+        const allTabs = p.querySelectorAll('.garage-tab');
+        for(let j=0; j<allTabs.length; j++) allTabs[j].classList.remove("on");
+        t.classList.add("on");
+        window._garageScrollLeft = 0;
+        _renderGarageDockList();
+      };
+    })(tabs[i]);
+  }
+  
+  _renderGarageDockList();
+}function _garageAvailableExpFor(vid){
   /* rev643: 返回該車已投入的研發進度（= researchProgress） */
   const g = _garageInitState();
   if(!g.researchProgress) g.researchProgress = {};
@@ -1285,29 +1384,29 @@ function _garageShowTechDetail(vid){
   const hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
 
   let body = "";
-  body += '<div class="garage-tech-detail-img-wrap">'
-    + '<img src="icons/vehicles/' + vid + '.png' + assetSuffix() + '" alt="">'
-    + '<div class="garage-tech-detail-name">' + v.name + ' <span style="color:#7a6f60;font-weight:normal">Tier ' + v.tier + '</span></div>'
-    + '</div>';
+  body += "<div class='garage-tech-detail-img-wrap'>";
+  body += "<img src='icons/vehicles/" + vid + ".png" + assetSuffix() + "' alt=''>";
+  body += "<div class='garage-tech-detail-name'>" + v.name + " <span style='color:#7a6f60;font-weight:normal'>Tier " + v.tier + "</span></div>";
+  body += "</div>";
 
-  body += '<div class="garage-tech-detail-cols">';
-  body += '<div class="garage-tech-detail-left">';
-  body += '<div class="garage-tech-detail-col-title">詳情' + (isCurrent ? '' : '（當前 → 目標）') + '</div>';
+  body += "<div class='garage-tech-detail-cols'>";
+  body += "<div class='garage-tech-detail-left'>";
+  body += "<div class='garage-tech-detail-col-title'>詳情" + (isCurrent ? "" : "（當前 → 目標）") + "</div>";
   body += _garageDetailHtml(cur, isCurrent ? null : v, null, null);
-  body += '</div>';
+  body += "</div>";
 
-  body += '<div class="garage-tech-detail-right">';
+  body += "<div class='garage-tech-detail-right'>";
   if(owned && isCurrent){
-    body += '<div class="garage-tech-detail-col-title">狀態</div>';
-    body += '<div class="tech-detail-status" style="color:#7ee07e">使用中</div>';
+    body += "<div class='garage-tech-detail-col-title'>狀態</div>";
+    body += "<div class='tech-detail-status' style='color:#7ee07e'>使用中</div>";
   } else if(owned){
-    body += '<div class="garage-tech-detail-col-title">狀態</div>';
-    body += '<div class="tech-detail-status" style="color:#7ee07e">已研發</div>';
-    body += '<button class="btn primary tech-detail-action" id="m-switch">切換</button>';
+    body += "<div class='garage-tech-detail-col-title'>狀態</div>";
+    body += "<div class='tech-detail-status' style='color:#7ee07e'>已研發</div>";
+    body += "<button class='btn primary tech-detail-action' id='m-switch'>切換</button>";
   } else if(!hasAllPrereq){
     const reqNames = prereqs.map(function(p){ return VEHICLES[p].name; }).join(" / ");
-    body += '<div class="garage-tech-detail-col-title">研發需求</div>';
-    body += '<div class="tech-detail-status" style="color:#e05252">需先研發<br>' + reqNames + '</div>';
+    body += "<div class='garage-tech-detail-col-title'>研發需求</div>";
+    body += "<div class='tech-detail-status' style='color:#e05252'>需先研發<br>" + reqNames + "</div>";
   } else if(v.researchCost){
     const ammo = _garageAmmoEquiv();
     const liq = (typeof _gardenLiquorValue === "function") ? _gardenLiquorValue() : 0;
@@ -1318,25 +1417,25 @@ function _garageShowTechDetail(vid){
     const cal = v.researchCost.ammoCal;
     const ammoIcon = (typeof AMMO_ICON_BY_CAL !== "undefined" && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : "545.png";
     const isTarget = (g.researchTarget === vid);
-    body += '<div class="garage-tech-detail-col-title">研發需求</div>';
-    body += '<div class="tech-detail-row"><span class="k"><img src="icons/items/' + ammoIcon + assetSuffix() + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
-    body += '<div class="tech-detail-row"><span class="k"><img src="icons/garden/liquor.png' + assetSuffix() + '" class="req-icon" alt=""> 私酒</span><span class="v ' + (liq >= v.researchCost.liquor ? 'ok' : 'bad') + '">' + Math.floor(liq) + '/' + v.researchCost.liquor + '</span></div>';
-    body += '<div class="tech-detail-row"><span class="k">經驗</span><span class="v ' + (expDone ? 'ok' : 'bad') + '">' + prog + '/' + need + '</span></div>';
-    body += '<div class="tech-detail-btn-col">';
+    body += "<div class='garage-tech-detail-col-title'>研發需求</div>";
+    body += "<div class='tech-detail-row'><span class='k'><img src='icons/items/" + ammoIcon + assetSuffix() + "' class='req-icon' alt=''> 彈藥</span><span class='v " + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + "'>" + Math.floor(ammo) + "/" + v.researchCost.ammoCount + "</span></div>";
+    body += "<div class='tech-detail-row'><span class='k'><img src='icons/garden/liquor.png" + assetSuffix() + "' class='req-icon' alt=''> 私酒</span><span class='v " + (liq >= v.researchCost.liquor ? 'ok' : 'bad') + "'>" + Math.floor(liq) + "/" + v.researchCost.liquor + "</span></div>";
+    body += "<div class='tech-detail-row'><span class='k'>經驗</span><span class='v " + (expDone ? 'ok' : 'bad') + "'>" + prog + "/" + need + "</span></div>";
+    body += "<div class='tech-detail-btn-col'>";
     if(expDone){
-      body += '<button class="btn primary tech-detail-action" id="m-buy"' + (canBuy ? '' : ' disabled') + '>購買</button>';
+      body += "<button class='btn primary tech-detail-action' id='m-buy'" + (canBuy ? '' : ' disabled') + ">購買</button>";
     } else if(isTarget){
-      body += '<button class="btn tech-detail-action" disabled>研發中</button>';
+      body += "<button class='btn tech-detail-action' disabled>研發中</button>";
     } else {
-      body += '<button class="btn primary tech-detail-action" id="m-research" data-mode="start">研發</button>';
+      body += "<button class='btn primary tech-detail-action' id='m-research' data-mode='start'>研發</button>";
     }
-    body += '</div>';
+    body += "</div>";
   } else {
-    body += '<div class="garage-tech-detail-col-title">狀態</div>';
-    body += '<div class="tech-detail-status" style="color:#7a6f60">—</div>';
+    body += "<div class='garage-tech-detail-col-title'>狀態</div>";
+    body += "<div class='tech-detail-status' style='color:#7a6f60'>—</div>";
   }
-  body += '</div>';
-  body += '</div>';
+  body += "</div>";
+  body += "</div>";
 
   const _ge = Math.floor(g.globalExp || 0);
   const _prog = _garageAvailableExpFor(vid);
@@ -1345,23 +1444,29 @@ function _garageShowTechDetail(vid){
   const _maxT = Math.min(_remain, _ge);
   const _showTransfer = !owned && hasAllPrereq && !!v.researchCost && _ge > 0 && _prog < _need && _maxT > 0;
   if(_showTransfer){
-    body += '<div class="garage-transfer-row" id="garage-transfer-row" style="margin-top:10px;flex-direction:column;align-items:stretch;gap:6px">';
-    body += '<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="color:#7a6f60;font-size:11px">🌐 全局經驗</span><span style="color:#a45ede;font-weight:bold;font-family:Menlo,Consolas,monospace;font-size:14px">' + _ge + '</span></div>';
-    body += '<div class="garage-transfer-slider-wrap">';
-    body += '<div class="garage-transfer-slider-info"><span>轉入數量</span><span><b id="gt-x">0</b> / ' + _maxT + '</span></div>';
-    body += '<input type="range" id="gt-slider" min="0" max="' + _maxT + '" value="0">';
-    body += '<div class="garage-transfer-slider-info"><span>轉入後全局經驗</span><b id="gt-after-ge">' + _ge + '</b></div>';
-    body += '<div class="garage-transfer-slider-info"><span>轉入後研發進度</span><b id="gt-after-prog">' + Math.floor(_prog) + ' / ' + _need + '</b></div>';
-    body += '<div class="garage-transfer-slider-actions"><button class="btn primary" id="gt-confirm" disabled>確認轉入</button></div>';
-    body += '</div></div>';
+    body += "<div class='garage-transfer-row' id='garage-transfer-row' style='margin-top:10px;flex-direction:column;align-items:stretch;gap:6px'>";
+    body += "<div style='display:flex;justify-content:space-between;align-items:baseline'><span style='color:#7a6f60;font-size:11px'>🌐 全局經驗</span><span style='color:#a45ede;font-weight:bold;font-family:Menlo,Consolas,monospace;font-size:14px'>" + _ge + "</span></div>";
+    body += "<div class='garage-transfer-slider-wrap'>";
+    body += "<div class='garage-transfer-slider-info'><span>轉入數量</span><span><b id='gt-x'>0</b> / " + _maxT + "</span></div>";
+    body += "<input type='range' id='gt-slider' min='0' max='" + _maxT + "' value='0'>";
+    body += "<div class='garage-transfer-slider-info'><span>轉入後全局經驗</span><b id='gt-after-ge'>" + _ge + "</b></div>";
+    body += "<div class='garage-transfer-slider-info'><span>轉入後研發進度</span><b id='gt-after-prog'>" + Math.floor(_prog) + " / " + _need + "</b></div>";
+    body += "<div class='garage-transfer-slider-actions'><button class='btn primary' id='gt-confirm' disabled>確認轉入</button></div>";
+    body += "</div></div>";
   }
 
-  const bd = openModal({ title: "科技樹詳情", body: body, onClose: function(){
-    if(typeof modalEl !== "undefined" && modalEl) modalEl.style.maxHeight = "";
+  const bd = openModal({ title: "載具詳情", body: body, onClose: function(){
+    
     closeModal();
     _garageOpenTechTree();
   }});
-  if(typeof modalEl !== "undefined" && modalEl) modalEl.style.maxHeight = "90vh";
+  
+  const closeX = bd.parentNode.querySelector(".modal-hd .x");
+  if(closeX){
+    closeX.textContent = "科技樹";
+    closeX.className = "btn btn-primary";
+    closeX.style.cssText = "background:#8a5f18;color:#fff;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:bold;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;margin-left:8px;border:1px solid #e8a33d;";
+  }
 
   function _refreshGaragePage(){
     const p = document.getElementById("garage-page");
@@ -1373,16 +1478,16 @@ function _garageShowTechDetail(vid){
 
   const rs = bd.querySelector("#m-research");
   if(rs){
-    const mode = rs.getAttribute('data-mode');
-    if(mode === 'start'){
+    const mode = rs.getAttribute("data-mode");
+    if(mode === "start"){
       rs.onclick = function(){
         _garageStartResearch(vid);
         _garageShowTechDetail(vid); _refreshGaragePage();
       };
-    } else if(mode === 'cancel'){
+    } else if(mode === "cancel"){
       rs.onclick = function(){
         g.researchTarget = null;
-        if(typeof save === 'function') save();
+        if(typeof save === "function") save();
         _garageShowTechDetail(vid); _refreshGaragePage();
       };
     }
@@ -1417,14 +1522,11 @@ function _garageShowTechDetail(vid){
         if(!g.researchProgress) g.researchProgress = {};
         g.researchProgress[vid] = (g.researchProgress[vid] || 0) + x;
         if(typeof save === "function") save();
-        console.info("[garage] 轉入", x, "全局經驗 →", vid);
         _garageShowTechDetail(vid); _refreshGaragePage();
       };
     }
   }
-}
-
-/* ===== end rev565 ===== */
+}/* ===== end rev565 ===== */
 
 function renderBase(){
   const z1=$('#zone1'),z2=$('#zone2'),z3=$('#zone3');
@@ -1883,3 +1985,29 @@ function _openLiquorDetail(){
   ft.innerHTML = "";
   openModal({ title: "\u79C1\u9152", body: body, footer: ft });
 }
+
+/* [rev888] runtime */
+(function(){
+  if(window._rev888RuntimeInstalled) return;
+  window._rev888RuntimeInstalled = true;
+  function fixRadioBtn(){
+    var btns = document.querySelectorAll('.radio-btn');
+    var fixed = 0;
+    for(var i = 0; i < btns.length; i++){
+      var el = btns[i];
+      var t = el.textContent || '';
+      if(t.indexOf('挑戰') !== -1 || t.indexOf('掃蕩') !== -1){
+        el.textContent = t.replace(/挑战/g, '挑戰').replace(/扫荡/g, '掃蕩');
+        fixed++;
+      }
+    }
+    if(fixed > 0) console.log('[rev888] runtime: fixed ' + fixed + ' radio button(s)');
+  }
+  setInterval(fixRadioBtn, 200);
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', fixRadioBtn);
+  } else {
+    fixRadioBtn();
+  }
+  console.log('[rev888] runtime DOM patcher installed');
+})();

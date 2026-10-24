@@ -1,3 +1,45 @@
+// [rev874] 闭环履带渲染
+// [rev873] 履带环扬尘与机炮节奏
+// [rev871] 机炮节奏调整
+// [rev868] 共用扬尘
+// [rev856] 修正角度
+// [rev855] 只看轮子转速
+// [rev854] 修正参数下限
+// [rev853] 只认轮子转速
+// [rev852] 重构扬尘物理
+// [rev851] 纯物理抛射
+// [rev850] 烟尘滚滚
+// [rev849] 烟尘滚滚
+// [rev848] 曲面切向抛射扬尘
+// [rev847] 引入风速
+// [rev846] 统一抛射与扩散物理
+// [rev845] 绝对安全修正
+// [rev843] 纯滚动扬尘
+// [rev842] 抛射角度修正
+// [rev841] 车速与扬尘体量关系
+// [rev840] 扬尘风速与方向修正
+// [rev839] 修正扬尘生成点
+// [rev838] 贴地渐变扬尘
+// [rev837] 贴地抛射扬尘
+// [rev836] 不规则扬尘
+// [rev835] 优化扬尘位置
+// [rev834] 原版扬尘恢复
+// [rev833] 抛射扬尘
+// [rev831] 真实物理扬尘
+// [rev830] 扬尘复原
+// [rev829] 每轮扬尘
+// [rev810] 修复 spawnMissile 作用域与导弹绘制抖动
+// [rev809] 獨立實體導彈與物理尾跡
+// [rev808] ATGM 導彈尾跡（矩形、跟隨、抖動補償）
+// [rev807] ATGM 專屬煙霧軌跡（更遠的擴散點與更長的噴射時間）
+// [rev806] 擴大擴散覆蓋範圍，維持快速淡出
+// [rev805] 擴大發射煙/擴散煙對比：擴散點更遠、更淡、消散更快
+// [rev804] 擴散點基於物理尺寸（targetW），無邊界裁剪
+// [rev803] 降低擴散煙透明度（alpha0 下調 + pow 3.0 恢復）
+// [rev802] 擴散點前移對接 + 發射煙拉長 + 擴散煙加濃
+// [rev801] 實拍物理：管退全程連續發射煙柱 + 向左擴散煙雲
+// [rev800] 发射烟首帧在炮口 + 扩散烟可见度提高
+// [rev799] 烟雾物理修复：管退全程持续喷出 + 首帧不跳过 + friction 时间基
 (function(){
   'use strict';
   if(window._vehicleRendererInstalled) return;
@@ -75,55 +117,71 @@
   const size = Math.ceil(r*2);
   if(size < 3) return null;
   const maskOn = ann.trackMask && ann.trackMask.enabled;
-  const maskKey = maskOn ? ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+','+p.y.toFixed(3); }).join(';') : 'off';
-  const key = (img.src||'') + '|' + cx.toFixed(1) + '|' + cy.toFixed(1) + '|' + size + '|' + maskKey;
+  const maskKey = maskOn ? ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+","+p.y.toFixed(3); }).join(";") : "off";
+  const key = (img.src||"") + "|" + cx.toFixed(1) + "|" + cy.toFixed(1) + "|" + size + "|" + maskKey;
   if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
-  const c = document.createElement('canvas'); c.width = size; c.height = size;
-  const cc = c.getContext('2d');
+  const c = document.createElement("canvas"); c.width = size; c.height = size;
+  const cc = c.getContext("2d");
   cc.save();
   cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
   cc.drawImage(img, -(cx - size/2), -(cy - size/2), cw, ch);
   cc.restore();
-  /* rev595: 遮罩鏡像/平鋪填充 —— 用可見部分反覆翻轉/平鋪，填滿整個圓形，
-     修復導向輪外露 < 50% 直徑時只翻轉一次導致上半部空缺（橄欖球形）的問題 */
   if(maskOn){
+    const pts = ann.trackMask.points.slice().sort(function(a,b){ return a.x-b.x; });
+    cc.save();
+    cc.globalCompositeOperation = "destination-out";
+    cc.beginPath();
+    cc.moveTo(pts[0].x * cw - (cx - size/2), -10);
+    for(let i = 0; i < pts.length; i++){
+      cc.lineTo(pts[i].x * cw - (cx - size/2), pts[i].y * ch - (cy - size/2));
+    }
+    cc.lineTo(pts[pts.length-1].x * cw - (cx - size/2), -10);
+    cc.closePath();
+    cc.fill();
+    cc.restore();
     const maskY = _getMaskYAtX(ann, wheel.cx);
     const maskYInCanvas = maskY * ch - (cy - size/2);
     if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
-      const belowH = size - maskYInCanvas;
-      const below = document.createElement('canvas');
-      below.width = size;
-      below.height = Math.max(1, Math.ceil(belowH));
-      const bc = below.getContext('2d');
-      bc.drawImage(c, 0, maskYInCanvas, size, belowH, 0, 0, size, belowH);
-      cc.save();
-      cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
-      cc.clearRect(0, 0, size, maskYInCanvas);
-      cc.restore();
-      cc.save();
-      cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
-      let y = maskYInCanvas;
-      let flip = true;
-      while(y > 0.5){
-        const drawH = Math.min(y, belowH);
-        const drawY = y - drawH;
-        if(flip){
+      const isLargeCut = maskYInCanvas > size / 2;
+      if(isLargeCut){
+        const fan = document.createElement("canvas");
+        fan.width = size; fan.height = size;
+        const fx = fan.getContext("2d");
+        fx.save();
+        fx.beginPath();
+        fx.moveTo(size/2, size/2);
+        fx.arc(size/2, size/2, size/2, Math.PI * 0.25, Math.PI * 0.75);
+        fx.closePath();
+        fx.clip();
+        fx.drawImage(img, -(cx - size/2), -(cy - size/2), cw, ch);
+        fx.restore();
+        cc.save();
+        cc.globalCompositeOperation = "destination-over";
+        for(let i = 1; i <= 7; i++){
           cc.save();
-          cc.translate(0, y);
-          cc.scale(1, -1);
-          cc.drawImage(below, 0, 0, size, drawH, 0, 0, size, drawH);
+          cc.translate(size/2, size/2);
+          cc.rotate((Math.PI / 4) * i);
+          cc.translate(-size/2, -size/2);
+          cc.drawImage(fan, 0, 0);
           cc.restore();
-        } else {
-          cc.drawImage(below, 0, 0, size, drawH, 0, drawY, size, drawH);
         }
-        y = drawY;
-        flip = !flip;
+        cc.restore();
+      } else {
+        const patch = document.createElement("canvas");
+        patch.width = size; patch.height = size;
+        const pc = patch.getContext("2d");
+        pc.drawImage(c, 0, 0);
+        cc.save();
+        cc.globalCompositeOperation = "destination-over";
+        cc.translate(0, maskYInCanvas * 2);
+        cc.scale(1, -1);
+        cc.drawImage(patch, 0, 0);
+        cc.restore();
       }
-      cc.restore();
     }
   }
   cc.save();
-  cc.globalCompositeOperation = 'destination-in';
+  cc.globalCompositeOperation = "destination-in";
   cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.fill();
   cc.restore();
   _wheelClipCache.set(key, c);
@@ -180,168 +238,123 @@ function _samplePath(segs, s){
 /* [rev788] 履带：poly clip 到 trackMask~trackLine 全区，擦除+纹理都覆盖全带 */
 /* [rev789] _drawTrackBand：drawImage 源坐标用原图尺寸，目标用 cw/ch，擦除+纹理 poly 一致 */
 /* [rev791] _drawTrackBand：固定 bandHeight（编辑器同款），单次绘制不拉伸不铺排 */
+
 function _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel){
   const sc = ann.trackScroll;
   if(!sc || !sc.enabled) return;
-  const path = _buildTrackPath(ann, cw, ch);
-  if(!path || !path.segs.length) return;
+  if(!ann.trackLoop || !ann.trackLoop.points || ann.trackLoop.points.length < 3) return;
+  const W = cw, H = ch;
+  const rawPts = ann.trackLoop.points.map(function(p){ return { x: p.x * W, y: p.y * H }; });
+  const n = rawPts.length;
+  let totalLen = 0;
+  const segs = [];
+  for(let i = 0; i < n; i++){
+    const p1 = rawPts[i], p2 = rawPts[(i + 1) % n];
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if(len < 0.5) continue;
+    segs.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, ux: dx / len, uy: dy / len, len: len, startLen: totalLen });
+    totalLen += len;
+  }
+  if(totalLen < 1) return;
+  let cx = 0, cy = 0;
+  for(let i = 0; i < n; i++){ cx += rawPts[i].x; cy += rawPts[i].y; }
+  cx /= n; cy /= n;
 
-  // ★ 源坐标用原图像素，目标用 cw/ch
-  const iw = img.naturalWidth || cw;
-  const ih = img.naturalHeight || ch;
-  const texSrcX0 = sc.textureX0 * iw;
-  const texSrcX1 = sc.textureX1 * iw;
-  const texSrcY0 = (sc.textureY0 == null || !isFinite(sc.textureY0)) ? 0 : sc.textureY0 * ih;
-  const texSrcY1 = (sc.textureY1 == null || !isFinite(sc.textureY1)) ? ih : sc.textureY1 * ih;
-  const texSrcW = texSrcX1 - texSrcX0;
-  const texSrcH = texSrcY1 - texSrcY0;
+  let _y0 = sc.textureY0, _y1 = sc.textureY1;
+  if(_y0 == null || !isFinite(_y0)) _y0 = 0.6;
+  if(_y1 == null || !isFinite(_y1)) _y1 = 1.0;
+  let _x0 = Math.max(0, Math.min(1, sc.textureX0));
+  let _x1 = Math.max(0, Math.min(1, sc.textureX1));
+  if(_x0 > _x1){ const _t = _x0; _x0 = _x1; _x1 = _t; }
+  if(_y0 > _y1){ const _t = _y0; _y0 = _y1; _y1 = _t; }
 
-  const texW = texSrcW * (cw / iw);
-  const texH = texSrcH * (ch / ih);
-  if(texW < 2 || texH < 2) return;
+  const imgW = img.naturalWidth || img.width || W;
+  const imgH = img.naturalHeight || img.height || H;
+  const srcX = _x0 * imgW;
+  const srcY = _y0 * imgH;
+  const srcTileW = (_x1 - _x0) * imgW;
+  const srcTileH = (_y1 - _y0) * imgH;
+  const dstTileW = (_x1 - _x0) * W;
+  const dstTileH = (_y1 - _y0) * H;
+  if(srcTileW < 1 || srcTileH < 1 || dstTileW < 1 || dstTileH < 1) return;
 
-  const totalLen = path.totalLen;
-  const effDir = -sc.direction;
-
-  // ★ bandH：直接用编辑器固定比例，不做动态计算
-  const bandH = (sc.bandHeight || 0.08) * ch;
-
-  // 速度：编辑器公式
-  let _vSpeed = vel;
-  const _ws = ann.wheels || [];
-  if(_ws.length > 0){
-    let _refR, _refRot;
-    const _idx = (sc.followWheel || 0) | 0;
-    if(_idx > 0 && _idx <= _ws.length){
-      _refR = _ws[_idx-1].r || 0.05;
-      _refRot = _ws[_idx-1].rotSpeed || 1;
-    } else {
-      _refR = _ws.reduce(function(s,w){ return s + (w.r||0); }, 0) / _ws.length;
-      _refRot = _ws.reduce(function(s,w){ return s + (w.rotSpeed||1); }, 0) / _ws.length;
+  function sampleArc(s){
+    s = s % totalLen;
+    if(s < 0) s += totalLen;
+    for(let i = 0; i < segs.length; i++){
+      const seg = segs[i];
+      if(s >= seg.startLen && s <= seg.startLen + seg.len){
+        const t = (s - seg.startLen) / seg.len;
+        return { x: seg.x1 + (seg.x2 - seg.x1) * t, y: seg.y1 + (seg.y2 - seg.y1) * t, ux: seg.ux, uy: seg.uy };
+      }
     }
-    _vSpeed = _refRot * 3 * _refR * cw;
+    const last = segs[segs.length - 1];
+    return { x: last.x2, y: last.y2, ux: last.ux, uy: last.uy };
+  }
+  function normalToCenter(p){
+    let nx = -p.uy, ny = p.ux;
+    if(nx * (cx - p.x) + ny * (cy - p.y) < 0){ nx = -nx; ny = -ny; }
+    return { nx: nx, ny: ny };
   }
 
-  const rawOffsetPx = animTime * _vSpeed * effDir;
-  const offsetPx = (((rawOffsetPx % texW) + texW) % texW);
+  const dir = sc.direction || -1;
+  let offset = (animTime * vel * dir) % dstTileW;
+  if(offset < 0) offset += dstTileW;
+  const steps = Math.ceil(totalLen / dstTileW) + 2;
+  const ext = 1.5;
 
-  const vScale = bandH / texH;
-
-  if(typeof window._trackDebug === "undefined") window._trackDebug = 0;
-  window._trackDebug++;
-  if(window._trackDebug % 120 === 1){
-    console.log("[track rev791] bandH=" + bandH.toFixed(1) + " texH=" + texH.toFixed(1) + " vScale=" + vScale.toFixed(2) + " texW=" + texW.toFixed(1) + " iw=" + iw + " ih=" + ih);
-  }
-
-  // poly：下缘=trackLine，上缘沿法线偏移 bandH
-  const upN = [];
-  for(let i = 0; i < path.pixPts.length; i++){
-    let ux, uy;
-    if(i === 0){ ux = path.pixPts[1].x - path.pixPts[0].x; uy = path.pixPts[1].y - path.pixPts[0].y; }
-    else if(i === path.pixPts.length-1){ ux = path.pixPts[i].x - path.pixPts[i-1].x; uy = path.pixPts[i].y - path.pixPts[i-1].y; }
-    else { ux = path.pixPts[i+1].x - path.pixPts[i-1].x; uy = path.pixPts[i+1].y - path.pixPts[i-1].y; }
-    const L = Math.hypot(ux, uy) || 1; ux /= L; uy /= L;
-    let nx = -uy, ny = ux;
-    if(ny > 0){ nx = -nx; ny = -ny; }
-    upN.push({ nx, ny });
-  }
-  const poly = [];
-  for(const p of path.pixPts) poly.push({ x: p.x, y: p.y });
-  for(let i = path.pixPts.length - 1; i >= 0; i--){
-    poly.push({ x: path.pixPts[i].x + upN[i].nx * bandH, y: path.pixPts[i].y + upN[i].ny * bandH });
-  }
-
-  // ① 擦除 poly 内原图
+  /* ★ v3 band-only erase：只擦「沿弧長鋪 dstTileW、沿法線 dstTileH」的帶子 */
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(poly[0].x, poly[0].y);
-  for(let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
-  ctx.closePath();
-  ctx.clip();
   ctx.globalCompositeOperation = "destination-out";
   ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, cw, ch);
+  for(let k = 0; k < steps; k++){
+    const s0 = offset + k * dstTileW;
+    const a = sampleArc(s0);
+    const b = sampleArc(s0 + dstTileW);
+    const na = normalToCenter(a);
+    const nb = normalToCenter(b);
+    ctx.beginPath();
+    ctx.moveTo(a.x - a.ux * ext, a.y - a.uy * ext);
+    ctx.lineTo(b.x + b.ux * ext, b.y + b.uy * ext);
+    ctx.lineTo(b.x + b.ux * ext + nb.nx * dstTileH, b.y + b.uy * ext + nb.ny * dstTileH);
+    ctx.lineTo(a.x - a.ux * ext + na.nx * dstTileH, a.y - a.uy * ext + na.ny * dstTileH);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
 
-  // ② 画纹理 + 条纹
+  /* ★ 用相同幾何填回紋理（源採樣用原圖尺寸、目標繪製用 canvas 尺寸） */
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(poly[0].x, poly[0].y);
-  for(let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
-  ctx.closePath();
-  ctx.clip();
-
-  const samplePathAngle = function(s){
-    if(s <= 0){ const p0 = path.segs[0]; return { x: p0.x1, y: p0.y1, angle: Math.atan2(p0.dy, p0.dx) }; }
-    if(s >= totalLen){ const p0 = path.segs[path.segs.length-1]; return { x: p0.x2, y: p0.y2, angle: Math.atan2(p0.dy, p0.dx) }; }
-    for(let i = 0; i < path.segs.length; i++){
-      const sg = path.segs[i];
-      if(s >= sg.startLen && s <= sg.startLen + sg.len){
-        const t = (s - sg.startLen) / sg.len;
-        return { x: sg.x1 + (sg.x2 - sg.x1) * t, y: sg.y1 + (sg.y2 - sg.y1) * t, angle: Math.atan2(sg.dy, sg.dx) };
-      }
-    }
-    return null;
-  };
-
-  if(sc.useTexture){
-    ctx.globalAlpha = 1.0;
-    for(let a = offsetPx - texW; a < totalLen + texW; a += texW){
-      const arcA = Math.max(0, Math.min(totalLen, a));
-      const arcB = Math.max(0, Math.min(totalLen, a + texW));
-      const pA = samplePathAngle(arcA);
-      const pB = samplePathAngle(arcB);
-      if(!pA || !pB) continue;
-      const dx = pB.x - pA.x, dy = pB.y - pA.y;
-      const segLen = Math.hypot(dx, dy);
-      if(segLen < 1) continue;
-      const angle = Math.atan2(dy, dx);
-      const ux = Math.cos(angle), uy = Math.sin(angle);
-      const uScale = segLen / texW;
-      let nx = -uy, ny = ux;
-      if(ny > 0){ nx = -nx; ny = -ny; }
-      const topX = pA.x + nx * bandH;
-      const topY = pA.y + ny * bandH;
-      const vx = -nx, vy = -ny;
-      ctx.save();
-      ctx.translate(topX, topY);
-      ctx.transform(ux * uScale, uy * uScale, vx * vScale, vy * vScale, 0, 0);
-      ctx.drawImage(img, texSrcX0, texSrcY0, texSrcW, texSrcH, 0, 0, texW, texH);
-      ctx.restore();
-    }
-    ctx.globalAlpha = 1;
+  ctx.globalAlpha = (sc.textureOpacity != null ? sc.textureOpacity : 0.85);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.imageSmoothingEnabled = true;
+  for(let k = 0; k < steps; k++){
+    const s0 = offset + k * dstTileW;
+    const a = sampleArc(s0);
+    const b = sampleArc(s0 + dstTileW);
+    const na = normalToCenter(a);
+    const nb = normalToCenter(b);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.lineTo(b.x + nb.nx * dstTileH, b.y + nb.ny * dstTileH);
+    ctx.lineTo(a.x + na.nx * dstTileH, a.y + na.ny * dstTileH);
+    ctx.closePath();
+    ctx.clip();
+    ctx.translate(a.x, a.y);
+    ctx.transform(a.ux, a.uy, na.nx, na.ny, 0, 0);
+    ctx.translate(0, dstTileH);
+    ctx.scale(1, -1);
+    const det = a.ux * na.ny - a.uy * na.nx;
+    if(det < 0){ ctx.scale(-1, 1); ctx.translate(-dstTileW, 0); }
+    ctx.drawImage(img, srcX, srcY, srcTileW, srcTileH, 0, 0, dstTileW, dstTileH);
+    ctx.restore();
   }
-
-  if(sc.useStripes){
-    const spacing = sc.spacing * cw;
-    if(spacing >= 3){
-      const darkW = spacing * 0.55;
-      const strength = sc.stripeStrength || 1;
-      const stepPx = Math.max(2, spacing / 2);
-      for(let s = 0; s < totalLen; s += stepPx){
-        const chunkLen = Math.min(stepPx, totalLen - s);
-        if(chunkLen < 0.01) continue;
-        const midP = _samplePath(path.segs, s + chunkLen / 2);
-        if(!midP) continue;
-        const texPos = ((s + chunkLen / 2 + rawOffsetPx) % spacing + spacing) % spacing;
-        const isDark = texPos < darkW;
-        const ang = Math.atan2(midP.ty, midP.tx);
-        ctx.save();
-        ctx.translate(midP.x, midP.y);
-        ctx.rotate(ang);
-        ctx.fillStyle = isDark ? "rgba(0,0,0," + (sc.darkAlpha * strength) + ")" : "rgba(255,255,255," + (sc.lightAlpha * strength) + ")";
-        ctx.fillRect(0, 0, chunkLen, bandH);
-        ctx.restore();
-      }
-    }
-  }
-
+  ctx.globalAlpha = 1;
   ctx.restore();
 }
-
-
-
-
 
 function _makeDoorClip(img, pts, cw, ch){
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -441,10 +454,15 @@ function _makeDoorClip(img, pts, cw, ch){
     const img = _loadVehicleImg(id);
     if(!img.complete || !img.naturalWidth) return;
 
-    const hasTrack = ann.trackLine && ann.trackLine.points && ann.trackLine.points.length >= 2;
+    const hasTrackLoop = ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 3;
+    const hasTrackLine = ann.trackLine && ann.trackLine.points && ann.trackLine.points.length >= 2;
     const hasTrackScroll = ann.trackScroll && ann.trackScroll.enabled;
 
-    if(hasTrack && hasTrackScroll){
+    if(hasTrackLoop && hasTrackScroll){
+      ctx.drawImage(img, 0, 0, cw, ch);
+      const vel = opts.trackVel || 60;
+      _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel);
+    } else if(hasTrackLine && hasTrackScroll){
       ctx.save();
       let _maxY = 0;
       for(const _p of ann.trackLine.points){ if(_p.y > _maxY) _maxY = _p.y; }
@@ -453,13 +471,10 @@ function _makeDoorClip(img, pts, cw, ch){
       ctx.clip();
       ctx.drawImage(img, 0, 0, cw, ch);
       ctx.restore();
-    } else {
-      ctx.drawImage(img, 0, 0, cw, ch);
-    }
-
-    if(hasTrack && hasTrackScroll){
       const vel = opts.trackVel || 60;
       _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel);
+    } else {
+      ctx.drawImage(img, 0, 0, cw, ch);
     }
 
     if(ann.wheels && ann.wheels.length){
@@ -473,7 +488,7 @@ function _makeDoorClip(img, pts, cw, ch){
           ctx.save();
           ctx.translate(cx, cy);
           ctx.rotate(rot);
-          ctx.drawImage(clip, -r, -r, r*2, r*2);
+          ctx.drawImage(clip, -r, -r, r * 2, r * 2);
           ctx.restore();
         }
       }
@@ -490,7 +505,7 @@ function _makeDoorClip(img, pts, cw, ch){
         if(ann.doors.upper) for(const d of ann.doors.upper) allDoors.push(d);
         if(ann.doors.hatch) for(const d of ann.doors.hatch) allDoors.push(d);
         ctx.save();
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = "#000000";
         for(const d of allDoors){
           if(!d.polygon || d.polygon.length < 3) continue;
           ctx.beginPath();
@@ -502,13 +517,13 @@ function _makeDoorClip(img, pts, cw, ch){
         ctx.restore();
       }
       if(ann.doors.lower && ann.doors.lower.length){
-        for(const d of ann.doors.lower) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * (110 / 180), '#0c0c0c');
+        for(const d of ann.doors.lower) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * (110 / 180), "#0c0c0c");
       }
       if(ann.doors.upper && ann.doors.upper.length){
-        for(const d of ann.doors.upper) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen, '#0c0c0c');
+        for(const d of ann.doors.upper) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen, "#0c0c0c");
       }
       if(ann.doors.hatch && ann.doors.hatch.length){
-        for(const d of ann.doors.hatch) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * 0.5, '#0c0c0c');
+        for(const d of ann.doors.hatch) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * 0.5, "#0c0c0c");
       }
     }
   }
@@ -600,6 +615,45 @@ function _makeDoorClip(img, pts, cw, ch){
 
   window.VehicleRenderer = { render: renderVehicle };
 
+  // [rev868] 共用扬尘系统
+  window.spawnDust = function(particles, px, py, wheel, targetW, targetH, wheelSpd) {
+    const mult = (wheelSpd === 20) ? 1.5 : 1.0;
+    const baseVx = -(5.0 + Math.random() * 4.0) * mult; // 强力的向左初速
+    const baseVy = -(1.5 + Math.random() * 2.0) * mult;
+    particles.push({
+      x: px + wheel.cx * targetW + (Math.random() - 0.5) * wheel.r * targetW * 0.5,
+      y: py + wheel.cy * targetH + wheel.r * targetW,
+      vx: baseVx,
+      vy: baseVy,
+      life: 1,
+      size: (6 + Math.random() * 10) * (wheelSpd === 20 ? 2.0 : 1.5),
+      hue: 28 + Math.random() * 18
+    });
+  };
+  window.updateAndDrawDust = function(ctx, particles, dt) {
+    const step = dt * 60;
+    for(let i = particles.length - 1; i >= 0; i--){
+      const p = particles[i];
+      p.x += p.vx * step;
+      p.y += p.vy * step;
+      p.vy += 0.08 * step; // 重力
+      p.vx *= Math.pow(0.97, step); // 阻力
+      p.life -= 0.016 * step;
+      if(p.life <= 0){ particles.splice(i, 1); continue; }
+      
+      const radius = p.size * (1.5 - p.life * 0.45);
+      const _alpha = Math.max(0, p.life) * 0.65;
+      
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
+      grad.addColorStop(0, 'hsla(' + p.hue + ', 35%, 48%, ' + _alpha + ')');
+      grad.addColorStop(1, 'hsla(' + p.hue + ', 35%, 48%, 0)');
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill();
+    }
+  };
+
+
   /* ============ BTR 支援演出 ============ */
 const BTR_TIMELINE = {
   enterDur: 2.5, arriveDur: 1.8, sinkDur: 1.5, centerDur: 1.0,
@@ -611,8 +665,8 @@ const MUZZLE_PROFILES = {
   kpvt:    { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
   pkt:     { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
   nsvt:    { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470, projectileType: 'bullet' },
-  '2a72':  { burst: 15, intervalMs: 200,  pauseMs: 500, flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
-  '2a42':  { burst: 15, intervalMs: 180,  pauseMs: 500, flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
+  '2a72':  { burst: 7,  intervalMs: 200,  pauseMs: 1500, flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
+  '2a42':  { burst: 7,  intervalMs: 180,  pauseMs: 1500, flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
   '2a46':  { burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   '2a46m1':{ burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   ags17:   { burst: 6,  intervalMs: 300,  pauseMs: 800, flashSize: 28, flashColor: '255,200,100', bulletSize: 4,  bulletSpeed: 350, projectileType: 'bullet' },
@@ -630,64 +684,92 @@ const BTRSupport = {
   
                         fx: {
     smoke: [], tracers: [],
-    spawnCannon(x, y) {
-      const _base = this.targetW || 300;
-      // 1. 锥形发射烟 (Jet)
-      this.smoke.push({ 
-        x: x, y: y, 
-        vx: _base * 25, vy: (Math.random() - 0.5) * _base * 0.05, 
-        life: 1, rate: 1 / 0.3, 
-        sizeX: _base * 0.15, sizeY: _base * 0.03, 
-        growX: _base * 5.0, growY: _base * 1.0, 
-        alpha0: 0.95, isJet: true, isCore: true, 
-        friction: 0.65, 
-        angle: 0, spin: 0, worldFactor: 0.1
-      });
-      
-      // 2. 弥散烟 (Diffuse) - 降低初始透明度，加快衰减
-      for(let i=0; i<6; i++) {
-        this.smoke.push({ 
-          x: x + _base * 0.15, y: y + (Math.random()-0.5)*_base*0.1, 
-          vx: _base * 4 + Math.random() * _base * 2, 
-          vy: (Math.random() - 0.5) * _base * 0.3, 
-          life: 1, rate: 1 / (1.2 + Math.random() * 0.6), 
-          sizeX: _base * 0.15, sizeY: _base * 0.15, 
-          growX: _base * 0.8, growY: _base * 0.8, 
-          alpha0: 0.15, 
-          isJet: false, isCore: false, 
-          friction: 0.94, 
-          angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 1,
-          worldFactor: 1.0 
+    // [rev799] 发射烟（激波）：单个粒子，由 _updateRecoilSmoke 在 t=0 调用
+    // 不设 skipUpdate —— 首帧被 fx.update 推进到炮口前方 125~250px，不遮挡炮口
+    // [rev801] 發射煙：高不透明度柱狀射流
+    // [rev802] 發射煙：拉長錐形，連接擴散點
+    spawnJetOne(x, y, weaponId) {
+      const _base = 300;
+      const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
+      const isATGM = (weaponId === 'atgm');
+      if (isATGM) {
+        // ATGM 專屬：扁平矩形柱狀噴射
+        this.smoke.push({
+          x: x + 15, y: y,
+          vx: _base * 30, vy: (Math.random() - 0.5) * _base * 0.02, // 縱向極小
+          life: 1, rate: 1 / 0.25,
+          sizeX: _base * 0.2, sizeY: _base * 0.02,
+          growX: _base * 4.0, growY: _base * 0.1, // Y 幾乎不長，保持柱狀
+          alpha0: 1.0, isJet: true, isCore: true,
+          friction: 0.7,
+          angle: 0, spin: 0, worldFactor: 0.1,
+          skipUpdate: true
+        });
+      } else if (isHeavy) {
+        this.smoke.push({
+          x: x + 15, y: y,
+          vx: _base * 25, vy: (Math.random() - 0.5) * _base * 0.1,
+          life: 1, rate: 1 / 0.25,
+          sizeX: _base * 0.15, sizeY: _base * 0.05,
+          growX: _base * 10.0, growY: _base * 2.0,
+          alpha0: 1.0, isJet: true, isCore: true,
+          friction: 0.7,
+          angle: 0, spin: 0, worldFactor: 0.1,
+          skipUpdate: true
+        });
+      } else {
+        this.smoke.push({
+          x: x + 10, y: y,
+          vx: _base * 18, vy: (Math.random() - 0.5) * _base * 0.05,
+          life: 1, rate: 1 / 0.2,
+          sizeX: _base * 0.1, sizeY: _base * 0.03,
+          growX: _base * 8.0, growY: _base * 1.5,
+          alpha0: 1.0, isJet: true, isCore: true,
+          friction: 0.7,
+          angle: 0, spin: 0, worldFactor: 0.1,
+          skipUpdate: true
         });
       }
     },
-    spawnMainGun(x, y) {
-      const _base = this.targetW || 300;
-      this.smoke.push({ 
-        x: x, y: y, 
-        vx: _base * 35, vy: (Math.random() - 0.5) * _base * 0.1, 
-        life: 1, rate: 1 / 0.4, 
-        sizeX: _base * 0.3, sizeY: _base * 0.1, 
-        growX: _base * 8.0, growY: _base * 3.0,
-        alpha0: 0.98, isJet: true, isCore: true, 
-        friction: 0.6, 
-        angle: 0, spin: 0, worldFactor: 0.1
-      });
-      // 主炮弥散烟
-      for(let i=0; i<10; i++) {
-        this.smoke.push({ 
-          x: x + _base * 0.2, y: y + (Math.random()-0.5)*_base*0.2, 
-          vx: _base * 6 + Math.random() * _base * 3, 
-          vy: -_base * 0.2 - Math.random() * _base * 0.3, 
-          life: 1, 
-          rate: 1 / (1.5 + Math.random() * 0.8), 
-          sizeX: _base * 0.25, sizeY: _base * 0.25, 
-          growX: _base * 1.2, growY: _base * 1.2, 
-          alpha0: 0.18, 
-          isJet: false, isCore: false, 
-          friction: 0.92, 
-          angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 1,
-          worldFactor: 1.0
+    // [rev799] 扩散烟：单个粒子，由 _updateRecoilSmoke 在管退全程按进度调用
+    // 设 skipUpdate: true —— 首帧不推进，fx.draw 第一次就画在「当时炮口」位置
+    // [rev801] 擴散煙：向左（車尾方向）擴散，半透明
+    // [rev802] 擴散煙：半透明，原地爆開膨脹後向左拖曳
+    // [rev803] 擴散煙：半透明（降低 alpha0），原地爆開膨脹後向左拖曳
+    // [rev805] 擴散煙：極淡、快速消散、向後拖曳
+    // [rev806] 擴散煙：長壽命確保覆蓋範圍，高 grow 快速膨脹，pow 4.0 快速淡出
+    spawnSpreadOne(x, y, weaponId) {
+      const _base = 300;
+      const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
+      if (isHeavy) {
+        this.smoke.push({
+          x: x + (Math.random() - 0.5) * _base * 0.2, 
+          y: y + (Math.random() - 0.5) * _base * 0.2,
+          vx: (Math.random() - 0.5) * _base * 0.5, 
+          vy: (Math.random() - 0.5) * _base * 0.5,
+          life: 1, rate: 1 / (2.0 + Math.random() * 0.8), // 恢復長壽命 2.0~2.8s
+          sizeX: _base * 0.3, sizeY: _base * 0.3,
+          growX: _base * 3.5, growY: _base * 3.5, // 加快膨脹
+          alpha0: 0.22, isJet: false, isCore: false,
+          friction: 0.92,
+          angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
+          worldFactor: 1.5,
+          skipUpdate: true
+        });
+      } else {
+        this.smoke.push({
+          x: x + (Math.random() - 0.5) * _base * 0.2, 
+          y: y + (Math.random() - 0.5) * _base * 0.15,
+          vx: (Math.random() - 0.5) * _base * 0.4,
+          vy: (Math.random() - 0.5) * _base * 0.4,
+          life: 1, rate: 1 / (1.5 + Math.random() * 0.6), // 恢復長壽命 1.5~2.1s
+          sizeX: _base * 0.2, sizeY: _base * 0.2,
+          growX: _base * 2.5, growY: _base * 2.5, // 加快膨脹
+          alpha0: 0.18, isJet: false, isCore: false,
+          friction: 0.94,
+          angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
+          worldFactor: 1.5,
+          skipUpdate: true
         });
       }
     },
@@ -709,14 +791,50 @@ const BTRSupport = {
     spawnTracer(x, y, speed, type) {
       this.tracers.push({ startX: x, startY: y, born: performance.now(), speed: speed, len: type === 'cannon' ? 80 : 40, width: type === 'cannon' ? 3 : 1.5, type: type });
     },
+    spawnMissileJet(x, y) {
+      // 導彈推力尾焰：短暫、不膨脹、完全覆蓋
+      this.smoke.push({
+        x: x - 15, y: y,
+        vx: -100, vy: (Math.random() - 0.5) * 6,
+        life: 1, rate: 1 / 0.15,
+        sizeX: 20, sizeY: 8,
+        growX: 0, growY: 0, // 不膨脹
+        alpha0: 1.0, isJet: true, isCore: true,
+        friction: 0.8,
+        angle: 0, spin: 0, worldFactor: 0.5,
+        skipUpdate: true
+      });
+    },
+    spawnMissileSpread(x, y) {
+      // 導彈擴散尾跡：半透明、長壽命、緩慢膨脹
+      this.smoke.push({
+        x: x - 20 + (Math.random() - 0.5) * 20,
+        y: y + (Math.random() - 0.5) * 10,
+        vx: -50 + Math.random() * 20,
+        vy: (Math.random() - 0.5) * 20,
+        life: 1, rate: 1 / (2.0 + Math.random() * 1.0), // 壽命 2~3 秒
+        sizeX: 15, sizeY: 15,
+        growX: 30, growY: 30,
+        alpha0: 0.35, isJet: false, isCore: false,
+        friction: 0.95,
+        angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
+        worldFactor: 1.5,
+        skipUpdate: true
+      });
+    },
+
     update(now, dt, worldSpeed) {
       for (let i = this.smoke.length - 1; i >= 0; i--) {
         const p = this.smoke[i];
+        // [rev799] 首帧不推进（扩散烟专用：让首次 draw 画在出生点）
+        if (p.skipUpdate) { p.skipUpdate = false; continue; }
         const driftSpeed = worldSpeed * (p.worldFactor || 0);
         p.x += (p.vx - driftSpeed) * dt; 
         p.y += p.vy * dt;
-        p.vx *= p.friction;
-        p.vy *= p.friction;
+        // [rev799] friction 时间基：任何帧率下衰减曲线等效 60fps
+        const _fric = Math.pow(p.friction, dt * 60);
+        p.vx *= _fric;
+        p.vy *= _fric;
         p.sizeX += p.growX * dt; 
         p.sizeY += p.growY * dt;
         p.life -= p.rate * dt; 
@@ -730,7 +848,7 @@ const BTRSupport = {
         if (p.isJet) {
           a = p.alpha0 * Math.pow(Math.max(0, p.life), 2.0);
         } else {
-          a = p.alpha0 * Math.pow(Math.max(0, p.life), 3.0); 
+          a = p.alpha0 * Math.pow(Math.max(0, p.life), 4.0); // rev805 加快消散 // rev803 恢復快速淡出 
         }
         if (a < 0.005) continue;
         
@@ -810,7 +928,7 @@ const BTRSupport = {
     this.active = true; this.startTime = performance.now(); this.phase = 'enter'; this.phaseT = 0;
     this.yOffset = 0; this.doorOpen = 0; this.shakeX = 0; this.shakeY = 0; this.sinkOffset = 0;
     this.kills = {}; this.loot = []; this.killCount = 0; this.lastTickSec = -1;
-    this.fireFx = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = []; this.recoilStates = {};
+    this.fireFx = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = []; this.recoilStates = {}; this.missiles = [];
     this.playerClipH = 1.0; this.playerXOffset = 0; this._finished = false;
     this._setupCanvas(); this._setupStreamBg(); this._setupMuzzles(); this._setupSupportRegion();
     const self = this; this.raf = requestAnimationFrame(function(t){ self._loop(t); });
@@ -987,13 +1105,9 @@ const BTRSupport = {
     const muzzleX = basePx + m.mx * this.targetW;
     const muzzleY = basePy + m.my * this.targetH;
     
-    // 生成烟雾
+    // 生成烟雾（[rev799] 机炮/主炮/ATGM 改由 _updateRecoilSmoke 按管退进度逐帧生成）
     if (isMG) {
       this.fx.spawnMG(muzzleX, muzzleY);
-    } else if (isMain) {
-      this.fx.spawnMainGun(muzzleX, muzzleY);
-    } else {
-      this.fx.spawnCannon(muzzleX, muzzleY);
     }
 
     this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon');
@@ -1029,7 +1143,26 @@ const BTRSupport = {
     else if (m.weaponId === '2a72') { rcDist = 0.055; rcDur = 500; }
     else if (m.weaponId === '2a42') { rcDist = 0.045; rcDur = 500; }
     else if (m.weaponId === 'atgm') { rcDist = 0.040; rcDur = 600; }
-    this.recoilStates[m.weaponId] = { startTime: now, duration: rcDur, dist: rcDist };
+    const isATGM = (m.weaponId === 'atgm');
+    this.recoilStates[m.weaponId] = {
+      startTime: now, duration: rcDur, dist: rcDist,
+      _smokeActive: !isMG && !isATGM, // ATGM 不在此處生成
+      _lastJetTime: now,
+      _lastSpreadTime: now,
+      _staticMuzzleX: muzzleX,
+      _muzzleY: muzzleY,
+      _isMain: isMain
+    };
+    
+    if (isATGM) {
+      this.missiles.push({
+        x: muzzleX, y: muzzleY,
+        startTime: now,
+        lastJetTime: now,
+        lastSpreadTime: now,
+        speed: this.width * 0.8 // 約 1.25 秒飛出螢幕
+      });
+    }
     m.recoilDur = rcDur;
     m.smokeDur = isMG ? 200 : rcDur; 
   },
@@ -1044,6 +1177,79 @@ const BTRSupport = {
     return 0;
   },
 
+  // [rev799] 管退全程持续生成烟雾：位置跟随「当时炮口」
+  // 发射烟 t=0 一次（原位），扩散烟按管退进度 p ∈ [0.05, 0.98] 均匀分布
+  // [rev801] 管退全程持續生成發射煙與擴散煙
+  // [rev802] 管退全程持續生成，擴散點前移對接發射煙
+  // [rev804] 擴散點基於物理尺寸（targetW），無論是否出界皆完整計算
+  // [rev805] 擴散點拉遠，與發射煙區隔
+  _updateRecoilSmoke(now) {
+    // 實時計算基礎座標（包含抖動），修正位置脫節
+    const basePx = this.x * this.width + this.shakeX;
+    const basePy = this.height * 0.95 - (this._contentBottomRatio || 1) * this.targetH + this.yOffset + this.shakeY;
+    
+    for (const m of this.muzzles) {
+      const rs = this.recoilStates[m.weaponId];
+      if (!rs || !rs._smokeActive) continue;
+      const t = now - rs.startTime;
+      if (t < 0) continue;
+      
+      const p = Math.min(1, t / rs.duration);
+      const _rcP = p < 0.08 ? p / 0.08 : Math.pow(1 - (p - 0.08) / 0.92, 2.4);
+      const _rcPx = rs.dist * this.targetW * _rcP;
+      
+      // 實時炮口位置
+      const _muzzleXNow = basePx + m.mx * this.targetW - _rcPx;
+      const _muzzleYNow = basePy + m.my * this.targetH;
+      
+      const isMain = rs._isMain;
+      const JET_INTERVAL = isMain ? 16 : 24;
+      const SPREAD_INTERVAL = isMain ? 24 : 32;
+      const JET_MAX_TIME = isMain ? 150 : 250;
+      
+      // 導彈飛行位移：每秒前進 8 個車身寬度
+      const _jetXNow = _muzzleXNow;
+      const _jetYNow = _muzzleYNow;
+      
+      while (now - rs._lastJetTime >= JET_INTERVAL && t <= JET_MAX_TIME) {
+        this.fx.spawnJetOne(_jetXNow, _jetYNow, m.weaponId);
+        rs._lastJetTime += JET_INTERVAL;
+      }
+      
+      const SPREAD_OFFSET = isMain ? this.targetW * 0.45 : this.targetW * 0.25;
+      const _spreadXNow = _muzzleXNow + SPREAD_OFFSET;
+      while (now - rs._lastSpreadTime >= SPREAD_INTERVAL && t <= rs.duration) {
+        this.fx.spawnSpreadOne(_spreadXNow, _muzzleYNow, m.weaponId);
+        rs._lastSpreadTime += SPREAD_INTERVAL;
+      }
+      
+      if (t > rs.duration) {
+        rs._smokeActive = false;
+      }
+    }
+  },
+
+  _updateMissiles(now, dt) {
+    if (!this.missiles || !this.missiles.length) return;
+    for (let i = this.missiles.length - 1; i >= 0; i--) {
+      const mis = this.missiles[i];
+      mis.x += mis.speed * dt;
+      
+      if (mis.x > this.width + 200 || now - mis.startTime > 3000) {
+        this.missiles.splice(i, 1);
+        continue;
+      }
+      
+      if (now - mis.lastJetTime >= 16) {
+        mis.lastJetTime = now;
+        this.fx.spawnMissileJet(mis.x, mis.y);
+      }
+      if (now - mis.lastSpreadTime >= 30) {
+        mis.lastSpreadTime = now;
+        this.fx.spawnMissileSpread(mis.x, mis.y);
+      }
+    }
+  },
   _render(now) {
     const ctx = this.ctx; if (!ctx) return; ctx.clearRect(0, 0, this.width, this.height);
     const ann = ANN[this.vehicleId]; if (!ann) return;
@@ -1063,35 +1269,66 @@ const BTRSupport = {
         } else if (wid !== '__default__') { delete this.recoilStates[wid]; } 
       } 
     }
-    const dt = Math.min(0.05, (now - (this._lastTick || now)) / 1000); this._lastTick = now; const worldSpeed = this._getBTRWorldSpeed();
+    const dt = Math.min(0.05, (now - (this._lastTick || now)) / 1000); this._lastTick = now;
+    this._updateMissiles(now, dt); const worldSpeed = this._getBTRWorldSpeed();
     
-    // 烟雾生成已移动至 _fireMuzzle，此处只处理特效更新
+    // [rev799] 管退全程持续生成烟雾（位置跟随当时炮口），回位时停止
+    this._updateRecoilSmoke(now);
     this.fx.update(now, dt, worldSpeed);
     
     renderVehicle(ctx, this.vehicleId, px, py, this.targetW, this.targetH, (now - this.startTime) / 1000, { trackVel: (this.phase === 'support') ? 300 : 100, wheelSpeed: (this.phase === 'support') ? 20 : 6, doorOpen: (this.doorOpen || 0) * 180, recoils: recoilsPx });
+    
+    // [rev809] 繪製佔位導彈實體
+    if (this.missiles && this.missiles.length) {
+      for (const mis of this.missiles) {
+        ctx.save();
+        ctx.translate(mis.x + this.shakeX, mis.y + this.shakeY);
+        // 尾焰
+        ctx.fillStyle = 'rgba(255, 200, 50, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(-15, 0);
+        ctx.lineTo(-30 - Math.random()*10, -4);
+        ctx.lineTo(-30 - Math.random()*10, 4);
+        ctx.closePath();
+        ctx.fill();
+        // 彈體
+        ctx.fillStyle = '#ddd';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 12, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
     
     this.fx.draw(ctx);
     for (const fx of this.fireFx) { 
       if (fx.layerOrder !== 'above') continue; 
       this._drawOneFireFx(ctx, fx, now, px, py); 
     }
-    this.fx.drawTracers(ctx, now);
     
+this.fx.drawTracers(ctx, now);
+    
+    // [rev868] 使用共用扬尘系统
     if(!this.dustParticles) this.dustParticles = [];
-    const intensity = (this.phase === 'support') ? 0.8 : 0;
-    if(ann.wheels && intensity > 0 && Math.random() < intensity){
-      const wheel = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
-      this.dustParticles.push({ x: px + wheel.cx * this.targetW, y: py + wheel.cy * this.targetH + wheel.r * this.targetW, vx: -(1.2 + Math.random() * 3.2), vy: -(0.3 + Math.random() * 1.2), life: 1, size: 6 + Math.random() * 10, hue: 28 + Math.random() * 18 });
+    const wheelSpd = (this.phase === 'support') ? 20 : 6;
+    const intensity = (wheelSpd === 20) ? 1.0 : 0.6;
+    if(intensity > 0 && Math.random() < intensity){
+      let _dustSrc = null;
+      // [rev873] 优先使用 trackLoop（闭合环）的底部点生成扬尘
+      if (ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2) {
+        const pts = ann.trackLoop.points;
+        const bottomPts = pts.filter(function(p){ return p.y > 0.4; });
+        const srcPt = bottomPts.length ? bottomPts[Math.floor(Math.random() * bottomPts.length)] : pts[Math.floor(Math.random() * pts.length)];
+        _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
+      } else if (ann.wheels && ann.wheels.length > 0) {
+        _dustSrc = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
+      }
+      if(_dustSrc) window.spawnDust(this.dustParticles, px, py, _dustSrc, this.targetW, this.targetH, wheelSpd);
     }
-    for(let i = this.dustParticles.length - 1; i >= 0; i--){
-      const p = this.dustParticles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.06; p.vx *= 0.98; p.life -= 0.014;
-      if(p.life <= 0){ this.dustParticles.splice(i, 1); continue; }
-      ctx.fillStyle = 'hsla(' + p.hue + ',35%,48%,' + (Math.max(0, p.life) * 0.65) + ')';
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (1.5 - p.life * 0.45), 0, Math.PI * 2); ctx.fill();
-    }
+    window.updateAndDrawDust(ctx, this.dustParticles, dt);
   },
 
-                _drawOneFireFx(ctx, fx, now, px, py) {
+  _drawOneFireFx(ctx, fx, now, px, py) {
     const age = now - fx.startTime, total = fx.endTime - fx.startTime; if (age > total) return;
     const t = age / total;
     const x = fx.spawnX !== undefined ? fx.spawnX : (px + fx.mx * this.targetW);
@@ -1156,7 +1393,7 @@ const BTRSupport = {
     if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
     if(this.canvas){ this.canvas.remove(); this.canvas = null; this.ctx = null; }
     if(this.streamBgEl){ this.streamBgEl.remove(); this.streamBgEl = null; }
-    this.fireFx = []; this.muzzles = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = [];
+    this.fireFx = []; this.muzzles = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = []; this.missiles = [];
   },
   stop() { this._cleanup(); this.active = false; }
 };
@@ -1268,4 +1505,109 @@ window._openBTRSupportDetail = function(log){
   
 
 
+
+  /* ============================================================
+     [rev884] 炮口煙共用：BTRSupport.fx 與掃蕩模式都調用這 4 個函數
+     ============================================================ */
+  window.MUZZLE_PROFILES = MUZZLE_PROFILES;
+
+  window._vsMakeSmokeJet = function(x, y, weaponId){
+    const _base = 300;
+    const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
+    const isATGM = (weaponId === 'atgm');
+    if (isATGM) {
+      return { x: x + 15, y: y, vx: _base * 30, vy: (Math.random() - 0.5) * _base * 0.02,
+        life: 1, rate: 1 / 0.25, sizeX: _base * 0.2, sizeY: _base * 0.02,
+        growX: _base * 4.0, growY: _base * 0.1, alpha0: 1.0, isJet: true, isCore: true,
+        friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
+    }
+    if (isHeavy) {
+      return { x: x + 15, y: y, vx: _base * 25, vy: (Math.random() - 0.5) * _base * 0.1,
+        life: 1, rate: 1 / 0.25, sizeX: _base * 0.15, sizeY: _base * 0.05,
+        growX: _base * 10.0, growY: _base * 2.0, alpha0: 1.0, isJet: true, isCore: true,
+        friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
+    }
+    return { x: x + 10, y: y, vx: _base * 18, vy: (Math.random() - 0.5) * _base * 0.05,
+      life: 1, rate: 1 / 0.2, sizeX: _base * 0.1, sizeY: _base * 0.03,
+      growX: _base * 8.0, growY: _base * 1.5, alpha0: 1.0, isJet: true, isCore: true,
+      friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
+  };
+
+  window._vsMakeSmokeSpread = function(x, y, weaponId){
+    const _base = 300;
+    const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
+    if (isHeavy) {
+      return { x: x + (Math.random() - 0.5) * _base * 0.2, y: y + (Math.random() - 0.5) * _base * 0.2,
+        vx: (Math.random() - 0.5) * _base * 0.5, vy: (Math.random() - 0.5) * _base * 0.5,
+        life: 1, rate: 1 / (2.0 + Math.random() * 0.8), sizeX: _base * 0.3, sizeY: _base * 0.3,
+        growX: _base * 3.5, growY: _base * 3.5, alpha0: 0.22, isJet: false, isCore: false,
+        friction: 0.92, angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
+        worldFactor: 1.5, skipUpdate: true };
+    }
+    return { x: x + (Math.random() - 0.5) * _base * 0.2, y: y + (Math.random() - 0.5) * _base * 0.15,
+      vx: (Math.random() - 0.5) * _base * 0.4, vy: (Math.random() - 0.5) * _base * 0.4,
+      life: 1, rate: 1 / (1.5 + Math.random() * 0.6), sizeX: _base * 0.2, sizeY: _base * 0.2,
+      growX: _base * 2.5, growY: _base * 2.5, alpha0: 0.18, isJet: false, isCore: false,
+      friction: 0.94, angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
+      worldFactor: 1.5, skipUpdate: true };
+  };
+
+  window._vsUpdateSmoke = function(particles, dt, worldSpeed){
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      if (p.skipUpdate) { p.skipUpdate = false; continue; }
+      const driftSpeed = worldSpeed * (p.worldFactor || 0);
+      p.x += (p.vx - driftSpeed) * dt;
+      p.y += p.vy * dt;
+      const _fric = Math.pow(p.friction, dt * 60);
+      p.vx *= _fric;
+      p.vy *= _fric;
+      p.sizeX += p.growX * dt;
+      p.sizeY += p.growY * dt;
+      p.life -= p.rate * dt;
+      p.angle += p.spin * dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  };
+
+  window._vsDrawSmoke = function(ctx, particles){
+    for (const p of particles) {
+      let a = 0;
+      if (p.isJet) {
+        a = p.alpha0 * Math.pow(Math.max(0, p.life), 2.0);
+      } else {
+        a = p.alpha0 * Math.pow(Math.max(0, p.life), 4.0);
+      }
+      if (a < 0.005) continue;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      if (p.isJet) {
+        ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
+        ctx.globalAlpha = a;
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
+        g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)');
+        g.addColorStop(1, 'rgba(200, 210, 220, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.rotate(p.angle);
+        ctx.globalAlpha = a;
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeX);
+        g.addColorStop(0, 'rgba(235, 235, 240, 0.9)');
+        g.addColorStop(0.5, 'rgba(210, 210, 215, 0.2)');
+        g.addColorStop(1, 'rgba(190, 190, 195, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, p.sizeX, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  /* 改造 BTRSupport.fx 使用共用函數 */
+  BTRSupport.fx.spawnJetOne = function(x, y, weaponId){ this.smoke.push(window._vsMakeSmokeJet(x, y, weaponId)); };
+  BTRSupport.fx.spawnSpreadOne = function(x, y, weaponId){ this.smoke.push(window._vsMakeSmokeSpread(x, y, weaponId)); };
+  BTRSupport.fx.update = function(now, dt, worldSpeed){ window._vsUpdateSmoke(this.smoke, dt, worldSpeed); };
+  BTRSupport.fx.draw = function(ctx){ window._vsDrawSmoke(ctx, this.smoke); };
 })();

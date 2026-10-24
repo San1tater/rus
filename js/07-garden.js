@@ -2941,53 +2941,70 @@ function _gardenFoodTtlMs(){
   return 24 * 3600 * 1000;
 }
 
+const GARDEN_SEED_ROT_MS = 48 * 3600 * 1000;
 function _gardenStorageRotCheck(){
   if(!state.garden) return { changed: false, report: null };
-  if(!state.garden.storageBatches || typeof state.garden.storageBatches !== 'object') state.garden.storageBatches = {};
+  if(!state.garden.storageBatches || typeof state.garden.storageBatches !== "object") state.garden.storageBatches = {};
   const g = _gardenMerchantInit();
-  if(typeof g.compostValue !== 'number'){ g.compostValue = (typeof g.compostAccelSec === 'number') ? g.compostAccelSec : 0; delete g.compostAccelSec; }
+  if(typeof g.compostValue !== "number"){ g.compostValue = (typeof g.compostAccelSec === "number") ? g.compostAccelSec : 0; delete g.compostAccelSec; }
   const storage = _gardenStorageInit();
-  const hasCompost = _gardenHasPlotType('compost');
+  const hasCompost = _gardenHasPlotType("compost");
   const ttl = _gardenFoodTtlMs();
   const now = Date.now();
   const seedsToAdd = [];
   const report = { rotted: 0, composted: 0, seeds: 0, accelSec: 0 };
   let changed = false;
-  // 補全 storage 中沒有 batch 記錄的 key（視為最舊，addedAt=0）
+  /* 補全 storage 中沒有 batch 記錄的 key：
+     作物：addedAt=0（舊存檔立即腐爛，兼容原行為）
+     種子：addedAt=now（從現在開始計 48h，不立即腐爛） */
   for(const _sk in storage){
     if(storage[_sk] <= 0) continue;
-    const _sp = _sk.split('@');
-    if(!CROPS[_sp[0]]) continue;
+    const _sp = _sk.split("@");
+    const _id = _sp[0];
+    const _isCrop = (typeof CROPS !== "undefined" && CROPS[_id]);
+    const _isSeed = (typeof SEEDS !== "undefined" && SEEDS[_id]);
+    if(!_isCrop && !_isSeed) continue;
     const _cur = state.garden.storageBatches[_sk];
     if(!Array.isArray(_cur) || !_cur.length){
-      state.garden.storageBatches[_sk] = [{ count: storage[_sk], addedAt: 0 }];
+      state.garden.storageBatches[_sk] = [{ count: storage[_sk], addedAt: _isSeed ? now : 0 }];
       changed = true;
     }
   }
   for(const k in state.garden.storageBatches){
     const batches = state.garden.storageBatches[k];
     if(!Array.isArray(batches) || !batches.length){ delete state.garden.storageBatches[k]; continue; }
-    const parts = k.split('@');
-    const cropId = parts[0], rar = parts[1];
-    if(!CROPS[cropId]){ delete state.garden.storageBatches[k]; continue; }
+    const parts = k.split("@");
+    const itemId = parts[0], rar = parts[1];
+    const _isCrop = (typeof CROPS !== "undefined" && CROPS[itemId]);
+    const _isSeed = (typeof SEEDS !== "undefined" && SEEDS[itemId]);
+    if(!_isCrop && !_isSeed){ delete state.garden.storageBatches[k]; continue; }
     const keep = [];
     let removed = 0;
-    for(const b of batches){
-      if(now - b.addedAt < ttl){ keep.push(b); continue; }
-      removed += b.count;
-      report.rotted += b.count;
-      if(hasCompost){
-        const fv = cropFoodValue(cropId, rar) * b.count;
-        const accel = fv * 0.25;
-        g.compostValue = (g.compostValue || 0) + accel;
-        report.accelSec = (report.accelSec || 0) + accel;
-        report.composted += b.count;
-        let sid = null;
-        for(const sk in SEEDS){ if(SEEDS[sk].cropId === cropId){ sid = sk; break; } }
-        if(sid){
-          let seedCount = 0;
-          for(let i = 0; i < b.count; i++){ if(Math.random() < 0.2) seedCount++; }
-          if(seedCount > 0){ seedsToAdd.push({ id: sid, rarity: rar, count: seedCount }); report.seeds += seedCount; }
+    if(_isSeed){
+      /* ★ 種子：48h 到期直接刪除，不進 report（無提示） */
+      for(const b of batches){
+        if(now - b.addedAt < GARDEN_SEED_ROT_MS){ keep.push(b); continue; }
+        removed += b.count;
+      }
+    } else {
+      /* 作物：保持原邏輯（ttl → 堆肥/種子） */
+      for(const b of batches){
+        if(now - b.addedAt < ttl){ keep.push(b); continue; }
+        removed += b.count;
+        report.rotted += b.count;
+        if(hasCompost){
+          const fv = cropFoodValue(itemId, rar) * b.count;
+          const accel = fv * 0.25;
+          g.compostValue = (g.compostValue || 0) + accel;
+          report.accelSec = (report.accelSec || 0) + accel;
+          report.composted += b.count;
+          let sid = null;
+          for(const sk in SEEDS){ if(SEEDS[sk].cropId === itemId){ sid = sk; break; } }
+          if(sid){
+            let seedCount = 0;
+            for(let i = 0; i < b.count; i++){ if(Math.random() < 0.2) seedCount++; }
+            if(seedCount > 0){ seedsToAdd.push({ id: sid, rarity: rar, count: seedCount }); report.seeds += seedCount; }
+          }
         }
       }
     }
@@ -4125,7 +4142,9 @@ function _gardenFindSeedToPlant(setting){
   }
   if(!candidates.length) return null;
   candidates.sort(function(a, b){
-    return (RARITY_MULT[b.rarity] || 1) - (RARITY_MULT[a.rarity] || 1);
+    const rd = (RARITY_MULT[b.rarity] || 1) - (RARITY_MULT[a.rarity] || 1);
+    if(rd !== 0) return rd;
+    return a.count - b.count;
   });
   return candidates[0];
 }
@@ -5714,6 +5733,7 @@ function _gardenOfflineSettle(now, baseTime){
   if(!state.garden.log) state.garden.log = [];
   state.garden.log.push({ t: Date.now(), text: summary, cls: 'offline', detail: detail });
   if(state.garden.log.length > 100) state.garden.log.splice(0, state.garden.log.length - 100);
+  try { if(typeof _gardenStorageRotCheck === "function") _gardenStorageRotCheck(); } catch(e){ console.warn("[offline rot]", e); }
   } finally {
     window._gardenOfflineSettleRunning = false;
   }

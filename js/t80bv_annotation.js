@@ -1,10 +1,9 @@
-/* 載具配置：t80bv (由載具標注編輯器 v1.9 生成) */
+/* 載具配置：t80bv (由載具標注編輯器 v2.0 生成) */
 /* - 車輪完整圓形旋轉 + 遮罩下緣鏡像補全
  * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關
- * - trackLine：履帶帶子上邊界折線（履帶滾動 + 原圖擦除用），只用於履帶
- * - trackScroll：沿 trackLine 弧長參數化滾動（A 層原圖紋理 + B 層條紋，v = ω·r）
- * - 渲染順序：image → eraseOriginalTrack → trackScroll → wheels → trackMask → doors → muzzles → effects
- *   （原圖 trackLine 以下且 trackMask 以下被擦除，保護車體；履帶在輪子下層）
+ * - trackLoop：履帶環多邊形（閉合），遊戲端需按此多邊形執行擦除與貼圖
+ * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
+ * - 渲染順序：image → eraseOriginalTrack（trackLoop） → trackScroll → wheels → trackMask → doors → muzzles → effects
  */
 const VEHICLE_ANNOTATION_T80BV = {
   "id": "t80bv",
@@ -42,43 +41,35 @@ const VEHICLE_ANNOTATION_T80BV = {
       }
     ]
   },
-  "trackLine": {
+  "trackLoop": {
     "points": [
       {
-        "x": 0.0785,
-        "y": 0.6413
+        "x": 0.0689,
+        "y": 0.6522
       },
       {
-        "x": 0.078,
-        "y": 0.7811
+        "x": 0.0786,
+        "y": 0.821
       },
       {
-        "x": 0.1025,
-        "y": 0.8833
+        "x": 0.1567,
+        "y": 1
       },
       {
-        "x": 0.1697,
-        "y": 1.0061
+        "x": 0.604,
+        "y": 1
       },
       {
-        "x": 0.6078,
-        "y": 0.9951
+        "x": 0.7023,
+        "y": 0.8203
       },
       {
-        "x": 0.7001,
-        "y": 0.8064
+        "x": 0.7185,
+        "y": 0.7143
       },
       {
-        "x": 0.7158,
-        "y": 0.7124
-      },
-      {
-        "x": 0.7162,
-        "y": 0.7117
-      },
-      {
-        "x": 0.7162,
-        "y": 0.7117
+        "x": 0.7018,
+        "y": 0.6401
       }
     ]
   },

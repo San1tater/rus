@@ -1,3 +1,10 @@
+// [rev875] 繁化与共用
+// [rev873] 掃蕩共用扬尘
+// [rev868] 掃蕩颜色与共用扬尘
+// [rev867] 掃蕩共用揚塵
+// [rev866] 掃蕩共用揚塵
+// [rev865] 掃蕩颜色修复
+// [rev864] 掃蕩扬尘
 /* ============================================================
    ★★★ BOSS MODULE — 戰鬥邏輯區 ★★★
    ============================================================ */
@@ -887,7 +894,7 @@ function startBossBattle(bid){
 
 
 /* ============================================================
-   Boss 扫荡系统（rev575：zone1 内演出 + 直观弹窗）
+   Boss 掃蕩系统（rev575：zone1 内演出 + 直观弹窗）
    ============================================================ */
 
 function _bossLevel(bid){
@@ -958,7 +965,7 @@ function _rollSweepLoot(bid){
   return result;
 }
 
-/* ★ 扫荡弹窗：参考建筑升级页 style */
+/* ★ 掃蕩弹窗：参考建筑升级页 style */
 function _openSweepDialog(bid){
   const sw = _sweepMaxCount(bid);
   if(sw.max <= 0){
@@ -995,7 +1002,7 @@ function _openSweepDialog(bid){
 
   const _fmt = function(n){ return Math.floor(n); };
   const _renderTotals = function(c){
-    // 总计消耗（每次 × c → 剩余）
+    // 總計消耗（每次 × c → 剩餘）
     const totalSeals = sw.perSeals * c;
     const totalLiq = sw.perLiquor * c;
     const totalAmmo = sw.perAmmo * c;
@@ -1096,7 +1103,7 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
   var PLAYER_FACTOR = 0.667;
   var RATIO_EXPLORE = 0.99 / 0.58;
   var vehH = PLAYER_SPRITE_H * PLAYER_FACTOR * RATIO_EXPLORE;
-  var ann = (typeof ANN !== "undefined") ? ANN[vid] : null;
+  var ann = (window.VEHICLE_ANNOTATIONS && window.VEHICLE_ANNOTATIONS[vid]) ? window.VEHICLE_ANNOTATIONS[vid] : null;
   var imgW = (ann && ann.imageSize) ? ann.imageSize.w : 640;
   var imgH = (ann && ann.imageSize) ? ann.imageSize.h : 240;
   var vehW = vehH * (imgW / imgH);
@@ -1113,9 +1120,11 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
   bossCanvas.width = BOSS_W; bossCanvas.height = BOSS_H;
   bossCanvas.style.cssText = "position:absolute;bottom:0;left:" + BOSS_START_PCT + "%;transform:translateX(-50%);width:" + BOSS_W + "px;height:" + BOSS_H + "px;opacity:0;transition:opacity 0.25s ease-out;will-change:left,transform;";
   try { var bctx = bossCanvas.getContext("2d"); drawBlockBoss(bctx, BOSS_W, BOSS_H, bid, "idle", 0); } catch(e){}
-  var veh = document.createElement("img");
-  veh.src = "icons/vehicles/" + vid + ".png" + (typeof assetSuffix === "function" ? assetSuffix() : "");
+  var veh = document.createElement("canvas");
+  veh.width = Math.max(1, Math.floor(vehW));
+  veh.height = Math.max(1, Math.floor(vehH));
   veh.style.cssText = "position:absolute;bottom:0;left:-50%;width:" + vehW + "px;height:" + vehH + "px;transform:translateX(-50%);will-change:left;";
+  var _vehCtx = veh.getContext("2d");
   var fireCanvas = document.createElement("canvas");
   fireCanvas.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:5;";
   fireCanvas.width = ZW; fireCanvas.height = ZH;
@@ -1143,6 +1152,22 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
   var startTime = performance.now();
   var lastFireAt = 0;
   var sweepSmoke = [], sweepTracers = [];
+
+  // [rev884] 掃蕩模式改用真實 muzzles + MUZZLE_PROFILES + 共用煙霧
+  var _sweepMuzzles = [];
+  if(ann && ann.muzzles && ann.muzzles.length){
+    for(var _mi = 0; _mi < ann.muzzles.length; _mi++){
+      var _md = ann.muzzles[_mi];
+      var _prof = (typeof window.MUZZLE_PROFILES !== 'undefined' && window.MUZZLE_PROFILES[_md.weaponId]) ? window.MUZZLE_PROFILES[_md.weaponId] : ((window.MUZZLE_PROFILES && window.MUZZLE_PROFILES.default) || { burst: 3, intervalMs: 100, pauseMs: 300 });
+      _sweepMuzzles.push({ weaponId: _md.weaponId, mx: _md.x, my: _md.y, profile: _prof, shotsLeft: _prof.burst, nextFireAt: 0 });
+    }
+  }
+  if(!_sweepMuzzles.length){
+    _sweepMuzzles.push({ weaponId: '__default__', mx: 0.85, my: 0.17, profile: ((window.MUZZLE_PROFILES && window.MUZZLE_PROFILES.default) || { burst: 3, intervalMs: 100, pauseMs: 300 }), shotsLeft: 3, nextFireAt: 0 });
+  }
+
+  window._sweepDustParticles = [];
+  if(!window._sweepDust) window._sweepDust = [];
   var _getSweepTex = function() {
     var c = document.createElement('canvas'); c.width = 128; c.height = 128;
     var cx = c.getContext('2d');
@@ -1183,6 +1208,17 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
           bossRot = Math.min(1, pushed / pushTotal) * 25; 
       }
       veh.style.left = vehX + "%"; 
+      if (typeof window.VehicleRenderer !== "undefined" && window.VEHICLE_ANNOTATIONS && window.VEHICLE_ANNOTATIONS[vid]) {
+        try {
+          _vehCtx.clearRect(0, 0, veh.width, veh.height);
+          window.VehicleRenderer.render(_vehCtx, vid, 0, 0, veh.width, veh.height, (now - startTime) / 1000, {
+            trackVel: 300,
+            wheelSpeed: 20,
+            doorOpen: 0,
+            recoils: {}
+          });
+        } catch(e) { console.warn("[sweep veh render]", e); }
+      }
       bossCanvas.style.left = bossX + "%";
       if(bossRot > 0){ bossCanvas.style.transform = "translateX(-50%) rotate(" + bossRot + "deg)"; }
       var dt = Math.min(0.05, (now - (window._sweepLastTick || now)) / 1000); 
@@ -1190,71 +1226,58 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
       var vehCenterPx = (vehX / 100) * ZW; 
       var muzzleXPx = vehCenterPx + vehW * 0.35; 
       var muzzleYPx = ZH - vehH + vehH * 0.17;
-      var worldSpeed = SWEEP_SPEED_PX_PER_SEC;
-                                    if(t >= FADE_IN_MS && elapsed < totalMoveMs && now - lastFireAt >= FIRE_INTERVAL){
-        lastFireAt = now;
-        sweepTracers.push({ startX: muzzleXPx, startY: muzzleYPx, born: now, speed: 2500, len: 100, width: 3 });
-        
-        const _base = vehW || 300;
-        // 1. 锥形发射烟
-        sweepSmoke.push({ 
-          x: muzzleXPx, y: muzzleYPx, 
-          vx: _base * 25, vy: (Math.random()-0.5)*10, 
-          life: 1, rate: 1/0.3, 
-          sizeX: _base * 0.15, sizeY: _base * 0.03, 
-          growX: _base * 5.0, growY: _base * 1.0, 
-          alpha0: 0.95, friction: 0.65, isJet: true, angle: 0, spin: 0, worldFactor: 0.1
-        });
-        // 2. 弥散烟
-        for(let i=0; i<4; i++) {
-          sweepSmoke.push({ 
-            x: muzzleXPx + _base * 0.15, y: muzzleYPx + (Math.random()-0.5)*20, 
-            vx: _base * 4 + Math.random()*_base*2, vy: (Math.random()-0.5)*30, 
-            life: 1, rate: 1/(1.2 + Math.random()*0.6), 
-            sizeX: _base * 0.15, sizeY: _base * 0.15, 
-            growX: _base * 0.8, growY: _base * 0.8, 
-            alpha0: 0.15, friction: 0.94, isJet: false, angle: Math.random()*6.28, spin: (Math.random()-0.5)*0.5, worldFactor: 1.0
-          });
+      
+var worldSpeed = SWEEP_SPEED_PX_PER_SEC;
+      if(t >= FADE_IN_MS && elapsed < totalMoveMs){
+        var _vehLeftPx = vehCenterPx - vehW / 2;
+        var _vehTopPx = ZH - vehH;
+        for(var _mi2 = 0; _mi2 < _sweepMuzzles.length; _mi2++){
+          var _mz = _sweepMuzzles[_mi2];
+          if(now < _mz.nextFireAt) continue;
+          _mz.nextFireAt = now + (_mz.shotsLeft > 1 ? _mz.profile.intervalMs : _mz.profile.pauseMs);
+          _mz.shotsLeft--;
+          if(_mz.shotsLeft <= 0) _mz.shotsLeft = _mz.profile.burst;
+          var _mxPx = _vehLeftPx + _mz.mx * vehW;
+          var _myPx = _vehTopPx + _mz.my * vehH;
+          if(typeof window._vsMakeSmokeJet === 'function'){
+            sweepSmoke.push(window._vsMakeSmokeJet(_mxPx, _myPx, _mz.weaponId));
+            for(var _si2 = 0; _si2 < 4; _si2++){
+              sweepSmoke.push(window._vsMakeSmokeSpread(_mxPx + vehW * 0.04, _myPx, _mz.weaponId));
+            }
+          }
+          sweepTracers.push({ startX: _mxPx, startY: _myPx, born: now, speed: 2500, len: 100, width: 3 });
         }
       }
-
-      for(var i = sweepSmoke.length - 1; i >= 0; i--){
-        var p = sweepSmoke[i]; 
-        const driftSpeed = worldSpeed * (p.worldFactor || 0);
-        p.x += (p.vx - driftSpeed) * dt; 
-        p.y += p.vy * dt;
-        p.vx *= p.friction; p.vy = p.vy * 0.95; 
-        p.sizeX += p.growX * dt; p.sizeY += p.growY * dt;
-        p.life -= p.rate * dt; p.angle += p.spin * dt;
-        if(p.life <= 0) sweepSmoke.splice(i, 1);
+      
+if(typeof window._vsUpdateSmoke === 'function'){
+        window._vsUpdateSmoke(sweepSmoke, dt, worldSpeed);
       }
       fcCtx.clearRect(0, 0, ZW, ZH);
-      for(var i = 0; i < sweepSmoke.length; i++){
-        var p = sweepSmoke[i]; 
-        var a = p.isJet ? (p.alpha0 * Math.pow(Math.max(0, p.life), 2.0)) : (p.alpha0 * Math.pow(Math.max(0, p.life), 3.0));
-        if(a < 0.005) continue;
-        fcCtx.globalAlpha = a; 
-        fcCtx.save(); fcCtx.translate(p.x, p.y); 
-        if (p.isJet) {
-          fcCtx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
-          const g = fcCtx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
-          g.addColorStop(0, 'rgba(255, 255, 255, 1)');
-          g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)');
-          g.addColorStop(1, 'rgba(200, 210, 220, 0)');
-          fcCtx.fillStyle = g;
-          fcCtx.beginPath(); fcCtx.arc(0, 0, p.sizeY, 0, Math.PI * 2); fcCtx.fill();
-        } else {
-          fcCtx.rotate(p.angle);
-          const g = fcCtx.createRadialGradient(0, 0, 0, 0, 0, p.sizeX);
-          g.addColorStop(0, 'rgba(235, 235, 240, 0.9)');
-          g.addColorStop(0.5, 'rgba(210, 210, 215, 0.2)');
-          g.addColorStop(1, 'rgba(190, 190, 195, 0)');
-          fcCtx.fillStyle = g;
-          fcCtx.beginPath(); fcCtx.arc(0, 0, p.sizeX, 0, Math.PI * 2); fcCtx.fill();
+      
+            // [rev878] 掃蕩揚塵：優先 trackLoop 底部點，走共用 spawnDust
+      if(!window._sweepDustParticles) window._sweepDustParticles = [];
+      if (ann && elapsed < totalMoveMs && Math.random() < 0.8) {
+        let _dustSrc = null;
+        if (ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2) {
+          const pts = ann.trackLoop.points;
+          const bottomPts = pts.filter(function(p){ return p.y > 0.4; });
+          const srcPt = bottomPts.length
+            ? bottomPts[Math.floor(Math.random() * bottomPts.length)]
+            : pts[Math.floor(Math.random() * pts.length)];
+          _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
+        } else if (ann.wheels && ann.wheels.length > 0) {
+          _dustSrc = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
         }
-        fcCtx.restore();
+        if (_dustSrc) {
+          window.spawnDust(window._sweepDustParticles, vehCenterPx - vehW/2, ZH - vehH, _dustSrc, vehW, vehH, 20);
+        }
       }
-fcCtx.globalAlpha = 1; fcCtx.save(); fcCtx.shadowColor = 'rgba(255,200,50,0.8)'; fcCtx.shadowBlur = 10;
+      window.updateAndDrawDust(fcCtx, window._sweepDustParticles, dt);
+      
+if(typeof window._vsDrawSmoke === 'function'){
+        window._vsDrawSmoke(fcCtx, sweepSmoke);
+      }
+      fcCtx.globalAlpha = 1; fcCtx.save(); fcCtx.shadowColor = 'rgba(255,200,50,0.8)'; fcCtx.shadowBlur = 10;
       for(var i = sweepTracers.length - 1; i >= 0; i--){
         var tr = sweepTracers[i]; var tipX = tr.startX + (now - tr.born)/1000 * tr.speed;
         if(tipX - tr.len > ZW + 200) { sweepTracers.splice(i, 1); continue; }

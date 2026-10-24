@@ -2523,6 +2523,7 @@ function buildingTick(){
   processCrafting();
   if(typeof _gardenMealTick === 'function'){ try{ _gardenMealTick(now); }catch(e){ console.warn('[buildingTick meal]', e); } }
   if(typeof _gardenFarmBackgroundTick === 'function'){ try{ _gardenFarmBackgroundTick(now); }catch(e){ console.warn('[buildingTick farm]', e); } }
+  if(typeof _gardenStorageRotCheck === "function"){ try{ _gardenStorageRotCheck(); }catch(e){ console.warn('[buildingTick rot]', e); } }
 }
 function processCrafting(){
   if(!state.crafting||!state.crafting.length)return;

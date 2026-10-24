@@ -1,3 +1,4 @@
+/* [rev819] 回滚滚动条显示 */
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;font-size:12px;touch-action:manipulation;user-select:none;overscroll-behavior:none}
@@ -1255,3 +1256,640 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 
 /* rev646: 標題欄空隙 —— 升級按鈕與全局經驗之間 */
 .garage-title > .garage-global-exp{margin-left:12px !important;}
+
+
+/* [rev811] 車場全新 UI */
+#garage-page {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  bottom: 54px; /* 留出底部導航欄 */
+  z-index: 9200;
+  background: #0e0c0a;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+#garage-page.on { display: flex; }
+
+.garage-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 6px;
+  gap: 6px;
+}
+
+/* 大圖展示區 */
+.garage-showcase {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: #1a1510 url("icons/vehicles/card_bg.png") center/cover no-repeat;
+  border: 1px solid #2a231c;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.garage-showcase img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.2s;
+}
+.garage-showcase:active img { transform: scale(0.98); }
+
+.garage-global-exp {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(14,12,10,0.8);
+  border: 1px solid #3a2f25;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #a45ede;
+  font-weight: bold;
+  font-family: Menlo, Consolas, monospace;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.garage-vehicle-name-bar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #e8a33d;
+  background: rgba(14,12,10,0.8);
+  border: 1px solid #3a2f25;
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.garage-camo-hint {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 16px;
+  opacity: 0.5;
+  z-index: 3;
+}
+
+/* 信息懸浮層 */
+.garage-info-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(0deg, rgba(14,12,10,0.95) 0%, rgba(14,12,10,0.8) 60%, transparent 100%);
+  padding: 20px 12px 10px;
+  pointer-events: none;
+}
+.garage-info-overlay .garage-stat-row {
+  display: inline-block;
+  margin-right: 12px;
+  font-size: 11px;
+  color: #e8a33d;
+}
+.garage-info-overlay .garage-stat-row .k { color: #7a6f60; margin-right: 4px; }
+.garage-history-desc {
+  font-size: 10px;
+  color: #a89a85;
+  margin-top: 6px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 底部 Dock */
+.garage-dock {
+  flex: 0 0 160px; /* 固定高度，吃掉剩余空間 */
+  display: flex;
+  flex-direction: column;
+  background: #151210;
+  border: 1px solid #2a231c;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.garage-dock-tabs {
+  display: flex;
+  height: 32px;
+  background: #1a1510;
+  border-bottom: 1px solid #2a231c;
+}
+.garage-tab {
+  flex: 1;
+  text-align: center;
+  line-height: 32px;
+  font-size: 11px;
+  color: #7a6f60;
+  cursor: pointer;
+}
+.garage-tab.on {
+  color: #e8a33d;
+  background: #2a1f10;
+  border-bottom: 2px solid #e8a33d;
+}
+
+.garage-dock-list {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px;
+  gap: 8px;
+  scrollbar-width: none;
+}
+.garage-dock-list::-webkit-scrollbar { display: none; }
+
+.garage-dock-card {
+  flex: 0 0 100px;
+  height: 100%;
+  max-height: 100px;
+  background: #1a1510;
+  border: 2px solid #2a231c;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s;
+}
+.garage-dock-card:active { transform: scale(0.95); }
+.garage-dock-card.current { border-color: #e8a33d; background: #2a1f10; }
+.garage-dock-card.owned { border-color: #4caf50; }
+.garage-dock-card.researching { border-color: #a45ede; background: #1f1528; }
+.garage-dock-card.locked { opacity: 0.4; }
+.garage-dock-card.tech-tree { border-color: #3a2a5a; background: #171222; }
+
+.gd-img {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 24px;
+}
+.gd-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.gd-name {
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gd-mark {
+  position: absolute;
+  top: 2px; right: 2px;
+  font-size: 12px;
+}
+
+/* [rev814] 車場保留原卡片結構，增加 Dock */
+#garage-page {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  bottom: 54px !important; /* 露出底部導航 */
+  z-index: 9200 !important;
+  background: #0e0c0a !important;
+  display: none !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+#garage-page.on { display: flex !important; }
+
+/* 原有大圖展示區 (相對定位以便加入全局經驗) */
+.garage-showcase {
+  position: relative !important;
+  cursor: pointer !important;
+}
+.garage-global-exp {
+  position: absolute !important;
+  top: 6px !important;
+  right: 6px !important;
+  background: rgba(14,12,10,0.85) !important;
+  border: 1px solid #3a2f25 !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
+  font-size: 11px !important;
+  color: #a45ede !important;
+  font-weight: bold !important;
+  font-family: Menlo, Consolas, monospace !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+/* 底部選車 Dock (分配剩餘空間) */
+.garage-dock {
+  flex: 1 1 0 !important;
+  min-height: 120px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #151210 !important;
+  border-top: 1px solid #2a231c !important;
+  overflow: hidden !important;
+}
+.garage-dock-tabs {
+  display: flex !important;
+  height: 34px !important;
+  background: #1a1510 !important;
+  border-bottom: 1px solid #2a231c !important;
+  flex: 0 0 auto !important;
+}
+.garage-tab {
+  flex: 1 !important;
+  text-align: center !important;
+  line-height: 34px !important;
+  font-size: 11px !important;
+  color: #7a6f60 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+.garage-tab.on {
+  color: #e8a33d !important;
+  background: #2a1f10 !important;
+  border-bottom: 2px solid #e8a33d !important;
+}
+.garage-dock-list {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 6px 8px !important;
+  gap: 8px !important;
+  scrollbar-width: none !important;
+}
+.garage-dock-list::-webkit-scrollbar { display: none !important; }
+
+.garage-dock-card {
+  flex: 0 0 88px !important;
+  height: 100% !important;
+  max-height: 100px !important;
+  background: #1a1510 !important;
+  border: 2px solid #2a231c !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  position: relative !important;
+  transition: transform 0.1s !important;
+  box-sizing: border-box !important;
+}
+.garage-dock-card:active { transform: scale(0.95) !important; }
+.garage-dock-card.current { border-color: #e8a33d !important; background: #2a1f10 !important; }
+.garage-dock-card.owned { border-color: #4caf50 !important; }
+.garage-dock-card.researching { border-color: #a45ede !important; background: #1f1528 !important; }
+.garage-dock-card.locked { opacity: 0.4 !important; }
+.garage-dock-card.tech-tree { border-color: #3a2a5a !important; background: #171222 !important; }
+
+.gd-img {
+  flex: 1 !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  font-size: 24px !important;
+}
+.gd-img img { max-width: 100% !important; max-height: 100% !important; object-fit: contain !important; }
+.gd-name {
+  width: 100% !important;
+  text-align: center !important;
+  font-size: 10px !important;
+  font-weight: bold !important;
+  color: #ddd !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.gd-mark {
+  position: absolute !important;
+  top: 2px !important; right: 2px !important;
+  font-size: 12px !important;
+}
+
+/* [rev815] 修復高度壓縮，Dock 固定高度 */
+.garage-dock {
+  flex: 0 0 110px !important; /* 固定高度，不再搶佔空間 */
+  display: flex !important;
+  flex-direction: column !important;
+  background: #151210 !important;
+  border-top: 1px solid #2a231c !important;
+  overflow: hidden !important;
+}
+
+/* 確保大圖區域能正常撐開 */
+.garage-main {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 6px 8px !important;
+  gap: 6px !important;
+  overflow: hidden !important;
+}
+
+.garage-showcase {
+  flex: 1 1 0 !important; /* 自動填滿剩餘高度 */
+}
+
+/* [rev816] 弹性高度分配 */
+.garage-main {
+  flex: 1 1 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 6px 8px !important;
+  gap: 6px !important;
+  min-height: 0 !important;
+}
+.garage-showcase {
+  flex: 1.5 !important; /* 大图比例最大 */
+}
+.garage-bottom {
+  flex: 1 !important; /* 左右信息栏比例次之 */
+  min-height: 0 !important;
+}
+.garage-dock {
+  flex: 1 !important; /* 选车区域占据剩余空间 */
+  display: flex !important;
+  flex-direction: column !important;
+  background: #151210 !important;
+  border-top: 1px solid #2a231c !important;
+  overflow: hidden !important;
+}
+
+/* 让空研发区域可点击 */
+#garage-research-empty {
+  cursor: pointer !important;
+  text-align: center !important;
+  padding: 10px 0 !important;
+  line-height: 1.5 !important;
+}
+
+/* [rev817] 弹性高度分配彻底修复 */
+.garage-main {
+  flex: 1 1 0 !important; /* 占据除了 Dock 之外的所有剩余高度 */
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 6px 8px !important;
+  gap: 6px !important;
+  min-height: 0 !important;
+}
+.garage-showcase {
+  flex: 1 !important; /* 大图吃掉剩余高度 */
+}
+.garage-bottom {
+  flex: 0 0 auto !important; /* 原版自适应内容高度 */
+}
+.garage-dock {
+  flex: 0 0 30vh !important; /* 占据固定视口比例的高度，不再抢原卡片的空间 */
+  display: flex !important;
+  flex-direction: column !important;
+  background: #151210 !important;
+  border-top: 1px solid #2a231c !important;
+  overflow: hidden !important;
+}
+
+/* 让空研发区域可点击 */
+#garage-research-empty {
+  cursor: pointer !important;
+  text-align: center !important;
+  padding: 10px 0 !important;
+  line-height: 1.5 !important;
+}
+
+/* [rev818] 卡片背景、等比缩放与滚动条 */
+.garage-dock-card {
+  background: #1a1510 url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+.gd-img {
+  flex: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+.gd-img img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+/* [rev819] 已移除滚动条样式，恢复隐藏 */
+
+/* [rev820] 统一卡片背景与状态 */
+/* 强制所有卡片使用背景图，移除纯色覆盖 */
+.garage-dock-card {
+  background: #1a1510 url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 当前装备：金色边框 + 轻微高亮遮罩 */
+.garage-dock-card.current {
+  border-color: #e8a33d !important;
+  box-shadow: inset 0 0 20px rgba(232, 163, 61, 0.3) !important;
+  background: linear-gradient(rgba(232, 163, 61, 0.15), rgba(232, 163, 61, 0.15)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 已拥有但未装备：绿色边框 */
+.garage-dock-card.owned {
+  border-color: #4caf50 !important;
+}
+
+/* 研发中：紫色边框 + 紫色高亮遮罩 */
+.garage-dock-card.researching {
+  border-color: #a45ede !important;
+  background: linear-gradient(rgba(164, 94, 222, 0.2), rgba(164, 94, 222, 0.2)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 未解锁：半透明 */
+.garage-dock-card.locked {
+  opacity: 0.4 !important;
+}
+
+/* [rev821] 彻底隐藏滚动条 */
+.garage-dock-list::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.garage-dock-list {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* [rev821] 统一卡片背景与状态 */
+/* 所有卡片基础背景 */
+.garage-dock-card {
+  background: #1a1510 url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 当前装备：金色边框 + 高亮遮罩 */
+.garage-dock-card.current {
+  border-color: #e8a33d !important;
+  background: linear-gradient(rgba(232, 163, 61, 0.15), rgba(232, 163, 61, 0.15)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 已拥有：绿色边框 */
+.garage-dock-card.owned {
+  border-color: #4caf50 !important;
+}
+
+/* 研发中：紫色边框 + 紫色遮罩 */
+.garage-dock-card.researching {
+  border-color: #a45ede !important;
+  background: linear-gradient(rgba(164, 94, 222, 0.2), rgba(164, 94, 222, 0.2)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 未解锁：半透明 */
+.garage-dock-card.locked {
+  opacity: 0.4 !important;
+}
+
+/* [rev823] 彻底隐藏滚动条 */
+.garage-dock-list::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.garage-dock-list {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* [rev823] 统一卡片背景与状态 */
+/* 所有卡片基础背景 */
+.garage-dock-card {
+  background: #1a1510 url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 当前装备：金色边框 + 高亮遮罩 */
+.garage-dock-card.current {
+  border-color: #e8a33d !important;
+  background: linear-gradient(rgba(232, 163, 61, 0.15), rgba(232, 163, 61, 0.15)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 已拥有：绿色边框 */
+.garage-dock-card.owned {
+  border-color: #4caf50 !important;
+}
+
+/* 研发中：紫色边框 + 紫色遮罩 */
+.garage-dock-card.researching {
+  border-color: #a45ede !important;
+  background: linear-gradient(rgba(164, 94, 222, 0.2), rgba(164, 94, 222, 0.2)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+
+/* 未解锁：半透明 */
+.garage-dock-card.locked {
+  opacity: 0.4 !important;
+}
+
+/* [rev824] 卡片铺满与去除滚动条 */
+/* 1. 确保 dock 卡片按高度撑满，宽度等比放大 */
+.garage-dock-list {
+  align-items: stretch !important;
+  padding: 4px 8px !important;
+}
+.garage-dock-card {
+  height: 100% !important;
+  max-height: none !important;
+  aspect-ratio: 4 / 3 !important;
+  flex: 0 0 auto !important;
+}
+.gd-img {
+  padding: 4px !important;
+}
+
+/* 2. 缩小详情页大图，避免弹窗内容过高出现滚动条 */
+.garage-tech-detail-img-wrap {
+  height: 110px !important;
+  margin-bottom: 6px !important;
+}
+.garage-tech-detail-name {
+  top: 4px !important;
+  left: 4px !important;
+  padding: 1px 6px !important;
+  font-size: 10px !important;
+}
+/* 调整弹窗内部各行的间距，减少高度占用 */
+.tech-detail-row {
+  font-size: 10px !important;
+  line-height: 1.4 !important;
+}
+.tech-detail-status {
+  font-size: 10px !important;
+}
+.tech-detail-action {
+  padding: 5px 4px !important;
+  font-size: 11px !important;
+  margin-top: 6px !important;
+}
+.modal-bd-inner {
+  padding: 8px 12px !important;
+}
+
+/* [rev825] 卡片铺满与去除滚动条 */
+/* 1. 确保 dock 卡片按高度撑满，宽度等比放大 */
+.garage-dock-list {
+  align-items: stretch !important;
+  padding: 4px 8px !important;
+}
+.garage-dock-card {
+  height: 100% !important;
+  max-height: none !important;
+  aspect-ratio: 4 / 3 !important;
+  flex: 0 0 auto !important;
+}
+.gd-img {
+  padding: 4px !important;
+}
+
+/* 2. 彻底去除载具详情弹窗的滚动条 */
+.modal .modal-bd-inner {
+  overflow: hidden !important;
+}
+.modal .modal-bd-inner::-webkit-scrollbar {
+  display: none !important;
+}
+/* 稍微缩小内部元素的间距和尺寸，确保小屏不溢出 */
+.garage-tech-detail-img-wrap {
+  height: 100px !important;
+  margin-bottom: 4px !important;
+}
+.garage-tech-detail-cols {
+  gap: 8px !important;
+}
+.tech-detail-row {
+  padding: 1px 0 !important;
+}
+.garage-tech-detail-col-title {
+  margin-bottom: 2px !important;
+}
+.tech-detail-action {
+  margin-top: 4px !important;
+}
+
+/* [rev874] 强制电台字体 */
+.radio-btn { font-size: 9px !important; font-weight: bold; }

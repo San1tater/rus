@@ -1,3 +1,4 @@
+// [rev825] 修復導航切換與車場關閉
 /* ============================================================
    06-core.js — 啟動 / 路由 / 全局事件
    由 06-part.js 拆解而來（rev343）
@@ -36,6 +37,8 @@ $$('.tab').forEach(t=>{
     if(_prevTab === 'garden' && _nextTab !== 'garden'){
       if(typeof closeGarden === 'function') closeGarden();
     }
+    /* [rev825] 關閉車場覆蓋層 */
+    if(typeof closeGaragePage === 'function'){ closeGaragePage(); }
     currentTab=_nextTab;
     if(currentTab==='base') _regionScrollPos=0;
     $$('.tab').forEach(x=>x.classList.toggle('active',x===t));
