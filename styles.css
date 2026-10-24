@@ -1037,7 +1037,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .wt-tech-wrap::-webkit-scrollbar{display:none;width:0;height:0}
 .wt-tech-wrap::-webkit-scrollbar-track{background:transparent}
 .wt-tech-wrap::-webkit-scrollbar-thumb{background:transparent;border:none}
-.wt-tech-canvas{position:relative;width:320px;height:438px;flex:0 0 auto}
+.wt-tech-canvas{position:relative;width:320px;height:438px;flex:0 0 auto;margin:0 auto}
 .wt-node{position:absolute;background:#1a1510;border:2px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px 3px;box-sizing:border-box;cursor:pointer;user-select:none;overflow:hidden;transition:transform .1s,border-color .15s,box-shadow .15s}
 .wt-node:active{transform:scale(.95)}
 .wt-node-img{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -1162,8 +1162,8 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 #btr-support-canvas{z-index:1 !important}
 
 
-/* rev570: no horizontal scrollbar on tech tree */
-.wt-tech-wrap{overflow-x:hidden !important;overflow-y:auto !important}
+/* [rev-fix-ms] rev570 允许科技树窄屏横向滑动（滚动条隐藏规则见 rev561i 段落） */
+.wt-tech-wrap{overflow-x:auto !important;overflow-y:auto !important}
 
 /* rev600: 載具卡片統一背景圖（科技樹節點 / 車場展示 / 研發目標） */
 .wt-node-img,
@@ -1464,7 +1464,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 #garage-page {
   position: fixed !important;
   top: 0 !important; left: 0 !important; right: 0 !important;
-  bottom: 54px !important; /* 露出底部導航 */
+  bottom: calc(54px + env(safe-area-inset-bottom, 0px)) !important; /* 露出底部導航 + 安全區 */
   z-index: 9200 !important;
   background: #0e0c0a !important;
   display: none !important;
@@ -1788,9 +1788,16 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
   padding: 4px !important;
 }
 
-/* 2. 彻底去除载具详情弹窗的滚动条 */
+/* [rev-fix-ms] 恢复弹窗内容区垂直滚动 + 隐藏滚动条
+   （rev825 原规则使用通用选择器 .modal .modal-bd-inner 造成所有弹窗禁滑，此处仅修正此规则本体） */
 .modal .modal-bd-inner {
-  overflow: hidden !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 .modal .modal-bd-inner::-webkit-scrollbar {
   display: none !important;
@@ -1816,58 +1823,156 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 /* [rev874] 强制电台字体 */
 .radio-btn { font-size: 9px !important; font-weight: bold; }
 
-/* [rev889] 車場車輛選擇區域與上方區域對齊 */
+/* [rev-garage-final] 車場三層佈局：showcase 28vh + bottom max-content + dock 填滿剩餘 */
+#garage-page {
+  padding: 6px 8px !important;
+  gap: 6px !important;
+}
+#garage-page .garage-main {
+  flex: 0 0 auto !important;
+  padding: 0 !important;
+  gap: 6px !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+#garage-page .garage-showcase {
+  flex: 0 0 28vh !important;
+  height: 28vh !important;
+  min-height: 0 !important;
+  max-height: 28vh !important;
+  box-sizing: border-box !important;
+}
+#garage-page .garage-bottom {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+#garage-page .garage-bottom-left,
+#garage-page .garage-bottom-right {
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+}
+#garage-page .garage-bottom-right {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+#garage-page .garage-research-wrap {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+#garage-page .garage-research-img-wrap {
+  flex: 1 1 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
 #garage-page .garage-dock {
-  margin: 0 8px 6px !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
   border: 1px solid #2a231c !important;
   border-radius: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
 }
-
-/* [rev890] 車場卡片改上下兩列（橫向滾動） */
-#garage-page .garage-dock {
-  flex: 0 0 22vh !important;
+#garage-page .garage-dock-tabs {
+  flex: 0 0 34px !important;
+  border-bottom: 1px solid #2a231c !important;
+  box-sizing: border-box !important;
 }
 #garage-page .garage-dock-list {
-  display: grid !important;
-  grid-template-rows: 1fr 1fr !important;
-  grid-auto-flow: column !important;
-  grid-auto-columns: 84px !important;
-  align-items: stretch !important;
-  padding: 4px 8px !important;
-  gap: 6px !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: wrap !important;
+  align-items: flex-start !important;
+  align-content: flex-start !important;
+  column-gap: 8px !important;
+  row-gap: 8px !important;
+  padding: 6px 8px !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  box-sizing: border-box !important;
+}
+#garage-page .garage-dock-list::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 #garage-page .garage-dock-card {
-  height: 100% !important;
-  max-height: none !important;
-  aspect-ratio: auto !important;
-  flex: none !important;
+  /* flex column 主軸 = 高度；每張卡片高度 = (可用高 - row gap) / 2 */
+  flex: 0 0 calc((100% - 8px) / 2) !important;
+  /* 寬度由 aspect-ratio 自動推導 = 高度 × 2 */
+  aspect-ratio: 2 / 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  align-self: flex-start !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  background: #1a1510 url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+  border: 2px solid #2a231c !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  position: relative !important;
+  transition: transform 0.1s !important;
 }
-
-/* [rev891] 還原 dock 高度，僅保留兩列卡片 */
-#garage-page .garage-dock {
-  flex: 0 0 30vh !important;
+#garage-page .garage-dock-card:active {
+  transform: scale(0.95) !important;
 }
-
-/* [rev-sweepHeight-fix] 科技樹窄屏水平滑動支援（無滾動條） */
-/* 原 rev570 強制 overflow-x:hidden 導致手機窄屏無法滑動查看；
-   此處放開水平滾動、改 margin:0 auto 讓畫布寬屏居中 / 窄屏左對齊可滑動；
-   保留 scrollbar-width:none + ::-webkit-scrollbar{display:none} 以隱藏滾動條 */
-.wt-tech-wrap{
-  display:block !important;
-  max-height:calc(82vh - 80px) !important;
-  overflow-x:auto !important;
-  overflow-y:auto !important;
-  -webkit-overflow-scrolling:touch !important;
-  touch-action:pan-x pan-y !important;
-  scrollbar-width:none !important;
-  -ms-overflow-style:none !important;
-  padding:8px 4px !important;
+#garage-page .garage-dock-card.current {
+  border-color: #e8a33d !important;
+  background: linear-gradient(rgba(232, 163, 61, 0.15), rgba(232, 163, 61, 0.15)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
 }
-.wt-tech-wrap::-webkit-scrollbar{display:none !important;width:0 !important;height:0 !important}
-.wt-tech-wrap::-webkit-scrollbar-track{background:transparent !important}
-.wt-tech-wrap::-webkit-scrollbar-thumb{background:transparent !important;border:none !important}
-.wt-tech-wrap .wt-tech-canvas{
-  margin:0 auto !important;
+#garage-page .garage-dock-card.owned {
+  border-color: #4caf50 !important;
+}
+#garage-page .garage-dock-card.researching {
+  border-color: #a45ede !important;
+  background: linear-gradient(rgba(164, 94, 222, 0.2), rgba(164, 94, 222, 0.2)), url("icons/vehicles/card_bg.png") center/cover no-repeat !important;
+}
+#garage-page .garage-dock-card.locked {
+  opacity: 0.4 !important;
+}
+#garage-page .garage-dock-card .gd-img {
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+#garage-page .garage-dock-card .gd-img img {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+#garage-page .garage-dock-card .gd-name {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  text-align: center !important;
+  font-size: 10px !important;
+  font-weight: bold !important;
+  color: #ddd !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.2 !important;
+  padding: 1px 0 !important;
 }
