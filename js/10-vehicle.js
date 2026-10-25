@@ -3563,39 +3563,7 @@ window._openBTRSupportDetail = function(log){
   /* ============================================================
    * Part 1: BMP 接人 —— fusion door 中心點對準玩家
    * ============================================================ */
-  if(window.BTRSupport && !window.BTRSupport._v11DoorPatched){
-    window.BTRSupport._v11DoorPatched = true;
-    var _origSetupCanvas = window.BTRSupport._setupCanvas;
-    window.BTRSupport._setupCanvas = function(){
-      _origSetupCanvas.call(this);
-      var ann = A[this.vehicleId];
-      if(!ann || !ann.doors) return;
-      var doors = [];
-      if(ann.doors.fusion && ann.doors.fusion.length){
-        doors = ann.doors.fusion;
-      } else {
-        if(ann.doors.upper) doors = doors.concat(ann.doors.upper);
-        if(ann.doors.lower) doors = doors.concat(ann.doors.lower);
-        if(ann.doors.hatch) doors = doors.concat(ann.doors.hatch);
-      }
-      if(!doors.length) return;
-      var _sumX = 0, _sumN = 0;
-      for(var i = 0; i < doors.length; i++){
-        var d = doors[i];
-        if(!d.polygon) continue;
-        for(var j = 0; j < d.polygon.length; j++){
-          _sumX += d.polygon[j].x;
-          _sumN++;
-        }
-      }
-      if(_sumN === 0) return;
-      var _doorCenterRatio = _sumX / _sumN;
-      var w = this.width;
-      var playerCenterX = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
-      this.doorOffsetRatio = _doorCenterRatio;
-      this.doorX = (playerCenterX - _doorCenterRatio * this.targetW) / w;
-    };
-  }
+
 
   /* ============================================================
    * Part 2: 裝甲 + weaponSpecial
@@ -3626,43 +3594,7 @@ window._openBTRSupportDetail = function(log){
   /* ============================================================
    * Part 3: _garageDetailHtml（裝甲多行 + 轉義）
    * ============================================================ */
-  window._garageDetailHtml = function(cur, tgt, curUses, maxUses){
-    var _esc = function(v){
-      if(v === null || v === undefined) return '';
-      return String(v).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/\n/g, '<br>');
-    };
-    var _armorRow = function(label, curVal, tgtVal){
-      var h = '<div class="garage-stat-row armor-row">';
-      h += '<span class="k">' + label + '</span>';
-      if(tgtVal !== null && tgtVal !== undefined){
-        h += '<span class="v-cur armor-val">' + _esc(curVal) + '</span>';
-        h += '<span class="v-arrow">→</span>';
-        var cls = 'v-new armor-val';
-        if(String(tgtVal) !== String(curVal)) cls += ' diff';
-        h += '<span class="' + cls + '">' + _esc(tgtVal) + '</span>';
-      } else {
-        h += '<span class="v-cur-only armor-val">' + _esc(curVal) + '</span>';
-      }
-      h += '</div>';
-      return h;
-    };
-    var h = '';
-    var curW = _splitVehicleWeaponList(cur);
-    var tgtW = tgt ? _splitVehicleWeaponList(tgt) : null;
-    h += _garageDetailRowMulti('主炮', curW.mainGun, tgtW ? tgtW.mainGun : null);
-    h += _garageDetailRowMulti('機槍', curW.machineGun, tgtW ? tgtW.machineGun : null);
-    var curSp = cur.weaponSpecial || '無';
-    var tgtSp = tgt ? (tgt.weaponSpecial || '無') : null;
-    h += _garageDetailRow('特殊武器', curSp, tgtSp);
-    h += _armorRow('裝甲', cur.armor, tgt ? tgt.armor : null);
-    h += _garageDetailRow('公路', cur.speedRoad + ' km/h', tgt ? tgt.speedRoad + ' km/h' : null);
-    h += _garageDetailRow('越野', cur.speedOffroad + ' km/h', tgt ? tgt.speedOffroad + ' km/h' : null);
-    h += _garageDetailRow('支援', cur.supportDuration + 's', tgt ? tgt.supportDuration + 's' : null);
-    if(curUses !== null && curUses !== undefined && maxUses > 0){
-      h += '<div class="garage-stat-row"><span class="k">電台</span><span class="v-cur-only">' + curUses + ' / ' + maxUses + '</span></div>';
-    }
-    return h;
-  };
+
 
   /* ============================================================
    * Part 4: 科技樹 —— t80uk/t80um 同層級 + PC 鼠標拖動
@@ -3698,92 +3630,7 @@ window._openBTRSupportDetail = function(log){
     container.style.cursor = 'grab';
   }
 
-  window._garageOpenTechTree = function(){
-    var NW = 100, NH = 64;
-    var nodes = [
-      { vid:'btr80',  x:120, y:4   },
-      { vid:'btr80a', x:10,  y:76  },
-      { vid:'btr82',  x:10,  y:148 },
-      { vid:'btr82a', x:10,  y:220 },
-      { vid:'btr90',  x:10,  y:292 },
-      { vid:'bmp1',   x:120, y:76  },
-      { vid:'bmp1m',  x:120, y:148 },
-      { vid:'bmp2',   x:120, y:220 },
-      { vid:'bmp3',   x:120, y:292 },
-      { vid:'bmd4',   x:120, y:364 },
-      { vid:'t80',    x:230, y:76  },
-      { vid:'t80b',   x:230, y:148 },
-      { vid:'t80bv',  x:230, y:220 },
-      { vid:'t80u',   x:230, y:292 },
-      { vid:'t80uk',  x:230, y:364 },
-      { vid:'t80um',  x:340, y:364 }
-    ];
-    var s = '';
-    s += '<svg width="450" height="440" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
-    // btr80 → 三分支
-    s += '<path d="M 170 68 L 170 72 L 60 72 L 60 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="170" y1="68" x2="170" y2="76" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 170 68 L 170 72 L 280 72 L 280 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    // 左列（BTR）
-    s += '<line x1="60" y1="140" x2="60" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="60" y1="212" x2="60" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="60" y1="284" x2="60" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    // 中列（BMP）
-    s += '<line x1="170" y1="140" x2="170" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="212" x2="170" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="284" x2="170" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="356" x2="170" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    // 右列（T-80）
-    s += '<line x1="280" y1="140" x2="280" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="212" x2="280" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="284" x2="280" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    // t80u → t80uk（直下）
-    s += '<line x1="280" y1="356" x2="280" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    // t80u → t80um（折線往右下）
-    s += '<path d="M 280 356 L 280 360 L 390 360 L 390 364" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '</svg>';
 
-    var g = _garageInitState();
-    var research = _garageGetResearchInfo();
-    var researchId = research ? research.targetId : null;
-    var nodesHtml = '';
-    for(var i = 0; i < nodes.length; i++){
-      var n = nodes[i];
-      var v = VEHICLES[n.vid];
-      if(!v) continue;
-      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
-      var isCur = g.currentVehicle === n.vid;
-      var isRes = (researchId === n.vid);
-      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
-        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
-      });
-      var hasAll = prereqs.length === 0 || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
-      var cls = 'wt-node';
-      var mark = '';
-      if(owned && isCur){ cls += ' current'; mark = '✓'; }
-      else if(owned){ cls += ' owned'; mark = '✓'; }
-      else if(!hasAll){ cls += ' locked'; mark = '🔒'; }
-      else if(isRes){ cls += ' researching'; mark = '🔬'; }
-      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
-      else { cls += ' locked'; mark = '?'; }
-      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
-        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
-        + '<div class="wt-node-name">' + v.name + '</div>'
-        + '<div class="wt-node-mark">' + mark + '</div>'
-        + '</div>';
-    }
-    var body = '<div class="wt-tech-wrap"><div class="wt-tech-canvas" style="width:450px;height:440px">' + s + nodesHtml + '</div></div>';
-    var bd = openModal({ title: '科技樹', body: body });
-    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
-    var wrap = bd.querySelector('.wt-tech-wrap');
-    if(wrap) _bindTechTreePan(wrap);
-    var btns = bd.querySelectorAll('[data-tech-node]');
-    for(var bi = 0; bi < btns.length; bi++){
-      (function(btn){
-        btn.onclick = function(){ _garageShowTechDetail(btn.getAttribute('data-tech-node')); };
-      })(btns[bi]);
-    }
-  };
 
   /* ============================================================
    * Part 5: CSS
@@ -3816,40 +3663,7 @@ window._openBTRSupportDetail = function(log){
   var A = window.VEHICLE_ANNOTATIONS = window.VEHICLE_ANNOTATIONS || {};
 
   /* Part 1: BMP door（幂等，v11 已执行则跳过） */
-  if(window.BTRSupport && !window.BTRSupport._v11DoorPatched){
-    window.BTRSupport._v11DoorPatched = true;
-    var _origSetupCanvas = window.BTRSupport._setupCanvas;
-    window.BTRSupport._setupCanvas = function(){
-      _origSetupCanvas.call(this);
-      var ann = A[this.vehicleId];
-      if(!ann || !ann.doors) return;
-      var doors = [];
-      if(ann.doors.fusion && ann.doors.fusion.length){
-        doors = ann.doors.fusion;
-      } else {
-        if(ann.doors.upper) doors = doors.concat(ann.doors.upper);
-        if(ann.doors.lower) doors = doors.concat(ann.doors.lower);
-        if(ann.doors.hatch) doors = doors.concat(ann.doors.hatch);
-      }
-      if(!doors.length) return;
-      var _sumX = 0, _sumN = 0;
-      for(var i = 0; i < doors.length; i++){
-        var d = doors[i];
-        if(!d.polygon) continue;
-        for(var j = 0; j < d.polygon.length; j++){
-          _sumX += d.polygon[j].x;
-          _sumN++;
-        }
-      }
-      if(_sumN === 0) return;
-      var _doorCenterRatio = _sumX / _sumN;
-      var w = this.width;
-      var playerCenterX = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
-      this.doorOffsetRatio = _doorCenterRatio;
-      this.doorX = (playerCenterX - _doorCenterRatio * this.targetW) / w;
-      console.log('[BTRSupport._setupCanvas] vid=' + this.vehicleId + ' doorCenter=' + _doorCenterRatio.toFixed(3));
-    };
-  }
+
 
   /* Part 2: 装甲 + weaponSpecial */
   if(typeof VEHICLES !== 'undefined'){
@@ -3877,41 +3691,7 @@ window._openBTRSupportDetail = function(log){
   }
 
   /* Part 3: _garageDetailHtml */
-  window._garageDetailHtml = function(cur, tgt, curUses, maxUses){
-    var _esc = function(v){
-      if(v === null || v === undefined) return '';
-      return String(v).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/\n/g, '<br>');
-    };
-    var _armorRow = function(label, curVal, tgtVal){
-      var h = '<div class="garage-stat-row armor-row">';
-      h += '<span class="k">' + label + '</span>';
-      if(tgtVal !== null && tgtVal !== undefined){
-        h += '<span class="v-cur armor-val">' + _esc(curVal) + '</span>';
-        h += '<span class="v-arrow">→</span>';
-        var cls = 'v-new armor-val';
-        if(String(tgtVal) !== String(curVal)) cls += ' diff';
-        h += '<span class="' + cls + '">' + _esc(tgtVal) + '</span>';
-      } else {
-        h += '<span class="v-cur-only armor-val">' + _esc(curVal) + '</span>';
-      }
-      h += '</div>';
-      return h;
-    };
-    var h = '';
-    var curW = _splitVehicleWeaponList(cur);
-    var tgtW = tgt ? _splitVehicleWeaponList(tgt) : null;
-    h += _garageDetailRowMulti('主炮', curW.mainGun, tgtW ? tgtW.mainGun : null);
-    h += _garageDetailRowMulti('機槍', curW.machineGun, tgtW ? tgtW.machineGun : null);
-    h += _garageDetailRow('特殊武器', cur.weaponSpecial || '無', tgt ? (tgt.weaponSpecial || '無') : null);
-    h += _armorRow('裝甲', cur.armor, tgt ? tgt.armor : null);
-    h += _garageDetailRow('公路', cur.speedRoad + ' km/h', tgt ? tgt.speedRoad + ' km/h' : null);
-    h += _garageDetailRow('越野', cur.speedOffroad + ' km/h', tgt ? tgt.speedOffroad + ' km/h' : null);
-    h += _garageDetailRow('支援', cur.supportDuration + 's', tgt ? tgt.supportDuration + 's' : null);
-    if(curUses !== null && curUses !== undefined && maxUses > 0){
-      h += '<div class="garage-stat-row"><span class="k">電台</span><span class="v-cur-only">' + curUses + ' / ' + maxUses + '</span></div>';
-    }
-    return h;
-  };
+
 
   /* Part 4: 科技樹 + PC 拖動 */
   function _bindTechTreePan(container){
@@ -3944,86 +3724,7 @@ window._openBTRSupportDetail = function(log){
     container.style.cursor = 'grab';
   }
 
-  window._garageOpenTechTree = function(){
-    var NW = 100, NH = 64;
-    var nodes = [
-      { vid:'btr80',  x:120, y:4   },
-      { vid:'btr80a', x:10,  y:76  },
-      { vid:'btr82',  x:10,  y:148 },
-      { vid:'btr82a', x:10,  y:220 },
-      { vid:'btr90',  x:10,  y:292 },
-      { vid:'bmp1',   x:120, y:76  },
-      { vid:'bmp1m',  x:120, y:148 },
-      { vid:'bmp2',   x:120, y:220 },
-      { vid:'bmp3',   x:120, y:292 },
-      { vid:'bmd4',   x:120, y:364 },
-      { vid:'t80',    x:230, y:76  },
-      { vid:'t80b',   x:230, y:148 },
-      { vid:'t80bv',  x:230, y:220 },
-      { vid:'t80u',   x:230, y:292 },
-      { vid:'t80uk',  x:230, y:364 },
-      { vid:'t80um',  x:340, y:364 }
-    ];
-    var s = '';
-    s += '<svg width="450" height="440" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
-    s += '<path d="M 170 68 L 170 72 L 60 72 L 60 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="170" y1="68" x2="170" y2="76" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 170 68 L 170 72 L 280 72 L 280 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="60" y1="140" x2="60" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="60" y1="212" x2="60" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="60" y1="284" x2="60" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="140" x2="170" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="212" x2="170" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="284" x2="170" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="356" x2="170" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="140" x2="280" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="212" x2="280" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="284" x2="280" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="356" x2="280" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 280 356 L 280 360 L 390 360 L 390 364" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '</svg>';
 
-    var g = _garageInitState();
-    var research = _garageGetResearchInfo();
-    var researchId = research ? research.targetId : null;
-    var nodesHtml = '';
-    for(var i = 0; i < nodes.length; i++){
-      var n = nodes[i];
-      var v = VEHICLES[n.vid];
-      if(!v) continue;
-      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
-      var isCur = g.currentVehicle === n.vid;
-      var isRes = (researchId === n.vid);
-      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
-        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
-      });
-      var hasAll = prereqs.length === 0 || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
-      var cls = 'wt-node';
-      var mark = '';
-      if(owned && isCur){ cls += ' current'; mark = '✓'; }
-      else if(owned){ cls += ' owned'; mark = '✓'; }
-      else if(!hasAll){ cls += ' locked'; mark = '🔒'; }
-      else if(isRes){ cls += ' researching'; mark = '🔬'; }
-      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
-      else { cls += ' locked'; mark = '?'; }
-      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
-        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
-        + '<div class="wt-node-name">' + v.name + '</div>'
-        + '<div class="wt-node-mark">' + mark + '</div>'
-        + '</div>';
-    }
-    var body = '<div class="wt-tech-wrap"><div class="wt-tech-canvas" style="width:450px;height:440px">' + s + nodesHtml + '</div></div>';
-    var bd = openModal({ title: '科技樹', body: body });
-    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
-    var wrap = bd.querySelector('.wt-tech-wrap');
-    if(wrap) _bindTechTreePan(wrap);
-    var btns = bd.querySelectorAll('[data-tech-node]');
-    for(var bi = 0; bi < btns.length; bi++){
-      (function(btn){
-        btn.onclick = function(){ _garageShowTechDetail(btn.getAttribute('data-tech-node')); };
-      })(btns[bi]);
-    }
-  };
 
   /* Part 5: CSS */
   if(!document.getElementById('patcher-v12-style')){
@@ -4289,39 +3990,7 @@ window._openBTRSupportDetail = function(log){
   /* ============================================================
    * Part 1: BMP 接人 —— fusion door 中心點對準玩家
    * ============================================================ */
-  if(window.BTRSupport && !window.BTRSupport._v13DoorPatched){
-    window.BTRSupport._v13DoorPatched = true;
-    var _origSetupCanvas = window.BTRSupport._setupCanvas;
-    window.BTRSupport._setupCanvas = function(){
-      _origSetupCanvas.call(this);
-      var ann = A[this.vehicleId];
-      if(!ann || !ann.doors) return;
-      var doors = [];
-      if(ann.doors.fusion && ann.doors.fusion.length){
-        doors = ann.doors.fusion;
-      } else {
-        if(ann.doors.upper) doors = doors.concat(ann.doors.upper);
-        if(ann.doors.lower) doors = doors.concat(ann.doors.lower);
-        if(ann.doors.hatch) doors = doors.concat(ann.doors.hatch);
-      }
-      if(!doors.length) return;
-      var _sumX = 0, _sumN = 0;
-      for(var i = 0; i < doors.length; i++){
-        var d = doors[i];
-        if(!d.polygon) continue;
-        for(var j = 0; j < d.polygon.length; j++){
-          _sumX += d.polygon[j].x;
-          _sumN++;
-        }
-      }
-      if(_sumN === 0) return;
-      var _doorCenterRatio = _sumX / _sumN;
-      var w = this.width;
-      var playerCenterX = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
-      this.doorOffsetRatio = _doorCenterRatio;
-      this.doorX = (playerCenterX - _doorCenterRatio * this.targetW) / w;
-    };
-  }
+
 
   /* ============================================================
    * Part 2: 裝甲 + weaponSpecial（覆蓋 v11）
@@ -4353,41 +4022,7 @@ window._openBTRSupportDetail = function(log){
   /* ============================================================
    * Part 3: _garageDetailHtml
    * ============================================================ */
-  window._garageDetailHtml = function(cur, tgt, curUses, maxUses){
-    var _esc = function(v){
-      if(v === null || v === undefined) return '';
-      return String(v).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/\n/g, '<br>');
-    };
-    var _armorRow = function(label, curVal, tgtVal){
-      var h = '<div class="garage-stat-row armor-row">';
-      h += '<span class="k">' + label + '</span>';
-      if(tgtVal !== null && tgtVal !== undefined){
-        h += '<span class="v-cur armor-val">' + _esc(curVal) + '</span>';
-        h += '<span class="v-arrow">→</span>';
-        var cls = 'v-new armor-val';
-        if(String(tgtVal) !== String(curVal)) cls += ' diff';
-        h += '<span class="' + cls + '">' + _esc(tgtVal) + '</span>';
-      } else {
-        h += '<span class="v-cur-only armor-val">' + _esc(curVal) + '</span>';
-      }
-      h += '</div>';
-      return h;
-    };
-    var h = '';
-    var curW = _splitVehicleWeaponList(cur);
-    var tgtW = tgt ? _splitVehicleWeaponList(tgt) : null;
-    h += _garageDetailRowMulti('主炮', curW.mainGun, tgtW ? tgtW.mainGun : null);
-    h += _garageDetailRowMulti('機槍', curW.machineGun, tgtW ? tgtW.machineGun : null);
-    h += _garageDetailRow('特殊武器', cur.weaponSpecial || '無', tgt ? (tgt.weaponSpecial || '無') : null);
-    h += _armorRow('裝甲', cur.armor, tgt ? tgt.armor : null);
-    h += _garageDetailRow('公路', cur.speedRoad + ' km/h', tgt ? tgt.speedRoad + ' km/h' : null);
-    h += _garageDetailRow('越野', cur.speedOffroad + ' km/h', tgt ? tgt.speedOffroad + ' km/h' : null);
-    h += _garageDetailRow('支援', cur.supportDuration + 's', tgt ? tgt.supportDuration + 's' : null);
-    if(curUses !== null && curUses !== undefined && maxUses > 0){
-      h += '<div class="garage-stat-row"><span class="k">電台</span><span class="v-cur-only">' + curUses + ' / ' + maxUses + '</span></div>';
-    }
-    return h;
-  };
+
 
   /* ============================================================
    * Part 4: 科技樹 + PC 拖動
@@ -4422,86 +4057,7 @@ window._openBTRSupportDetail = function(log){
     container.style.cursor = 'grab';
   }
 
-  window._garageOpenTechTree = function(){
-    var NW = 100, NH = 64;
-    var nodes = [
-      { vid:'btr80',  x:120, y:4   },
-      { vid:'btr80a', x:10,  y:76  },
-      { vid:'btr82',  x:10,  y:148 },
-      { vid:'btr82a', x:10,  y:220 },
-      { vid:'btr90',  x:10,  y:292 },
-      { vid:'bmp1',   x:120, y:76  },
-      { vid:'bmp1m',  x:120, y:148 },
-      { vid:'bmp2',   x:120, y:220 },
-      { vid:'bmp3',   x:120, y:292 },
-      { vid:'bmd4',   x:120, y:364 },
-      { vid:'t80',    x:230, y:76  },
-      { vid:'t80b',   x:230, y:148 },
-      { vid:'t80bv',  x:230, y:220 },
-      { vid:'t80u',   x:230, y:292 },
-      { vid:'t80uk',  x:230, y:364 },
-      { vid:'t80um',  x:340, y:364 }
-    ];
-    var s = '';
-    s += '<svg width="450" height="440" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
-    s += '<path d="M 170 68 L 170 72 L 60 72 L 60 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="170" y1="68" x2="170" y2="76" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 170 68 L 170 72 L 280 72 L 280 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="60" y1="140" x2="60" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="60" y1="212" x2="60" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="60" y1="284" x2="60" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="140" x2="170" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="212" x2="170" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="284" x2="170" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="356" x2="170" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="140" x2="280" y2="148" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="212" x2="280" y2="220" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="284" x2="280" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="356" x2="280" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 280 356 L 280 360 L 390 360 L 390 364" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '</svg>';
 
-    var g = _garageInitState();
-    var research = _garageGetResearchInfo();
-    var researchId = research ? research.targetId : null;
-    var nodesHtml = '';
-    for(var i = 0; i < nodes.length; i++){
-      var n = nodes[i];
-      var v = VEHICLES[n.vid];
-      if(!v) continue;
-      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
-      var isCur = g.currentVehicle === n.vid;
-      var isRes = (researchId === n.vid);
-      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
-        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
-      });
-      var hasAll = prereqs.length === 0 || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
-      var cls = 'wt-node';
-      var mark = '';
-      if(owned && isCur){ cls += ' current'; mark = '✓'; }
-      else if(owned){ cls += ' owned'; mark = '✓'; }
-      else if(!hasAll){ cls += ' locked'; mark = '🔒'; }
-      else if(isRes){ cls += ' researching'; mark = '🔬'; }
-      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
-      else { cls += ' locked'; mark = '?'; }
-      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
-        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
-        + '<div class="wt-node-name">' + v.name + '</div>'
-        + '<div class="wt-node-mark">' + mark + '</div>'
-        + '</div>';
-    }
-    var body = '<div class="wt-tech-wrap"><div class="wt-tech-canvas" style="width:450px;height:440px">' + s + nodesHtml + '</div></div>';
-    var bd = openModal({ title: '科技樹', body: body });
-    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
-    var wrap = bd.querySelector('.wt-tech-wrap');
-    if(wrap) _bindTechTreePan(wrap);
-    var btns = bd.querySelectorAll('[data-tech-node]');
-    for(var bi = 0; bi < btns.length; bi++){
-      (function(btn){
-        btn.onclick = function(){ _garageShowTechDetail(btn.getAttribute('data-tech-node')); };
-      })(btns[bi]);
-    }
-  };
 
   /* ============================================================
    * Part 5: CSS
@@ -4636,75 +4192,12 @@ window._openBTRSupportDetail = function(log){
   }
 
   /* BMP door 对准 */
-  if(window.BTRSupport && !window.BTRSupport._v20DoorPatched){
-    window.BTRSupport._v20DoorPatched = true;
-    var _origSetup = window.BTRSupport._setupCanvas;
-    window.BTRSupport._setupCanvas = function(){
-      _origSetup.call(this);
-      var ann = A[this.vehicleId];
-      if(!ann || !ann.doors) return;
-      var doors = [];
-      if(ann.doors.fusion && ann.doors.fusion.length){ doors = ann.doors.fusion; }
-      else {
-        if(ann.doors.upper) doors = doors.concat(ann.doors.upper);
-        if(ann.doors.lower) doors = doors.concat(ann.doors.lower);
-        if(ann.doors.hatch) doors = doors.concat(ann.doors.hatch);
-      }
-      if(!doors.length) return;
-      var sx = 0, sn = 0;
-      for(var i = 0; i < doors.length; i++){
-        var d = doors[i]; if(!d.polygon) continue;
-        for(var j = 0; j < d.polygon.length; j++){ sx += d.polygon[j].x; sn++; }
-      }
-      if(sn === 0) return;
-      var r = sx / sn;
-      var w = this.width;
-      var pcx = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
-      this.doorOffsetRatio = r;
-      this.doorX = (pcx - r * this.targetW) / w;
-    };
-  }
+
 
   /* ============================================================
    * _garageDetailHtml —— 装甲多行利用左侧空间
    * ============================================================ */
-  window._garageDetailHtml = function(cur, tgt, cu, mu){
-    var _e = function(v){ if(v==null) return ''; return String(v).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>'); };
-    // 装甲多行：每行完整语义，第一行有 k 标签，后续行 k 留空
-    var _arMulti = function(label, cv, tv){
-      var cLines = String(cv || '').split('\n');
-      var tLines = tv != null ? String(tv || '').split('\n') : null;
-      var maxN = Math.max(cLines.length, tLines ? tLines.length : 1);
-      var h = '';
-      for(var i = 0; i < maxN; i++){
-        var cl = cLines[i] || '';
-        var tl = tLines ? (tLines[i] || '') : null;
-        h += '<div class="garage-stat-row armor-row">';
-        h += '<span class="k">' + (i === 0 ? label : '') + '</span>';
-        if(tl !== null){
-          h += '<span class="v-cur armor-val">' + _e(cl) + '</span>';
-          h += '<span class="v-arrow">→</span>';
-          h += '<span class="v-new armor-val' + (tl !== cl ? ' diff' : '') + '">' + _e(tl) + '</span>';
-        } else {
-          h += '<span class="v-cur-only armor-val">' + _e(cl) + '</span>';
-        }
-        h += '</div>';
-      }
-      return h;
-    };
-    var h = '';
-    var cw = _splitVehicleWeaponList(cur);
-    var tw = tgt ? _splitVehicleWeaponList(tgt) : null;
-    h += _garageDetailRowMulti('主炮', cw.mainGun, tw?tw.mainGun:null);
-    h += _garageDetailRowMulti('機槍', cw.machineGun, tw?tw.machineGun:null);
-    h += _garageDetailRow('特殊武器', cur.weaponSpecial || '無', tgt ? (tgt.weaponSpecial || '無') : null);
-    h += _arMulti('裝甲', cur.armor, tgt ? tgt.armor : null);
-    h += _garageDetailRow('公路', cur.speedRoad+' km/h', tgt?tgt.speedRoad+' km/h':null);
-    h += _garageDetailRow('越野', cur.speedOffroad+' km/h', tgt?tgt.speedOffroad+' km/h':null);
-    h += _garageDetailRow('支援', cur.supportDuration+'s', tgt?tgt.supportDuration+'s':null);
-    if(cu != null && mu > 0){ h += '<div class="garage-stat-row"><span class="k">電台</span><span class="v-cur-only">'+cu+' / '+mu+'</span></div>'; }
-    return h;
-  };
+
 
   /* 科技树 */
   function _pan(c){
@@ -4724,51 +4217,7 @@ window._openBTRSupportDetail = function(log){
     c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
     c.style.cursor='grab';
   }
-  window._garageOpenTechTree = function(){
-    var NW=100, NH=64;
-    var nodes = [
-      {vid:'btr80',x:120,y:4},{vid:'btr80a',x:10,y:76},{vid:'btr82',x:10,y:148},{vid:'btr82a',x:10,y:220},{vid:'btr90',x:10,y:292},
-      {vid:'bmp1',x:120,y:76},{vid:'bmp1m',x:120,y:148},{vid:'bmp2',x:120,y:220},{vid:'bmp3',x:120,y:292},{vid:'bmd4',x:120,y:364},
-      {vid:'t80',x:230,y:76},{vid:'t80b',x:230,y:148},{vid:'t80bv',x:230,y:220},{vid:'t80u',x:230,y:292},{vid:'t80uk',x:230,y:364},{vid:'t80um',x:340,y:364}
-    ];
-    var s = '<svg width="450" height="440" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
-    s += '<path d="M 170 68 L 170 72 L 60 72 L 60 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="170" y1="68" x2="170" y2="76" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 170 68 L 170 72 L 280 72 L 280 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="60" y1="140" x2="60" y2="148" stroke="#8a5f18" stroke-width="2"/><line x1="60" y1="212" x2="60" y2="220" stroke="#8a5f18" stroke-width="2"/><line x1="60" y1="284" x2="60" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="140" x2="170" y2="148" stroke="#8a5f18" stroke-width="2"/><line x1="170" y1="212" x2="170" y2="220" stroke="#8a5f18" stroke-width="2"/><line x1="170" y1="284" x2="170" y2="292" stroke="#8a5f18" stroke-width="2"/><line x1="170" y1="356" x2="170" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="140" x2="280" y2="148" stroke="#8a5f18" stroke-width="2"/><line x1="280" y1="212" x2="280" y2="220" stroke="#8a5f18" stroke-width="2"/><line x1="280" y1="284" x2="280" y2="292" stroke="#8a5f18" stroke-width="2"/><line x1="280" y1="356" x2="280" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 280 356 L 280 360 L 390 360 L 390 364" stroke="#8a5f18" stroke-width="2" fill="none"/></svg>';
-    var g = _garageInitState();
-    var res = _garageGetResearchInfo();
-    var rId = res ? res.targetId : null;
-    var h = '';
-    for(var i = 0; i < nodes.length; i++){
-      var n = nodes[i];
-      var v = VEHICLES[n.vid]; if(!v) continue;
-      var own = g.ownedVehicles.indexOf(n.vid) >= 0;
-      var cur = g.currentVehicle === n.vid;
-      var isR = (rId === n.vid);
-      var pre = Object.keys(VEHICLES).filter(function(p){ return (VEHICLES[p].next||[]).indexOf(n.vid)>=0; });
-      var hasAll = pre.length === 0 || pre.every(function(p){ return g.ownedVehicles.indexOf(p)>=0; });
-      var cls = 'wt-node', mk = '';
-      if(own && cur){ cls += ' current'; mk = '✓'; }
-      else if(own){ cls += ' owned'; mk = '✓'; }
-      else if(!hasAll){ cls += ' locked'; mk = '🔒'; }
-      else if(isR){ cls += ' researching'; mk = '🔬'; }
-      else if(v.researchCost){ cls += ' researchable'; mk = '🔬'; }
-      else { cls += ' locked'; mk = '?'; }
-      h += '<div class="'+cls+'" data-tech-node="'+n.vid+'" style="left:'+n.x+'px;top:'+n.y+'px;width:'+NW+'px;height:'+NH+'px"><div class="wt-node-img"><img src="icons/vehicles/'+n.vid+'.png'+assetSuffix()+'" data-fallback="1" alt=""></div><div class="wt-node-name">'+v.name+'</div><div class="wt-node-mark">'+mk+'</div></div>';
-    }
-    var bd = openModal({ title:'科技樹', body:'<div class="wt-tech-wrap"><div class="wt-tech-canvas" style="width:450px;height:440px">'+s+h+'</div></div>' });
-    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
-    var wrap = bd.querySelector('.wt-tech-wrap');
-    if(wrap) _pan(wrap);
-    var btns = bd.querySelectorAll('[data-tech-node]');
-    for(var bi = 0; bi < btns.length; bi++){
-      (function(b){ b.onclick = function(){ _garageShowTechDetail(b.getAttribute('data-tech-node')); }; })(btns[bi]);
-    }
-  };
+
 
   /* ============================================================
    * ★ stat panel：CSS + inline 双保险 + MutationObserver
@@ -5063,43 +4512,7 @@ window._openBTRSupportDetail = function(log){
   /* ============================================================
    * _garageDetailHtml —— 装甲完整语义多行（利用左侧空间）
    * ============================================================ */
-  window._garageDetailHtml = function(cur, tgt, cu, mu){
-    var _e = function(v){ if(v==null) return ''; return String(v).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>'); };
-    var _arMulti = function(label, cv, tv){
-      var cLines = String(cv || '').split('\n').filter(Boolean);
-      var tLines = tv != null ? String(tv || '').split('\n').filter(Boolean) : null;
-      if(!cLines.length) cLines = [''];
-      var maxN = tLines ? Math.max(cLines.length, tLines.length) : cLines.length;
-      var h = '';
-      for(var i = 0; i < maxN; i++){
-        var cl = cLines[i] || '';
-        var tl = tLines ? (tLines[i] || '') : null;
-        h += '<div class="garage-stat-row armor-row">';
-        h += '<span class="k">' + (i === 0 ? label : '') + '</span>';
-        if(tl !== null){
-          h += '<span class="v-cur armor-val">' + _e(cl) + '</span>';
-          h += '<span class="v-arrow">→</span>';
-          h += '<span class="v-new armor-val' + (tl !== cl ? ' diff' : '') + '">' + _e(tl) + '</span>';
-        } else {
-          h += '<span class="v-cur-only armor-val">' + _e(cl) + '</span>';
-        }
-        h += '</div>';
-      }
-      return h;
-    };
-    var h = '';
-    var cw = _splitVehicleWeaponList(cur);
-    var tw = tgt ? _splitVehicleWeaponList(tgt) : null;
-    h += _garageDetailRowMulti('主炮', cw.mainGun, tw?tw.mainGun:null);
-    h += _garageDetailRowMulti('機槍', cw.machineGun, tw?tw.machineGun:null);
-    h += _garageDetailRow('特殊武器', cur.weaponSpecial || '無', tgt ? (tgt.weaponSpecial || '無') : null);
-    h += _arMulti('裝甲', cur.armor, tgt ? tgt.armor : null);
-    h += _garageDetailRow('公路', cur.speedRoad+' km/h', tgt?tgt.speedRoad+' km/h':null);
-    h += _garageDetailRow('越野', cur.speedOffroad+' km/h', tgt?tgt.speedOffroad+' km/h':null);
-    h += _garageDetailRow('支援', cur.supportDuration+'s', tgt?tgt.supportDuration+'s':null);
-    if(cu != null && mu > 0){ h += '<div class="garage-stat-row"><span class="k">電台</span><span class="v-cur-only">'+cu+' / '+mu+'</span></div>'; }
-    return h;
-  };
+
 
   /* 科技树 */
   function _pan(c){
