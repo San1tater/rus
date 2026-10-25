@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>載具標注編輯器 v2.0 (trackLoop)</title>
+<title>載具標注編輯器 v2.0 (TrackLoop 纯净版)</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;font-size:12px}
@@ -84,7 +84,7 @@ aside{background:#151210;display:flex;flex-direction:column}
 <body>
 <div id="app">
   <header>
-    <h1>🚗 載具標注編輯器 v2.0 (trackLoop)</h1>
+    <h1>🚗 載具標注編輯器 v2.0 (TrackLoop)</h1>
     <label>ID</label>
     <input type="text" id="vehicleId" value="btr80">
     <span class="spacer"></span>
@@ -106,6 +106,8 @@ aside{background:#151210;display:flex;flex-direction:column}
           <div class="toolBtn" data-tool="polygon"><span class="ico">⬟</span>多邊形 3</div>
           <div class="toolBtn" data-tool="muzzle"><span class="ico">🎯</span>槍口 4</div>
           <div class="toolBtn" data-tool="trackloop" style="grid-column:span 2"><span class="ico">🔁</span>履帶環 5</div>
+          <div class="toolBtn" data-tool="fusion_door"><span class="ico">🚪</span>融合車門 6</div>
+          <div class="toolBtn" data-tool="missile"><span class="ico">🚀</span>導彈實體 7</div>
         </div>
         <div class="sectionTitle"><span>📋 標注對象</span></div>
         <div id="objList"></div>
@@ -118,7 +120,7 @@ aside{background:#151210;display:flex;flex-direction:column}
         <div class="propRow"><label>啟用</label><button id="pTrackMaskEnabled" class="toggleBtn">停用</button></div>
         <div id="trackMaskPoints"></div>
         <button id="btnAddMaskPoint" style="width:100%;background:#241d16;border:1px solid #3a2f25;color:#a89a85;border-radius:3px;padding:4px;font-size:10px;cursor:pointer;margin-top:4px">+ 添加控制點</button>
-        <div class="helpTip">折線以上的原圖部分會作為遮罩層，永遠遮蓋車輪旋轉頂端。與履帶滾動無關。</div>
+        <div class="helpTip">折線以上的原圖部分會作為遮罩層，永遠遮蓋車輪旋轉頂端。</div>
 
         <div class="sectionTitle">🛞 履帶滾動</div>
         <div class="propRow"><label>啟用</label><button id="pTrackScrollEnabled" class="toggleBtn">停用</button></div>
@@ -161,6 +163,52 @@ aside{background:#151210;display:flex;flex-direction:column}
 <div id="toast"></div>
 <script>
 "use strict";
+
+// ============================================================
+// 1. 全局基础函数与配置（解决 getShakeOffset 等遗漏问题）
+// ============================================================
+window.getShakeOffset = function(){ 
+  if (typeof S === 'undefined' || !S.shakeEnabled || !S.playing) return {x:0, y:0}; 
+  const t = performance.now(); 
+  return { x: Math.sin(t/40)*1.5, y: Math.cos(t/55)*1.2 }; 
+};
+window.getWheelRotSpeed = function(o){ 
+  if (typeof S === 'undefined') return o.rotSpeed || 1;
+  const boost = (S.shakeEnabled && S.playing) ? 3 : 1; 
+  return (o.rotSpeed || 1) * boost; 
+};
+window.getDoorClipCanvas = function(o){
+  if(typeof S === 'undefined' || !S.image || !imgCache.complete || !imgCache.naturalWidth) return null;
+  const pts = o.points; 
+  if(!pts || pts.length < 3) return null;
+  const w = canvas.width, h = canvas.height;
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  for(const p of pts){ 
+    const px = p.x*w, py = p.y*h; 
+    if(px<minX) minX=px; if(py<minY) minY=py; 
+    if(px>maxX) maxX=px; if(py>maxY) maxY=py; 
+  }
+  const bw = Math.ceil(maxX-minX), bh = Math.ceil(maxY-minY);
+  if(bw<2 || bh<2) return null;
+  const key = S.image.dataUrl.slice(-40) + '|' + pts.map(p=>p.x.toFixed(3)+','+p.y.toFixed(3)).join(';');
+  if(_doorClipCache.has(key)) return _doorClipCache.get(key);
+  const c = document.createElement('canvas'); c.width=bw; c.height=bh;
+  const cc = c.getContext('2d');
+  cc.beginPath(); 
+  cc.moveTo(pts[0].x*w-minX, pts[0].y*h-minY); 
+  for(let i=1;i<pts.length;i++) cc.lineTo(pts[i].x*w-minX, pts[i].y*h-minY); 
+  cc.closePath(); 
+  cc.clip();
+  cc.drawImage(imgCache, -minX, -minY, w, h);
+  const result = {canvas:c, minX, minY, bw, bh};
+  _doorClipCache.set(key, result);
+  if(_doorClipCache.size>30){ _doorClipCache.delete(_doorClipCache.keys().next().value); }
+  return result;
+};
+
+// ============================================================
+// 2. 数据与核心逻辑
+// ============================================================
 const VEHICLE_WEAPONS_LIBRARY = [
   { id:'kpvt',  name:'14.5mm KPVT',     type:'機槍',     caliber:'14.5mm' },
   { id:'pkt',   name:'7.62mm PKT',      type:'機槍',     caliber:'7.62mm' },
@@ -170,12 +218,16 @@ const VEHICLE_WEAPONS_LIBRARY = [
   { id:'atgm',  name:'ATGM 發射筒',     type:'反坦克導彈', caliber:'—' },
   { id:'2a46',  name:'125mm 2A46',      type:'主炮',     caliber:'125mm' },
   { id:'2a46m1',name:'125mm 2A46M-1',   type:'主炮',     caliber:'125mm' },
+  { id:'2a28',  name:'73mm 2A28',       type:'低壓炮',   caliber:'73mm' },
+  { id:'2a70',  name:'100mm 2A70',      type:'主炮',     caliber:'100mm' }
 ];
 const RECOIL_CONFIG = {
   '2a46':   { dist: 0.06,  duration: 1500 },
   '2a46m1': { dist: 0.06,  duration: 1500 },
   '2a42':   { dist: 0.015, duration: 150 },
   '2a72':   { dist: 0.035, duration: 150 },
+  '2a28':   { dist: 0.04,  duration: 300 },
+  '2a70':   { dist: 0.035, duration: 400 },
   default:  { dist: 0,     duration: 0 }
 };
 const MUZZLE_PROFILES = {
@@ -201,6 +253,12 @@ const VEHICLE_WEAPON_MAP = {
   t80u:   ['2a46m1', 'pkt', 'nsvt'],
   t80uk:  ['2a46m1', 'pkt', 'nsvt'],
   t80um:  ['2a46m1', 'pkt', 'nsvt'],
+  bmp1:   ['2a28', 'pkt', 'atgm'],
+  bmp1am: ['2a72', 'pkt'],
+  bmp1m:  ['2a42', 'pkt'],
+  bmp2:   ['2a42', 'pkt', 'atgm'],
+  bmp3:   ['2a70', '2a72', 'pkt'],
+  bmd4:   ['2a70', '2a72', 'pkt'],
 };
 function getWeaponsForVehicle(vid){ const ids=VEHICLE_WEAPON_MAP[vid]; if(!ids) return VEHICLE_WEAPONS_LIBRARY; return VEHICLE_WEAPONS_LIBRARY.filter(w=>ids.indexOf(w.id)!==-1); }
 function getWeaponById(id){ return VEHICLE_WEAPONS_LIBRARY.find(w=>w.id===id)||null; }
@@ -211,36 +269,19 @@ const TRACKLOOP_ID = '__trackloop__';
 const S = {
   vehicleId:'btr80', image:null,
   anchor:{ groundY:0.85, centerX:0.5 },
-  trackMask:{
-    enabled:false,
-    points:[{x:0,y:0.6},{x:1,y:0.6}],
-  },
+  trackMask:{ enabled:false, points:[{x:0,y:0.6},{x:1,y:0.6}] },
   trackLoop:{ points: [] },
   draftLoop:[],
-  // 舊 trackLine 保留不用（向後相容）
-  trackLine:{ points: [] },
   trackScroll:{
-    enabled:false,
-    direction:-1,
-    spacing:0.06,
-    darkAlpha:0.28,
-    lightAlpha:0.12,
-    followWheel:0,
-    useTexture:true,
-    textureX0:0.15,
-    textureX1:0.40,
-    textureY0:null,
-    textureY1:null,
-    bandHeight:0.08,
-    textureOpacity:0.85,
-    useStripes:false,
-    stripeStrength:0.25,
+    enabled:false, direction:-1, spacing:0.06, darkAlpha:0.28, lightAlpha:0.12, followWheel:0,
+    useTexture:true, textureX0:0.15, textureX1:0.40, textureY0:null, textureY1:null,
+    bandHeight:0.08, textureOpacity:0.85, useStripes:false, stripeStrength:0.25,
   },
   objects:[], selectedId:null, tool:'select',
-  view:{scale:1,tx:0,ty:0}, draftPolygon:[], draftTrackLine:[],
+  view:{scale:1,tx:0,ty:0}, draftPolygon:[],
   mousePos:{x:0,y:0,inside:false}, playing:false, animTime:0, animSpeed:1,
   shakeEnabled:false, xrayMode:false,
-  fireEffects:[], simFireTimer:null, recoilStates:{},
+  fireEffects:[], simFireTimer:null, recoilStates:{}, flyingMissiles:[],
   firePreviewActive:false, firePreviewSpeed:1, muzzleFireState:{},
 };
 
@@ -293,7 +334,6 @@ function updateZoomInfo(){ document.getElementById('zoomInfo').textContent=Math.
 function updatePhaseInfo(){ const el=document.getElementById('phaseInfo'); if(!el) return; if(!S.playing){ el.textContent=''; return; } el.textContent=getDoorPhaseName(S.animTime,S.animSpeed); }
 function getObjById(id){ if(id===TRACKLOOP_ID) return null; return S.objects.find(o=>o.id===id); }
 function pointInPolygon(x,y,pts){ let inside=false; for(let i=0,j=pts.length-1;i<pts.length;j=i++){ const xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y; if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
-function distToSegment(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1; const len2=dx*dx+dy*dy; if(len2<1e-9) return Math.hypot(px-x1,py-y1); let t=((px-x1)*dx+(py-y1)*dy)/len2; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-(x1+t*dx),py-(y1+t*dy)); }
 
 function hitTest(nx,ny){
   for(let i=S.objects.length-1;i>=0;i--){ const o=S.objects[i]; if(o.hidden) continue; if(o.type==='wheel'&&o.wheel){ const dx=nx-o.wheel.cx,dy=(ny-o.wheel.cy)*(canvas.height/canvas.width); if(Math.hypot(dx,dy)<=o.wheel.r) return o; } else if(o.type==='muzzle'&&o.muzzle){ const s=normToScreen(nx,ny),s2=normToScreen(o.muzzle.x,o.muzzle.y); if(Math.hypot(s.x-s2.x,s.y-s2.y)<=12) return o; } else if(o.points&&o.points.length>=3){ if(pointInPolygon(nx,ny,o.points)) return o; } } return null; }
@@ -313,35 +353,199 @@ function hitVertex(nx,ny){
 
 function hitTrackMaskPoint(nx,ny){ if(!S.trackMask.enabled) return -1; const s=normToScreen(nx,ny); for(let i=0;i<S.trackMask.points.length;i++){ const p=normToScreen(S.trackMask.points[i].x,S.trackMask.points[i].y); if(Math.hypot(s.x-p.x,s.y-p.y)<=10) return i; } return -1; }
 
-function getDoorHingeAxis(o){
-  const pts=o.points; if(!pts||pts.length<3) return null;
-  if(o.type==='door_upper'){ const s=pts.slice().sort((a,b)=>b.x-a.x); let p1=s[0],p2=s[1]; if(p1.y>p2.y){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
-  if(o.type==='door_lower'){ const s=pts.slice().sort((a,b)=>b.y-a.y); let p1=s[0],p2=s[1]; if(p1.x>p2.x){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
-  if(o.type==='hatch'){
-    if(typeof o.hingeEdge==='number' && o.hingeEdge>=0 && o.hingeEdge<pts.length){ const i=o.hingeEdge, j=(i+1)%pts.length; return {p1:pts[i],p2:pts[j],edgeIdx:i}; }
-    const s=pts.slice().sort((a,b)=>b.y-a.y); let p1=s[0],p2=s[1]; if(p1.x>p2.x){const t=p1;p1=p2;p2=t;}
-    let idx=0; for(let i=0;i<pts.length;i++){ const j=(i+1)%pts.length; if((pts[i]===p1&&pts[j]===p2)||(pts[i]===p2&&pts[j]===p1)){ idx=i; break; } }
-    return {p1,p2,edgeIdx:idx};
+function getMaskYAtX(nx){ const pts=S.trackMask.points.slice().sort((a,b)=>a.x-b.x); if(pts.length<2) return 1; if(nx<=pts[0].x) return pts[0].y; if(nx>=pts[pts.length-1].x) return pts[pts.length-1].y; for(let i=0;i<pts.length-1;i++){ if(nx>=pts[i].x && nx<=pts[i+1].x){ const t=(nx-pts[i].x)/(pts[i+1].x-pts[i].x); return pts[i].y+(pts[i+1].y-pts[i].y)*t; } } return 1; }
+
+function getPolygonTopYAtX(x, pts) {
+  let topY = 1e9;
+  for(let i=0; i<pts.length; i++) {
+    const p1 = pts[i], p2 = pts[(i+1)%pts.length];
+    if ((p1.x <= x && p2.x >= x) || (p2.x <= x && p1.x >= x)) {
+      if (p1.x === p2.x) { topY = Math.min(topY, p1.y, p2.y); } 
+      else { const t = (x - p1.x) / (p2.x - p1.x); topY = Math.min(topY, p1.y + t * (p2.y - p1.y)); }
+    }
   }
+  return topY === 1e9 ? -1 : topY;
+}
+
+function getTextureRect(){
+  const sc = S.trackScroll;
+  let y0n = sc.textureY0, y1n = sc.textureY1;
+  const H = canvas.height;
+  if(y0n == null || !isFinite(y0n)) y0n = 0.6;
+  if(y1n == null || !isFinite(y1n)) y1n = 1.0;
+  let x0 = Math.max(0, Math.min(1, sc.textureX0));
+  let x1 = Math.max(0, Math.min(1, sc.textureX1));
+  if(x0 > x1){ const t = x0; x0 = x1; x1 = t; }
+  if(y0n > y1n){ const t = y0n; y0n = y1n; y1n = t; }
+  return { x0, x1, y0: y0n, y1: y1n };
+}
+
+function hitTextureRect(nx, ny){
+  const sc = S.trackScroll;
+  if(!sc.enabled || !sc.useTexture) return null;
+  const W = canvas.width, H = canvas.height;
+  const r = getTextureRect();
+  const x0=r.x0*W, x1=r.x1*W, y0=r.y0*H, y1=r.y1*H;
+  const px=nx*W, py=ny*H;
+  const th = 12 / S.view.scale;
+  const onLeft = Math.abs(px-x0)<=th, onRight = Math.abs(px-x1)<=th;
+  const onTop = Math.abs(py-y0)<=th, onBottom = Math.abs(py-y1)<=th;
+  const inX = px>=x0-th && px<=x1+th, inY = py>=y0-th && py<=y1+th;
+  if(!inX || !inY) return null;
+  if(onTop && onLeft) return 'tl';
+  if(onTop && onRight) return 'tr';
+  if(onBottom && onLeft) return 'bl';
+  if(onBottom && onRight) return 'br';
+  if(onTop) return 't';
+  if(onBottom) return 'b';
+  if(onLeft) return 'l';
+  if(onRight) return 'r';
   return null;
 }
 
-function getMaskYAtX(nx){ const pts=S.trackMask.points.slice().sort((a,b)=>a.x-b.x); if(pts.length<2) return 1; if(nx<=pts[0].x) return pts[0].y; if(nx>=pts[pts.length-1].x) return pts[pts.length-1].y; for(let i=0;i<pts.length-1;i++){ if(nx>=pts[i].x && nx<=pts[i+1].x){ const t=(nx-pts[i].x)/(pts[i+1].x-pts[i].x); return pts[i].y+(pts[i+1].y-pts[i].y)*t; } } return 1; }
-
-// ============ trackLoop 新增繪製 ============
 function eraseOriginalTrackByLoop(){
   if(!S.trackScroll.enabled) return;
-  const W = canvas.width, H = canvas.height;
-  const rawPts = S.trackLoop.points.map(p=>({x:p.x*W, y:p.y*H}));
-  if(rawPts.length < 3) return;
+  if(!S.trackLoop || S.trackLoop.points.length < 3) return;
+  if(!S.image || !imgCache.complete || !imgCache.naturalWidth) return;
+  var W = canvas.width, H = canvas.height;
+  var rawPts = S.trackLoop.points.map(function(p){ return { x:p.x*W, y:p.y*H }; });
+  var n = rawPts.length;
+  if(n < 3) return;
+  var segs = [], totalLen = 0;
+  for(var i=0;i<n;i++){
+    var p1 = rawPts[i], p2 = rawPts[(i+1)%n];
+    var dx = p2.x - p1.x, dy = p2.y - p1.y;
+    var len = Math.sqrt(dx*dx + dy*dy);
+    if(len < 0.5) continue;
+    segs.push({x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,ux:dx/len,uy:dy/len,len:len,startLen:totalLen});
+    totalLen += len;
+  }
+  if(totalLen < 1) return;
+  var cx = 0, cy = 0;
+  for(var i=0;i<n;i++){ cx += rawPts[i].x; cy += rawPts[i].y; }
+  cx /= n; cy /= n;
+  var r = getTextureRect();
+  var texH = (r.y1 - r.y0) * H;
+  var texW = (r.x1 - r.x0) * W;
+  if(texH < 2 || texW < 2) return;
+  function sampleArc(s){
+    s = s % totalLen; if(s<0) s += totalLen;
+    for(var i=0;i<segs.length;i++){
+      var seg = segs[i];
+      if(s >= seg.startLen && s <= seg.startLen + seg.len){
+        var t = (s - seg.startLen) / seg.len;
+        return { x: seg.x1+(seg.x2-seg.x1)*t, y: seg.y1+(seg.y2-seg.y1)*t, ux: seg.ux, uy: seg.uy };
+      }
+    }
+    var last = segs[segs.length-1];
+    return { x:last.x2, y:last.y2, ux:last.ux, uy:last.uy };
+  }
+  function normalToCenter(p){
+    var nx = -p.uy, ny = p.ux;
+    if(nx*(cx-p.x) + ny*(cy-p.y) < 0){ nx=-nx; ny=-ny; }
+    return { nx:nx, ny:ny };
+  }
+  var steps = Math.ceil(totalLen / texW) + 2;
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(rawPts[0].x, rawPts[0].y);
-  for(let i=1;i<rawPts.length;i++) ctx.lineTo(rawPts[i].x, rawPts[i].y);
-  ctx.closePath();
-  ctx.clip();
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.fillStyle = "#000";
+  for(var k=0;k<steps;k++){
+    var s0 = k * texW;
+    var a  = sampleArc(s0);
+    var b  = sampleArc(s0 + texW);
+    var na = normalToCenter(a);
+    var nb = normalToCenter(b);
+    var ext = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(a.x - a.ux*ext, a.y - a.uy*ext);
+    ctx.lineTo(b.x + b.ux*ext, b.y + b.uy*ext);
+    ctx.lineTo(b.x + b.ux*ext + nb.nx*texH, b.y + b.uy*ext + nb.ny*texH);
+    ctx.lineTo(a.x - a.ux*ext + na.nx*texH, a.y - a.uy*ext + na.ny*texH);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawTrackErasePatchBase(){
+  if(!S.trackScroll.enabled) return;
+  if(!S.trackLoop || S.trackLoop.points.length < 3) return;
+  if(!S.image || !imgCache.complete || !imgCache.naturalWidth) return;
+  const W = canvas.width, H = canvas.height;
+  
+  // ★ 核心修改：严格限制在履带环包围盒中心线以上
+  let minY = 1, maxY = 0;
+  for(const p of S.trackLoop.points){
+    if(p.y < minY) minY = p.y;
+    if(p.y > maxY) maxY = p.y;
+  }
+  const limitY = ((minY + maxY) / 2) * H; 
+
+  const rawPts = S.trackLoop.points.map(p => ({ x:p.x * W, y:p.y * H }));
+  const n = rawPts.length;
+  if(n < 3) return;
+  let segs = [], totalLen = 0;
+  for(let i = 0; i < n; i++){
+    const p1 = rawPts[i], p2 = rawPts[(i + 1) % n];
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if(len < 0.5) continue;
+    segs.push({ x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y, ux:dx / len, uy:dy / len, len:len, startLen:totalLen });
+    totalLen += len;
+  }
+  if(totalLen < 1) return;
+  let cx = 0, cy = 0;
+  for(let i = 0; i < n; i++){ cx += rawPts[i].x; cy += rawPts[i].y; }
+  cx /= n; cy /= n;
+  const r = getTextureRect();
+  const texW = (r.x1 - r.x0) * W, texH = (r.y1 - r.y0) * H;
+  if(texW < 2 || texH < 2) return;
+  function sampleArc(s){
+    s = s % totalLen; if(s < 0) s += totalLen;
+    for(let i = 0; i < segs.length; i++){
+      const seg = segs[i];
+      if(s >= seg.startLen && s <= seg.startLen + seg.len){
+        const t = (s - seg.startLen) / seg.len;
+        return { x: seg.x1 + (seg.x2 - seg.x1) * t, y: seg.y1 + (seg.y2 - seg.y1) * t, ux: seg.ux, uy: seg.uy };
+      }
+    }
+    const last = segs[segs.length - 1];
+    return { x:last.x2, y:last.y2, ux:last.ux, uy:last.uy };
+  }
+  function normalToCenter(p){
+    let nx = -p.uy, ny = p.ux;
+    if(nx * (cx - p.x) + ny * (cy - p.y) < 0){ nx = -nx; ny = -ny; }
+    return { nx, ny };
+  }
+  const steps = Math.ceil(totalLen / texW) + 2;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  for(let k = 0; k < steps; k++){
+    const s0 = k * texW;
+    const a = sampleArc(s0);
+    const b = sampleArc(s0 + texW);
+    const na = normalToCenter(a);
+    const nb = normalToCenter(b);
+    const ext = 1.5;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(a.x - a.ux * ext, a.y - a.uy * ext);
+    ctx.lineTo(b.x + b.ux * ext, b.y + b.uy * ext);
+    ctx.lineTo(b.x + b.ux * ext + nb.nx * texH, b.y + b.uy * ext + nb.ny * texH);
+    ctx.lineTo(a.x - a.ux * ext + na.nx * texH, a.y - a.uy * ext + na.ny * texH);
+    ctx.closePath();
+    ctx.clip();
+    
+    // 截断超出中心线的部分
+    ctx.beginPath(); ctx.rect(0, 0, W, limitY); ctx.clip();
+    
+    let mx = (na.nx + nb.nx) / 2, my = (na.ny + nb.ny) / 2;
+    const len = Math.hypot(mx, my) || 1;
+    mx /= len; my /= len;
+    ctx.translate(-mx * texH, -my * texH);
+    ctx.drawImage(imgCache, 0, 0, W, H);
+    ctx.restore();
+  }
   ctx.restore();
 }
 
@@ -349,120 +553,95 @@ function drawTrackScrollByLoop(){
   if(!S.trackScroll.enabled) return;
   if(!S.trackLoop || S.trackLoop.points.length < 3) return;
   if(!S.image || !imgCache.complete || !imgCache.naturalWidth) return;
-  const sc = S.trackScroll;
-  const W = canvas.width, H = canvas.height;
-  const rawPts = S.trackLoop.points.map(p=>({x:p.x*W, y:p.y*H}));
-  const n = rawPts.length;
-  let totalLen = 0;
-  const segs = [];
-  for(let i=0;i<n;i++){
-    const p1 = rawPts[i], p2 = rawPts[(i+1)%n];
-    const dx = p2.x-p1.x, dy = p2.y-p1.y;
-    const len = Math.sqrt(dx*dx+dy*dy);
+  var sc = S.trackScroll;
+  var W = canvas.width, H = canvas.height;
+  var rawPts = S.trackLoop.points.map(function(p){ return { x:p.x*W, y:p.y*H }; });
+  var n = rawPts.length;
+  var segs = [], totalLen = 0;
+  for(var i=0;i<n;i++){
+    var p1 = rawPts[i], p2 = rawPts[(i+1)%n];
+    var dx = p2.x-p1.x, dy = p2.y-p1.y;
+    var len = Math.sqrt(dx*dx+dy*dy);
     if(len < 0.5) continue;
-    segs.push({x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y, ux:dx/len, uy:dy/len, len, startLen:totalLen});
+    segs.push({x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,ux:dx/len,uy:dy/len,len:len,startLen:totalLen});
     totalLen += len;
   }
   if(totalLen < 1) return;
-  let cx=0, cy=0;
-  for(let i=0;i<n;i++){ cx+=rawPts[i].x; cy+=rawPts[i].y; }
+  var cx=0, cy=0;
+  for(var i=0;i<n;i++){ cx+=rawPts[i].x; cy+=rawPts[i].y; }
   cx/=n; cy/=n;
-
-  const r = getTextureRect();
-  const tx0 = r.x0*W, ty0 = r.y0*H, tx1 = r.x1*W, ty1 = r.y1*H;
-  const texW = tx1-tx0, texH = ty1-ty0;
-  if(texW < 2 || texH < 2) return;
-
-  let vel = 60;
-  const wheels = S.objects.filter(o=>o.type==='wheel' && o.wheel);
+  var r = getTextureRect();
+  var tx0=r.x0*W, ty0=r.y0*H, tx1=r.x1*W, ty1=r.y1*H;
+  var texW=tx1-tx0, texH=ty1-ty0;
+  if(texW<2 || texH<2) return;
+  var vel = 60;
+  var wheels = S.objects.filter(function(o){ return o.type==="wheel" && o.wheel; });
   if(wheels.length){
-    let avgR=0, avgRot=0;
-    for(const w of wheels){ avgR+=w.wheel.r; avgRot+=(w.rotSpeed||1); }
-    avgR/=wheels.length; avgRot/=wheels.length;
+    var avgR=0, avgRot=0;
+    for(var wi=0;wi<wheels.length;wi++){ avgR += wheels[wi].wheel.r; avgRot += (wheels[wi].rotSpeed||1); }
+    avgR /= wheels.length; avgRot /= wheels.length;
     vel = Math.max(30, Math.min(200, avgRot*avgR*W*0.15));
   }
-  const animT = S.animTime || 0;
-  const dir = sc.direction || -1;
-
+  var animT = S.animTime || 0;
+  var dir = sc.direction || -1;
   function sampleArc(s){
-    s = s % totalLen;
-    if(s < 0) s += totalLen;
-    for(const seg of segs){
+    s = s % totalLen; if(s<0) s += totalLen;
+    for(var i=0;i<segs.length;i++){
+      var seg = segs[i];
       if(s >= seg.startLen && s <= seg.startLen + seg.len){
-        const t = (s - seg.startLen) / seg.len;
-        return {x:seg.x1+(seg.x2-seg.x1)*t, y:seg.y1+(seg.y2-seg.y1)*t, ux:seg.ux, uy:seg.uy};
+        var t = (s - seg.startLen) / seg.len;
+        return { x: seg.x1+(seg.x2-seg.x1)*t, y: seg.y1+(seg.y2-seg.y1)*t, ux: seg.ux, uy: seg.uy };
       }
     }
-    const last = segs[segs.length-1];
-    return {x:last.x2, y:last.y2, ux:last.ux, uy:last.uy};
+    var last = segs[segs.length-1];
+    return { x:last.x2, y:last.y2, ux:last.ux, uy:last.uy };
   }
   function normalToCenter(p){
-    let nx = -p.uy, ny = p.ux;
+    var nx = -p.uy, ny = p.ux;
     if(nx*(cx-p.x) + ny*(cy-p.y) < 0){ nx=-nx; ny=-ny; }
-    return {nx, ny};
+    return { nx:nx, ny:ny };
   }
-
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(rawPts[0].x, rawPts[0].y);
-  for(let i=1;i<n;i++) ctx.lineTo(rawPts[i].x, rawPts[i].y);
+  for(var i=1;i<n;i++) ctx.lineTo(rawPts[i].x, rawPts[i].y);
   ctx.closePath();
   ctx.clip();
-
   if(sc.useTexture){
-    let offset = (animT * vel * dir) % texW;
-    if(offset < 0) offset += texW;
-    const steps = Math.ceil(totalLen / texW) + 2;
-    ctx.globalAlpha = sc.textureOpacity || 0.85;
-    for(let k=0;k<steps;k++){
-      const s0 = offset + k*texW;
-      const a = sampleArc(s0);
-      const b = sampleArc(s0 + texW);
-      const na = normalToCenter(a);
-      const nb = normalToCenter(b);
+    var offset = (animT * vel * dir) % texW; if(offset<0) offset += texW;
+    var steps = Math.ceil(totalLen / texW) + 2;
+    var prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = (sc.textureOpacity || 0.85);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.imageSmoothingEnabled = true;
+    for(var k=0;k<steps;k++){
+      var s0 = offset + k*texW;
+      var a = sampleArc(s0);
+      var b = sampleArc(s0 + texW);
+      var na = normalToCenter(a);
+      var nb = normalToCenter(b);
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
-      ctx.lineTo(b.x + nb.nx * texH, b.y + nb.ny * texH);
-      ctx.lineTo(a.x + na.nx * texH, a.y + na.ny * texH);
+      ctx.lineTo(b.x + nb.nx*texH, b.y + nb.ny*texH);
+      ctx.lineTo(a.x + na.nx*texH, a.y + na.ny*texH);
       ctx.closePath();
       ctx.clip();
       ctx.translate(a.x, a.y);
       ctx.transform(a.ux, a.uy, na.nx, na.ny, 0, 0);
       ctx.translate(0, texH);
       ctx.scale(1, -1);
-      const det = a.ux * na.ny - a.uy * na.nx;
-      if(det < 0){
-        ctx.scale(-1, 1);
-        ctx.translate(-texW, 0);
-      }
+      var det = a.ux*na.ny - a.uy*na.nx;
+      if(det < 0){ ctx.scale(-1,1); ctx.translate(-texW,0); }
       ctx.drawImage(imgCache, tx0, ty0, texW, texH, 0, 0, texW, texH);
       ctx.restore();
     }
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = prevAlpha;
   }
-  // 條紋完全移除，不再有任何黑色線段
   ctx.restore();
 }
 
-// ============ 舊 trackLine 繪製（保留不調用） ============
-function getTrackTopYAtX(nx){ return null; }
-function buildTrackPath(){ return null; }
-function sampleTrackPath(){ return null; }
-function traceTrackClipPath(){}
-function buildTrackBandShape(){ return null; }
-function traceTrackBandPath(){}
-function eraseOriginalTrack(){}
-function drawQuad(){}
-function drawQuadUp(){}
-function drawTrackStripesLayer(){}
-function drawTrackTextureLayer(){}
-function drawTrackScroll(){}
-function drawTrackLineGuide(){}
-function drawDraftTrackLine(){}
-
-// ============ 新履帶環引導 ============
 function drawTrackLoopGuide(){
   const pts = S.trackLoop.points;
   if(pts.length < 3) return;
@@ -505,31 +684,114 @@ function drawDraftLoop(){
   ctx.restore();
 }
 
-// ============ 門 / 遮罩 / 輪子 / 武器 ============
 function getWheelClipCanvas(o){
   if(!S.image||!imgCache.complete||!imgCache.naturalWidth) return null;
   if(!o.wheel) return null;
   const w=canvas.width,h=canvas.height,cx=o.wheel.cx*w,cy=o.wheel.cy*h,r=o.wheel.r*w;
   const size=Math.ceil(r*2); if(size<3) return null;
   const maskKey = (S.trackMask.enabled && S.trackMask.points.length>=2) ? S.trackMask.points.map(p=>p.x.toFixed(3)+','+p.y.toFixed(3)).join(';') : 'off';
-  const key=S.image.dataUrl.slice(-40)+'|'+cx.toFixed(1)+'|'+cy.toFixed(1)+'|'+size+'|'+maskKey;
+  const loopKey = (S.trackLoop && S.trackLoop.points.length>=3) ? S.trackLoop.points.map(p=>p.x.toFixed(2)+','+p.y.toFixed(2)).join(';') : 'off';
+  const key=S.image.dataUrl.slice(-40)+'|'+cx.toFixed(1)+'|'+cy.toFixed(1)+'|'+size+'|'+maskKey+'|'+loopKey;
   if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
   const c=document.createElement('canvas'); c.width=size; c.height=size;
   const cc=c.getContext('2d');
   cc.save(); cc.beginPath(); cc.arc(size/2,size/2,size/2-0.5,0,Math.PI*2); cc.clip(); cc.drawImage(imgCache,-(cx-size/2),-(cy-size/2),w,h); cc.restore();
+
+  let cutY_A = -1;
+  let cutY_B = -1;
   if(S.trackMask.enabled && S.trackMask.points.length>=2){
-    const maskY = getMaskYAtX(o.wheel.cx);
-    const maskYInCanvas = maskY * h - (cy - size/2);
-    if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
-      const below = document.createElement('canvas'); below.width=size; below.height=size;
-      const bc = below.getContext('2d'); bc.drawImage(c,0,0); bc.globalCompositeOperation='destination-in'; bc.fillRect(0, maskYInCanvas, size, size - maskYInCanvas);
-      cc.save(); cc.beginPath(); cc.arc(size/2,size/2,size/2-0.5,0,Math.PI*2); cc.clip(); cc.clearRect(0, 0, size, maskYInCanvas); cc.restore();
-      cc.save(); cc.beginPath(); cc.arc(size/2,size/2,size/2-0.5,0,Math.PI*2); cc.clip(); cc.translate(0, maskYInCanvas * 2); cc.scale(1, -1); cc.drawImage(below, 0, 0); cc.restore();
+    cutY_A = getMaskYAtX(o.wheel.cx) * h - (cy - size/2);
+  }
+  if(S.trackLoop && S.trackLoop.points.length>=3){
+    let inTrack = false;
+    if (pointInPolygon(o.wheel.cx, o.wheel.cy, S.trackLoop.points)) inTrack = true;
+    else {
+      for (let i = 0; i < 16; i++) {
+          const ang = (i / 16) * Math.PI * 2;
+          const nx = o.wheel.cx + Math.cos(ang) * o.wheel.r;
+          const ny = o.wheel.cy + Math.sin(ang) * o.wheel.r * (w / h);
+          if (pointInPolygon(nx, ny, S.trackLoop.points)) { inTrack = true; break; }
+      }
+    }
+    if (inTrack) {
+      let trackTopY = getPolygonTopYAtX(o.wheel.cx, S.trackLoop.points);
+      if (trackTopY >= 0) {
+        const rtex = getTextureRect();
+        const texH = (rtex.y1 - rtex.y0) * h;
+        cutY_B = (trackTopY * h + texH) - (cy - size/2);
+      }
     }
   }
-  cc.save(); cc.globalCompositeOperation='destination-in'; cc.beginPath(); cc.arc(size/2,size/2,size/2-0.5,0,Math.PI*2); cc.fill(); cc.restore();
-  _wheelClipCache.set(key,c);
-  if(_wheelClipCache.size>40){ _wheelClipCache.delete(_wheelClipCache.keys().next().value); }
+
+  let finalCutY = -1;
+  if (cutY_A !== -1) finalCutY = cutY_A;
+  if (cutY_B !== -1) finalCutY = finalCutY === -1 ? cutY_B : Math.max(finalCutY, cutY_B);
+
+  let maxWheelCy = 0, hasWheel = false;
+  for(const obj of S.objects) {
+      if(obj.type === 'wheel' && obj.wheel) {
+          if(obj.wheel.cy > maxWheelCy) { maxWheelCy = obj.wheel.cy; hasWheel = true; }
+      }
+  }
+  if (hasWheel) {
+      let limitY_local = maxWheelCy * h - (cy - size/2);
+      if (finalCutY > limitY_local) finalCutY = limitY_local;
+  }
+  if (finalCutY > size / 2) finalCutY = size / 2;
+
+  let maskYInCanvas = finalCutY;
+
+  if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
+    cc.save();
+    cc.globalCompositeOperation = "destination-out";
+    cc.fillRect(0, 0, size, maskYInCanvas);
+    cc.restore();
+    
+    var isLargeCut = maskYInCanvas > size / 2;
+    if(isLargeCut){
+      var fan = document.createElement("canvas"); fan.width = size; fan.height = size;
+      var fx = fan.getContext("2d");
+      fx.save();
+      fx.beginPath();
+      fx.moveTo(size/2, size/2);
+      fx.arc(size/2, size/2, size/2, Math.PI*0.25, Math.PI*0.75);
+      fx.closePath();
+      fx.clip();
+      fx.drawImage(imgCache, -(cx-size/2), -(cy-size/2), w, h);
+      fx.restore();
+      cc.save();
+      cc.globalCompositeOperation = "destination-over";
+      for(var j=1;j<=7;j++){
+        cc.save();
+        cc.translate(size/2, size/2);
+        cc.rotate((Math.PI/4)*j);
+        cc.translate(-size/2, -size/2);
+        cc.drawImage(fan, 0, 0);
+        cc.restore();
+      }
+      cc.restore();
+    } else {
+      var temp = document.createElement("canvas"); temp.width = size; temp.height = size;
+      var tc = temp.getContext("2d"); tc.drawImage(c, 0, 0);
+      cc.save();
+      cc.globalCompositeOperation = "destination-over";
+      var angles = [15,-15,30,-30,45,-45,60,-60,90,-90];
+      for(var k=0;k<angles.length;k++){
+        cc.save();
+        cc.translate(size/2, size/2);
+        cc.rotate(angles[k] * Math.PI/180);
+        cc.translate(-size/2, -size/2);
+        cc.drawImage(temp, 0, 0);
+        cc.restore();
+      }
+      cc.restore();
+    }
+  }
+  cc.save(); cc.globalCompositeOperation = "destination-in";
+  cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.fill();
+  cc.restore();
+  _wheelClipCache.set(key, c);
+  if(_wheelClipCache.size > 40){ _wheelClipCache.delete(_wheelClipCache.keys().next().value); }
   return c;
 }
 
@@ -549,294 +811,6 @@ function getMaskCanvas(){
   return c;
 }
 
-function getDoorClipCanvas(o){
-  if(!S.image||!imgCache.complete||!imgCache.naturalWidth) return null;
-  const pts=o.points; if(!pts||pts.length<3) return null;
-  const w=canvas.width,h=canvas.height;
-  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-  for(const p of pts){ const px=p.x*w,py=p.y*h; if(px<minX)minX=px; if(py<minY)minY=py; if(px>maxX)maxX=px; if(py>maxY)maxY=py; }
-  const bw=Math.ceil(maxX-minX),bh=Math.ceil(maxY-minY);
-  if(bw<2||bh<2) return null;
-  const key=S.image.dataUrl.slice(-40)+'|'+pts.map(p=>p.x.toFixed(3)+','+p.y.toFixed(3)).join(';');
-  if(_doorClipCache.has(key)) return _doorClipCache.get(key);
-  const c=document.createElement('canvas'); c.width=bw; c.height=bh;
-  const cc=c.getContext('2d');
-  cc.beginPath(); cc.moveTo(pts[0].x*w-minX,pts[0].y*h-minY); for(let i=1;i<pts.length;i++) cc.lineTo(pts[i].x*w-minX,pts[i].y*h-minY); cc.closePath(); cc.clip();
-  cc.drawImage(imgCache,-minX,-minY,w,h);
-  const result={canvas:c,minX,minY,bw,bh};
-  _doorClipCache.set(key,result);
-  if(_doorClipCache.size>30){ _doorClipCache.delete(_doorClipCache.keys().next().value); }
-  return result;
-}
-
-function getShakeOffset(){ if(!S.shakeEnabled||!S.playing) return {x:0,y:0}; const t=performance.now(); return { x: Math.sin(t/40)*1.5, y: Math.cos(t/55)*1.2 }; }
-function getWheelRotSpeed(o){ const boost = (S.shakeEnabled&&S.playing) ? 3 : 1; return (o.rotSpeed||1) * boost; }
-
-function getTextureRect(){
-  const sc = S.trackScroll;
-  let y0n = sc.textureY0;
-  let y1n = sc.textureY1;
-  const H = canvas.height;
-  if(y0n == null || !isFinite(y0n)) y0n = 0.6;
-  if(y1n == null || !isFinite(y1n)) y1n = 1.0;
-  let x0 = Math.max(0, Math.min(1, sc.textureX0));
-  let x1 = Math.max(0, Math.min(1, sc.textureX1));
-  if(x0 > x1){ const t = x0; x0 = x1; x1 = t; }
-  if(y0n > y1n){ const t = y0n; y0n = y1n; y1n = t; }
-  return { x0, x1, y0: y0n, y1: y1n };
-}
-
-function hitTextureRect(nx, ny){
-  const sc = S.trackScroll;
-  if(!sc.enabled || !sc.useTexture) return null;
-  const W = canvas.width, H = canvas.height;
-  const r = getTextureRect();
-  const x0=r.x0*W, x1=r.x1*W, y0=r.y0*H, y1=r.y1*H;
-  const px=nx*W, py=ny*H;
-  const th = 12 / S.view.scale;
-  const onLeft = Math.abs(px-x0)<=th, onRight = Math.abs(px-x1)<=th;
-  const onTop = Math.abs(py-y0)<=th, onBottom = Math.abs(py-y1)<=th;
-  const inX = px>=x0-th && px<=x1+th, inY = py>=y0-th && py<=y1+th;
-  if(!inX || !inY) return null;
-  if(onTop && onLeft) return 'tl';
-  if(onTop && onRight) return 'tr';
-  if(onBottom && onLeft) return 'bl';
-  if(onBottom && onRight) return 'br';
-  if(onTop) return 't';
-  if(onBottom) return 'b';
-  if(onLeft) return 'l';
-  if(onRight) return 'r';
-  return null;
-}
-
-// ============ 主渲染 ============
-function render(){
-  if(!ctx) return;
-  const w=canvas.width,h=canvas.height;
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.clearRect(0,0,w,h);
-  drawGrid();
-  ctx.setTransform(S.view.scale,0,0,S.view.scale,S.view.tx,S.view.ty);
-
-  const shake = getShakeOffset();
-  ctx.save();
-  if(shake.x||shake.y) ctx.translate(shake.x, shake.y);
-
-  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder==='below') drawMuzzle(o,o.id===S.selectedId); }
-  drawFireEffects('below');
-
-  if(S.image){
-    if(imgCache.src!==S.image.dataUrl) imgCache.src=S.image.dataUrl;
-    if(imgCache.complete&&imgCache.naturalWidth>0){
-      const alpha = S.xrayMode ? 0.35 : 1;
-      ctx.globalAlpha = alpha;
-      ctx.drawImage(imgCache,0,0,w,h);
-      ctx.globalAlpha = 1;
-    }
-  } else {
-    ctx.fillStyle='#0a0806'; ctx.fillRect(0,0,w,h);
-    ctx.fillStyle='#3a2f25'; ctx.font='20px sans-serif'; ctx.textAlign='center';
-    ctx.fillText('點擊「導入圖片」載入載具側視圖',w/2,h/2);
-  }
-
-  // ★ 新繪製路徑：trackLoop
-  eraseOriginalTrackByLoop();
-  drawTrackScrollByLoop();
-
-  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='wheel'&&o.wheel) drawWheel(o,o.id===S.selectedId,getWheelRotSpeed(o)); }
-
-  const maskC = getMaskCanvas();
-  if(maskC){ ctx.drawImage(maskC,0,0,w,h); }
-
-  /* === 武器管退 === */
-  {
-    const _nowT = performance.now();
-    let _hasWeapon = false;
-    for(const o of S.objects){
-      if(o.hidden) continue;
-      if(o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
-      _hasWeapon = true; break;
-    }
-    if(_hasWeapon){
-      const s = S.view.scale;
-      const tx = S.view.tx;
-      const ty = S.view.ty;
-
-      if(!window._fullC || window._fullC.width !== w || window._fullC.height !== h){
-        window._fullC = document.createElement('canvas'); window._fullC.width = w; window._fullC.height = h;
-      }
-      if(!window._bodyC || window._bodyC.width !== w || window._bodyC.height !== h){
-        window._bodyC = document.createElement('canvas'); window._bodyC.width = w; window._bodyC.height = h;
-      }
-      if(!window._wepC || window._wepC.width !== w || window._wepC.height !== h){
-        window._wepC = document.createElement('canvas'); window._wepC.width = w; window._wepC.height = h;
-      }
-      const fullC = window._fullC; const fullX = fullC.getContext('2d');
-      const bodyC = window._bodyC; const bodyX = bodyC.getContext('2d');
-      const wepC = window._wepC; const wepX = wepC.getContext('2d');
-
-      fullX.setTransform(1,0,0,1,0,0);
-      fullX.clearRect(0,0,w,h);
-      fullX.drawImage(canvas, 0, 0);
-
-      bodyX.setTransform(1,0,0,1,0,0);
-      bodyX.clearRect(0,0,w,h);
-      bodyX.drawImage(fullC, 0, 0);
-      bodyX.globalCompositeOperation = 'destination-out';
-      for(const o of S.objects){
-        if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
-        bodyX.beginPath();
-        for(let i=0; i<o.points.length; i++){
-          const px = o.points[i].x * w * s + tx;
-          const py = o.points[i].y * h * s + ty;
-          if(i===0) bodyX.moveTo(px, py);
-          else bodyX.lineTo(px, py);
-        }
-        bodyX.closePath();
-        bodyX.fill();
-      }
-      bodyX.globalCompositeOperation = 'source-over';
-
-      ctx.save();
-      ctx.setTransform(1,0,0,1,0,0);
-      ctx.globalCompositeOperation = 'destination-out';
-      for(const o of S.objects){
-        if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
-        ctx.beginPath();
-        for(let i=0; i<o.points.length; i++){
-          const px = o.points[i].x * w * s + tx;
-          const py = o.points[i].y * h * s + ty;
-          if(i===0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.restore();
-
-      for(const o of S.objects){
-        if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
-        let rx = 0;
-        const rs = S.recoilStates[o.id];
-        if(rs){
-          const _t = (_nowT - rs.startTime) / rs.duration;
-          if(_t < 1){
-            const _p = _t < 0.25 ? _t / 0.25 : Math.pow(1 - (_t - 0.25) / 0.75, 1.8);
-            rx = rs.dist * _p * w * s;
-          } else { delete S.recoilStates[o.id]; }
-        }
-        wepX.setTransform(1,0,0,1,0,0);
-        wepX.clearRect(0,0,w,h);
-        wepX.drawImage(fullC, 0, 0);
-        wepX.globalCompositeOperation = 'destination-in';
-        wepX.beginPath();
-        for(let i=0; i<o.points.length; i++){
-          const px = o.points[i].x * w * s + tx;
-          const py = o.points[i].y * h * s + ty;
-          if(i===0) wepX.moveTo(px, py);
-          else wepX.lineTo(px, py);
-        }
-        wepX.closePath();
-        wepX.fill();
-        wepX.globalCompositeOperation = 'source-over';
-
-        ctx.save();
-        ctx.setTransform(1,0,0,1,0,0);
-        ctx.drawImage(wepC, -rx, 0);
-        ctx.restore();
-      }
-
-      ctx.save();
-      ctx.setTransform(1,0,0,1,0,0);
-      ctx.drawImage(bodyC, 0, 0);
-      ctx.restore();
-    }
-  }
-
-  for(const o of S.objects){
-    if(o.hidden) continue;
-    if((o.type==='door_upper'||o.type==='door_lower'||o.type==='hatch')&&o.points&&o.points.length>=3){
-      const ang=getOpenAngle(o,S.playing?S.animTime:0);
-      if(ang>3){
-        ctx.fillStyle=o.fillColor||'#000000';
-        ctx.beginPath(); ctx.moveTo(o.points[0].x*w,o.points[0].y*h);
-        for(let i=1;i<o.points.length;i++) ctx.lineTo(o.points[i].x*w,o.points[i].y*h);
-        ctx.closePath(); ctx.fill();
-      }
-    }
-  }
-
-  for(const o of S.objects){
-    if(o.hidden) continue;
-    if(o.type==='door_upper'||o.type==='door_lower') drawDoor(o,o.id===S.selectedId,0);
-    else if(o.type==='hatch') drawHatch(o,o.id===S.selectedId,0);
-    else if(o.type==='weapon'&&o.points) drawPolygon(o,o.id===S.selectedId);
-  }
-
-  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder!=='below') drawMuzzle(o,o.id===S.selectedId); }
-  drawFireEffects('above');
-  ctx.restore();
-
-  drawAnchorLines();
-  if(S.trackMask.enabled) drawTrackMaskLine();
-  drawTrackLoopGuide();
-  if(S.trackScroll.enabled && S.trackScroll.useTexture) drawTextureRectOverlay();
-  if(S.draftPolygon.length>0) drawDraftPolygon();
-  if(S.draftLoop.length>0) drawDraftLoop();
-  drawHandles();
-
-  ctx.setTransform(1,0,0,1,0,0);
-}
-
-function drawTextureRectOverlay(){
-  const sc = S.trackScroll;
-  if(!sc.useTexture) return;
-  const W = canvas.width, H = canvas.height;
-  const r = getTextureRect();
-  const x0 = r.x0*W, x1 = r.x1*W, y0 = r.y0*H, y1 = r.y1*H;
-  ctx.save();
-  ctx.strokeStyle='#ffcc44'; ctx.lineWidth=1.5/S.view.scale;
-  ctx.setLineDash([6/S.view.scale,4/S.view.scale]);
-  ctx.strokeRect(x0, y0, x1-x0, y1-y0);
-  ctx.setLineDash([]);
-  ctx.fillStyle='rgba(255,204,68,0.9)';
-  ctx.font=(10/S.view.scale)+'px monospace';
-  ctx.textAlign='left';
-  ctx.fillText('紋理取樣區（可拖拽調整）', x0+4/S.view.scale, y0-4/S.view.scale);
-  const hs = 5/S.view.scale;
-  for(const [hx,hy] of [[x0,y0],[x1,y0],[x0,y1],[x1,y1]]){
-    ctx.fillStyle='#ffcc44';
-    ctx.beginPath(); ctx.arc(hx, hy, hs, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5/S.view.scale; ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function getOpenAngle(o,animT){
-  let maxAngle=180;
-  if(o.type==='door_upper') maxAngle=180; else if(o.type==='door_lower') maxAngle=110; else if(o.type==='hatch') maxAngle=180;
-  if(!S.playing) return o.openAngle||0;
-  return getDoorOpenProgress(animT, S.animSpeed) * maxAngle;
-}
-
-function drawGrid(){ ctx.strokeStyle='rgba(232,163,61,0.06)'; ctx.lineWidth=1; for(let x=0;x<canvas.width;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); } for(let y=0;y<canvas.height;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); } }
-function drawAnchorLines(){ const w=canvas.width,h=canvas.height; const gy=S.anchor.groundY*h; ctx.strokeStyle='rgba(76,175,80,0.6)'; ctx.lineWidth=1.5/S.view.scale; ctx.setLineDash([8/S.view.scale,6/S.view.scale]); ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(w,gy); ctx.stroke(); const cx=S.anchor.centerX*w; ctx.strokeStyle='rgba(74,144,217,0.5)'; ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,h); ctx.stroke(); ctx.setLineDash([]); }
-function drawTrackMaskLine(){
-  const w=canvas.width,h=canvas.height;
-  const pts=S.trackMask.points.slice().sort((a,b)=>a.x-b.x);
-  if(pts.length<2) return;
-  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=2/S.view.scale;
-  ctx.setLineDash([6/S.view.scale,4/S.view.scale]);
-  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h);
-  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h);
-  ctx.stroke(); ctx.setLineDash([]);
-  for(const p of S.trackMask.points){
-    ctx.fillStyle='#4af0ff'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5/S.view.scale;
-    const s=6/S.view.scale;
-    ctx.beginPath(); ctx.arc(p.x*w,p.y*h,s,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  }
-}
 function drawWheel(o,isSel,rotSpeed){
   const w=canvas.width,h=canvas.height,cx=o.wheel.cx*w,cy=o.wheel.cy*h,r=o.wheel.r*w;
   if(r<1) return;
@@ -853,62 +827,91 @@ function drawWheel(o,isSel,rotSpeed){
   ctx.fillText(o.name||'車輪',cx,cy+r+14/S.view.scale);
 }
 
-function drawDoor(o,isSel,animT){
-  const w=canvas.width,h=canvas.height; const pts=o.points;
+function drawFusionDoor(o, isSel){
+  const w=canvas.width, h=canvas.height; const pts=o.points;
   if(!pts||pts.length<3) return;
+  
   const ang=getOpenAngle(o,S.playing?S.animTime:0);
-  const cosA=Math.cos(ang*Math.PI/180);
-  const isFront=cosA>=0;
-  const hinge=getDoorHingeAxis(o); if(!hinge) return;
-  const {p1,p2}=hinge;
-  const x1=p1.x*w,y1=p1.y*h,x2=p2.x*w,y2=p2.y*h;
-  const alpha=Math.atan2(y2-y1,x2-x1);
-  ctx.save();
-  ctx.translate(x1,y1); ctx.rotate(alpha); ctx.scale(1,cosA); ctx.rotate(-alpha); ctx.translate(-x1,-y1);
-  if(isFront){ const clip=getDoorClipCanvas(o); if(clip) ctx.drawImage(clip.canvas,clip.minX,clip.minY,clip.bw,clip.bh); else { ctx.fillStyle='rgba(232,163,61,0.4)'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); } }
-  else { ctx.fillStyle=o.fillColor||'#000000'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); ctx.strokeStyle='rgba(80,80,80,0.45)'; ctx.lineWidth=1/S.view.scale; ctx.stroke(); }
-  ctx.strokeStyle=isSel?'#e8a33d':'#e07ae8'; ctx.lineWidth=2/S.view.scale;
-  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.stroke();
-  ctx.restore();
-  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=3/S.view.scale;
-  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-  ctx.fillStyle='#4af0ff';
-  for(const [px,py] of [[x1,y1],[x2,y2]]){ const s=5/S.view.scale; ctx.fillRect(px-s,py-s,s*2,s*2); }
-  let cx=0,cy=0; for(const p of pts){ cx+=p.x; cy+=p.y; } cx=(cx/pts.length)*w; cy=(cy/pts.length)*h;
-  ctx.fillStyle=isSel?'#e8a33d':'#e07ae8'; ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='center';
-  ctx.fillText((o.name||'車門')+' '+Math.round(ang)+'° '+(isFront?'正':'背'),cx,cy-20/S.view.scale);
-}
+  let cosA=Math.cos(ang*Math.PI/180); 
+  if (Math.abs(cosA) < 0.02) cosA = 0.02 * Math.sign(cosA || 1);
 
-function drawHatch(o,isSel,animT){
-  const w=canvas.width,h=canvas.height; const pts=o.points;
-  if(!pts||pts.length<3) return;
-  const ang=getOpenAngle(o,S.playing?S.animTime:0);
-  const cosA=Math.cos(ang*Math.PI/180);
-  const showBack = cosA < 0;
-  let minY = Infinity, bestI = 0;
-  for(let i=0;i<pts.length;i++){
-    const j = (i+1)%pts.length;
-    const my = (pts[i].y + pts[j].y) / 2;
-    if(my < minY){ minY = my; bestI = i; }
+  let idx = (o.hingeEdge || 0) % pts.length;
+  const p1 = pts[idx], p2 = pts[(idx+1)%pts.length];
+  
+  let x1 = p1.x * w, y1 = p1.y * h;
+  let x2 = p2.x * w, y2 = p2.y * h;
+  if (Math.hypot(x2 - x1, y2 - y1) < 0.01) { x2 = x1 + 1; y2 = y1; }
+
+  let alpha = Math.atan2(y2 - y1, x2 - x1);
+  if (!isFinite(alpha)) alpha = 0;
+
+  let minMidX = 1e9, leftEdgeIdx = -1;
+  for(let i=0; i<pts.length; i++){
+      const j = (i+1)%pts.length;
+      const midX = (pts[i].x + pts[j].x) / 2; 
+      if(midX < minMidX){ minMidX = midX; leftEdgeIdx = i; }
   }
-  let p1 = pts[bestI], p2 = pts[(bestI+1)%pts.length];
-  if(p1.x > p2.x){ const t = p1; p1 = p2; p2 = t; }
-  const x1=p1.x*w,y1=p1.y*h,x2=p2.x*w,y2=p2.y*h;
-  const alpha=Math.atan2(y2-y1,x2-x1);
+
   ctx.save();
-  ctx.translate(x1,y1); ctx.rotate(alpha); ctx.scale(1,cosA); ctx.rotate(-alpha); ctx.translate(-x1,-y1);
-  if(!showBack){ const clip=getDoorClipCanvas(o); if(clip) ctx.drawImage(clip.canvas,clip.minX,clip.minY,clip.bw,clip.bh); else { ctx.fillStyle='rgba(120,200,255,0.4)'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); } }
-  else { ctx.fillStyle=o.fillColor||'#000000'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); ctx.strokeStyle='rgba(80,80,80,0.45)'; ctx.lineWidth=1/S.view.scale; ctx.stroke(); }
-  ctx.strokeStyle=isSel?'#e8a33d':'#4ad8e8'; ctx.lineWidth=2/S.view.scale;
-  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.stroke();
+  ctx.translate(x1, y1);
+  ctx.rotate(alpha);
+  ctx.scale(1, cosA);
+  ctx.rotate(-alpha);
+  ctx.translate(-x1, -y1);
+
+  ctx.fillStyle = o.fillColor || '#000000';
+  ctx.beginPath(); 
+  ctx.moveTo(pts[0].x*w, pts[0].y*h);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w, pts[i].y*h);
+  ctx.closePath(); 
+  ctx.fill();
   ctx.restore();
-  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=3/S.view.scale;
-  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-  ctx.fillStyle='#4af0ff';
-  for(const [px,py] of [[x1,y1],[x2,y2]]){ const s=5/S.view.scale; ctx.fillRect(px-s,py-s,s*2,s*2); }
-  let cx=0,cy=0; for(const p of pts){ cx+=p.x; cy+=p.y; } cx=(cx/pts.length)*w; cy=(cy/pts.length)*h;
-  ctx.fillStyle=isSel?'#e8a33d':'#4ad8e8'; ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='center';
-  ctx.fillText((o.name||'艙門')+' '+Math.round(ang)+'° '+(showBack?'背':'正'),cx,cy-20/S.view.scale);
+
+  const transPts = pts.map(p => {
+      const px = p.x * w, py = p.y * h;
+      const dx = px - x1, dy = py - y1;
+      const cos = Math.cos(-alpha), sin = Math.sin(-alpha);
+      const rx = dx * cos - dy * sin;
+      const ry = dx * sin + dy * cos;
+      const sy = ry * cosA;
+      const fcos = Math.cos(alpha), fsin = Math.sin(alpha);
+      const fx = rx * fcos - sy * fsin;
+      const fy = rx * fsin + sy * fcos;
+      return { x: fx + x1, y: fy + y1 };
+  });
+
+  const baseLineWidth = 2 / S.view.scale;
+  ctx.strokeStyle = isSel ? '#e8a33d' : '#a45ede'; 
+  ctx.lineWidth = baseLineWidth;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(transPts[0].x, transPts[0].y);
+  for(let i=1; i<transPts.length; i++) ctx.lineTo(transPts[i].x, transPts[i].y);
+  ctx.closePath();
+  ctx.stroke();
+
+  if (leftEdgeIdx >= 0 && ang > 2) {
+      const thickMult = 1 + Math.pow(ang / 90, 1.5) * 3; 
+      ctx.lineWidth = baseLineWidth * thickMult;
+      ctx.strokeStyle = isSel ? '#ffdd88' : '#ffffff';
+      ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
+      const n = pts.length;
+      const pStart = transPts[(leftEdgeIdx - 1 + n) % n];
+      const pLeft1 = transPts[leftEdgeIdx];
+      const pLeft2 = transPts[(leftEdgeIdx + 1) % n];
+      const pEnd = transPts[(leftEdgeIdx + 2) % n];
+      ctx.beginPath(); ctx.moveTo(pStart.x, pStart.y); ctx.lineTo(pLeft1.x, pLeft1.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pLeft1.x, pLeft1.y); ctx.lineTo(pLeft2.x, pLeft2.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pLeft2.x, pLeft2.y); ctx.lineTo(pEnd.x, pEnd.y); ctx.stroke();
+  }
+
+  if(isSel){
+    ctx.strokeStyle='#4af0ff'; ctx.lineWidth=3/S.view.scale;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.fillStyle='#4af0ff';
+    const s = 5/S.view.scale;
+    for(const [px,py] of [[x1,y1],[x2,y2]]) ctx.fillRect(px-s,py-s,s*2,s*2);
+  }
 }
 
 function drawPolygon(o,isSel){
@@ -987,20 +990,268 @@ function drawHandles(){
   function handle(x,y){ ctx.beginPath(); ctx.arc(x,y,hs,0,Math.PI*2); ctx.fill(); ctx.stroke(); }
   if(o.type==='wheel'&&o.wheel){ handle(o.wheel.cx*w,o.wheel.cy*h); handle((o.wheel.cx+o.wheel.r)*w,o.wheel.cy*h); }
   else if(o.type==='muzzle'&&o.muzzle){ handle(o.muzzle.x*w,o.muzzle.y*h); }
-  else if(o.points){
-    ctx.font = (9/S.view.scale) + 'px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
+  else if(o.points){ 
+    ctx.font = (9/S.view.scale) + 'px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     for(let i = 0; i < o.points.length; i++){
       const p = o.points[i];
       handle(p.x*w, p.y*h);
-      ctx.fillStyle = '#fff';
-      ctx.fillText('P' + i, p.x*w + 5/S.view.scale, p.y*h - 5/S.view.scale);
+      ctx.fillStyle = '#fff'; ctx.fillText('P' + i, p.x*w + 5/S.view.scale, p.y*h - 5/S.view.scale);
     }
   }
 }
 
-// ============ 事件 ============
+function render(){
+  if(!ctx) return;
+  const w=canvas.width,h=canvas.height;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,w,h);
+  drawGrid();
+  ctx.setTransform(S.view.scale,0,0,S.view.scale,S.view.tx,S.view.ty);
+
+  const shake = getShakeOffset();
+  ctx.save();
+  if(shake.x||shake.y) ctx.translate(shake.x, shake.y);
+
+  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder==='below') drawMuzzle(o,o.id===S.selectedId); }
+  drawFireEffects('below');
+
+  if(S.image){
+    if(imgCache.src!==S.image.dataUrl) imgCache.src=S.image.dataUrl;
+    if(imgCache.complete&&imgCache.naturalWidth>0){
+      const alpha = S.xrayMode ? 0.35 : 1;
+      ctx.globalAlpha = alpha;
+      
+      for(const o of S.objects){
+        if(!o.hidden && o.type==='fusion_door') drawFusionDoor(o, o.id === S.selectedId);
+      }
+      for(const o of S.objects){
+        if(!o.hidden && (o.type==='door_upper'||o.type==='door_lower')) drawDoor(o, o.id===S.selectedId, 0);
+        if(!o.hidden && o.type==='hatch') drawHatch(o, o.id===S.selectedId, 0);
+      }
+
+      const _firedMissiles = S.objects.filter(o => o.type === 'missile' && o.fired);
+      if (_firedMissiles.length > 0) {
+        const _key = imgCache.src + "_" + _firedMissiles.map(o => o.id).join(",");
+        if (window._erasedImgCacheKey !== _key) {
+          const ec = document.createElement('canvas'); ec.width = w; ec.height = h;
+          const ecx = ec.getContext('2d');
+          ecx.drawImage(imgCache, 0, 0, w, h);
+          ecx.globalCompositeOperation = 'destination-out';
+          for(const o of _firedMissiles){
+            ecx.beginPath();
+            ecx.moveTo(o.points[0].x*w, o.points[0].y*h);
+            for(let i=1; i<o.points.length; i++) ecx.lineTo(o.points[i].x*w, o.points[i].y*h);
+            ecx.closePath(); ecx.fill();
+          }
+          window._erasedImgCache = ec;
+          window._erasedImgCacheKey = _key;
+        }
+        ctx.drawImage(window._erasedImgCache, 0, 0, w, h);
+      } else {
+        ctx.drawImage(imgCache, 0, 0, w, h);
+      }
+      ctx.globalAlpha = 1;
+    }
+  } else {
+    ctx.fillStyle='#0a0806'; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='#3a2f25'; ctx.font='20px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('點擊「導入圖片」載入載具側視圖',w/2,h/2);
+  }
+  
+  eraseOriginalTrackByLoop();
+  drawTrackErasePatchBase(); 
+  drawTrackScrollByLoop(); 
+
+  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='wheel'&&o.wheel) drawWheel(o,o.id===S.selectedId,getWheelRotSpeed(o)); }
+  const maskC = getMaskCanvas();
+  if(maskC){ ctx.drawImage(maskC,0,0,w,h); }
+  
+  {
+    const _nowT = performance.now();
+    let _hasWeapon = false;
+    for(const o of S.objects){ if(o.hidden) continue; if(o.type !== 'weapon' || !o.points || o.points.length < 3) continue; _hasWeapon = true; break; }
+    if(_hasWeapon){
+      const s = S.view.scale, tx = S.view.tx, ty = S.view.ty;
+      if(!window._fullC || window._fullC.width !== w || window._fullC.height !== h){ window._fullC = document.createElement('canvas'); window._fullC.width = w; window._fullC.height = h; }
+      if(!window._bodyC || window._bodyC.width !== w || window._bodyC.height !== h){ window._bodyC = document.createElement('canvas'); window._bodyC.width = w; window._bodyC.height = h; }
+      if(!window._wepC || window._wepC.width !== w || window._wepC.height !== h){ window._wepC = document.createElement('canvas'); window._wepC.width = w; window._wepC.height = h; }
+      const fullC = window._fullC, fullX = fullC.getContext('2d');
+      const bodyC = window._bodyC, bodyX = bodyC.getContext('2d');
+      const wepC = window._wepC, wepX = wepC.getContext('2d');
+      
+      fullX.setTransform(1,0,0,1,0,0); fullX.clearRect(0,0,w,h); fullX.drawImage(canvas, 0, 0);
+      bodyX.setTransform(1,0,0,1,0,0); bodyX.clearRect(0,0,w,h); bodyX.drawImage(fullC, 0, 0);
+      bodyX.globalCompositeOperation = 'destination-out';
+      for(const o of S.objects){
+        if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+        bodyX.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) bodyX.moveTo(px, py); else bodyX.lineTo(px, py); } bodyX.closePath(); bodyX.fill();
+      }
+      bodyX.globalCompositeOperation = 'source-over';
+      ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalCompositeOperation = 'destination-out';
+      for(const o of S.objects){
+        if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+        ctx.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.closePath(); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over'; ctx.restore();
+      for(const o of S.objects){
+        if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+        let rx = 0; const rs = S.recoilStates[o.id];
+        if(rs){ const _t = (_nowT - rs.startTime) / rs.duration; if(_t < 1){ const _p = _t < 0.25 ? _t / 0.25 : Math.pow(1 - (_t - 0.25) / 0.75, 1.8); rx = rs.dist * _p * w * s; } else { delete S.recoilStates[o.id]; } }
+        wepX.setTransform(1,0,0,1,0,0); wepX.clearRect(0,0,w,h); wepX.drawImage(fullC, 0, 0);
+        wepX.globalCompositeOperation = 'destination-in';
+        wepX.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) wepX.moveTo(px, py); else wepX.lineTo(px, py); } wepX.closePath(); wepX.fill();
+        wepX.globalCompositeOperation = 'source-over';
+        ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(wepC, -rx, 0); ctx.restore();
+      }
+      ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(bodyC, 0, 0); ctx.restore();
+    }
+  }
+
+  for(const o of S.objects){
+    if(o.hidden) continue;
+    if(o.type==='weapon'&&o.points) drawPolygon(o,o.id===S.selectedId);
+  }
+  for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder!=='below') drawMuzzle(o,o.id===S.selectedId); }
+  
+  if(S.flyingMissiles && S.flyingMissiles.length > 0){
+    for(const f of S.flyingMissiles){
+      ctx.drawImage(f.img, f.box.minX*w, f.box.minY*h, f.box.w*w, f.box.h*h, f.x*w, f.box.minY*h, f.box.w*w, f.box.h*h);
+    }
+  }
+  
+  drawFireEffects('above');
+  ctx.restore();
+
+  drawAnchorLines();
+  if(S.trackMask.enabled) drawTrackMaskLine();
+  drawTrackLoopGuide();
+  if(S.trackScroll.enabled && S.trackScroll.useTexture) drawTextureRectOverlay();
+  if(S.draftPolygon.length>0) drawDraftPolygon();
+  if(S.draftLoop.length>0) drawDraftLoop();
+  drawHandles();
+  ctx.setTransform(1,0,0,1,0,0);
+}
+
+function drawTextureRectOverlay(){
+  const sc = S.trackScroll;
+  if(!sc.useTexture) return;
+  const W = canvas.width, H = canvas.height;
+  const r = getTextureRect();
+  const x0 = r.x0*W, x1 = r.x1*W, y0 = r.y0*H, y1 = r.y1*H;
+  ctx.save();
+  ctx.strokeStyle='#ffcc44'; ctx.lineWidth=1.5/S.view.scale;
+  ctx.setLineDash([6/S.view.scale,4/S.view.scale]);
+  ctx.strokeRect(x0, y0, x1-x0, y1-y0);
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,204,68,0.9)';
+  ctx.font=(10/S.view.scale)+'px monospace';
+  ctx.textAlign='left';
+  ctx.fillText('紋理取樣區（可拖拽調整）', x0+4/S.view.scale, y0-4/S.view.scale);
+  const hs = 5/S.view.scale;
+  for(const [hx,hy] of [[x0,y0],[x1,y0],[x0,y1],[x1,y1]]){
+    ctx.fillStyle='#ffcc44';
+    ctx.beginPath(); ctx.arc(hx, hy, hs, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5/S.view.scale; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function getOpenAngle(o,animT){
+  let maxAngle=180;
+  if(o.type==='door_upper') maxAngle=180; else if(o.type==='door_lower') maxAngle=110; else if(o.type==='hatch'||o.type==='fusion_door') maxAngle=90;
+  if(!S.playing) return o.openAngle||0;
+  return getDoorOpenProgress(animT, S.animSpeed) * maxAngle;
+}
+
+function drawGrid(){ ctx.strokeStyle='rgba(232,163,61,0.06)'; ctx.lineWidth=1; for(let x=0;x<canvas.width;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); } for(let y=0;y<canvas.height;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); } }
+function drawAnchorLines(){ const w=canvas.width,h=canvas.height; const gy=S.anchor.groundY*h; ctx.strokeStyle='rgba(76,175,80,0.6)'; ctx.lineWidth=1.5/S.view.scale; ctx.setLineDash([8/S.view.scale,6/S.view.scale]); ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(w,gy); ctx.stroke(); const cx=S.anchor.centerX*w; ctx.strokeStyle='rgba(74,144,217,0.5)'; ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,h); ctx.stroke(); ctx.setLineDash([]); }
+function drawTrackMaskLine(){
+  const w=canvas.width,h=canvas.height;
+  const pts=S.trackMask.points.slice().sort((a,b)=>a.x-b.x);
+  if(pts.length<2) return;
+  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=2/S.view.scale;
+  ctx.setLineDash([6/S.view.scale,4/S.view.scale]);
+  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h);
+  ctx.stroke(); ctx.setLineDash([]);
+  for(const p of S.trackMask.points){
+    ctx.fillStyle='#4af0ff'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5/S.view.scale;
+    const s=6/S.view.scale;
+    ctx.beginPath(); ctx.arc(p.x*w,p.y*h,s,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+}
+
+function drawDoor(o,isSel,animT){
+  const w=canvas.width,h=canvas.height; const pts=o.points;
+  if(!pts||pts.length<3) return;
+  const ang=getOpenAngle(o,S.playing?S.animTime:0);
+  const cosA=Math.cos(ang*Math.PI/180);
+  const isFront=cosA>=0;
+  const hinge=getDoorHingeAxis(o); if(!hinge) return;
+  const {p1,p2}=hinge;
+  const x1=p1.x*w,y1=p1.y*h,x2=p2.x*w,y2=p2.y*h;
+  const alpha=Math.atan2(y2-y1,x2-x1);
+  ctx.save();
+  ctx.translate(x1,y1); ctx.rotate(alpha); ctx.scale(1,cosA); ctx.rotate(-alpha); ctx.translate(-x1,-y1);
+  if(isFront){ const clip=getDoorClipCanvas(o); if(clip) ctx.drawImage(clip.canvas,clip.minX,clip.minY,clip.bw,clip.bh); else { ctx.fillStyle='rgba(232,163,61,0.4)'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); } }
+  else { ctx.fillStyle=o.fillColor||'#000000'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); ctx.strokeStyle='rgba(80,80,80,0.45)'; ctx.lineWidth=1/S.view.scale; ctx.stroke(); }
+  ctx.strokeStyle=isSel?'#e8a33d':'#e07ae8'; ctx.lineWidth=2/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=3/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.fillStyle='#4af0ff';
+  for(const [px,py] of [[x1,y1],[x2,y2]]){ const s=5/S.view.scale; ctx.fillRect(px-s,py-s,s*2,s*2); }
+  let cx=0,cy=0; for(const p of pts){ cx+=p.x; cy+=p.y; } cx=(cx/pts.length)*w; cy=(cy/pts.length)*h;
+  ctx.fillStyle=isSel?'#e8a33d':'#e07ae8'; ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='center';
+  ctx.fillText((o.name||'車門')+' '+Math.round(ang)+'° '+(isFront?'正':'背'),cx,cy-20/S.view.scale);
+}
+
+function drawHatch(o,isSel,animT){
+  const w=canvas.width,h=canvas.height; const pts=o.points;
+  if(!pts||pts.length<3) return;
+  const ang=getOpenAngle(o,S.playing?S.animTime:0);
+  const cosA=Math.cos(ang*Math.PI/180);
+  const showBack = cosA < 0;
+  let minY = Infinity, bestI = 0;
+  for(let i=0;i<pts.length;i++){
+    const j = (i+1)%pts.length;
+    const my = (pts[i].y + pts[j].y) / 2;
+    if(my < minY){ minY = my; bestI = i; }
+  }
+  let p1 = pts[bestI], p2 = pts[(bestI+1)%pts.length];
+  if(p1.x > p2.x){ const t = p1; p1 = p2; p2 = t; }
+  const x1=p1.x*w,y1=p1.y*h,x2=p2.x*w,y2=p2.y*h;
+  const alpha=Math.atan2(y2-y1,x2-x1);
+  ctx.save();
+  ctx.translate(x1,y1); ctx.rotate(alpha); ctx.scale(1,cosA); ctx.rotate(-alpha); ctx.translate(-x1,-y1);
+  if(!showBack){ const clip=getDoorClipCanvas(o); if(clip) ctx.drawImage(clip.canvas,clip.minX,clip.minY,clip.bw,clip.bh); else { ctx.fillStyle='rgba(120,200,255,0.4)'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); } }
+  else { ctx.fillStyle=o.fillColor||'#000000'; ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.fill(); ctx.strokeStyle='rgba(80,80,80,0.45)'; ctx.lineWidth=1/S.view.scale; ctx.stroke(); }
+  ctx.strokeStyle=isSel?'#e8a33d':'#4ad8e8'; ctx.lineWidth=2/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(pts[0].x*w,pts[0].y*h); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*w,pts[i].y*h); ctx.closePath(); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle='#4af0ff'; ctx.lineWidth=3/S.view.scale;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.fillStyle='#4af0ff';
+  for(const [px,py] of [[x1,y1],[x2,y2]]){ const s=5/S.view.scale; ctx.fillRect(px-s,py-s,s*2,s*2); }
+  let cx=0,cy=0; for(const p of pts){ cx+=p.x; cy+=p.y; } cx=(cx/pts.length)*w; cy=(cy/pts.length)*h;
+  ctx.fillStyle=isSel?'#e8a33d':'#4ad8e8'; ctx.font=(11/S.view.scale)+'px sans-serif'; ctx.textAlign='center';
+  ctx.fillText((o.name||'艙門')+' '+Math.round(ang)+'° '+(showBack?'背':'正'),cx,cy-20/S.view.scale);
+}
+
+function getDoorHingeAxis(o){
+  const pts=o.points; if(!pts||pts.length<3) return null;
+  if(o.type==='door_upper'){ const s=pts.slice().sort((a,b)=>b.x-a.x); let p1=s[0],p2=s[1]; if(p1.y>p2.y){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
+  if(o.type==='door_lower'){ const s=pts.slice().sort((a,b)=>b.y-a.y); let p1=s[0],p2=s[1]; if(p1.x>p2.x){const t=p1;p1=p2;p2=t;} return {p1,p2}; }
+  if(o.type==='hatch'){
+    if(typeof o.hingeEdge==='number' && o.hingeEdge>=0 && o.hingeEdge<pts.length){ const i=o.hingeEdge, j=(i+1)%pts.length; return {p1:pts[i],p2:pts[j],edgeIdx:i}; }
+    const s=pts.slice().sort((a,b)=>b.y-a.y); let p1=s[0],p2=s[1]; if(p1.x>p2.x){const t=p1;p1=p2;p2=t;}
+    let idx=0; for(let i=0;i<pts.length;i++){ const j=(i+1)%pts.length; if((pts[i]===p1&&pts[j]===p2)||(pts[i]===p2&&pts[j]===p1)){ idx=i; break; } }
+    return {p1,p2,edgeIdx:idx};
+  }
+  return null;
+}
+
 let dragState=null;
 canvas.addEventListener('pointerdown',(e)=>{
   if(e.button!==0) return;
@@ -1037,7 +1288,7 @@ canvas.addEventListener('pointerdown',(e)=>{
     setTool('select'); updateObjectList(); updatePropPanel(); render();
     return;
   }
-  if(S.tool==='polygon'){
+  if(S.tool==='polygon' || S.tool==='fusion_door' || S.tool==='missile'){
     if(S.draftPolygon.length>=3){
       const first=normToScreen(S.draftPolygon[0].x,S.draftPolygon[0].y);
       const cur=normToScreen(n.x,n.y);
@@ -1081,7 +1332,7 @@ canvas.addEventListener('pointermove',(e)=>{
     if(dragState.kind==='muzzle'&&obj&&obj.muzzle){ obj.muzzle.x=n.x; obj.muzzle.y=n.y; updatePropPanel(); render(); return; }
     if(dragState.kind==='draw-wheel'){ const dx=n.x-dragState.startN.x, dy=(n.y-dragState.startN.y)*(canvas.height/canvas.width); dragState.radius=Math.hypot(dx,dy); renderDrawPreview(dragState); return; }
   }
-  if(S.tool==='polygon'&&S.draftPolygon.length>0) render();
+  if((S.tool==='polygon'||S.tool==='fusion_door'||S.tool==='missile')&&S.draftPolygon.length>0) render();
   if(S.tool==='trackloop'&&S.draftLoop.length>0) render();
 });
 
@@ -1105,7 +1356,8 @@ canvas.addEventListener('pointerup',(e)=>{
 });
 canvas.addEventListener('pointercancel',()=>{ dragState=null; });
 canvas.addEventListener('dblclick',(e)=>{
-  if(S.tool==='polygon'&&S.draftPolygon.length>=3) finishPolygon();
+  if(S.tool==='polygon' && S.draftPolygon.length>=3) finishPolygon();
+  if((S.tool==='fusion_door'||S.tool==='missile') && S.draftPolygon.length>=3) finishPolygon();
   if(S.tool==='trackloop'&&S.draftLoop.length>=3) finishTrackLoop();
 });
 
@@ -1133,20 +1385,35 @@ function renderDrawPreview(ds){
 
 function finishPolygon(){
   if(S.draftPolygon.length<3){ toast('至少需要 3 個頂點','err'); S.draftPolygon=[]; render(); return; }
+  
+  const type = S.tool; 
+  if (type === 'fusion_door' || type === 'missile') {
+    const newObj = {
+      id: uid(), type: type, name: (type==='missile'?'導彈 ':'車門 ') + (S.objects.filter(o=>o.type===type).length+1),
+      points: S.draftPolygon.slice(), openAngle: 0, fillColor: '#000000', hidden: false,
+      weaponId: type === 'missile' ? 'atgm' : null,
+      fired: false, hingeEdge: 0
+    };
+    S.objects.push(newObj); S.selectedId = newObj.id; S.draftPolygon = [];
+    setTool('select'); updateObjectList(); updatePropPanel(); render();
+    return;
+  }
+
   const kind=prompt('多邊形類型：\n1 = 車門上片（繞右側邊翻）\n2 = 車門下片（繞底邊翻）\n3 = 艙門（繞底邊翻 90°）\n4 = 武器區域','1');
-  let type='weapon', name='';
-  if(kind==='1'){ type='door_upper'; name='車門(上) '+(S.objects.filter(o=>o.type===type).length+1); }
-  else if(kind==='2'){ type='door_lower'; name='車門(下) '+(S.objects.filter(o=>o.type===type).length+1); }
+  let t='weapon', name='';
+  if(kind==='1'){ t='door_upper'; name='車門(上) '+(S.objects.filter(o=>o.type===t).length+1); }
+  else if(kind==='2'){ t='door_lower'; name='車門(下) '+(S.objects.filter(o=>o.type===t).length+1); }
   else if(kind==='3'){
-    type='hatch'; name='艙門 '+(S.objects.filter(o=>o.type===type).length+1);
+    t='hatch'; name='艙門 '+(S.objects.filter(o=>o.type===t).length+1);
     let maxY=-1, bestI=0;
     for(let i=0;i<S.draftPolygon.length;i++){ const j=(i+1)%S.draftPolygon.length; const my=(S.draftPolygon[i].y+S.draftPolygon[j].y)/2; if(my>maxY){ maxY=my; bestI=i; } }
-    const newObj={id:uid(),type:type,name:name,points:S.draftPolygon.slice(),hingeEdge:bestI,openAngle:0,fillColor:'#000000',hidden:false};
+    const newObj={id:uid(),type:t,name:name,points:S.draftPolygon.slice(),hingeEdge:bestI,openAngle:0,fillColor:'#000000',hidden:false};
     S.objects.push(newObj); S.selectedId=newObj.id; S.draftPolygon=[];
     setTool('select'); updateObjectList(); updatePropPanel(); render();
     toast('艙門已加入（默認底邊為軸，向外翻）','ok'); return;
-  } else { type='weapon'; name='武器 '+(S.objects.filter(o=>o.type===type).length+1); }
-  const newObj={id:uid(),type:type,name:name,points:S.draftPolygon.slice(),hidden:false,openAngle:0,fillColor:'#000000',weaponId:null,recoilDist:null};
+  } else { t='weapon'; name='武器 '+(S.objects.filter(o=>o.type===t).length+1); }
+  
+  const newObj={id:uid(),type:t,name:name,points:S.draftPolygon.slice(),hidden:false,openAngle:0,fillColor:'#000000',weaponId:null,recoilDist:null};
   S.objects.push(newObj); S.selectedId=newObj.id; S.draftPolygon=[];
   setTool('select'); updateObjectList(); updatePropPanel(); render();
   toast(name+' 已加入','ok');
@@ -1160,7 +1427,7 @@ function updateObjectList(){
     html += '<div class="objCard' + cls + '" data-id="' + TRACKLOOP_ID + '"><span class="ico">🔁</span><span class="nm">履帶環（' + S.trackLoop.points.length + ' 點）</span><span class="btn" data-clear-trackloop="1">✕</span></div>';
   }
   if(S.objects.length===0 && S.trackLoop.points.length<3){ el.innerHTML='<div class="emptyHint">尚無標注</div>'; return; }
-  const icons={wheel:'⭕',door_upper:'🚪',door_lower:'🚪',hatch:'⏏️',weapon:'🔫',muzzle:'🎯'};
+  const icons={wheel:'⭕',door_upper:'🚪',door_lower:'🚪',hatch:'⏏️',weapon:'🔫',muzzle:'🎯',fusion_door:'🚪',missile:'🚀'};
   for(const o of S.objects){
     const cls=(o.id===S.selectedId?' selected':'')+(o.hidden?' hidden':'');
     let _extra='';
@@ -1219,7 +1486,7 @@ function renderTrackScrollProps(){
   const y1Auto = (sc.textureY1 == null || !isFinite(sc.textureY1));
   let html = '';
   html += '<div class="propRow"><label>方向</label><select id="tsDir">'
-    + '<option value="-1"'+(sc.direction===-1?' selected':'')+'>向左（車頭向右前進）</option>'
+    + '<option value="-1"'+(sc.direction===-1?' selected':'')+'>向左</option>'
     + '<option value="1"'+(sc.direction===1?' selected':'')+'>向右</option>'
     + '</select></div>';
   html += '<div class="propRow"><label>原圖紋理</label><button id="tsUseTex" class="toggleBtn'+(sc.useTexture?' on':'')+'">'+(sc.useTexture?'啟用':'停用')+'</button></div>';
@@ -1229,7 +1496,7 @@ function renderTrackScrollProps(){
   html += '<div class="propRow"><label>紋理 Y止</label><input type="number" id="tsTexY1" value="'+(y1Auto?'':sc.textureY1.toFixed(3))+'" step="0.01" min="0" max="1" placeholder="自動"></div>';
   html += '<div class="propRow"><label>紋理透明度</label><input type="number" id="tsTexOp" value="'+sc.textureOpacity.toFixed(2)+'" step="0.05" min="0" max="1"></div>';
   html += '<div style="font-size:10px;color:#7a6f60;margin-top:4px">取樣區 ' + (r.x0*100).toFixed(1) + '% ~ ' + (r.x1*100).toFixed(1) + '% × ' + (r.y0*100).toFixed(1) + '% ~ ' + (r.y1*100).toFixed(1) + '%</div>';
-  html += '<div class="helpTip">沿履帶環弧長參數化滾動；程序條紋已完全移除；貼圖方向嚴格正向，不自帶任何額外底色。</div>';
+  html += '<div class="helpTip">沿履帶環弧長參數化滾動；程序條紋已完全移除；貼圖方向嚴格正向。</div>';
   el.innerHTML = html;
 
   const bindNum = (id, fn) => { const e=document.getElementById(id); if(e) e.oninput = (ev)=>{ const v=parseFloat(ev.target.value); if(isFinite(v)) fn(v); }; };
@@ -1285,6 +1552,20 @@ function updatePropPanel(){
     for(const w of weapons) html+='<option value="'+w.id+'"'+(o.weaponId===w.id?' selected':'')+'>'+w.name+'</option>';
     html+='</select></div>';
     html+='<div class="propRow"><label>層序</label><select id="pLayerOrder"><option value="above"'+(o.layerOrder!=='below'?' selected':'')+'>above（之上）</option><option value="below"'+(o.layerOrder==='below'?' selected':'')+'>below（之下，被遮擋）</option></select></div>';
+  } else if(o.type==='fusion_door'){
+    html+='<div class="sectionTitle">🚪 融合車門</div>';
+    let opts = '';
+    for(let i=0; i<o.points.length; i++) opts += '<option value="'+i+'" '+(o.hingeEdge===i?'selected':'')+'>P'+i+'-P'+((i+1)%o.points.length)+'</option>';
+    html+='<div class="propRow"><label>鉸鏈邊</label><select id="pHingeEdge">'+opts+'</select></div>';
+    html+='<div class="propRow"><label>預覽角度</label><input type="range" id="pOpenAngle" min="0" max="90" value="'+(o.openAngle||0)+'" step="1"></div>';
+    html+='<div class="propRow"><label>填充顏色</label><input type="color" id="pFillColor" value="'+(o.fillColor||'#000000')+'"></div>';
+  } else if(o.type==='missile'){
+    html+='<div class="sectionTitle">🚀 導彈實體</div>';
+    const weapons=getWeaponsForVehicle(S.vehicleId);
+    html+='<div class="propRow"><label>綁定武器</label><select id="pWeaponId"><option value="">（未綁定）</option>';
+    for(const w of weapons) html+='<option value="'+w.id+'"'+(o.weaponId===w.id?' selected':'')+'>'+w.name+'</option>';
+    html+='</select></div>';
+    html+='<div class="propRow"><label>狀態</label><button id="pResetMissile" class="toggleBtn '+(o.fired?'':'on')+'">'+(o.fired?'已發射 (復位)':'準備就緒')+'</button></div>';
   } else if(o.points){
     html+='<div class="sectionTitle">🔫 武器區域</div>';
     const weapons=getWeaponsForVehicle(S.vehicleId);
@@ -1333,6 +1614,13 @@ function bindPropEvents(o){
     bind('pMy',e=>{ const v=parseFloat(e.target.value); if(isFinite(v)){ o.muzzle.y=Math.max(0,Math.min(1,v)); render(); } });
     const ws=document.getElementById('pWeaponId'); if(ws) ws.onchange=e=>{ const id=e.target.value||null; if(id&&!isValidWeaponId(id)){ toast('無效','err'); return; } o.weaponId=id; renderWeaponList(); render(); };
     const lo=document.getElementById('pLayerOrder'); if(lo) lo.onchange=e=>{ o.layerOrder=e.target.value==='below'?'below':'above'; render(); };
+  } else if(o.type==='fusion_door'){
+    bind('pFillColor',e=>{ o.fillColor=e.target.value; render(); });
+    bind('pOpenAngle',e=>{ o.openAngle=parseFloat(e.target.value); render(); });
+    const he=document.getElementById('pHingeEdge'); if(he) he.onchange=e=>{ o.hingeEdge=parseInt(e.target.value); render(); };
+  } else if(o.type==='missile'){
+    const ws=document.getElementById('pWeaponId'); if(ws) ws.onchange=e=>{ o.weaponId=e.target.value||null; render(); };
+    const rs=document.getElementById('pResetMissile'); if(rs) rs.onclick=()=>{ o.fired=false; updatePropPanel(); render(); };
   } else if(o.points){
     document.querySelectorAll('[data-vx]').forEach(inp=>{ inp.oninput=e=>{ const i=parseInt(inp.dataset.vx); const v=parseFloat(e.target.value); if(isFinite(v)){ o.points[i].x=Math.max(0,Math.min(1,v)); _doorClipCache.clear(); render(); } }; });
     document.querySelectorAll('[data-vy]').forEach(inp=>{ inp.oninput=e=>{ const i=parseInt(inp.dataset.vy); const v=parseFloat(e.target.value); if(isFinite(v)){ o.points[i].y=Math.max(0,Math.min(1,v)); _doorClipCache.clear(); render(); } }; });
@@ -1353,8 +1641,10 @@ document.addEventListener('keydown',(e)=>{
   else if(e.key==='3') setTool('polygon');
   else if(e.key==='4') setTool('muzzle');
   else if(e.key==='5') setTool('trackloop');
+  else if(e.key==='6') setTool('fusion_door');
+  else if(e.key==='7') setTool('missile');
   else if(e.key==='Escape'){ if(S.draftLoop.length>0){ S.draftLoop=[]; render(); } else if(S.draftPolygon.length>0){ S.draftPolygon=[]; render(); } else if(S.selectedId){ S.selectedId=null; updateObjectList(); updatePropPanel(); render(); } }
-  else if(e.key==='Enter'){ if(S.tool==='trackloop'&&S.draftLoop.length>=3) finishTrackLoop(); else if(S.tool==='polygon'&&S.draftPolygon.length>=3) finishPolygon(); }
+  else if(e.key==='Enter'){ if(S.tool==='trackloop'&&S.draftLoop.length>=3) finishTrackLoop(); else if(S.draftPolygon.length>=3) finishPolygon(); }
   else if(e.key==='Delete'||e.key==='Backspace'){
     if(S.selectedId === TRACKLOOP_ID){ if(confirm('清除履帶環？')){ S.trackLoop.points=[]; S.selectedId=null; updateObjectList(); updatePropPanel(); render(); } return; }
     if(S.selectedId){ const o=getObjById(S.selectedId); if(o&&confirm('刪除「'+(o.name||'未命名')+'」？')){ S.objects=S.objects.filter(x=>x.id!==S.selectedId); S.selectedId=null; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); updateObjectList(); updatePropPanel(); render(); } }
@@ -1372,14 +1662,62 @@ document.querySelectorAll('.toolBtn').forEach(b=>{ b.onclick=()=>setTool(b.datas
 
 function _fireMuzzleOnce(o, now){
   const wd = getWeaponById(o.weaponId);
-  const type = wd ? wd.type : '機槍';
-  let bs = 3.5, bv = 450, fs = 26, fo = 'rgba(255,200,80,0.7)';
-  if(o.weaponId === 'pkt'){ bs = 2; bv = 450; fs = 12; fo = 'rgba(255,200,80,0.35)'; }
-  else if(type === '主炮'){ bs = 6; bv = 300; fs = 40; fo = 'rgba(255,140,60,0.85)'; }
-  else if(type === '機炮'){ bs = 4.5; bv = 380; fs = 32; fo = 'rgba(255,180,80,0.8)'; }
-  else if(type === '反坦克導彈'){ bs = 5; bv = 280; fs = 30; fo = 'rgba(255,200,100,0.85)'; }
-  S.fireEffects.push({ x: o.muzzle.x, y: o.muzzle.y, startTime: now, duration: 600, bulletSize: bs, bulletSpeed: bv, flashSize: fs, flashOuter: fo, layerOrder: o.layerOrder || 'above', muzzleId: o.id });
-  const areas = S.objects.filter(function(a){ return a.type === 'weapon' && a.weaponId === o.weaponId; });
+  if (!S.flyingMissiles) S.flyingMissiles = [];
+  
+  if (o.weaponId === 'atgm') {
+    // 【ATGM】：产生尾焰，并触发导弹实体
+    S.fireEffects.push({ 
+      x: o.muzzle.x, y: o.muzzle.y, startTime: now, duration: 300, 
+      bulletSize: 6, bulletSpeed: 100, flashSize: 35, flashOuter: 'rgba(255,120,40,0.9)', 
+      layerOrder: o.layerOrder || 'above', muzzleId: o.id 
+    });
+    
+    for(let i=0; i<S.objects.length; i++){
+      const m = S.objects[i];
+      if(m.type === 'missile' && !m.fired && !m.hidden){
+        m.fired = true; 
+        const cw = canvas.width, ch = canvas.height;
+        const tempC = document.createElement('canvas');
+        tempC.width = cw; tempC.height = ch;
+        const tCtx = tempC.getContext('2d');
+        
+        tCtx.drawImage(imgCache, 0, 0);
+        tCtx.globalCompositeOperation = 'destination-in';
+        tCtx.beginPath(); tCtx.moveTo(m.points[0].x*cw, m.points[0].y*ch);
+        for(let p=1; p<m.points.length; p++) tCtx.lineTo(m.points[p].x*cw, m.points[p].y*ch);
+        tCtx.closePath(); tCtx.fill();
+        
+        let minX=1, maxX=0, minY=1, maxY=0;
+        for(let p of m.points){ if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x; if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y; }
+        
+        let startX = minX, startY = minY;
+        if (o.muzzle) {
+            startX = o.muzzle.x - (maxX - minX) / 2;
+            startY = o.muzzle.y - (maxY - minY) / 2;
+        }
+        
+        S.flyingMissiles.push({ 
+          img: tempC, x: startX, y: startY, speed: 1.2, 
+          box: {minX, maxX, minY, maxY, w: maxX-minX, h: maxY-minY} 
+        });
+      }
+    }
+  } else {
+    // 【普通武器】：产生子弹/炮弹特效
+    let bs = 3.5, bv = 450, fs = 26, fo = 'rgba(255,200,80,0.7)';
+    if(o.weaponId === 'pkt'){ bs = 2; bv = 450; fs = 12; fo = 'rgba(255,200,80,0.35)'; }
+    else if(wd && wd.type === '主炮'){ bs = 6; bv = 300; fs = 40; fo = 'rgba(255,140,60,0.85)'; }
+    else if(wd && wd.type === '機炮'){ bs = 4.5; bv = 380; fs = 32; fo = 'rgba(255,180,80,0.8)'; }
+    
+    S.fireEffects.push({ 
+      x: o.muzzle.x, y: o.muzzle.y, startTime: now, duration: 600, 
+      bulletSize: bs, bulletSpeed: bv, flashSize: fs, flashOuter: fo, 
+      layerOrder: o.layerOrder || 'above', muzzleId: o.id 
+    });
+  }
+
+  // 通用后坐力处理
+  const areas = S.objects.filter(a => a.type === 'weapon' && a.weaponId === o.weaponId);
   let rc_dist = 0, rc_duration = 0;
   try{ const rc = RECOIL_CONFIG[o.weaponId] || RECOIL_CONFIG.default; rc_dist = rc.dist; rc_duration = rc.duration; }catch(_){}
   for(var _k = 0; _k < areas.length; _k++){
@@ -1397,11 +1735,14 @@ function _updateFirePreviewLoop(now){
   for(var _i = 0; _i < S.objects.length; _i++){
     var o = S.objects[_i];
     if(o.type !== 'muzzle' || !o.muzzle || !o.weaponId || o.hidden) continue;
+    
     var prof = (typeof MUZZLE_PROFILES !== 'undefined' && MUZZLE_PROFILES[o.weaponId]) ? MUZZLE_PROFILES[o.weaponId] : { burst: 1, intervalMs: 1000, pauseMs: 1000 };
     var st = S.muzzleFireState[o.id];
     if(!st){ st = { nextAt: now, shotsLeft: prof.burst }; S.muzzleFireState[o.id] = st; }
     if(now < st.nextAt) continue;
-    _fireMuzzleOnce(o, now);
+    
+    window._fireMuzzleOnce(o, now);
+    
     st.shotsLeft--;
     if(st.shotsLeft <= 0){
       st.shotsLeft = prof.burst;
@@ -1417,15 +1758,18 @@ function triggerFirePreview(){
   for(var _i = 0; _i < S.objects.length; _i++){
     var o = S.objects[_i];
     if(o.type !== 'muzzle' || !o.muzzle || !o.weaponId) continue;
-    _fireMuzzleOnce(o, now);
+    window._fireMuzzleOnce(o, now);
   }
+  window.render();
 }
+
 document.getElementById('btnFirePreview').onclick=function(){
   S.firePreviewActive = !S.firePreviewActive;
   this.classList.toggle('on', S.firePreviewActive);
   this.textContent = S.firePreviewActive ? '⏸ 停火' : '🔥 開火';
   if(S.firePreviewActive){
     S.muzzleFireState = {};
+    triggerFirePreview();
     toast('持續開火（' + S.firePreviewSpeed + 'x）','ok');
   } else {
     toast('停火');
@@ -1454,7 +1798,7 @@ document.getElementById('btnLoadCfg').onclick=()=>{ document.getElementById('fil
 document.getElementById('fileCfg').onchange=(e)=>{ const f=e.target.files[0]; if(f) loadConfig(f); };
 document.getElementById('btnExpJson').onclick=()=>exportConfig();
 document.getElementById('btnExpJs').onclick=()=>exportJS();
-document.getElementById('btnReset').onclick=()=>{ if(!confirm('重置所有標注？')) return; S.objects=[]; S.selectedId=null; S.draftPolygon=[]; S.draftLoop=[]; S.fireEffects=[]; S.trackMask={enabled:false,points:[{x:0,y:0.6},{x:1,y:0.6}]}; S.trackLoop={points:[]}; S.trackLine={points:[]}; S.trackScroll={enabled:false,direction:-1,spacing:0.06,darkAlpha:0.28,lightAlpha:0.12,followWheel:0,useTexture:true,textureX0:0.15,textureX1:0.40,textureY0:null,textureY1:null,bandHeight:0.08,textureOpacity:0.85,useStripes:false,stripeStrength:0.25}; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); renderTrackMaskPoints(); renderTrackScrollProps(); renderWeaponList(); updateObjectList(); updatePropPanel(); render(); };
+document.getElementById('btnReset').onclick=()=>{ if(!confirm('重置所有標注？')) return; S.objects=[]; S.selectedId=null; S.draftPolygon=[]; S.draftLoop=[]; S.fireEffects=[]; S.trackMask={enabled:false,points:[{x:0,y:0.6},{x:1,y:0.6}]}; S.trackLoop={points:[]}; S.trackScroll={enabled:false,direction:-1,spacing:0.06,darkAlpha:0.28,lightAlpha:0.12,followWheel:0,useTexture:true,textureX0:0.15,textureX1:0.40,textureY0:null,textureY1:null,bandHeight:0.08,textureOpacity:0.85,useStripes:false,stripeStrength:0.25}; _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear(); renderTrackMaskPoints(); renderTrackScrollProps(); renderWeaponList(); updateObjectList(); updatePropPanel(); render(); };
 document.getElementById('vehicleId').oninput=(e)=>{ S.vehicleId=e.target.value.trim()||'unnamed'; renderWeaponList(); const sel=getObjById(S.selectedId); if(sel&&sel.type==='muzzle') updatePropPanel(); };
 document.getElementById('anchorGroundY').oninput=(e)=>{ const v=parseFloat(e.target.value); if(isFinite(v)&&v>=0&&v<=1){ S.anchor.groundY=v; render(); } };
 document.getElementById('anchorCenterX').oninput=(e)=>{ const v=parseFloat(e.target.value); if(isFinite(v)&&v>=0&&v<=1){ S.anchor.centerX=v; render(); } };
@@ -1490,7 +1834,9 @@ function loadConfig(file){
       else S.trackScroll = Object.assign({}, dfltScroll);
       if(data.trackLoop && Array.isArray(data.trackLoop.points)) S.trackLoop = { points: data.trackLoop.points.map(p=>({x:p.x,y:p.y})) };
       else S.trackLoop = { points: [] };
-      S.trackLine = { points: [] }; // 向後相容
+      
+      _wheelClipCache.clear(); _doorClipCache.clear(); _maskCache.clear();
+      
       S.objects=data.objects.map(o=>{
         const b={id:o.id||uid(),type:o.type||'weapon',name:o.name||'未命名',hidden:!!o.hidden};
         if(o.type==='wheel') return {...b,wheel:{cx:o.wheel.cx,cy:o.wheel.cy,r:o.wheel.r},rotSpeed:o.rotSpeed||1};
@@ -1500,8 +1846,9 @@ function loadConfig(file){
         if(o.type==='weapon'){
           obj.weaponId=o.weaponId||null;
           obj.recoilDist=typeof o.recoilDist==='number'?o.recoilDist:null;
-          if(obj.weaponId === '2a46m1' && obj.recoilDist === 0){ obj.recoilDist = 0.06; }
         }
+        if(o.type==='fusion_door') { obj.hingeEdge = typeof o.hingeEdge==='number'?o.hingeEdge:0; }
+        if(o.type==='missile') { obj.weaponId = o.weaponId || 'atgm'; obj.fired = !!o.fired; }
         return obj;
       });
       if(data.image&&data.image.dataUrl){
@@ -1525,6 +1872,8 @@ function serializeObjects(){
     const obj={...b,points:o.points.map(p=>({x:+p.x.toFixed(4),y:+p.y.toFixed(4)})),openAngle:+(o.openAngle||0).toFixed(1),fillColor:o.fillColor||'#000000'};
     if(o.type==='hatch'&&typeof o.hingeEdge==='number') obj.hingeEdge=o.hingeEdge;
     if(o.type==='weapon'){ obj.weaponId=o.weaponId||null; obj.recoilDist=typeof o.recoilDist==='number'?o.recoilDist:null; }
+    if(o.type==='fusion_door') { obj.hingeEdge = o.hingeEdge || 0; }
+    if(o.type==='missile') { obj.weaponId = o.weaponId || 'atgm'; obj.fired = !!o.fired; }
     return obj;
   });
 }
@@ -1550,7 +1899,6 @@ function buildConfigJSON(){
     anchor:{groundY:S.anchor.groundY,centerX:S.anchor.centerX},
     trackMask:{enabled:!!S.trackMask.enabled, points:S.trackMask.points.map(p=>({x:+p.x.toFixed(4),y:+p.y.toFixed(4)}))},
     trackLoop: (S.trackLoop.points.length >= 3) ? { points: S.trackLoop.points.map(p=>({x:+p.x.toFixed(4),y:+p.y.toFixed(4)})) } : null,
-    trackLine: null,
     trackScroll: serializeTrackScroll(S.trackScroll),
     objects:serializeObjects(), animSpeed:S.animSpeed,
     renderOrder: ['image','eraseOriginalTrack','trackScroll','wheels','trackMask','doors','muzzles','effects'],
@@ -1577,6 +1925,8 @@ function exportJS(){
   const upperDoors=data.objects.filter(o=>o.type==='door_upper');
   const lowerDoors=data.objects.filter(o=>o.type==='door_lower');
   const hatches=data.objects.filter(o=>o.type==='hatch');
+  const fusionDoors=data.objects.filter(o=>o.type==='fusion_door');
+  const missiles=data.objects.filter(o=>o.type==='missile');
   const weaponAreas=data.objects.filter(o=>o.type==='weapon');
   const muzzles=data.objects.filter(o=>o.type==='muzzle');
   const wheels=data.objects.filter(o=>o.type==='wheel');
@@ -1595,12 +1945,19 @@ function exportJS(){
       upper:upperDoors.map(o=>{ const h=hingeOf(o.points,'door_upper'); return {polygon:o.points,fillColor:o.fillColor,hingeP1:h.p1,hingeP2:h.p2,openRotation:180,frontUses:'image_crop',backUses:'solid_color'}; }),
       lower:lowerDoors.map(o=>{ const h=hingeOf(o.points,'door_lower'); return {polygon:o.points,fillColor:o.fillColor,hingeP1:h.p1,hingeP2:h.p2,openRotation:110,frontUses:'image_crop',backUses:'solid_color'}; }),
       hatch:hatches.map(o=>{ const h=hingeOf(o.points,'hatch'); return {polygon:o.points,fillColor:o.fillColor,hingeP1:h.p1,hingeP2:h.p2,hingeEdgeIdx:typeof o.hingeEdge==='number'?o.hingeEdge:0,openRotation:90,frontUses:'image_crop',backUses:'solid_color',flipDirection:'outward'}; }),
+      fusion: fusionDoors.map(o => {
+         const pts = o.points;
+         const idx = o.hingeEdge || 0;
+         return {
+           polygon: pts, fillColor: o.fillColor,
+           hingeP1: pts[idx], hingeP2: pts[(idx+1)%pts.length],
+           hingeEdgeIdx: idx, openRotation: 90
+         };
+      })
     },
+    missiles: missiles.map(o => ({ polygon: o.points, weaponId: o.weaponId })),
     weaponAreas:weaponAreas.map(o=>({
-      id:o.id,
-      polygon:o.points,
-      name:o.name,
-      weaponId:o.weaponId||null,
+      id:o.id, polygon:o.points, name:o.name, weaponId:o.weaponId||null,
       recoilDist:(typeof o.recoilDist==='number')?o.recoilDist:null
     })),
     muzzles:muzzles.map(o=>({x:o.muzzle.x,y:o.muzzle.y,name:o.name,weaponId:o.weaponId||null,layerOrder:o.layerOrder==='below'?'below':'above'})),
@@ -1612,7 +1969,8 @@ function exportJS(){
     ' * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關\n'+
     ' * - trackLoop：履帶環多邊形（閉合），遊戲端需按此多邊形執行擦除與貼圖\n'+
     ' * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）\n'+
-    ' * - 渲染順序：image → eraseOriginalTrack（trackLoop） → trackScroll → wheels → trackMask → doors → muzzles → effects\n'+
+    ' * - fusion：融合車門（純實色多邊形）\n'+
+    ' * - missiles：單發實體導彈\n'+
     ' */\n'+
     'const '+vn+' = '+JSON.stringify(gameData,null,2)+';\n';
   const blob=new Blob([js],{type:'text/javascript'});
@@ -1625,7 +1983,17 @@ function loop(t){
   const dt=(t-lastFrameTime)/1000; lastFrameTime=t;
   if(S.playing){ S.animTime+=dt; updatePhaseInfo(); }
   if(S.firePreviewActive) _updateFirePreviewLoop(performance.now());
-  if(S.playing || S.firePreviewActive || S.fireEffects.length > 0 || Object.keys(S.recoilStates).length > 0) render();
+  
+  let needRender = false;
+  if(S.flyingMissiles && S.flyingMissiles.length > 0) {
+    for(let i = S.flyingMissiles.length - 1; i >= 0; i--){
+      S.flyingMissiles[i].x += S.flyingMissiles[i].speed * dt;
+      if(S.flyingMissiles[i].x > 1.5) S.flyingMissiles.splice(i, 1);
+      else needRender = true;
+    }
+  }
+
+  if(S.playing || S.firePreviewActive || S.fireEffects.length > 0 || Object.keys(S.recoilStates).length > 0 || needRender) render();
   rafId=requestAnimationFrame(loop);
 }
 
@@ -1633,182 +2001,539 @@ window.addEventListener('resize',()=>{ if(S.image) fitView(); render(); });
 
 renderWeaponList(); renderTrackMaskPoints(); renderTrackScrollProps(); updateObjectList(); updatePropPanel(); render();
 rafId=requestAnimationFrame(loop);
-console.log('載具標注編輯器 v2.0 (trackLoop) 已啟動');
+console.log('載具標注編輯器 v2.0 (TrackLoop) 已啟動');
 </script>
-
-
-
-
 <script>
-/* === Patcher v7: 透明网格验证 + rev920 wheel + band-only erase + source-over texture === */
 (function(){
-  if(window._patcherV7Installed) return;
-  window._patcherV7Installed = true;
+  if(window._bmpPatchInstalledV82) return;
+  window._bmpPatchInstalledV82 = true;
+  for(let i=7; i<=82; i++) window['_bmpPatchInstalledV'+i] = true;
 
-  // ---------- ① 透明网格背景（Photoshop 风） ----------
-  if(!document.getElementById("_patcherV7Css")){
-    var st = document.createElement("style");
-    st.id = "_patcherV7Css";
-    st.textContent = [
-      "#canvasWrap{",
-        "background-color:#1a1a1a !important;",
-        "background-image:",
-          "linear-gradient(45deg,#2e2e2e 25%,transparent 25%),",
-          "linear-gradient(-45deg,#2e2e2e 25%,transparent 25%),",
-          "linear-gradient(45deg,transparent 75%,#2e2e2e 75%),",
-          "linear-gradient(-45deg,transparent 75%,#2e2e2e 75%) !important;",
-        "background-size:16px 16px !important;",
-        "background-position:0 0,0 8px,8px -8px,-8px 0 !important",
-      "}",
-      "#canvas{background:transparent !important}",
-      "#_patcherV7Badge{position:absolute;top:6px;right:6px;background:rgba(14,12,10,.85);border:1px solid #3a2f25;border-radius:4px;padding:3px 8px;font-size:10px;color:#a89a85;pointer-events:none;z-index:10}",
-      "#_patcherV7Badge b{color:#4caf50}"
-    ].join("");
-    document.head.appendChild(st);
-  }
+  // ============================================================
+  // 1. getBaseImage：永久挖空所有「已發射」導彈槽
+  //    - fired=false 的導彈保留在原圖（自然待發）
+  //    - fired=true 的導彈槽被挖空（原圖留白 + flyingMissiles 飛出）
+  //    - key 含頂點座標，拖動多邊形會自動重建
+  //    - 沒有 missile 對象的載具直接返回 imgCache（零開銷）
+  // ============================================================
+  window.getBaseImage = function(){
+    if(typeof imgCache === 'undefined' || !imgCache || !imgCache.complete || !imgCache.naturalWidth) return imgCache;
+    const fired = S.objects.filter(o => o.type === 'missile' && o.fired && o.points && o.points.length >= 3);
+    if(fired.length === 0) return imgCache;
+    const W = canvas.width, H = canvas.height;
+    const key = (imgCache.src||'') + '|fired|' + W + 'x' + H + '|' +
+      fired.map(o => o.id + ':' + o.points.map(p => p.x.toFixed(4) + ',' + p.y.toFixed(4)).join(';')).join('|');
+    if(window._baseImgCacheKey === key && window._baseImgCache) return window._baseImgCache;
+    const ec = document.createElement('canvas'); ec.width = W; ec.height = H;
+    const ecx = ec.getContext('2d');
+    ecx.drawImage(imgCache, 0, 0, W, H);
+    ecx.globalCompositeOperation = 'destination-out';
+    for(const o of fired){
+      ecx.beginPath();
+      ecx.moveTo(o.points[0].x*W, o.points[0].y*H);
+      for(let i=1;i<o.points.length;i++) ecx.lineTo(o.points[i].x*W, o.points[i].y*H);
+      ecx.closePath(); ecx.fill();
+    }
+    window._baseImgCache = ec;
+    window._baseImgCacheKey = key;
+    return ec;
+  };
 
-  // ---------- ② rev920 wheel ----------
+  // ============================================================
+  // 2. 重寫 drawTrackErasePatchBase（V81 遺留修正：嚴格限制至履帶環中心 Y 值）
+  //    - 保留 V81 的核心視覺邏輯，本版本無關導彈分離，可獨立生效
+  // ============================================================
+  window.drawTrackErasePatchBase = function(){
+    if(!S.trackScroll.enabled) return;
+    if(!S.trackLoop || S.trackLoop.points.length < 3) return;
+    if(!S.image || !imgCache.complete || !imgCache.naturalWidth) return;
+
+    const W = canvas.width, H = canvas.height;
+    let minY = 1, maxY = 0;
+    for(const p of S.trackLoop.points){
+      if(p.y < minY) minY = p.y;
+      if(p.y > maxY) maxY = p.y;
+    }
+    const limitY = ((minY + maxY) / 2) * H;
+
+    const rawPts = S.trackLoop.points.map(p => ({ x:p.x * W, y:p.y * H }));
+    const n = rawPts.length;
+    if(n < 3) return;
+
+    let segs = [], totalLen = 0;
+    for(let i = 0; i < n; i++){
+      const p1 = rawPts[i], p2 = rawPts[(i + 1) % n];
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if(len < 0.5) continue;
+      segs.push({ x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y, ux:dx / len, uy:dy / len, len:len, startLen:totalLen });
+      totalLen += len;
+    }
+    if(totalLen < 1) return;
+
+    let cx = 0, cy = 0;
+    for(let i = 0; i < n; i++){ cx += rawPts[i].x; cy += rawPts[i].y; }
+    cx /= n; cy /= n;
+
+    const r = getTextureRect();
+    const texW = (r.x1 - r.x0) * W, texH = (r.y1 - r.y0) * H;
+    if(texW < 2 || texH < 2) return;
+
+    function sampleArc(s){
+      s = s % totalLen; if(s < 0) s += totalLen;
+      for(let i = 0; i < segs.length; i++){
+        const seg = segs[i];
+        if(s >= seg.startLen && s <= seg.startLen + seg.len){
+          const t = (s - seg.startLen) / seg.len;
+          return { x: seg.x1 + (seg.x2 - seg.x1) * t, y: seg.y1 + (seg.y2 - seg.y1) * t, ux: seg.ux, uy: seg.uy };
+        }
+      }
+      const last = segs[segs.length - 1];
+      return { x:last.x2, y:last.y2, ux:last.ux, uy:last.uy };
+    }
+
+    function normalToCenter(p){
+      let nx = -p.uy, ny = p.ux;
+      if(nx * (cx - p.x) + ny * (cy - p.y) < 0){ nx = -nx; ny = -ny; }
+      return { nx, ny };
+    }
+
+    const steps = Math.ceil(totalLen / texW) + 2;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+
+    for(let k = 0; k < steps; k++){
+      const s0 = k * texW;
+      const a = sampleArc(s0);
+      const b = sampleArc(s0 + texW);
+      const na = normalToCenter(a);
+      const nb = normalToCenter(b);
+      const ext = 1.5;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(a.x - a.ux * ext, a.y - a.uy * ext);
+      ctx.lineTo(b.x + b.ux * ext, b.y + b.uy * ext);
+      ctx.lineTo(b.x + b.ux * ext + nb.nx * texH, b.y + b.uy * ext + nb.ny * texH);
+      ctx.lineTo(a.x - a.ux * ext + na.nx * texH, a.y - a.uy * ext + na.ny * texH);
+      ctx.closePath();
+      ctx.clip();
+
+      ctx.beginPath();
+      ctx.rect(0, 0, W, limitY);
+      ctx.clip();
+
+      let mx = (na.nx + nb.nx) / 2, my = (na.ny + nb.ny) / 2;
+      const len = Math.hypot(mx, my) || 1;
+      mx /= len; my /= len;
+
+      ctx.translate(-mx * texH, -my * texH);
+      ctx.drawImage(imgCache, 0, 0, W, H);
+      ctx.restore();
+    }
+    ctx.restore();
+  };
+
+  // ============================================================
+  // 3. 重寫 render：用 getBaseImage() 取代舊 _erasedImgCache 邏輯
+  //    - 其他邏輯一字不差抄自原檔，僅替換原圖繪製那一行
+  // ============================================================
+  window.render = function(){
+    if(!ctx) return;
+    const w=canvas.width,h=canvas.height;
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,w,h);
+    drawGrid();
+    ctx.setTransform(S.view.scale,0,0,S.view.scale,S.view.tx,S.view.ty);
+
+    const shake = getShakeOffset();
+    ctx.save();
+    if(shake.x||shake.y) ctx.translate(shake.x, shake.y);
+
+    for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder==='below') drawMuzzle(o,o.id===S.selectedId); }
+    drawFireEffects('below');
+
+    if(S.image){
+      if(imgCache.src!==S.image.dataUrl) imgCache.src=S.image.dataUrl;
+      if(imgCache.complete&&imgCache.naturalWidth>0){
+        const alpha = S.xrayMode ? 0.35 : 1;
+        ctx.globalAlpha = alpha;
+
+        for(const o of S.objects){
+          if(!o.hidden && o.type==='fusion_door') drawFusionDoor(o, o.id === S.selectedId);
+        }
+        for(const o of S.objects){
+          if(!o.hidden && (o.type==='door_upper'||o.type==='door_lower')) drawDoor(o, o.id===S.selectedId, 0);
+          if(!o.hidden && o.type==='hatch') drawHatch(o, o.id===S.selectedId, 0);
+        }
+
+        // ★ V82 核心：用 getBaseImage() 一次畫完（含挖空已發射導彈槽）
+        ctx.drawImage(getBaseImage(), 0, 0, w, h);
+
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      ctx.fillStyle='#0a0806'; ctx.fillRect(0,0,w,h);
+      ctx.fillStyle='#3a2f25'; ctx.font='20px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('點擊「導入圖片」載入載具側視圖',w/2,h/2);
+    }
+
+    eraseOriginalTrackByLoop();
+    drawTrackErasePatchBase();
+    drawTrackScrollByLoop();
+
+    for(const o of S.objects){ if(o.hidden) continue; if(o.type==='wheel'&&o.wheel) drawWheel(o,o.id===S.selectedId,getWheelRotSpeed(o)); }
+    const maskC = getMaskCanvas();
+    if(maskC){ ctx.drawImage(maskC,0,0,w,h); }
+
+    {
+      const _nowT = performance.now();
+      let _hasWeapon = false;
+      for(const o of S.objects){ if(o.hidden) continue; if(o.type !== 'weapon' || !o.points || o.points.length < 3) continue; _hasWeapon = true; break; }
+      if(_hasWeapon){
+        const s = S.view.scale, tx = S.view.tx, ty = S.view.ty;
+        if(!window._fullC || window._fullC.width !== w || window._fullC.height !== h){ window._fullC = document.createElement('canvas'); window._fullC.width = w; window._fullC.height = h; }
+        if(!window._bodyC || window._bodyC.width !== w || window._bodyC.height !== h){ window._bodyC = document.createElement('canvas'); window._bodyC.width = w; window._bodyC.height = h; }
+        if(!window._wepC || window._wepC.width !== w || window._wepC.height !== h){ window._wepC = document.createElement('canvas'); window._wepC.width = w; window._wepC.height = h; }
+        const fullC = window._fullC, fullX = fullC.getContext('2d');
+        const bodyC = window._bodyC, bodyX = bodyC.getContext('2d');
+        const wepC = window._wepC, wepX = wepC.getContext('2d');
+
+        fullX.setTransform(1,0,0,1,0,0); fullX.clearRect(0,0,w,h); fullX.drawImage(canvas, 0, 0);
+        bodyX.setTransform(1,0,0,1,0,0); bodyX.clearRect(0,0,w,h); bodyX.drawImage(fullC, 0, 0);
+        bodyX.globalCompositeOperation = 'destination-out';
+        for(const o of S.objects){
+          if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+          bodyX.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) bodyX.moveTo(px, py); else bodyX.lineTo(px, py); } bodyX.closePath(); bodyX.fill();
+        }
+        bodyX.globalCompositeOperation = 'source-over';
+        ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalCompositeOperation = 'destination-out';
+        for(const o of S.objects){
+          if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+          ctx.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.closePath(); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over'; ctx.restore();
+        for(const o of S.objects){
+          if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+          let rx = 0; const rs = S.recoilStates[o.id];
+          if(rs){ const _t = (_nowT - rs.startTime) / rs.duration; if(_t < 1){ const _p = _t < 0.25 ? _t / 0.25 : Math.pow(1 - (_t - 0.25) / 0.75, 1.8); rx = rs.dist * _p * w * s; } else { delete S.recoilStates[o.id]; } }
+          wepX.setTransform(1,0,0,1,0,0); wepX.clearRect(0,0,w,h); wepX.drawImage(fullC, 0, 0);
+          wepX.globalCompositeOperation = 'destination-in';
+          wepX.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) wepX.moveTo(px, py); else wepX.lineTo(px, py); } wepX.closePath(); wepX.fill();
+          wepX.globalCompositeOperation = 'source-over';
+          ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(wepC, -rx, 0); ctx.restore();
+        }
+        ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(bodyC, 0, 0); ctx.restore();
+      }
+    }
+
+    for(const o of S.objects){
+      if(o.hidden) continue;
+      if(o.type==='weapon'&&o.points) drawPolygon(o,o.id===S.selectedId);
+    }
+    for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder!=='below') drawMuzzle(o,o.id===S.selectedId); }
+
+    if(S.flyingMissiles && S.flyingMissiles.length > 0){
+      for(const f of S.flyingMissiles){
+        ctx.drawImage(f.img, f.box.minX*w, f.box.minY*h, f.box.w*w, f.box.h*h, f.x*w, f.box.minY*h, f.box.w*w, f.box.h*h);
+      }
+    }
+
+    drawFireEffects('above');
+    ctx.restore();
+
+    drawAnchorLines();
+    if(S.trackMask.enabled) drawTrackMaskLine();
+    drawTrackLoopGuide();
+    if(S.trackScroll.enabled && S.trackScroll.useTexture) drawTextureRectOverlay();
+    if(S.draftPolygon.length>0) drawDraftPolygon();
+    if(S.draftLoop.length>0) drawDraftLoop();
+    drawHandles();
+    ctx.setTransform(1,0,0,1,0,0);
+  };
+
+  // 清理舊 _erasedImgCache（不再使用，避免誤導）
+  window._erasedImgCache = null;
+  window._erasedImgCacheKey = null;
+
+  setTimeout(() => {
+    if (typeof render === 'function') render();
+  }, 100);
+
+  console.log('[V82] 導彈實體分離 + 履帶精準補全 已就緒');
+})();
+
+</script>
+<script>
+(function(){
+  if(window._bmpPatchInstalledV83) return;
+  window._bmpPatchInstalledV83 = true;
+  for(let i=7; i<=83; i++) window['_bmpPatchInstalledV'+i] = true;
+
+  // ============================================================
+  // 1. getBaseImage：永久挖空所有「已發射」導彈槽
+  // ============================================================
+  window.getBaseImage = function(){
+    if(typeof imgCache === 'undefined' || !imgCache || !imgCache.complete || !imgCache.naturalWidth) return imgCache;
+    const fired = S.objects.filter(o => o.type === 'missile' && o.fired && o.points && o.points.length >= 3);
+    if(fired.length === 0) return imgCache;
+    const W = canvas.width, H = canvas.height;
+    const key = (imgCache.src||'') + '|fired|' + W + 'x' + H + '|' +
+      fired.map(o => o.id + ':' + o.points.map(p => p.x.toFixed(4) + ',' + p.y.toFixed(4)).join(';')).join('|');
+    if(window._baseImgCacheKey === key && window._baseImgCache) return window._baseImgCache;
+    const ec = document.createElement('canvas'); ec.width = W; ec.height = H;
+    const ecx = ec.getContext('2d');
+    ecx.drawImage(imgCache, 0, 0, W, H);
+    ecx.globalCompositeOperation = 'destination-out';
+    for(const o of fired){
+      ecx.beginPath();
+      ecx.moveTo(o.points[0].x*W, o.points[0].y*H);
+      for(let i=1;i<o.points.length;i++) ecx.lineTo(o.points[i].x*W, o.points[i].y*H);
+      ecx.closePath(); ecx.fill();
+    }
+    window._baseImgCache = ec;
+    window._baseImgCacheKey = key;
+    return ec;
+  };
+
+  window.getBaseImageKey = function(){
+    const fired = S.objects.filter(o => o.type === 'missile' && o.fired && o.points && o.points.length >= 3);
+    if(fired.length === 0) return 'nofired';
+    return 'fired|' + fired.map(o => o.id + ':' + o.points.map(p => p.x.toFixed(4) + ',' + p.y.toFixed(4)).join(';')).join('|');
+  };
+
+  // ============================================================
+  // 2. getMaskCanvas：從 getBaseImage 取圖，key 含 baseKey
+  // ============================================================
+  window.getMaskCanvas = function(){
+    if(!S.image || !imgCache.complete || !imgCache.naturalWidth) return null;
+    if(!S.trackMask.enabled || S.trackMask.points.length < 2) return null;
+    const w = canvas.width, h = canvas.height;
+    const baseKey = getBaseImageKey();
+    const key = baseKey + '|mask|' + (imgCache.src||'').slice(-40) + '|' + S.trackMask.points.map(p => p.x.toFixed(3) + ',' + p.y.toFixed(3)).join(';');
+    if(_maskCache.has(key)) return _maskCache.get(key);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const cc = c.getContext('2d');
+    const pts = S.trackMask.points.slice().sort((a,b) => a.x - b.x);
+    cc.beginPath(); cc.moveTo(pts[0].x*w, 0);
+    for(const p of pts) cc.lineTo(p.x*w, p.y*h);
+    cc.lineTo(pts[pts.length-1].x*w, 0); cc.closePath(); cc.clip();
+    cc.drawImage(getBaseImage(), 0, 0, w, h);
+    _maskCache.set(key, c);
+    if(_maskCache.size > 20){ _maskCache.delete(_maskCache.keys().next().value); }
+    return c;
+  };
+
+  // ============================================================
+  // 3. getWheelClipCanvas：從 getBaseImage 取圖，key 含 baseKey
+  // ============================================================
   window.getWheelClipCanvas = function(o){
     if(!S.image || !imgCache.complete || !imgCache.naturalWidth) return null;
     if(!o.wheel) return null;
-    var w = canvas.width, h = canvas.height;
-    var cx = o.wheel.cx * w, cy = o.wheel.cy * h, r = o.wheel.r * w;
-    var size = Math.ceil(r * 2); if(size < 3) return null;
-    var maskKey = (S.trackMask.enabled && S.trackMask.points.length >= 2) ? S.trackMask.points.map(function(p){ return p.x.toFixed(3) + "," + p.y.toFixed(3); }).join(";") : "off";
-    var key = S.image.dataUrl.slice(-40) + "|" + cx.toFixed(1) + "|" + cy.toFixed(1) + "|" + size + "|" + maskKey;
+    const w = canvas.width, h = canvas.height;
+    const cx = o.wheel.cx * w, cy = o.wheel.cy * h, r = o.wheel.r * w;
+    const size = Math.ceil(r * 2); if(size < 3) return null;
+    const baseKey = getBaseImageKey();
+    const maskKey = (S.trackMask.enabled && S.trackMask.points.length >= 2) ? S.trackMask.points.map(p => p.x.toFixed(3) + ',' + p.y.toFixed(3)).join(';') : 'off';
+    const loopKey = (S.trackLoop && S.trackLoop.points.length >= 3) ? S.trackLoop.points.map(p => p.x.toFixed(2) + ',' + p.y.toFixed(2)).join(';') : 'off';
+    const key = baseKey + '|' + (imgCache.src||'').slice(-40) + '|' + cx.toFixed(1) + '|' + cy.toFixed(1) + '|' + size + '|' + maskKey + '|' + loopKey;
     if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
-    var c = document.createElement("canvas"); c.width = size; c.height = size;
-    var cc = c.getContext("2d");
+
+    const baseImg = getBaseImage();
+    const c = document.createElement('canvas'); c.width = size; c.height = size;
+    const cc = c.getContext('2d');
     cc.save(); cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.clip();
-    cc.drawImage(imgCache, -(cx-size/2), -(cy-size/2), w, h); cc.restore();
+    cc.drawImage(baseImg, -(cx-size/2), -(cy-size/2), w, h);
+    cc.restore();
+
+    let cutY_A = -1, cutY_B = -1;
     if(S.trackMask.enabled && S.trackMask.points.length >= 2){
-      var pts = S.trackMask.points.slice().sort(function(a,b){ return a.x-b.x; });
-      cc.save();
-      cc.globalCompositeOperation = "destination-out";
-      cc.beginPath();
-      cc.moveTo(pts[0].x*w - (cx-size/2), -10);
-      for(var i=0;i<pts.length;i++){ cc.lineTo(pts[i].x*w - (cx-size/2), pts[i].y*h - (cy-size/2)); }
-      cc.lineTo(pts[pts.length-1].x*w - (cx-size/2), -10);
-      cc.closePath();
-      cc.fill();
-      cc.restore();
-      var maskYInCanvas = getMaskYAtX(o.wheel.cx) * h - (cy - size/2);
-      if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
-        var isLargeCut = maskYInCanvas > size / 2;
-        if(isLargeCut){
-          var fan = document.createElement("canvas"); fan.width = size; fan.height = size;
-          var fx = fan.getContext("2d");
-          fx.save();
-          fx.beginPath();
-          fx.moveTo(size/2, size/2);
-          fx.arc(size/2, size/2, size/2, Math.PI*0.25, Math.PI*0.75);
-          fx.closePath();
-          fx.clip();
-          fx.drawImage(imgCache, -(cx-size/2), -(cy-size/2), w, h);
-          fx.restore();
-          cc.save();
-          cc.globalCompositeOperation = "destination-over";
-          for(var j=1;j<=7;j++){
-            cc.save();
-            cc.translate(size/2, size/2);
-            cc.rotate((Math.PI/4)*j);
-            cc.translate(-size/2, -size/2);
-            cc.drawImage(fan, 0, 0);
-            cc.restore();
-          }
-          cc.restore();
-        } else {
-          var temp = document.createElement("canvas"); temp.width = size; temp.height = size;
-          var tc = temp.getContext("2d"); tc.drawImage(c, 0, 0);
-          cc.save();
-          cc.globalCompositeOperation = "destination-over";
-          var angles = [15,-15,30,-30,45,-45,60,-60,90,-90];
-          for(var k=0;k<angles.length;k++){
-            cc.save();
-            cc.translate(size/2, size/2);
-            cc.rotate(angles[k] * Math.PI/180);
-            cc.translate(-size/2, -size/2);
-            cc.drawImage(temp, 0, 0);
-            cc.restore();
-          }
-          cc.restore();
+      cutY_A = getMaskYAtX(o.wheel.cx) * h - (cy - size/2);
+    }
+    if(S.trackLoop && S.trackLoop.points.length >= 3){
+      let inTrack = false;
+      if(pointInPolygon(o.wheel.cx, o.wheel.cy, S.trackLoop.points)) inTrack = true;
+      else {
+        for(let i = 0; i < 16; i++){
+          const ang = (i / 16) * Math.PI * 2;
+          const nx = o.wheel.cx + Math.cos(ang) * o.wheel.r;
+          const ny = o.wheel.cy + Math.sin(ang) * o.wheel.r * (w / h);
+          if(pointInPolygon(nx, ny, S.trackLoop.points)){ inTrack = true; break; }
+        }
+      }
+      if(inTrack){
+        let trackTopY = getPolygonTopYAtX(o.wheel.cx, S.trackLoop.points);
+        if(trackTopY >= 0){
+          const rtex = getTextureRect();
+          const texH = (rtex.y1 - rtex.y0) * h;
+          cutY_B = (trackTopY * h + texH) - (cy - size/2);
         }
       }
     }
+
+    let finalCutY = -1;
+    if(cutY_A !== -1) finalCutY = cutY_A;
+    if(cutY_B !== -1) finalCutY = finalCutY === -1 ? cutY_B : Math.max(finalCutY, cutY_B);
+
+    let maxWheelCy = 0, hasWheel = false;
+    for(const obj of S.objects){
+      if(obj.type === 'wheel' && obj.wheel && obj.wheel.cy > maxWheelCy){ maxWheelCy = obj.wheel.cy; hasWheel = true; }
+    }
+    if(hasWheel){
+      let limitY_local = maxWheelCy * h - (cy - size/2);
+      if(finalCutY > limitY_local) finalCutY = limitY_local;
+    }
+    if(finalCutY > size / 2) finalCutY = size / 2;
+
+    let maskYInCanvas = finalCutY;
+    if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
+      cc.save(); cc.globalCompositeOperation = "destination-out";
+      cc.fillRect(0, 0, size, maskYInCanvas); cc.restore();
+
+      var isLargeCut = maskYInCanvas > size / 2;
+      if(isLargeCut){
+        var fan = document.createElement("canvas"); fan.width = size; fan.height = size;
+        var fx = fan.getContext("2d");
+        fx.save(); fx.beginPath(); fx.moveTo(size/2, size/2);
+        fx.arc(size/2, size/2, size/2, Math.PI*0.25, Math.PI*0.75); fx.closePath(); fx.clip();
+        fx.drawImage(baseImg, -(cx-size/2), -(cy-size/2), w, h);
+        fx.restore();
+        cc.save(); cc.globalCompositeOperation = "destination-over";
+        for(var j=1;j<=7;j++){
+          cc.save(); cc.translate(size/2, size/2); cc.rotate((Math.PI/4)*j); cc.translate(-size/2, -size/2);
+          cc.drawImage(fan, 0, 0); cc.restore();
+        }
+        cc.restore();
+      } else {
+        var temp = document.createElement("canvas"); temp.width = size; temp.height = size;
+        var tc = temp.getContext("2d"); tc.drawImage(c, 0, 0);
+        cc.save(); cc.globalCompositeOperation = "destination-over";
+        var angles = [15,-15,30,-30,45,-45,60,-60,90,-90];
+        for(var k=0;k<angles.length;k++){
+          cc.save(); cc.translate(size/2, size/2); cc.rotate(angles[k] * Math.PI/180); cc.translate(-size/2, -size/2);
+          cc.drawImage(temp, 0, 0); cc.restore();
+        }
+        cc.restore();
+      }
+    }
     cc.save(); cc.globalCompositeOperation = "destination-in";
-    cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.fill();
-    cc.restore();
+    cc.beginPath(); cc.arc(size/2, size/2, size/2-0.5, 0, Math.PI*2); cc.fill(); cc.restore();
     _wheelClipCache.set(key, c);
     if(_wheelClipCache.size > 40){ _wheelClipCache.delete(_wheelClipCache.keys().next().value); }
     return c;
   };
 
-  // ---------- ③ band-only erase ----------
-  window.eraseOriginalTrackByLoop = function(){
+  // ============================================================
+  // 4. getDoorClipCanvas：從 getBaseImage 取圖
+  // ============================================================
+  window.getDoorClipCanvas = function(o){
+    if(typeof S === 'undefined' || !S.image || !imgCache.complete || !imgCache.naturalWidth) return null;
+    const pts = o.points;
+    if(!pts || pts.length < 3) return null;
+    const w = canvas.width, h = canvas.height;
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    for(const p of pts){
+      const px = p.x*w, py = p.y*h;
+      if(px<minX) minX=px; if(py<minY) minY=py;
+      if(px>maxX) maxX=px; if(py>maxY) maxY=py;
+    }
+    const bw = Math.ceil(maxX-minX), bh = Math.ceil(maxY-minY);
+    if(bw<2 || bh<2) return null;
+    const baseKey = getBaseImageKey();
+    const key = baseKey + '|door|' + (imgCache.src||'').slice(-40) + '|' + pts.map(p => p.x.toFixed(3) + ',' + p.y.toFixed(3)).join(';');
+    if(_doorClipCache.has(key)) return _doorClipCache.get(key);
+    const c = document.createElement('canvas'); c.width = bw; c.height = bh;
+    const cc = c.getContext('2d');
+    cc.beginPath();
+    cc.moveTo(pts[0].x*w - minX, pts[0].y*h - minY);
+    for(let i=1;i<pts.length;i++) cc.lineTo(pts[i].x*w - minX, pts[i].y*h - minY);
+    cc.closePath(); cc.clip();
+    cc.drawImage(getBaseImage(), -minX, -minY, w, h);
+    const result = {canvas:c, minX, minY, bw, bh};
+    _doorClipCache.set(key, result);
+    if(_doorClipCache.size > 30){ _doorClipCache.delete(_doorClipCache.keys().next().value); }
+    return result;
+  };
+
+  // ============================================================
+  // 5. drawTrackErasePatchBase：從 getBaseImage 取紋理
+  // ============================================================
+  window.drawTrackErasePatchBase = function(){
     if(!S.trackScroll.enabled) return;
     if(!S.trackLoop || S.trackLoop.points.length < 3) return;
     if(!S.image || !imgCache.complete || !imgCache.naturalWidth) return;
-    var W = canvas.width, H = canvas.height;
-    var rawPts = S.trackLoop.points.map(function(p){ return { x:p.x*W, y:p.y*H }; });
-    var n = rawPts.length;
+    const W = canvas.width, H = canvas.height;
+    let minY = 1, maxY = 0;
+    for(const p of S.trackLoop.points){ if(p.y < minY) minY = p.y; if(p.y > maxY) maxY = p.y; }
+    const limitY = ((minY + maxY) / 2) * H;
+    const rawPts = S.trackLoop.points.map(p => ({ x:p.x * W, y:p.y * H }));
+    const n = rawPts.length;
     if(n < 3) return;
-    var segs = [], totalLen = 0;
-    for(var i=0;i<n;i++){
-      var p1 = rawPts[i], p2 = rawPts[(i+1)%n];
-      var dx = p2.x - p1.x, dy = p2.y - p1.y;
-      var len = Math.sqrt(dx*dx + dy*dy);
+    let segs = [], totalLen = 0;
+    for(let i = 0; i < n; i++){
+      const p1 = rawPts[i], p2 = rawPts[(i + 1) % n];
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
       if(len < 0.5) continue;
-      segs.push({x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,ux:dx/len,uy:dy/len,len:len,startLen:totalLen});
+      segs.push({ x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y, ux:dx / len, uy:dy / len, len:len, startLen:totalLen });
       totalLen += len;
     }
     if(totalLen < 1) return;
-    var cx = 0, cy = 0;
-    for(var i=0;i<n;i++){ cx += rawPts[i].x; cy += rawPts[i].y; }
+    let cx = 0, cy = 0;
+    for(let i = 0; i < n; i++){ cx += rawPts[i].x; cy += rawPts[i].y; }
     cx /= n; cy /= n;
-    var r = getTextureRect();
-    var texH = (r.y1 - r.y0) * H;
-    var texW = (r.x1 - r.x0) * W;
-    if(texH < 2 || texW < 2) return;
+    const r = getTextureRect();
+    const texW = (r.x1 - r.x0) * W, texH = (r.y1 - r.y0) * H;
+    if(texW < 2 || texH < 2) return;
     function sampleArc(s){
-      s = s % totalLen; if(s<0) s += totalLen;
-      for(var i=0;i<segs.length;i++){
-        var seg = segs[i];
+      s = s % totalLen; if(s < 0) s += totalLen;
+      for(let i = 0; i < segs.length; i++){
+        const seg = segs[i];
         if(s >= seg.startLen && s <= seg.startLen + seg.len){
-          var t = (s - seg.startLen) / seg.len;
-          return { x: seg.x1+(seg.x2-seg.x1)*t, y: seg.y1+(seg.y2-seg.y1)*t, ux: seg.ux, uy: seg.uy };
+          const t = (s - seg.startLen) / seg.len;
+          return { x: seg.x1 + (seg.x2 - seg.x1) * t, y: seg.y1 + (seg.y2 - seg.y1) * t, ux: seg.ux, uy: seg.uy };
         }
       }
-      var last = segs[segs.length-1];
+      const last = segs[segs.length - 1];
       return { x:last.x2, y:last.y2, ux:last.ux, uy:last.uy };
     }
     function normalToCenter(p){
-      var nx = -p.uy, ny = p.ux;
-      if(nx*(cx-p.x) + ny*(cy-p.y) < 0){ nx=-nx; ny=-ny; }
-      return { nx:nx, ny:ny };
+      let nx = -p.uy, ny = p.ux;
+      if(nx * (cx - p.x) + ny * (cy - p.y) < 0){ nx = -nx; ny = -ny; }
+      return { nx, ny };
     }
-    var steps = Math.ceil(totalLen / texW) + 2;
+    const baseImg = getBaseImage();
+    const steps = Math.ceil(totalLen / texW) + 2;
     ctx.save();
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.fillStyle = "#000";
-    for(var k=0;k<steps;k++){
-      var s0 = k * texW;
-      var a  = sampleArc(s0);
-      var b  = sampleArc(s0 + texW);
-      var na = normalToCenter(a);
-      var nb = normalToCenter(b);
-      var ext = 1.5;
+    ctx.globalCompositeOperation = 'source-over';
+    for(let k = 0; k < steps; k++){
+      const s0 = k * texW;
+      const a = sampleArc(s0);
+      const b = sampleArc(s0 + texW);
+      const na = normalToCenter(a);
+      const nb = normalToCenter(b);
+      const ext = 1.5;
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(a.x - a.ux*ext, a.y - a.uy*ext);
-      ctx.lineTo(b.x + b.ux*ext, b.y + b.uy*ext);
-      ctx.lineTo(b.x + b.ux*ext + nb.nx*texH, b.y + b.uy*ext + nb.ny*texH);
-      ctx.lineTo(a.x - a.ux*ext + na.nx*texH, a.y - a.uy*ext + na.ny*texH);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(a.x - a.ux * ext, a.y - a.uy * ext);
+      ctx.lineTo(b.x + b.ux * ext, b.y + b.uy * ext);
+      ctx.lineTo(b.x + b.ux * ext + nb.nx * texH, b.y + b.uy * ext + nb.ny * texH);
+      ctx.lineTo(a.x - a.ux * ext + na.nx * texH, a.y - a.uy * ext + na.ny * texH);
+      ctx.closePath(); ctx.clip();
+      ctx.beginPath(); ctx.rect(0, 0, W, limitY); ctx.clip();
+      let mx = (na.nx + nb.nx) / 2, my = (na.ny + nb.ny) / 2;
+      const len = Math.hypot(mx, my) || 1;
+      mx /= len; my /= len;
+      ctx.translate(-mx * texH, -my * texH);
+      ctx.drawImage(baseImg, 0, 0, W, H);
+      ctx.restore();
     }
     ctx.restore();
   };
 
-  // ---------- ④ source-over texture ----------
+  // ============================================================
+  // 6. drawTrackScrollByLoop：從 getBaseImage 取紋理
+  // ============================================================
   window.drawTrackScrollByLoop = function(){
     if(!S.trackScroll.enabled) return;
     if(!S.trackLoop || S.trackLoop.points.length < 3) return;
@@ -1861,12 +2586,12 @@ console.log('載具標注編輯器 v2.0 (trackLoop) 已啟動');
       if(nx*(cx-p.x) + ny*(cy-p.y) < 0){ nx=-nx; ny=-ny; }
       return { nx:nx, ny:ny };
     }
+    const baseImg = getBaseImage();
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(rawPts[0].x, rawPts[0].y);
     for(var i=1;i<n;i++) ctx.lineTo(rawPts[i].x, rawPts[i].y);
-    ctx.closePath();
-    ctx.clip();
+    ctx.closePath(); ctx.clip();
     if(sc.useTexture){
       var offset = (animT * vel * dir) % texW; if(offset<0) offset += texW;
       var steps = Math.ceil(totalLen / texW) + 2;
@@ -1882,19 +2607,17 @@ console.log('載具標注編輯器 v2.0 (trackLoop) 已啟動');
         var nb = normalToCenter(b);
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
         ctx.lineTo(b.x + nb.nx*texH, b.y + nb.ny*texH);
         ctx.lineTo(a.x + na.nx*texH, a.y + na.ny*texH);
-        ctx.closePath();
-        ctx.clip();
+        ctx.closePath(); ctx.clip();
         ctx.translate(a.x, a.y);
         ctx.transform(a.ux, a.uy, na.nx, na.ny, 0, 0);
         ctx.translate(0, texH);
         ctx.scale(1, -1);
         var det = a.ux*na.ny - a.uy*na.nx;
         if(det < 0){ ctx.scale(-1,1); ctx.translate(-texW,0); }
-        ctx.drawImage(imgCache, tx0, ty0, texW, texH, 0, 0, texW, texH);
+        ctx.drawImage(baseImg, tx0, ty0, texW, texH, 0, 0, texW, texH);
         ctx.restore();
       }
       ctx.globalAlpha = prevAlpha;
@@ -1902,46 +2625,116 @@ console.log('載具標注編輯器 v2.0 (trackLoop) 已啟動');
     ctx.restore();
   };
 
-  // ---------- ⑤ 采样调试（履带区域中心点 alpha 应为 0） ----------
-  window._patcherV7Sample = function(){
-    try {
-      if(!canvas || !canvas.width) { console.warn("[V7] canvas 未就绪"); return; }
-      if(!S.trackLoop || S.trackLoop.points.length < 3){
-        console.log("[V7] 未设置 trackLoop，无法采样");
-        return;
+  // ============================================================
+  // 7. render：畫原圖用 getBaseImage()
+  // ============================================================
+  window.render = function(){
+    if(!ctx) return;
+    const w=canvas.width,h=canvas.height;
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,w,h);
+    drawGrid();
+    ctx.setTransform(S.view.scale,0,0,S.view.scale,S.view.tx,S.view.ty);
+    const shake = getShakeOffset();
+    ctx.save();
+    if(shake.x||shake.y) ctx.translate(shake.x, shake.y);
+    for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder==='below') drawMuzzle(o,o.id===S.selectedId); }
+    drawFireEffects('below');
+    if(S.image){
+      if(imgCache.src!==S.image.dataUrl) imgCache.src=S.image.dataUrl;
+      if(imgCache.complete&&imgCache.naturalWidth>0){
+        const alpha = S.xrayMode ? 0.35 : 1;
+        ctx.globalAlpha = alpha;
+        for(const o of S.objects){ if(!o.hidden && o.type==='fusion_door') drawFusionDoor(o, o.id === S.selectedId); }
+        for(const o of S.objects){
+          if(!o.hidden && (o.type==='door_upper'||o.type==='door_lower')) drawDoor(o, o.id===S.selectedId, 0);
+          if(!o.hidden && o.type==='hatch') drawHatch(o, o.id===S.selectedId, 0);
+        }
+        ctx.drawImage(getBaseImage(), 0, 0, w, h);
+        ctx.globalAlpha = 1;
       }
-      // 计算 trackLoop 中心
-      var W = canvas.width, H = canvas.height;
-      var cxPix = 0, cyPix = 0, n = S.trackLoop.points.length;
-      for(var i=0;i<n;i++){ cxPix += S.trackLoop.points[i].x * W; cyPix += S.trackLoop.points[i].y * H; }
-      cxPix = Math.floor(cxPix / n);
-      cyPix = Math.floor(cyPix / n);
-      var c2 = canvas.getContext("2d");
-      // 在 trackLoop 内多点采样：中心 + 上/下/左/右偏移
-      var samples = [
-        {name:"center", x:cxPix, y:cyPix},
-        {name:"center+1%x", x:cxPix + Math.floor(W*0.01), y:cyPix},
-        {name:"center-1%x", x:cxPix - Math.floor(W*0.01), y:cyPix},
-        {name:"center+1%y", x:cxPix, y:cyPix + Math.floor(H*0.01)},
-        {name:"center-1%y", x:cxPix, y:cyPix - Math.floor(H*0.01)}
-      ];
-      console.group("[V7] canvas 像素 alpha 采样 (trackLoop 内)");
-      for(var k=0;k<samples.length;k++){
-        var s = samples[k];
-        if(s.x<0||s.y<0||s.x>=W||s.y>=H) continue;
-        var px = c2.getImageData(s.x, s.y, 1, 1).data;
-        var label = s.name + " @(" + s.x + "," + s.y + ")";
-        if(px[3] === 0){ console.log("  %c" + label + " → alpha=0 (透明 ✓)", "color:#4caf50"); }
-        else { console.log("  %c" + label + " → RGBA(" + px[0] + "," + px[1] + "," + px[2] + "," + px[3] + ")", "color:#e8a33d"); }
+    } else {
+      ctx.fillStyle='#0a0806'; ctx.fillRect(0,0,w,h);
+      ctx.fillStyle='#3a2f25'; ctx.font='20px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('點擊「導入圖片」載入載具側視圖',w/2,h/2);
+    }
+    eraseOriginalTrackByLoop();
+    drawTrackErasePatchBase();
+    drawTrackScrollByLoop();
+    for(const o of S.objects){ if(o.hidden) continue; if(o.type==='wheel'&&o.wheel) drawWheel(o,o.id===S.selectedId,getWheelRotSpeed(o)); }
+    const maskC = getMaskCanvas();
+    if(maskC){ ctx.drawImage(maskC,0,0,w,h); }
+    {
+      const _nowT = performance.now();
+      let _hasWeapon = false;
+      for(const o of S.objects){ if(o.hidden) continue; if(o.type !== 'weapon' || !o.points || o.points.length < 3) continue; _hasWeapon = true; break; }
+      if(_hasWeapon){
+        const s = S.view.scale, tx = S.view.tx, ty = S.view.ty;
+        if(!window._fullC || window._fullC.width !== w || window._fullC.height !== h){ window._fullC = document.createElement('canvas'); window._fullC.width = w; window._fullC.height = h; }
+        if(!window._bodyC || window._bodyC.width !== w || window._bodyC.height !== h){ window._bodyC = document.createElement('canvas'); window._bodyC.width = w; window._bodyC.height = h; }
+        if(!window._wepC || window._wepC.width !== w || window._wepC.height !== h){ window._wepC = document.createElement('canvas'); window._wepC.width = w; window._wepC.height = h; }
+        const fullC = window._fullC, fullX = fullC.getContext('2d');
+        const bodyC = window._bodyC, bodyX = bodyC.getContext('2d');
+        const wepC = window._wepC, wepX = wepC.getContext('2d');
+        fullX.setTransform(1,0,0,1,0,0); fullX.clearRect(0,0,w,h); fullX.drawImage(canvas, 0, 0);
+        bodyX.setTransform(1,0,0,1,0,0); bodyX.clearRect(0,0,w,h); bodyX.drawImage(fullC, 0, 0);
+        bodyX.globalCompositeOperation = 'destination-out';
+        for(const o of S.objects){
+          if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+          bodyX.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) bodyX.moveTo(px, py); else bodyX.lineTo(px, py); } bodyX.closePath(); bodyX.fill();
+        }
+        bodyX.globalCompositeOperation = 'source-over';
+        ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalCompositeOperation = 'destination-out';
+        for(const o of S.objects){
+          if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+          ctx.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.closePath(); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over'; ctx.restore();
+        for(const o of S.objects){
+          if(o.hidden || o.type !== 'weapon' || !o.points || o.points.length < 3) continue;
+          let rx = 0; const rs = S.recoilStates[o.id];
+          if(rs){ const _t = (_nowT - rs.startTime) / rs.duration; if(_t < 1){ const _p = _t < 0.25 ? _t / 0.25 : Math.pow(1 - (_t - 0.25) / 0.75, 1.8); rx = rs.dist * _p * w * s; } else { delete S.recoilStates[o.id]; } }
+          wepX.setTransform(1,0,0,1,0,0); wepX.clearRect(0,0,w,h); wepX.drawImage(fullC, 0, 0);
+          wepX.globalCompositeOperation = 'destination-in';
+          wepX.beginPath(); for(let i=0; i<o.points.length; i++){ const px = o.points[i].x * w * s + tx; const py = o.points[i].y * h * s + ty; if(i===0) wepX.moveTo(px, py); else wepX.lineTo(px, py); } wepX.closePath(); wepX.fill();
+          wepX.globalCompositeOperation = 'source-over';
+          ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(wepC, -rx, 0); ctx.restore();
+        }
+        ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(bodyC, 0, 0); ctx.restore();
       }
-      console.groupEnd();
-    } catch(e){ console.warn("[V7] sample failed", e); }
+    }
+    for(const o of S.objects){ if(o.hidden) continue; if(o.type==='weapon'&&o.points) drawPolygon(o,o.id===S.selectedId); }
+    for(const o of S.objects){ if(o.hidden) continue; if(o.type==='muzzle'&&o.muzzle&&o.layerOrder!=='below') drawMuzzle(o,o.id===S.selectedId); }
+    if(S.flyingMissiles && S.flyingMissiles.length > 0){
+      for(const f of S.flyingMissiles){
+        ctx.drawImage(f.img, f.box.minX*w, f.box.minY*h, f.box.w*w, f.box.h*h, f.x*w, f.box.minY*h, f.box.w*w, f.box.h*h);
+      }
+    }
+    drawFireEffects('above');
+    ctx.restore();
+    drawAnchorLines();
+    if(S.trackMask.enabled) drawTrackMaskLine();
+    drawTrackLoopGuide();
+    if(S.trackScroll.enabled && S.trackScroll.useTexture) drawTextureRectOverlay();
+    if(S.draftPolygon.length>0) drawDraftPolygon();
+    if(S.draftLoop.length>0) drawDraftLoop();
+    drawHandles();
+    ctx.setTransform(1,0,0,1,0,0);
   };
-  setTimeout(window._patcherV7Sample, 5000);
 
-  console.log("[PatcherV7] 透明网格 + rev920 wheel + band-only erase + source-over texture 已安装");
-  console.log("[V7] 5 秒后会自动采样履带中心 alpha；也可手动执行 _patcherV7Sample() 复查");
+  // 清掉舊快取
+  try{ _maskCache.clear(); }catch(_){}
+  try{ _wheelClipCache.clear(); }catch(_){}
+  try{ _doorClipCache.clear(); }catch(_){}
+  window._baseImgCache = null;
+  window._baseImgCacheKey = null;
+  window._erasedImgCache = null;
+  window._erasedImgCacheKey = null;
+
+  setTimeout(() => { if(typeof render === 'function') render(); }, 100);
+  console.log('[V83] 導彈實體分離（全鏈路）+ 履帶精準補全 已就緒');
 })();
+
 </script>
 </body>
 </html>

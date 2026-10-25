@@ -3,7 +3,8 @@
  * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關
  * - trackLoop：履帶環多邊形（閉合），遊戲端需按此多邊形執行擦除與貼圖
  * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
- * - 渲染順序：image → eraseOriginalTrack（trackLoop） → trackScroll → wheels → trackMask → doors → muzzles → effects
+ * - fusion：融合車門（純實色多邊形）
+ * - missiles：單發實體導彈
  */
 const VEHICLE_ANNOTATION_T80U = {
   "id": "t80u",
@@ -132,49 +133,49 @@ const VEHICLE_ANNOTATION_T80U = {
     {
       "cx": 0.1144,
       "cy": 0.7521,
-      "r": 0.0341,
+      "r": 0.0295,
       "rotSpeed": 1
     },
     {
       "cx": 0.1842,
       "cy": 0.8519,
-      "r": 0.0341,
+      "r": 0.0361,
       "rotSpeed": 1
     },
     {
       "cx": 0.2607,
       "cy": 0.8506,
-      "r": 0.0341,
+      "r": 0.0361,
       "rotSpeed": 1
     },
     {
       "cx": 0.3485,
       "cy": 0.8504,
-      "r": 0.0341,
+      "r": 0.0361,
       "rotSpeed": 1
     },
     {
       "cx": 0.4257,
       "cy": 0.8506,
-      "r": 0.0341,
+      "r": 0.0361,
       "rotSpeed": 1
     },
     {
-      "cx": 0.5171,
-      "cy": 0.8536,
-      "r": 0.0341,
+      "cx": 0.5155,
+      "cy": 0.8508,
+      "r": 0.0361,
       "rotSpeed": 1
     },
     {
-      "cx": 0.5937,
-      "cy": 0.8384,
-      "r": 0.0341,
+      "cx": 0.5933,
+      "cy": 0.8497,
+      "r": 0.0361,
       "rotSpeed": 1
     },
     {
-      "cx": 0.6712,
-      "cy": 0.7097,
-      "r": 0.0341,
+      "cx": 0.669,
+      "cy": 0.7266,
+      "r": 0.0303,
       "rotSpeed": 1
     }
   ],
@@ -244,8 +245,10 @@ const VEHICLE_ANNOTATION_T80U = {
         "backUses": "solid_color",
         "flipDirection": "outward"
       }
-    ]
+    ],
+    "fusion": []
   },
+  "missiles": [],
   "weaponAreas": [
     {
       "id": "oapjqexh",

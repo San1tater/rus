@@ -968,7 +968,6 @@ function _openSweepDialog(bid){
 
   let h = '';
   h += '<div class="detail-title">' + bossIcon(bid) + ' ' + b.name + ' <span style="font-size:12px;color:#7a6f60;font-weight:normal;margin-left:4px">Lv.' + sw.level + '</span></div>';
-  h += '<div class="detail-sub">批量掃蕩 · 每次約 3.5 秒</div>';
 
   h += '<div class="divider"></div>';
   h += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">';
@@ -1049,19 +1048,11 @@ function _executeSweep(bid, count){
   const origPointer = tabbar ? tabbar.style.pointerEvents : '';
   if(tabbar) tabbar.style.pointerEvents = 'none';
 
-  const allLoot = [];
-  let servantGained = null;
-  let finishedIdx = 0;
-
-  function next(){
-    if(finishedIdx >= count){
-      if(tabbar) tabbar.style.pointerEvents = origPointer;
-      _finishBatchSweep(bid, vid, level, count, allLoot, servantGained, expTarget);
-      return;
-    }
-    finishedIdx++;
-    const _idx = finishedIdx;
-    _playOneSweepAnim(bid, vid, _idx, count, function(){
+  /* [rev-once-sweep] 無論掃蕩多少次，只播一次動畫，一次性結算 count 次 */
+  _playOneSweepAnim(bid, vid, count, function(){
+    const allLoot = [];
+    let servantGained = null;
+    for(let i = 0; i < count; i++){
       const loot = _rollSweepLoot(bid);
       for(const it of loot) allLoot.push(it);
       if(!servantGained && Math.random() < 0.25){
@@ -1078,14 +1069,14 @@ function _executeSweep(bid, count){
         }
       }
       state.stats.bossKills = (state.stats.bossKills || 0) + 1;
-      next();
-    });
-  }
-  next();
+    }
+    if(tabbar) tabbar.style.pointerEvents = origPointer;
+    _finishBatchSweep(bid, vid, level, count, allLoot, servantGained, expTarget);
+  });
 }
 
 /* ★ zone1 內演出（背景 + 绘製 boss + 載具推 boss 一起出畫面） */
-function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
+function _playOneSweepAnim(bid, vid, totalCount, onComplete){
   var z1 = document.getElementById("zone1");
   if(!z1){ onComplete(); return; }
   z1.innerHTML = "";
@@ -1126,7 +1117,7 @@ function _playOneSweepAnim(bid, vid, currentIdx, totalCount, onComplete){
   var fcCtx = fireCanvas.getContext("2d");
   var progress = document.createElement("div");
   progress.style.cssText = "position:absolute;top:8px;left:50%;transform:translateX(-50%);color:#e8a33d;font-size:12px;font-weight:bold;background:rgba(14,12,10,.85);border:1px solid #8a5f18;padding:3px 12px;border-radius:10px;z-index:10;white-space:nowrap;";
-  progress.textContent = "掃蕩 " + currentIdx + " / " + totalCount;
+  progress.textContent = "掃蕩 ×" + totalCount;
   scene.appendChild(bg); scene.appendChild(bossCanvas); scene.appendChild(veh); scene.appendChild(fireCanvas); scene.appendChild(progress);
   z1.appendChild(scene);
   requestAnimationFrame(function(){ bg.style.opacity = "1"; bossCanvas.style.opacity = "1"; });
