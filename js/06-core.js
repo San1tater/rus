@@ -182,9 +182,9 @@ function updatePlayerStatPanel(){
   const apm = panel.querySelector('.ap-m');
   if(lv) lv.textContent = 'Lv.' + state.player.level;
   if(hpv) hpv.textContent = _f(state.player.hp);
-  if(hpm) hpm.textContent = _f(state.player.maxHp);
+  if(hpm) hpm.textContent = '/ ' + _f(state.player.maxHp);
   if(apv) apv.textContent = _f(state.player.armor);
-  if(apm) apm.textContent = _f(state.player.maxArmor);
+  if(apm) apm.textContent = '/ ' + _f(state.player.maxArmor);
 }
 function heroLoop(now){
   _tickHeroWalkSwitch(now);

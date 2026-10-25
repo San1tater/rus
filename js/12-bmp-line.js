@@ -8,31 +8,7 @@
     return;
   }
 
-  // ============ 1. 存檔遷移：bmp1am → bmp1m ============
-  try {
-    if(typeof state !== 'undefined' && state && state.garage){
-      var g0 = state.garage;
-      if(Array.isArray(g0.ownedVehicles)){
-        var idx0 = g0.ownedVehicles.indexOf('bmp1am');
-        if(idx0 >= 0){ g0.ownedVehicles[idx0] = 'bmp1m'; }
-      }
-      if(g0.vehicleExp && typeof g0.vehicleExp === 'object' && g0.vehicleExp.bmp1am !== undefined){
-        g0.vehicleExp.bmp1m = (g0.vehicleExp.bmp1m || 0) + g0.vehicleExp.bmp1am;
-        delete g0.vehicleExp.bmp1am;
-      }
-      if(g0.researchProgress && typeof g0.researchProgress === 'object' && g0.researchProgress.bmp1am !== undefined){
-        g0.researchProgress.bmp1m = (g0.researchProgress.bmp1m || 0) + g0.researchProgress.bmp1am;
-        delete g0.researchProgress.bmp1am;
-      }
-      if(g0.currentVehicle === 'bmp1am') g0.currentVehicle = 'bmp1m';
-      if(g0.researchTarget === 'bmp1am') g0.researchTarget = 'bmp1m';
-      if(typeof save === 'function') save();
-      console.log('[bmp-line] 存檔遷移完成 bmp1am → bmp1m');
-    }
-  } catch(e){ console.warn('[bmp-line] 遷移失敗', e); }
-
-  // ============ 2. 移除 bmp1am，新增 bmp1m ============
-  if(VEHICLES.bmp1am){ delete VEHICLES.bmp1am; }
+  // ============ 2. 新增 bmp1m ============
 
   if(!VEHICLES.bmp1){
     VEHICLES.bmp1 = {
