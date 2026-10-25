@@ -534,7 +534,7 @@ function renderBattleScene(z1){
             }
           }
         }
-      } catch(e){ console.warn('[aimLocal]', e); battle.aimLocal = null; }
+      } catch(e){ battle.aimLocal = null; }
       const fx = document.getElementById('battle-fx');
       if(fx){
         const old = document.getElementById('aim-marker');
@@ -1137,7 +1137,7 @@ function _playOneSweepAnim(bid, vid, totalCount, onComplete){
   var FIRE_INTERVAL = 150;
   var startTime = performance.now();
   var lastFireAt = 0;
-  var sweepSmoke = [], sweepTracers = [];
+  var sweepSmoke = [], sweepTracers = []; var _sweepErasedMissilePolys = [], _sweepErasedBaseImg = null, _sweepMissiles = [];
 
   // [rev884] 掃蕩模式改用真實 muzzles + MUZZLE_PROFILES + 共用煙霧
   var _sweepMuzzles = [];
@@ -1197,13 +1197,15 @@ function _playOneSweepAnim(bid, vid, totalCount, onComplete){
       if (typeof window.VehicleRenderer !== "undefined" && window.VEHICLE_ANNOTATIONS && window.VEHICLE_ANNOTATIONS[vid]) {
         try {
           _vehCtx.clearRect(0, 0, veh.width, veh.height);
-          window.VehicleRenderer.render(_vehCtx, vid, 0, 0, veh.width, veh.height, (now - startTime) / 1000, {
-            trackVel: 300,
-            wheelSpeed: 20,
-            doorOpen: 0,
-            recoils: {}
-          });
-        } catch(e) { console.warn("[sweep veh render]", e); }
+          var _vehRenderOpts = { trackVel: 300, wheelSpeed: 20, doorOpen: 0, recoils: {} };
+          if(_sweepErasedMissilePolys.length > 0){
+            if(!_sweepErasedBaseImg && typeof window._makeErasedBaseImage === "function"){
+              _sweepErasedBaseImg = window._makeErasedBaseImage(vid, _sweepErasedMissilePolys);
+            }
+            if(_sweepErasedBaseImg) _vehRenderOpts.baseImage = _sweepErasedBaseImg;
+          }
+          window.VehicleRenderer.render(_vehCtx, vid, 0, 0, veh.width, veh.height, (now - startTime) / 1000, _vehRenderOpts);
+        } catch(e) { }
       }
       bossCanvas.style.left = bossX + "%";
       if(bossRot > 0){ bossCanvas.style.transform = "translateX(-50%) rotate(" + bossRot + "deg)"; }
@@ -1231,7 +1233,63 @@ var worldSpeed = SWEEP_SPEED_PX_PER_SEC;
               sweepSmoke.push(window._vsMakeSmokeSpread(_mxPx + vehW * 0.04, _myPx, _mz.weaponId));
             }
           }
-          sweepTracers.push({ startX: _mxPx, startY: _myPx, born: now, speed: 2500, len: 100, width: 3 });
+          if(_mz.weaponId === "atgm"){
+            // _isAtgmSweep_v42：只有 ann.missiles 存在时才挖空，推独立实体
+            var _annSv42 = window.VEHICLE_ANNOTATIONS && window.VEHICLE_ANNOTATIONS[vid];
+            if(_annSv42 && _annSv42.missiles && _annSv42.missiles.length){
+              for(var _miSv42 = 0; _miSv42 < _annSv42.missiles.length; _miSv42++){
+                var _misSv42 = _annSv42.missiles[_miSv42];
+                if(_misSv42.weaponId === "atgm" && _misSv42.polygon && _misSv42.polygon.length >= 3){
+                  var _exSv42 = false;
+                  for(var _eiSv42 = 0; _eiSv42 < _sweepErasedMissilePolys.length; _eiSv42++){
+                    if(_sweepErasedMissilePolys[_eiSv42] === _misSv42.polygon){ _exSv42 = true; break; }
+                  }
+                  if(!_exSv42){ _sweepErasedMissilePolys.push(_misSv42.polygon); _sweepErasedBaseImg = null; }
+                }
+              }
+            }
+            _sweepMissiles.push({ x: _mxPx, y: _myPx, born: now, speed: 800 });
+          } else {
+            if(_mz.weaponId === "atgm"){
+            // _isAtgmSweep_v43：有导弹实体只挖空，无导弹实体只画椭圆
+            var _annSv43 = window.VEHICLE_ANNOTATIONS && window.VEHICLE_ANNOTATIONS[vid];
+            var _hasMissilePolySv43 = false;
+            if(_annSv43 && _annSv43.missiles && _annSv43.missiles.length){
+              for(var _miSv43 = 0; _miSv43 < _annSv43.missiles.length; _miSv43++){
+                var _misSv43 = _annSv43.missiles[_miSv43];
+                if(_misSv43.weaponId === "atgm" && _misSv43.polygon && _misSv43.polygon.length >= 3){
+                  _hasMissilePolySv43 = true;
+                  var _exSv43 = false;
+                  for(var _eiSv43 = 0; _eiSv43 < _sweepErasedMissilePolys.length; _eiSv43++){
+                    if(_sweepErasedMissilePolys[_eiSv43] === _misSv43.polygon){ _exSv43 = true; break; }
+                  }
+                  if(!_exSv43){ _sweepErasedMissilePolys.push(_misSv43.polygon); _sweepErasedBaseImg = null; }
+                }
+              }
+            }
+            if(!_hasMissilePolySv43){
+              _sweepMissiles.push({ x: _mxPx, y: _myPx, born: now, speed: 800 });
+            }
+          } else {
+            sweepTracers.push({ startX: _mxPx, startY: _myPx, born: now, speed: 2500, len: 100, width: 3 });
+          }
+          }
+          if(_mz.weaponId === "atgm"){
+            var _ann3 = window.VEHICLE_ANNOTATIONS && window.VEHICLE_ANNOTATIONS[vid];
+            if(_ann3 && _ann3.missiles && _ann3.missiles.length){
+              for(var _mi3 = 0; _mi3 < _ann3.missiles.length; _mi3++){
+                var _mis3 = _ann3.missiles[_mi3];
+                if(_mis3.weaponId === "atgm" && _mis3.polygon && _mis3.polygon.length >= 3){
+                  var _exists3 = false;
+                  for(var _ei3 = 0; _ei3 < _sweepErasedMissilePolys.length; _ei3++){
+                    if(_sweepErasedMissilePolys[_ei3] === _mis3.polygon){ _exists3 = true; break; }
+                  }
+                  if(!_exists3){ _sweepErasedMissilePolys.push(_mis3.polygon); _sweepErasedBaseImg = null; }
+                }
+              }
+            }
+            _sweepMissiles.push({ x: _mxPx, y: _myPx, born: now, speed: 800 });
+          }
         }
       }
       
@@ -1239,6 +1297,27 @@ if(typeof window._vsUpdateSmoke === 'function'){
         window._vsUpdateSmoke(sweepSmoke, dt, worldSpeed);
       }
       fcCtx.clearRect(0, 0, ZW, ZH);
+      // _sweepMissilesRendered_v42
+      for(var _smi = 0; _smi < _sweepMissiles.length; _smi++){
+        var _sm = _sweepMissiles[_smi];
+        var _smx = _sm.x + (now - _sm.born) / 1000 * _sm.speed;
+        if(_smx > ZW + 200) continue;
+        fcCtx.save();
+        fcCtx.translate(_smx, _sm.y);
+        fcCtx.fillStyle = "rgba(255, 200, 50, 0.85)";
+        fcCtx.beginPath();
+        fcCtx.moveTo(-15, 0);
+        fcCtx.lineTo(-30 - Math.random()*10, -4);
+        fcCtx.lineTo(-30 - Math.random()*10, 4);
+        fcCtx.closePath();
+        fcCtx.fill();
+        fcCtx.fillStyle = "#eee";
+        fcCtx.beginPath();
+        fcCtx.ellipse(0, 0, 12, 4, 0, 0, Math.PI * 2);
+        fcCtx.fill();
+        fcCtx.restore();
+      }
+      _sweepMissiles = _sweepMissiles.filter(function(_m){ return _m.x + (now - _m.born) / 1000 * _m.speed <= ZW + 200; });
       
             // [rev878] 掃蕩揚塵：優先 trackLoop 底部點，走共用 spawnDust
       if(!window._sweepDustParticles) window._sweepDustParticles = [];

@@ -94,7 +94,17 @@
     return img;
   }
 
-  function _getMaskYAtX(ann, nx){
+  function _isImgReady(src){
+  if(!src) return false;
+  if(typeof HTMLCanvasElement !== "undefined" && src instanceof HTMLCanvasElement) return src.width > 0 && src.height > 0;
+  return !!(src.complete && src.naturalWidth);
+}
+function _getSrcKey(src){
+  if(!src) return "";
+  if(src._baseId) return src._baseId;
+  return src.src || "";
+}
+function _getMaskYAtX(ann, nx){
     if(!ann.trackMask || !ann.trackMask.points) return 1;
     const pts = ann.trackMask.points.slice().sort(function(a,b){ return a.x-b.x; });
     if(pts.length < 2) return 1;
@@ -116,9 +126,10 @@ function _getWheelClip(img, ann, wheel, cw, ch){
   const r = wheel.r * cw;
   const size = Math.ceil(r*2);
   if(size < 3) return null;
+  if(!_isImgReady(img)) return null;
   const maskOn = ann.trackMask && ann.trackMask.enabled;
   const maskKey = maskOn ? ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+","+p.y.toFixed(3); }).join(";") : "off";
-  const key = (img.src||"") + "|" + cw + "x" + ch + "|" + cx.toFixed(1) + "|" + cy.toFixed(1) + "|" + size + "|" + maskKey;
+  const key = _getSrcKey(img) + "|" + cw + "x" + ch + "|" + cx.toFixed(1) + "|" + cy.toFixed(1) + "|" + size + "|" + maskKey;
   if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
   
   const c = document.createElement("canvas"); c.width = size; c.height = size;
@@ -203,7 +214,7 @@ function _getWheelClip(img, ann, wheel, cw, ch){
 const _maskCache = new Map();
 function _getMaskLayer(img, ann, cw, ch){
   if(!ann.trackMask || !ann.trackMask.enabled || ann.trackMask.points.length < 2) return null;
-  const key = (img.src||"") + "|" + ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+","+p.y.toFixed(3); }).join(";") + "|" + cw + "x" + ch;
+  const key = _getSrcKey(img) + "|" + ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+","+p.y.toFixed(3); }).join(";") + "|" + cw + "x" + ch;
   if(_maskCache.has(key)) return _maskCache.get(key);
   const c = document.createElement("canvas"); c.width = cw; c.height = ch;
   const cc = c.getContext("2d");
@@ -251,6 +262,10 @@ function _samplePath(segs, s){
 /* [rev791] _drawTrackBand：固定 bandHeight（编辑器同款），单次绘制不拉伸不铺排 */
 
 function _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel){
+  /* [v59-fix] 復刻編輯器邏輯：擦除 + 整圖法線平移填補 + tile紋理疊加
+     修復所有 trackLoop 車輛（BMP1/1M/2/3/BMD4、T-80 系列）車體上緣透明問題
+     原理：擦除後先用「整張原圖沿法線反向平移 dstTileH」填補擦除區
+     再疊加 tile 紋理做滾動動畫，等效編輯器 drawTrackErasePatchBase + drawTrackScrollByLoop */
   const sc = ann.trackScroll;
   if(!sc || !sc.enabled) return;
   if(!ann.trackLoop || !ann.trackLoop.points || ann.trackLoop.points.length < 3) return;
@@ -290,6 +305,14 @@ function _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel){
   const dstTileH = (_y1 - _y0) * H;
   if(srcTileW < 1 || srcTileH < 1 || dstTileW < 1 || dstTileH < 1) return;
 
+  /* 複刻編輯器：limitY = 履帶環垂直中線（車體邊界） */
+  let _minY = 1, _maxY = 0;
+  for(const p of ann.trackLoop.points){
+    if(p.y < _minY) _minY = p.y;
+    if(p.y > _maxY) _maxY = p.y;
+  }
+  const limitY = ((_minY + _maxY) / 2) * H;
+
   function sampleArc(s){
     s = s % totalLen;
     if(s < 0) s += totalLen;
@@ -310,17 +333,23 @@ function _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel){
   }
 
   const dir = sc.direction || -1;
-  let offset = (animTime * vel * dir) % dstTileW;
-  if(offset < 0) offset += dstTileW;
-  const steps = Math.ceil(totalLen / dstTileW) + 2;
   const ext = 1.5;
+  const steps = Math.ceil(totalLen / dstTileW) + 2;
 
-  /* ★ v3 band-only erase：只擦「沿弧長鋪 dstTileW、沿法線 dstTileH」的帶子 */
+  /* ── 外層 clip：只在 trackLoop 多邊形內操作，防止 wrap 溢出 ── */
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(rawPts[0].x, rawPts[0].y);
+  for(let i = 1; i < n; i++) ctx.lineTo(rawPts[i].x, rawPts[i].y);
+  ctx.closePath();
+  ctx.clip();
+
+  /* ── 步驟 1：擦除原圖履帶帶子 ── */
   ctx.save();
   ctx.globalCompositeOperation = "destination-out";
   ctx.fillStyle = "#000";
   for(let k = 0; k < steps; k++){
-    const s0 = offset + k * dstTileW;
+    const s0 = k * dstTileW;
     const a = sampleArc(s0);
     const b = sampleArc(s0 + dstTileW);
     const na = normalToCenter(a);
@@ -335,36 +364,73 @@ function _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel){
   }
   ctx.restore();
 
-  /* ★ 用相同幾何填回紋理（源採樣用原圖尺寸、目標繪製用 canvas 尺寸） */
-  ctx.save();
-  ctx.globalAlpha = (sc.textureOpacity != null ? sc.textureOpacity : 0.85);
-  ctx.globalCompositeOperation = "source-over";
-  ctx.imageSmoothingEnabled = true;
+  /* ── 步驟 2：整圖法線平移填補（複刻編輯器 drawTrackErasePatchBase）
+     對每塊 tile 平行四邊形 clip 到「tile區 ∩ limitY以下」，
+     將整張原圖沿平均法線反向平移 dstTileH 後繪製，
+     把「原圖中位於帶子法線下方的像素」拉到帶子位置，
+     恢復車體上緣細節，避免透明。 ── */
   for(let k = 0; k < steps; k++){
-    const s0 = offset + k * dstTileW;
+    const s0 = k * dstTileW;
     const a = sampleArc(s0);
     const b = sampleArc(s0 + dstTileW);
     const na = normalToCenter(a);
     const nb = normalToCenter(b);
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.lineTo(b.x + nb.nx * dstTileH, b.y + nb.ny * dstTileH);
-    ctx.lineTo(a.x + na.nx * dstTileH, a.y + na.ny * dstTileH);
+    ctx.moveTo(a.x - a.ux * ext, a.y - a.uy * ext);
+    ctx.lineTo(b.x + b.ux * ext, b.y + b.uy * ext);
+    ctx.lineTo(b.x + b.ux * ext + nb.nx * dstTileH, b.y + b.uy * ext + nb.ny * dstTileH);
+    ctx.lineTo(a.x - a.ux * ext + na.nx * dstTileH, a.y - a.uy * ext + na.ny * dstTileH);
     ctx.closePath();
     ctx.clip();
-    ctx.translate(a.x, a.y);
-    ctx.transform(a.ux, a.uy, na.nx, na.ny, 0, 0);
-    ctx.translate(0, dstTileH);
-    ctx.scale(1, -1);
-    const det = a.ux * na.ny - a.uy * na.nx;
-    if(det < 0){ ctx.scale(-1, 1); ctx.translate(-dstTileW, 0); }
-    ctx.drawImage(img, srcX, srcY, srcTileW, srcTileH, 0, 0, dstTileW, dstTileH);
+    /* 只填到車體中線以下，複刻編輯器 */
+    ctx.beginPath();
+    ctx.rect(0, 0, W, limitY);
+    ctx.clip();
+    /* 平均法線 */
+    let mx = (na.nx + nb.nx) / 2, my = (na.ny + nb.ny) / 2;
+    const _mlen = Math.hypot(mx, my) || 1;
+    mx /= _mlen; my /= _mlen;
+    /* 整圖沿法線反向平移，覆蓋擦除區 */
+    ctx.translate(-mx * dstTileH, -my * dstTileH);
+    ctx.drawImage(img, 0, 0, W, H);
     ctx.restore();
   }
-  ctx.globalAlpha = 1;
-  ctx.restore();
+
+  /* ── 步驟 3：tile 紋理滾動疊加（可選，用於履帶紋理動畫） ── */
+  if(sc.useTexture){
+    let offset = (animTime * vel * dir) % dstTileW;
+    if(offset < 0) offset += dstTileW;
+    ctx.globalAlpha = (sc.textureOpacity != null ? sc.textureOpacity : 0.85);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.imageSmoothingEnabled = true;
+    for(let k = 0; k < steps; k++){
+      const s0 = offset + k * dstTileW;
+      const a = sampleArc(s0);
+      const b = sampleArc(s0 + dstTileW);
+      const na = normalToCenter(a);
+      const nb = normalToCenter(b);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(b.x + nb.nx * dstTileH, b.y + nb.ny * dstTileH);
+      ctx.lineTo(a.x + na.nx * dstTileH, a.y + na.ny * dstTileH);
+      ctx.closePath();
+      ctx.clip();
+      ctx.translate(a.x, a.y);
+      ctx.transform(a.ux, a.uy, na.nx, na.ny, 0, 0);
+      ctx.translate(0, dstTileH);
+      ctx.scale(1, -1);
+      const det = a.ux * na.ny - a.uy * na.nx;
+      if(det < 0){ ctx.scale(-1, 1); ctx.translate(-dstTileW, 0); }
+      ctx.drawImage(img, srcX, srcY, srcTileW, srcTileH, 0, 0, dstTileW, dstTileH);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore(); /* 外層 clip */
 }
 
 function _makeDoorClip(img, pts, cw, ch){
@@ -465,14 +531,16 @@ function _makeDoorClip(img, pts, cw, ch){
     const img = _loadVehicleImg(id);
     if(!img.complete || !img.naturalWidth) return;
 
+    var _drawSrc = (opts && opts.baseImage) || img;
+
     const hasTrackLoop = ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 3;
     const hasTrackLine = ann.trackLine && ann.trackLine.points && ann.trackLine.points.length >= 2;
     const hasTrackScroll = ann.trackScroll && ann.trackScroll.enabled;
 
     if(hasTrackLoop && hasTrackScroll){
-      ctx.drawImage(img, 0, 0, cw, ch);
+      ctx.drawImage(_drawSrc, 0, 0, cw, ch);
       const vel = opts.trackVel || 60;
-      _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel);
+      _drawTrackBand(ctx, _drawSrc, ann, cw, ch, animTime, vel);
     } else if(hasTrackLine && hasTrackScroll){
       ctx.save();
       let _maxY = 0;
@@ -480,12 +548,12 @@ function _makeDoorClip(img, pts, cw, ch){
       ctx.beginPath();
       ctx.rect(0, 0, cw, _maxY * ch);
       ctx.clip();
-      ctx.drawImage(img, 0, 0, cw, ch);
+      ctx.drawImage(_drawSrc, 0, 0, cw, ch);
       ctx.restore();
       const vel = opts.trackVel || 60;
-      _drawTrackBand(ctx, img, ann, cw, ch, animTime, vel);
+      _drawTrackBand(ctx, _drawSrc, ann, cw, ch, animTime, vel);
     } else {
-      ctx.drawImage(img, 0, 0, cw, ch);
+      ctx.drawImage(_drawSrc, 0, 0, cw, ch);
     }
 
     if(ann.wheels && ann.wheels.length){
@@ -493,7 +561,7 @@ function _makeDoorClip(img, pts, cw, ch){
         const cx = wheel.cx * cw;
         const cy = wheel.cy * ch;
         const r = wheel.r * cw;
-        const clip = _getWheelClip(img, ann, wheel, cw, ch);
+        const clip = _getWheelClip(_drawSrc, ann, wheel, cw, ch);
         if(clip){
           const rot = (wheel.rotSpeed || 1) * animTime * (opts.wheelSpeed || 3);
           ctx.save();
@@ -505,7 +573,7 @@ function _makeDoorClip(img, pts, cw, ch){
       }
     }
 
-    const maskC = _getMaskLayer(img, ann, cw, ch);
+    const maskC = _getMaskLayer(_drawSrc, ann, cw, ch);
     if(maskC) ctx.drawImage(maskC, 0, 0);
 
     if(ann.doors){
@@ -528,13 +596,13 @@ function _makeDoorClip(img, pts, cw, ch){
         ctx.restore();
       }
       if(ann.doors.lower && ann.doors.lower.length){
-        for(const d of ann.doors.lower) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * (110 / 180), "#0c0c0c");
+        for(const d of ann.doors.lower) _renderDoor(ctx, _drawSrc, ann, d, cw, ch, doorOpen * (110 / 180), "#0c0c0c");
       }
       if(ann.doors.upper && ann.doors.upper.length){
-        for(const d of ann.doors.upper) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen, "#0c0c0c");
+        for(const d of ann.doors.upper) _renderDoor(ctx, _drawSrc, ann, d, cw, ch, doorOpen, "#0c0c0c");
       }
       if(ann.doors.hatch && ann.doors.hatch.length){
-        for(const d of ann.doors.hatch) _renderDoor(ctx, img, ann, d, cw, ch, doorOpen * 0.5, "#0c0c0c");
+        for(const d of ann.doors.hatch) _renderDoor(ctx, _drawSrc, ann, d, cw, ch, doorOpen * 0.5, "#0c0c0c");
       }
     }
   }
@@ -673,16 +741,17 @@ const BTR_TIMELINE = {
 const PHASE_ORDER = ['enter', 'arrive', 'sink', 'center', 'support', 'lift', 'exit', 'leave'];
 
 const MUZZLE_PROFILES = {
-  kpvt:    { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
-  pkt:     { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
-  nsvt:    { burst: 3,  intervalMs: 80,   pauseMs: 300, flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470, projectileType: 'bullet' },
-  '2a72':  { burst: 7,  intervalMs: 200,  pauseMs: 1500, flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
-  '2a42':  { burst: 7,  intervalMs: 180,  pauseMs: 1500, flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
-  '2a46':  { burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
-  '2a46m1':{ burst: 1,  intervalMs: 6500, pauseMs: 6500, flashSize: 40, flashColor: '255,140,60', bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
-  ags17:   { burst: 6,  intervalMs: 300,  pauseMs: 800, flashSize: 28, flashColor: '255,200,100', bulletSize: 4,  bulletSpeed: 350, projectileType: 'bullet' },
-  atgm:    { burst: 1,  intervalMs: 5000, pauseMs: 5000, flashSize: 30, flashColor: '255,200,100', bulletSize: 5,  bulletSpeed: 280, projectileType: 'missile' },
-  default: { burst: 3,  intervalMs: 100,  pauseMs: 300, flashSize: 22, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' }
+  kpvt:    { burst: 3,  intervalMs: 100,   pauseMs: 300,   flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
+  pkt:     { burst: 3,  intervalMs: 80,    pauseMs: 300,   flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
+  nsvt:    { burst: 3,  intervalMs: 80,    pauseMs: 300,   flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470, projectileType: 'bullet' },
+  '2a72':  { burst: 15, intervalMs: 200,   pauseMs: 500,   flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
+  '2a42':  { burst: 15, intervalMs: 92,    pauseMs: 500,   flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
+  '2a46':  { burst: 1,  intervalMs: 7500,  pauseMs: 7500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
+  '2a46m1':{ burst: 1,  intervalMs: 7500,  pauseMs: 7500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
+  atgm:    { burst: 1,  intervalMs: 20000, pauseMs: 20000, flashSize: 30, flashColor: '255,200,100', bulletSize: 5,   bulletSpeed: 280, projectileType: 'missile' },
+  '2a28':  { burst: 1,  intervalMs: 6000,  pauseMs: 6000,  flashSize: 36, flashColor: '255,150,60',  bulletSize: 5.5, bulletSpeed: 320, projectileType: 'bullet' },
+  '2a70':  { burst: 1,  intervalMs: 6000,  pauseMs: 6000,  flashSize: 38, flashColor: '255,145,60',  bulletSize: 5.5, bulletSpeed: 310, projectileType: 'bullet' },
+  default: { burst: 3,  intervalMs: 100,   pauseMs: 300,   flashSize: 22, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' }
 };
 
 const BTRSupport = {
@@ -939,7 +1008,7 @@ const BTRSupport = {
     this.active = true; this.startTime = performance.now(); this.phase = 'enter'; this.phaseT = 0;
     this.yOffset = 0; this.doorOpen = 0; this.shakeX = 0; this.shakeY = 0; this.sinkOffset = 0;
     this.kills = {}; this.loot = []; this.killCount = 0; this.lastTickSec = -1;
-    this.fireFx = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = []; this.recoilStates = {}; this.missiles = [];
+    this.fireFx = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = []; this.recoilStates = {}; this.missiles = []; this.erasedMissilePolys = []; this.erasedBaseImg = null;
     this.playerClipH = 1.0; this.playerXOffset = 0; this._finished = false;
     this._setupCanvas(); this._setupStreamBg(); this._setupMuzzles(); this._setupSupportRegion();
     const self = this; this.raf = requestAnimationFrame(function(t){ self._loop(t); });
@@ -1112,7 +1181,8 @@ const BTRSupport = {
     const basePx = this.x * this.width;
     const basePy = this.height * 0.95 - (this._contentBottomRatio || 1) * this.targetH + this.yOffset;
     const isMG = (m.weaponId === 'pkt' || m.weaponId === 'nsvt' || m.weaponId === 'kpvt');
-    const isMain = (m.weaponId === '2a46' || m.weaponId === '2a46m1');
+    const isATGM = (m.weaponId === 'atgm');
+    const isMain = (m.weaponId === '2a46' || m.weaponId === '2a46m1' || m.weaponId === '2a28' || m.weaponId === '2a70');
     const muzzleX = basePx + m.mx * this.targetW;
     const muzzleY = basePy + m.my * this.targetH;
     
@@ -1121,7 +1191,7 @@ const BTRSupport = {
       this.fx.spawnMG(muzzleX, muzzleY);
     }
 
-    this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon');
+    if (!isATGM) this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon');
 
     // 火光随机化：主炮100%，机炮首发100%后续15%，机枪10%
     let triggerFlash = false;
@@ -1151,10 +1221,12 @@ const BTRSupport = {
     if (!this.recoilStates) this.recoilStates = {};
     let rcDist = 0, rcDur = 0;
     if (m.weaponId === '2a46' || m.weaponId === '2a46m1') { rcDist = 0.10; rcDur = 900; }
+    else if (m.weaponId === '2a28') { rcDist = 0.055; rcDur = 900; }
+    else if (m.weaponId === '2a70') { rcDist = 0.048; rcDur = 900; }
     else if (m.weaponId === '2a72') { rcDist = 0.055; rcDur = 500; }
     else if (m.weaponId === '2a42') { rcDist = 0.045; rcDur = 500; }
     else if (m.weaponId === 'atgm') { rcDist = 0.040; rcDur = 600; }
-    const isATGM = (m.weaponId === 'atgm');
+    
     this.recoilStates[m.weaponId] = {
       startTime: now, duration: rcDur, dist: rcDist,
       _smokeActive: !isMG && !isATGM, // ATGM 不在此處生成
@@ -1166,16 +1238,74 @@ const BTRSupport = {
     };
     
     if (isATGM) {
-      this.missiles.push({
-        x: muzzleX, y: muzzleY,
-        startTime: now,
-        lastJetTime: now,
-        lastSpreadTime: now,
-        speed: this.width * 0.8 // 約 1.25 秒飛出螢幕
-      });
+      // _isAtgmBranch_v49：每次检查图像，未加载则回退椭圆
+      if(!this.erasedMissileImgs) this.erasedMissileImgs = [];
+      var _ann49 = ANN[this.vehicleId];
+      var _pushed49 = false;
+      if(_ann49 && _ann49.missiles && _ann49.missiles.length){
+        for(var _mi49 = 0; _mi49 < _ann49.missiles.length; _mi49++){
+          var _mis49 = _ann49.missiles[_mi49];
+          if(_mis49.weaponId !== "atgm" || !_mis49.polygon || _mis49.polygon.length < 3) continue;
+          var _ex49 = -1;
+          for(var _ei49 = 0; _ei49 < this.erasedMissilePolys.length; _ei49++){
+            if(this.erasedMissilePolys[_ei49] === _mis49.polygon){ _ex49 = _ei49; break; }
+          }
+          if(_ex49 < 0){
+            this.erasedMissilePolys.push(_mis49.polygon);
+            this.erasedBaseImg = null;
+            _ex49 = this.erasedMissilePolys.length - 1;
+          }
+          if(!this.erasedMissileImgs[_ex49] || !this.erasedMissileImgs[_ex49].canvas){
+            var _img49 = _loadVehicleImg(this.vehicleId);
+            if(_img49 && _img49.complete && _img49.naturalWidth){
+              var _nw49 = _img49.naturalWidth, _nh49 = _img49.naturalHeight;
+              var _poly49 = _mis49.polygon;
+              var _mnX49 = 1, _mxX49 = 0, _mnY49 = 1, _mxY49 = 0;
+              for(var _pi49 = 0; _pi49 < _poly49.length; _pi49++){
+                var _pt49 = _poly49[_pi49];
+                if(_pt49.x < _mnX49) _mnX49 = _pt49.x;
+                if(_pt49.x > _mxX49) _mxX49 = _pt49.x;
+                if(_pt49.y < _mnY49) _mnY49 = _pt49.y;
+                if(_pt49.y > _mxY49) _mxY49 = _pt49.y;
+              }
+              var _tc49 = document.createElement("canvas");
+              _tc49.width = _nw49; _tc49.height = _nh49;
+              var _tcx49 = _tc49.getContext("2d");
+              _tcx49.drawImage(_img49, 0, 0);
+              _tcx49.globalCompositeOperation = "destination-in";
+              _tcx49.beginPath();
+              _tcx49.moveTo(_poly49[0].x * _nw49, _poly49[0].y * _nh49);
+              for(var _pj49 = 1; _pj49 < _poly49.length; _pj49++) _tcx49.lineTo(_poly49[_pj49].x * _nw49, _poly49[_pj49].y * _nh49);
+              _tcx49.closePath(); _tcx49.fill();
+              this.erasedMissileImgs[_ex49] = {
+                canvas: _tc49, imgW: _nw49, imgH: _nh49,
+                box: { minX: _mnX49, maxX: _mxX49, minY: _mnY49, maxY: _mxY49, w: _mxX49 - _mnX49, h: _mxY49 - _mnY49 }
+              };
+            }
+          }
+          if(this.erasedMissileImgs[_ex49] && this.erasedMissileImgs[_ex49].canvas){
+            var _c49 = this.erasedMissileImgs[_ex49];
+            this.missiles.push({
+              img: _c49.canvas, imgW: _c49.imgW, imgH: _c49.imgH, box: _c49.box,
+              x: muzzleX, y: muzzleY,
+              startTime: now, lastJetTime: now, lastSpreadTime: now,
+              speed: this.width * 0.8, isImageEntity: true
+            });
+            _pushed49 = true;
+          }
+        }
+      }
+      if(!_pushed49){
+        this.missiles.push({
+          x: muzzleX, y: muzzleY,
+          startTime: now, lastJetTime: now, lastSpreadTime: now,
+          speed: this.width * 0.8
+        });
+      }
     }
     m.recoilDur = rcDur;
     m.smokeDur = isMG ? 200 : rcDur; 
+
   },
 
 
@@ -1287,27 +1417,62 @@ const BTRSupport = {
     this._updateRecoilSmoke(now);
     this.fx.update(now, dt, worldSpeed);
     
-    (window.VehicleRenderer && window.VehicleRenderer.render || renderVehicle)(ctx, this.vehicleId, px, py, this.targetW, this.targetH, (now - this.startTime) / 1000, { trackVel: (this.phase === "support") ? 300 : 100, wheelSpeed: (this.phase === "support") ? 20 : 6, doorOpen: (this.doorOpen || 0) * 180, recoils: recoilsPx });
+    var _renderOpts = { trackVel: (this.phase === "support") ? 300 : 100, wheelSpeed: (this.phase === "support") ? 20 : 6, doorOpen: (this.doorOpen || 0) * 180, recoils: recoilsPx };
+    if(this.erasedMissilePolys && this.erasedMissilePolys.length > 0){
+      if(!this.erasedBaseImg){
+        var _bImg53 = _loadVehicleImg(this.vehicleId);
+        if(_bImg53 && _bImg53.complete && _bImg53.naturalWidth){
+          var _nw53 = _bImg53.naturalWidth, _nh53 = _bImg53.naturalHeight;
+          var _ec53 = document.createElement("canvas");
+          _ec53.width = _nw53; _ec53.height = _nh53;
+          var _ecx53 = _ec53.getContext("2d");
+          _ecx53.drawImage(_bImg53, 0, 0);
+          _ecx53.globalCompositeOperation = "destination-out";
+          _ecx53.fillStyle = "#000";
+          for(var _pi53 = 0; _pi53 < this.erasedMissilePolys.length; _pi53++){
+            var _poly53 = this.erasedMissilePolys[_pi53];
+            if(!_poly53 || _poly53.length < 3) continue;
+            _ecx53.beginPath();
+            _ecx53.moveTo(_poly53[0].x * _nw53, _poly53[0].y * _nh53);
+            for(var _pj53 = 1; _pj53 < _poly53.length; _pj53++) _ecx53.lineTo(_poly53[_pj53].x * _nw53, _poly53[_pj53].y * _nh53);
+            _ecx53.closePath();
+            _ecx53.fill();
+          }
+          this.erasedBaseImg = _ec53;
+        }
+      }
+      if(this.erasedBaseImg) _renderOpts.baseImage = this.erasedBaseImg;
+    }
+    (window.VehicleRenderer && window.VehicleRenderer.render || renderVehicle)(ctx, this.vehicleId, px, py, this.targetW, this.targetH, (now - this.startTime) / 1000, _renderOpts);
     
-    // [rev809] 繪製佔位導彈實體
     if (this.missiles && this.missiles.length) {
       for (const mis of this.missiles) {
-        ctx.save();
-        ctx.translate(mis.x + this.shakeX, mis.y + this.shakeY);
-        // 尾焰
-        ctx.fillStyle = 'rgba(255, 200, 50, 0.8)';
-        ctx.beginPath();
-        ctx.moveTo(-15, 0);
-        ctx.lineTo(-30 - Math.random()*10, -4);
-        ctx.lineTo(-30 - Math.random()*10, 4);
-        ctx.closePath();
-        ctx.fill();
-        // 彈體
-        ctx.fillStyle = '#ddd';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 12, 4, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        if (mis.isImageEntity && mis.img) {
+          var _srcX = mis.box.minX * mis.imgW;
+          var _srcY = mis.box.minY * mis.imgH;
+          var _srcW = mis.box.w * mis.imgW;
+          var _srcH = mis.box.h * mis.imgH;
+          var _drawW = mis.box.w * this.width;
+          var _drawH = mis.box.h * this.height;
+          var _drawX = mis.x + this.shakeX - _drawW / 2;
+          var _drawY = mis.y + this.shakeY - _drawH / 2;
+          ctx.drawImage(mis.img, _srcX, _srcY, _srcW, _srcH, _drawX, _drawY, _drawW, _drawH);
+        } else {
+          ctx.save();
+          ctx.translate(mis.x + this.shakeX, mis.y + this.shakeY);
+          ctx.fillStyle = "rgba(255, 200, 50, 0.8)";
+          ctx.beginPath();
+          ctx.moveTo(-15, 0);
+          ctx.lineTo(-30 - Math.random()*10, -4);
+          ctx.lineTo(-30 - Math.random()*10, 4);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = "#ddd";
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 12, 4, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
       }
     }
     
@@ -1346,7 +1511,7 @@ this.fx.drawTracers(ctx, now);
     const y = fx.spawnY !== undefined ? fx.spawnY : (py + fx.my * this.targetH);
     if (t < 0.15 && fx.triggerFlash) {
       const ft = t / 0.15; 
-      const isCannon = (fx.weaponId === '2a42' || fx.weaponId === '2a72' || fx.weaponId === '2a46' || fx.weaponId === '2a46m1');
+      const isCannon = (fx.weaponId === '2a42' || fx.weaponId === '2a72' || fx.weaponId === '2a46' || fx.weaponId === '2a46m1' || fx.weaponId === '2a28' || fx.weaponId === '2a70');
       const isMain = (fx.weaponId === '2a46' || fx.weaponId === '2a46m1');
       const fxX = x + (isCannon ? 60 : 15);
       const fxY = y + (Math.random() - 0.5) * (isMain ? 10 : 4);
@@ -3649,8 +3814,7 @@ window._openBTRSupportDetail = function(log){
     document.head.appendChild(st);
   }
 
-  console.log('[patcher-v11] BMP 接人 + 科技樹 + 裝甲 + 鼠標拖動 已就緒');
-})();
+  })();
 
 
 // [patcher-v12-patch]
@@ -3743,9 +3907,6 @@ window._openBTRSupportDetail = function(log){
   /* 診斷輸出 */
   var bmpIds = ['bmp1','bmp1m','bmp2','bmp3','bmd4'];
   var bmpStatus = bmpIds.map(function(id){ return id + ':' + (A[id] ? '✅' : '❌'); }).join(' ');
-  console.log('[patcher-v12] ✅ 就緒');
-  console.log('[patcher-v12] VEHICLE_ANNOTATIONS keys:', Object.keys(A));
-  console.log('[patcher-v12] BMP status:', bmpStatus);
   if(bmpIds.some(function(id){ return !A[id]; })){
     console.error('[patcher-v12] ❌ 部分 BMP annotation 缺失！遊戲將 fallback btr80');
     console.error('   這意味著 Inlined bmp annotation 段丟失，請檢查 10-vehicle.js 是否還有 // ===== Inlined: bmp1_annotation.js =====');
@@ -3925,9 +4086,6 @@ window._openBTRSupportDetail = function(log){
   Object.keys(BMP_ANN_DATA).forEach(function(id){
     if(!A[id]) A[id] = BMP_ANN_DATA[id];
   });
-  console.log('[patcher-v13] ✅ 硬編碼 BMP annotation 已注入');
-  console.log('[patcher-v13] VEHICLE_ANNOTATIONS keys:', Object.keys(A).join(', '));
-
   /* ============================================================
    * Part 0.5: 重建 VEHICLES.bmp1/1m/2/3/bmd4（修復科技樹消失）
    * ============================================================ */
@@ -3963,10 +4121,8 @@ window._openBTRSupportDetail = function(log){
       speedRoad:70, speedOffroad:'45-50', supportDuration:42, next:[],
       researchCost:{ ammoCal:'7.62x54', ammoCount:3000, liquor:3000, exp:15000 } })) created.push('bmd4');
     if(created.length){
-      console.log('[patcher-v13] ✅ 重建 VEHICLES: ' + created.join(', '));
-    } else {
-      console.log('[patcher-v13] VEHICLES.bmp* 已存在，跳過重建');
-    }
+      } else {
+      }
 
     /* Part 0.6: 恢復 btr80.next 鏈接 */
     if(VEHICLES.btr80){
@@ -3975,8 +4131,7 @@ window._openBTRSupportDetail = function(log){
       if(b0.indexOf('bmp1') < 0) b0.push('bmp1');
       if(b0.indexOf('t80') < 0) b0.push('t80');
       VEHICLES.btr80.next = b0.filter(function(v){ return v !== 'bmp1am'; });
-      console.log('[patcher-v13] btr80.next = [' + VEHICLES.btr80.next.join(', ') + ']');
-    }
+      }
     var _chain = [['bmp1','bmp1m'],['bmp1m','bmp2'],['bmp2','bmp3'],['bmp3','bmd4']];
     for(var ci = 0; ci < _chain.length; ci++){
       var cur = VEHICLES[_chain[ci][0]];
@@ -4079,16 +4234,9 @@ window._openBTRSupportDetail = function(log){
   var bmpIds = ['bmp1','bmp1m','bmp2','bmp3','bmd4'];
   var annStatus = bmpIds.map(function(id){ return id + ':' + (A[id] ? '✅' : '❌'); }).join(' ');
   var vehStatus = (typeof VEHICLES !== 'undefined') ? bmpIds.map(function(id){ return id + ':' + (VEHICLES[id] ? '✅' : '❌'); }).join(' ') : 'VEHICLES 未定義';
-  console.log('[patcher-v13] ========== 最終狀態 ==========');
-  console.log('[patcher-v13] ANN:', annStatus);
-  console.log('[patcher-v13] VEHICLES:', vehStatus);
   if(typeof VEHICLES !== 'undefined' && VEHICLES.btr80){
-    console.log('[patcher-v13] btr80.next:', JSON.stringify(VEHICLES.btr80.next));
-  }
-  console.log('[patcher-v13] ================================');
-  console.log('[patcher-v13] ✅ 就緒。車場 → 科技樹 應可見 BMP 線');
-  console.log('[patcher-v13] 電台召喚前請先研發 bmp1 或執行 __forceBMP()');
-})();
+    }
+  })();
 
 // [patcher-v20-patch]
 // [patcher-fix-v20] stat panel 每次执行+inline兜底 + 装甲完整语义多行
@@ -4245,8 +4393,6 @@ window._openBTRSupportDetail = function(log){
     '.wt-node{user-select:none;-webkit-user-select:none}'
   ].join('\n');
   document.head.appendChild(styleEl);
-  console.log('[patcher-v20] ✅ patcher-v20-style 已注入');
-
   /* inline 兜底（不改字号/颜色/粗细/DOM） */
   function _forcePanel(){
     var panels = document.querySelectorAll('.player-stat-panel');
@@ -4279,14 +4425,12 @@ window._openBTRSupportDetail = function(log){
   /* 诊断 */
   setTimeout(function(){
     var panel = document.querySelector('.player-stat-panel');
-    if(!panel){ console.log('[patcher-v20] 诊断: 未找到 .player-stat-panel（可能在其他 tab）'); return; }
+    if(!panel){ return; }
     var cs = getComputedStyle(panel);
-    console.log('[patcher-v20] 诊断 panel: fontSize=' + cs.fontSize + ' lineHeight=' + cs.lineHeight + ' width=' + panel.style.width);
     var rows = panel.querySelectorAll('.row');
     for(var i = 0; i < rows.length; i++){
       var rcs = getComputedStyle(rows[i]);
-      console.log('[patcher-v20] 诊断 row[' + i + ']: flexWrap=' + rcs.flexWrap + ' display=' + rcs.display + ' overflow=' + rcs.overflow);
-    }
+      }
   }, 500);
 
   /* fusion door */
@@ -4330,12 +4474,9 @@ window._openBTRSupportDetail = function(log){
   }
 
   var bmpIds = ['bmp1','bmp1m','bmp2','bmp3','bmd4'];
-  console.log('[patcher-v20] ANN:', bmpIds.map(function(id){ return id+':'+(A[id]?'✅':'❌'); }).join(' '));
   if(typeof VEHICLES !== 'undefined'){
-    console.log('[patcher-v20] bmp1.armor:', JSON.stringify(VEHICLES.bmp1 && VEHICLES.bmp1.armor));
-  }
-  console.log('[patcher-v20] ✅ 就緒');
-})();
+    }
+  })();
 
 
 // [patcher-v21-patch]
@@ -4639,12 +4780,9 @@ window._openBTRSupportDetail = function(log){
   }
 
   var bmpIds = ['bmp1','bmp1m','bmp2','bmp3','bmd4'];
-  console.log('[patcher-v21] ANN:', bmpIds.map(function(id){ return id+':'+(A[id]?'✅':'❌'); }).join(' '));
   if(typeof VEHICLES !== 'undefined'){
-    console.log('[patcher-v21] bmp1.armor:', JSON.stringify(VEHICLES.bmp1 && VEHICLES.bmp1.armor));
-  }
-  console.log('[patcher-v21] ✅ 就緒（stat panel 恢復原始 flex-wrap:wrap）');
-})();
+    }
+  })();
 
 
 // [patcher-v30-patch]
@@ -4971,17 +5109,11 @@ window._openBTRSupportDetail = function(log){
         if(_en > 8) _long.push(id + ':' + v + '(' + _en + ')');
       });
     });
-    console.log('[patcher-v30] 英數>8 檢查:', _long.length ? ('❌ ' + _long.join(' | ')) : '✅ 全部通過');
     var _bad = Object.keys(ARMOR_GRID).filter(function(id){
       return typeof VEHICLES === 'undefined' || !VEHICLES[id] || !Array.isArray(VEHICLES[id].armorGrid) || VEHICLES[id].armorGrid.length !== 3;
     });
-    console.log('[patcher-v30] 3 行檢查:', _bad.length ? ('❌ ' + _bad.join(',')) : '✅ 全部 ' + Object.keys(ARMOR_GRID).length + ' 輛');
-    console.log('[patcher-v30] 導彈譯名:', Object.keys(WEAPON_SPECIAL_ZH).map(function(id){
-      return id + '=' + WEAPON_SPECIAL_ZH[id];
-    }).join(' '));
-  }catch(e){ console.warn('[patcher-v30] diag', e); }
-  console.log('[patcher-v30] ✅ 就緒（裝甲 3 行 + 導彈中文 + 速度前進/倒車 + 全局經驗整合）');
-})();
+    }catch(e){ }
+  })();
 
 // [patcher-v32-patch]
 // [patcher-fix-v32] 轉入後全局經驗 / 轉入後研發進度 各自獨立一行，位於確認按鈕上方
@@ -5071,6 +5203,5 @@ window._openBTRSupportDetail = function(log){
     window._v32Obs = o;
   }
 
-  console.log('[patcher-v32] ✅ 轉入後全局經驗 / 轉入後研發進度 已各自獨立一行，位於確認按鈕上方');
-})();
+  })();
 
