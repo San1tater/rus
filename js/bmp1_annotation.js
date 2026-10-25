@@ -41,8 +41,8 @@ const VEHICLE_ANNOTATION_BMP1 = {
   "trackLoop": {
     "points": [
       {
-        "x": 0.0902,
-        "y": 0.5446
+        "x": 0.0883,
+        "y": 0.5195
       },
       {
         "x": 0.039,
