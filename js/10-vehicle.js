@@ -121,15 +121,32 @@ function _getMaskYAtX(ann, nx){
 
   const _wheelClipCache = new Map();
 function _getWheelClip(img, ann, wheel, cw, ch){
+  /* [v60-fix] 補齊編輯器 cutY_B / finalCutY / maxWheelCy 邏輯
+     解決 BMP / BMD / T-80 車輪上部在車體上緣露出的問題。
+     複刻編輯器 getWheelClipCanvas：
+       cutY_A = getMaskYAtX(中心)
+       cutY_B = getPolygonTopYAtX(中心) + texH
+       finalCutY = max(cutY_A, cutY_B) ∩ ≤ maxWheelCyY ∩ ≤ size/2
+       fillRect 挖空 + fan/angles 鏡像補全 */
   const cx = wheel.cx * cw;
   const cy = wheel.cy * ch;
   const r = wheel.r * cw;
   const size = Math.ceil(r*2);
   if(size < 3) return null;
   if(!_isImgReady(img)) return null;
+  
   const maskOn = ann.trackMask && ann.trackMask.enabled;
+  const loopOn = ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 3;
   const maskKey = maskOn ? ann.trackMask.points.map(function(p){ return p.x.toFixed(3)+","+p.y.toFixed(3); }).join(";") : "off";
-  const key = _getSrcKey(img) + "|" + cw + "x" + ch + "|" + cx.toFixed(1) + "|" + cy.toFixed(1) + "|" + size + "|" + maskKey;
+  const loopKey = loopOn ? ann.trackLoop.points.map(function(p){ return p.x.toFixed(3)+","+p.y.toFixed(3); }).join(";") : "off";
+  const sc = ann.trackScroll || {};
+  let _ty0 = sc.textureY0, _ty1 = sc.textureY1;
+  if(_ty0 == null || !isFinite(_ty0)) _ty0 = 0.6;
+  if(_ty1 == null || !isFinite(_ty1)) _ty1 = 1.0;
+  if(_ty0 > _ty1){ const _t = _ty0; _ty0 = _ty1; _ty1 = _t; }
+  const texKey = _ty0.toFixed(3) + "," + _ty1.toFixed(3);
+  
+  const key = _getSrcKey(img) + "|" + cw + "x" + ch + "|" + cx.toFixed(1) + "|" + cy.toFixed(1) + "|" + size + "|" + maskKey + "|" + loopKey + "|" + texKey;
   if(_wheelClipCache.has(key)) return _wheelClipCache.get(key);
   
   const c = document.createElement("canvas"); c.width = size; c.height = size;
@@ -139,65 +156,116 @@ function _getWheelClip(img, ann, wheel, cw, ch){
   cc.drawImage(img, -(cx - size/2), -(cy - size/2), cw, ch);
   cc.restore();
   
-  if(maskOn){
-    const pts = ann.trackMask.points.slice().sort(function(a,b){ return a.x-b.x; });
+  /* ── 計算 cutY_A（trackMask 中心處 Y） ── */
+  let cutY_A = -1;
+  if(maskOn && ann.trackMask.points.length >= 2){
+    cutY_A = _getMaskYAtX(ann, wheel.cx) * ch - (cy - size/2);
+  }
+  
+  /* ── 計算 cutY_B（trackLoop 上邊界 + texH） ── */
+  let cutY_B = -1;
+  if(loopOn){
+    const _ptInPoly = function(px, py, pts){
+      let inside = false;
+      for(let i = 0, j = pts.length-1; i < pts.length; j = i++){
+        const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+        if(((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+      }
+      return inside;
+    };
+    const _polyTopYAtX = function(x, pts){
+      let topY = 1e9;
+      for(let i = 0; i < pts.length; i++){
+        const p1 = pts[i], p2 = pts[(i+1) % pts.length];
+        if((p1.x <= x && p2.x >= x) || (p2.x <= x && p1.x >= x)){
+          if(p1.x === p2.x) topY = Math.min(topY, p1.y, p2.y);
+          else {
+            const t = (x - p1.x) / (p2.x - p1.x);
+            topY = Math.min(topY, p1.y + t * (p2.y - p1.y));
+          }
+        }
+      }
+      return topY === 1e9 ? -1 : topY;
+    };
+    let inTrack = _ptInPoly(wheel.cx, wheel.cy, ann.trackLoop.points);
+    if(!inTrack){
+      for(let i = 0; i < 16; i++){
+        const ang = (i / 16) * Math.PI * 2;
+        const nx = wheel.cx + Math.cos(ang) * wheel.r;
+        const ny = wheel.cy + Math.sin(ang) * wheel.r * (cw / ch);
+        if(_ptInPoly(nx, ny, ann.trackLoop.points)){ inTrack = true; break; }
+      }
+    }
+    if(inTrack){
+      const trackTopY = _polyTopYAtX(wheel.cx, ann.trackLoop.points);
+      if(trackTopY >= 0){
+        const texH = (_ty1 - _ty0) * ch;
+        cutY_B = (trackTopY * ch + texH) - (cy - size/2);
+      }
+    }
+  }
+  
+  let finalCutY = -1;
+  if(cutY_A !== -1) finalCutY = cutY_A;
+  if(cutY_B !== -1) finalCutY = finalCutY === -1 ? cutY_B : Math.max(finalCutY, cutY_B);
+  
+  /* ── maxWheelCy 限制（不超過最底車輪中心） ── */
+  let maxWheelCy = 0, hasWheel = false;
+  if(ann.wheels){
+    for(let wi = 0; wi < ann.wheels.length; wi++){
+      if(ann.wheels[wi].cy > maxWheelCy){ maxWheelCy = ann.wheels[wi].cy; hasWheel = true; }
+    }
+  }
+  if(hasWheel){
+    const limitY_local = maxWheelCy * ch - (cy - size/2);
+    if(finalCutY > limitY_local) finalCutY = limitY_local;
+  }
+  if(finalCutY > size / 2) finalCutY = size / 2;
+  
+  /* ── fillRect 挖空 + fan/angles 鏡像補全（複刻編輯器） ── */
+  if(finalCutY > 0.5 && finalCutY < size - 0.5){
     cc.save();
     cc.globalCompositeOperation = "destination-out";
-    cc.beginPath();
-    cc.moveTo(pts[0].x * cw - (cx - size/2), -10);
-    for(let i = 0; i < pts.length; i++){
-      cc.lineTo(pts[i].x * cw - (cx - size/2), pts[i].y * ch - (cy - size/2));
-    }
-    cc.lineTo(pts[pts.length-1].x * cw - (cx - size/2), -10);
-    cc.closePath();
-    cc.fill();
+    cc.fillRect(0, 0, size, finalCutY);
     cc.restore();
     
-    const maskY = _getMaskYAtX(ann, wheel.cx);
-    const maskYInCanvas = maskY * ch - (cy - size/2);
-    if(maskYInCanvas > 0.5 && maskYInCanvas < size - 0.5){
-      const isLargeCut = maskYInCanvas > size / 2;
-      if(isLargeCut){
-        const fan = document.createElement("canvas");
-        fan.width = size; fan.height = size;
-        const fx = fan.getContext("2d");
-        fx.save();
-        fx.beginPath();
-        fx.moveTo(size/2, size/2);
-        fx.arc(size/2, size/2, size/2, Math.PI * 0.25, Math.PI * 0.75);
-        fx.closePath();
-        fx.clip();
-        fx.drawImage(img, -(cx - size/2), -(cy - size/2), cw, ch);
-        fx.restore();
+    const isLargeCut = finalCutY > size / 2;
+    if(isLargeCut){
+      const fan = document.createElement("canvas"); fan.width = size; fan.height = size;
+      const fx = fan.getContext("2d");
+      fx.save();
+      fx.beginPath();
+      fx.moveTo(size/2, size/2);
+      fx.arc(size/2, size/2, size/2, Math.PI*0.25, Math.PI*0.75);
+      fx.closePath(); fx.clip();
+      fx.drawImage(img, -(cx - size/2), -(cy - size/2), cw, ch);
+      fx.restore();
+      cc.save();
+      cc.globalCompositeOperation = "destination-over";
+      for(let j = 1; j <= 7; j++){
         cc.save();
-        cc.globalCompositeOperation = "destination-over";
-        for(let i = 1; i <= 7; i++){
-          cc.save();
-          cc.translate(size/2, size/2);
-          cc.rotate((Math.PI / 4) * i);
-          cc.translate(-size/2, -size/2);
-          cc.drawImage(fan, 0, 0);
-          cc.restore();
-        }
-        cc.restore();
-      } else {
-        const temp = document.createElement("canvas");
-        temp.width = size; temp.height = size;
-        const tc = temp.getContext("2d");
-        tc.drawImage(c, 0, 0);
-        cc.save();
-        cc.globalCompositeOperation = "destination-over";
-        const angles = [15,-15,30,-30,45,-45,60,-60,90,-90];
-        for(let k = 0; k < angles.length; k++){
-          cc.save();
-          cc.translate(size/2, size/2);
-          cc.rotate(angles[k] * Math.PI/180);
-          cc.translate(-size/2, -size/2);
-          cc.drawImage(temp, 0, 0);
-          cc.restore();
-        }
+        cc.translate(size/2, size/2);
+        cc.rotate((Math.PI/4) * j);
+        cc.translate(-size/2, -size/2);
+        cc.drawImage(fan, 0, 0);
         cc.restore();
       }
+      cc.restore();
+    } else {
+      const temp = document.createElement("canvas"); temp.width = size; temp.height = size;
+      const tc = temp.getContext("2d"); tc.drawImage(c, 0, 0);
+      cc.save();
+      cc.globalCompositeOperation = "destination-over";
+      const angles = [15,-15,30,-30,45,-45,60,-60,90,-90];
+      for(let k = 0; k < angles.length; k++){
+        cc.save();
+        cc.translate(size/2, size/2);
+        cc.rotate(angles[k] * Math.PI/180);
+        cc.translate(-size/2, -size/2);
+        cc.drawImage(temp, 0, 0);
+        cc.restore();
+      }
+      cc.restore();
     }
   }
   
@@ -3844,8 +3912,8 @@ window._openBTRSupportDetail = function(log){
     _applyArmor('bmp1',  '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '9M14 Malyutka ATGM');
     _applyArmor('bmp1m', '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '無');
     _applyArmor('bmp2',  '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '9M113 Konkurs ATGM');
-    _applyArmor('bmp3',  '鋼 22 + 鋁 60mm（車體正面）\n鋁 43mm（車體側面/後部）\n鋼 16 + 空 70 + 鋁 50mm（炮塔正面）', '9M117 Bastion 炮射導彈');
-    _applyArmor('bmd4',  '鋁 40mm（車體正面）\n鋁 30mm（車體側面）\n鋼 23mm（炮塔）', '9M117M3 炮射導彈');
+    _applyArmor('bmp3',  '鋼 22 + 鋁 60mm（車體正面）\n鋁 43mm（車體側面/後部）\n鋼 16 + 空 70 + 鋁 50mm（炮塔正面）', '無');
+    _applyArmor('bmd4',  '鋁 40mm（車體正面）\n鋁 30mm（車體側面）\n鋼 23mm（炮塔）', '無');
     _applyArmor('t80',   '複合裝甲\n炮塔 500mm 等效均質鋼\n車體 450mm 等效均質鋼', '無');
     _applyArmor('t80b',  '複合裝甲 + 30mm 鋼首上\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
     _applyArmor('t80bv', '複合裝甲 + Kontakt-1 ERA\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
@@ -4111,12 +4179,12 @@ window._openBTRSupportDetail = function(log){
       speedRoad:65, speedOffroad:'45-50', supportDuration:35, next:['bmp3'],
       researchCost:{ ammoCal:'7.62', ammoCount:2000, liquor:500, exp:3000 } })) created.push('bmp2');
     if(_ensure('bmp3', { id:'bmp3', name:'BMP-3', tier:4, line:'bmp',
-      weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'9M117 Bastion 炮射導彈',
+      weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
       armor:'鋼 22 + 鋁 60mm（車體正面）\n鋁 43mm（車體側面/後部）\n鋼 16 + 空 70 + 鋁 50mm（炮塔正面）',
       speedRoad:70, speedOffroad:'45-50', supportDuration:40, next:['bmd4'],
       researchCost:{ ammoCal:'7.62x54', ammoCount:2500, liquor:2500, exp:12000 } })) created.push('bmp3');
     if(_ensure('bmd4', { id:'bmd4', name:'BMD-4', tier:5, line:'bmp',
-      weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'9M117M3 炮射導彈',
+      weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
       armor:'鋁 40mm（車體正面）\n鋁 30mm（車體側面）\n鋼 23mm（炮塔）',
       speedRoad:70, speedOffroad:'45-50', supportDuration:42, next:[],
       researchCost:{ ammoCal:'7.62x54', ammoCount:3000, liquor:3000, exp:15000 } })) created.push('bmd4');
@@ -4164,8 +4232,8 @@ window._openBTRSupportDetail = function(log){
     _applyArmor('bmp1',  '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '9M14 Malyutka ATGM');
     _applyArmor('bmp1m', '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '無');
     _applyArmor('bmp2',  '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '9M113 Konkurs ATGM');
-    _applyArmor('bmp3',  '鋼 22 + 鋁 60mm（車體正面）\n鋁 43mm（車體側面/後部）\n鋼 16 + 空 70 + 鋁 50mm（炮塔正面）', '9M117 Bastion 炮射導彈');
-    _applyArmor('bmd4',  '鋁 40mm（車體正面）\n鋁 30mm（車體側面）\n鋼 23mm（炮塔）', '9M117M3 炮射導彈');
+    _applyArmor('bmp3',  '鋼 22 + 鋁 60mm（車體正面）\n鋁 43mm（車體側面/後部）\n鋼 16 + 空 70 + 鋁 50mm（炮塔正面）', '無');
+    _applyArmor('bmd4',  '鋁 40mm（車體正面）\n鋁 30mm（車體側面）\n鋼 23mm（炮塔）', '無');
     _applyArmor('t80',   '複合裝甲\n炮塔 500mm 等效均質鋼\n車體 450mm 等效均質鋼', '無');
     _applyArmor('t80b',  '複合裝甲 + 30mm 鋼首上\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
     _applyArmor('t80bv', '複合裝甲 + Kontakt-1 ERA\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
@@ -4306,8 +4374,8 @@ window._openBTRSupportDetail = function(log){
     _ensure('bmp1',{id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon:'73mm 2A28 + 7.62mm PKT + ATGM',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
     _ensure('bmp1m',{id:'bmp1m',name:'BMP-1M',tier:2,line:'bmp',weapon:'30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:32,next:['bmp2'],researchCost:{ammoCal:'5.45',ammoCount:1500,liquor:150,exp:800}});
     _ensure('bmp2',{id:'bmp2',name:'BMP-2',tier:3,line:'bmp',weapon:'30mm 2A42 + 7.62mm PKT',weaponSpecial:'9M113 Konkurs ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:35,next:['bmp3'],researchCost:{ammoCal:'7.62',ammoCount:2000,liquor:500,exp:3000}});
-    _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'9M117 Bastion',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
-    _ensure('bmd4',{id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'9M117M3',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
+    _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
+    _ensure('bmd4',{id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
     if(VEHICLES.btr80){
       var b0 = VEHICLES.btr80.next = VEHICLES.btr80.next || [];
       if(b0.indexOf('btr80a')<0) b0.push('btr80a');
@@ -4335,8 +4403,8 @@ window._openBTRSupportDetail = function(log){
     if(VEHICLES.bmp1)  VEHICLES.bmp1.weaponSpecial = '9M14 Malyutka ATGM';
     if(VEHICLES.bmp1m) VEHICLES.bmp1m.weaponSpecial = '無';
     if(VEHICLES.bmp2)  VEHICLES.bmp2.weaponSpecial = '9M113 Konkurs ATGM';
-    if(VEHICLES.bmp3)  VEHICLES.bmp3.weaponSpecial = '9M117 Bastion';
-    if(VEHICLES.bmd4)  VEHICLES.bmd4.weaponSpecial = '9M117M3';
+    if(VEHICLES.bmp3)  VEHICLES.bmp3.weaponSpecial = '無';
+    if(VEHICLES.bmd4)  VEHICLES.bmd4.weaponSpecial = '無';
   }
 
   /* BMP door 对准 */
@@ -4593,8 +4661,8 @@ window._openBTRSupportDetail = function(log){
     _ensure('bmp1',{id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon:'73mm 2A28 + 7.62mm PKT + ATGM',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
     _ensure('bmp1m',{id:'bmp1m',name:'BMP-1M',tier:2,line:'bmp',weapon:'30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:32,next:['bmp2'],researchCost:{ammoCal:'5.45',ammoCount:1500,liquor:150,exp:800}});
     _ensure('bmp2',{id:'bmp2',name:'BMP-2',tier:3,line:'bmp',weapon:'30mm 2A42 + 7.62mm PKT',weaponSpecial:'9M113 Konkurs ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:35,next:['bmp3'],researchCost:{ammoCal:'7.62',ammoCount:2000,liquor:500,exp:3000}});
-    _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'9M117 Bastion',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
-    _ensure('bmd4',{id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'9M117M3',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
+    _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
+    _ensure('bmd4',{id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
     if(VEHICLES.btr80){
       var b0 = VEHICLES.btr80.next = VEHICLES.btr80.next || [];
       if(b0.indexOf('btr80a')<0) b0.push('btr80a');
@@ -4616,8 +4684,8 @@ window._openBTRSupportDetail = function(log){
     if(VEHICLES.btr90) VEHICLES.btr90.weaponSpecial = 'ATGM 發射筒';
     if(VEHICLES.bmp1)  VEHICLES.bmp1.weaponSpecial = '9M14 Malyutka ATGM';
     if(VEHICLES.bmp2)  VEHICLES.bmp2.weaponSpecial = '9M113 Konkurs ATGM';
-    if(VEHICLES.bmp3)  VEHICLES.bmp3.weaponSpecial = '9M117 Bastion';
-    if(VEHICLES.bmd4)  VEHICLES.bmd4.weaponSpecial = '9M117M3';
+    if(VEHICLES.bmp3)  VEHICLES.bmp3.weaponSpecial = '無';
+    if(VEHICLES.bmd4)  VEHICLES.bmd4.weaponSpecial = '無';
   }
 
   /* BMP door 对准 */
@@ -4839,8 +4907,8 @@ window._openBTRSupportDetail = function(log){
     bmp1:   '9M14 嬰兒',
     bmp1m:  '無',
     bmp2:   '9M113 競賽',
-    bmp3:   '9M117 堡壘',
-    bmd4:   '9M117M3 堡壘-M',
+    bmp3:   '無',
+    bmd4:   '無',
     t80:    '無',
     t80b:   '無',
     t80bv:  '無',

@@ -1145,7 +1145,8 @@ function _playOneSweepAnim(bid, vid, totalCount, onComplete){
     for(var _mi = 0; _mi < ann.muzzles.length; _mi++){
       var _md = ann.muzzles[_mi];
       var _prof = (typeof window.MUZZLE_PROFILES !== 'undefined' && window.MUZZLE_PROFILES[_md.weaponId]) ? window.MUZZLE_PROFILES[_md.weaponId] : ((window.MUZZLE_PROFILES && window.MUZZLE_PROFILES.default) || { burst: 3, intervalMs: 100, pauseMs: 300 });
-      _sweepMuzzles.push({ weaponId: _md.weaponId, mx: _md.x, my: _md.y, profile: _prof, shotsLeft: _prof.burst, nextFireAt: 0 });
+      /* [v61-sweep-noatgm] 掃蕩模式不發射 ATGM（導彈速度 800 < 車速 1200 px/s，視覺上導彈會落在車後） */
+      if(_md.weaponId !== 'atgm') _sweepMuzzles.push({ weaponId: _md.weaponId, mx: _md.x, my: _md.y, profile: _prof, shotsLeft: _prof.burst, nextFireAt: 0 });
     }
   }
   if(!_sweepMuzzles.length){
