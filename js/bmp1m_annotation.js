@@ -271,8 +271,8 @@ const VEHICLE_ANNOTATION_BMP1M = {
       "layerOrder": "above"
     },
     {
-      "x": 0.6953,
-      "y": 0.1156,
+      "x": 0.6924,
+      "y": 0.1216,
       "name": "槍口 2",
       "weaponId": "2a42",
       "layerOrder": "above"

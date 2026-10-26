@@ -1044,18 +1044,13 @@ const BTRSupport = {
       for (const p of this.smoke) {
         let a = 0;
         if (p.isJet) {
-          a = p.alpha0 * Math.pow(Math.max(0, p.life), 2.0);
-        } else {
-          a = p.alpha0 * Math.pow(Math.max(0, p.life), 4.0); // rev805 加快消散 // rev803 恢復快速淡出 
+        if (p._muzzleX !== undefined) {
+            ctx.beginPath();
+            ctx.rect(p._muzzleX, -20000, 40000, 40000);
+            ctx.clip();
         }
-        if (a < 0.005) continue;
-        
-        ctx.save(); 
-        ctx.translate(p.x, p.y); 
-        
-        if (p.isJet) {
-          ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1); 
-          ctx.globalAlpha = a; 
+        ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
+        ctx.globalAlpha = a; 
           const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
           g.addColorStop(0, 'rgba(255, 255, 255, 1)');
           g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)'); 
@@ -1140,7 +1135,7 @@ const BTRSupport = {
   _setupMuzzles() {
     const ann = ANN[this.vehicleId]; this.muzzles = []; if(!ann || !ann.muzzles) return;
     for(const m of ann.muzzles){
-      this.muzzles.push({ weaponId: m.weaponId, mx: m.x, my: m.y, profile: MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default, shotsLeft: (MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default).burst, nextFireAt: 0, lastFireAt: 0 });
+      this.muzzles.push({ weaponId: m.weaponId, mx: m.x, my: m.y, angle: m.angle, profile: MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default, shotsLeft: (MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default).burst, nextFireAt: 0, lastFireAt: 0 });
     }
   },
   _setupStreamBg() {
@@ -1198,7 +1193,7 @@ const BTRSupport = {
       this.doorOffsetRatio = _doorCenterRatio; this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
       let maxMuzzleX = 0; if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
       // [Debug] 接入實時滑動條比例
-      const targetMuzzleRatio = window._debugMuzzleRatio || 0.65; 
+      const targetMuzzleRatio = 0.9; 
       const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW; 
       const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
       this.centerPX = leftPx / w;
@@ -1481,7 +1476,10 @@ const BTRSupport = {
       const _jetYNow = _muzzleYNow;
       
       while (now - rs._lastJetTime >= JET_INTERVAL && t <= JET_MAX_TIME) {
-        this.fx.spawnJetOne(_jetXNow, _jetYNow, m.weaponId);
+        let jetAngle = 0;
+        if (typeof m.angle === 'number') jetAngle = m.angle;
+        else if (window.MUZZLE_ANGLES && window.MUZZLE_ANGLES[m.weaponId]) jetAngle = window.MUZZLE_ANGLES[m.weaponId];
+        this.fx.spawnJetOne(_jetXNow, _jetYNow, m.weaponId, jetAngle, _muzzleXNow);
         rs._lastJetTime += JET_INTERVAL;
       }
       
@@ -1571,6 +1569,13 @@ const BTRSupport = {
       }
       if(this.erasedBaseImg) _renderOpts.baseImage = this.erasedBaseImg;
     }
+    // [圖層分層] 1. 先畫發射煙 (在下層，被炮管遮擋)
+    if (this.fx && this.fx.smoke) {
+        const _jets = this.fx.smoke.filter(p => p.isJet);
+        window._vsDrawSmoke(ctx, _jets);
+    }
+
+    // [圖層分層] 2. 畫載具 (炮管蓋住發射煙內部)
     (window.VehicleRenderer && window.VehicleRenderer.render || renderVehicle)(ctx, this.vehicleId, px, py, this.targetW, this.targetH, (now - this.startTime) / 1000, _renderOpts);
     
     if (this.missiles && this.missiles.length) {
@@ -1604,7 +1609,11 @@ const BTRSupport = {
       }
     }
     
-    this.fx.draw(ctx);
+    // [圖層分層] 3. 畫擴散煙 (在上層)
+    if (this.fx && this.fx.smoke) {
+        const _spreads = this.fx.smoke.filter(p => !p.isJet);
+        window._vsDrawSmoke(ctx, _spreads);
+    }
     for (const fx of this.fireFx) { 
       if (fx.layerOrder !== 'above') continue; 
       this._drawOneFireFx(ctx, fx, now, px, py); 
@@ -1621,22 +1630,38 @@ this.fx.drawTracers(ctx, now);
       // [rev873] 优先使用 trackLoop（闭合环）的底部点生成扬尘
       if (ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2) {
         const pts = ann.trackLoop.points;
-        // [dust-no-right-top] 履带环右上角不生成扬尘：
-        //   排除 x ≥ maxX - 0.15 且 y < 0.65 的顶点
-        //   右侧底部导轮（y ≥ 0.65）、左侧、中央照常生成
-        let _tMaxX = 0;
-        for(let _i = 0; _i < pts.length; _i++){ if(pts[_i].x > _tMaxX) _tMaxX = pts[_i].x; }
-        // [Debug] 排除上緣（y < maxY * 0.5）與右側（x > maxX * 0.8）
-        let _tMaxY = 0;
-        for(let _i = 0; _i < pts.length; _i++){ if(pts[_i].y > _tMaxY) _tMaxY = pts[_i].y; }
+        
+        // [精準直邊揚塵] 換用不易衝突的變數名
+        let _dustMaxX = 0, _dustMaxY = 0;
+        for(let _di = 0; _di < pts.length; _di++){ 
+            if(pts[_di].x > _dustMaxX) _dustMaxX = pts[_di].x; 
+            if(pts[_di].y > _dustMaxY) _dustMaxY = pts[_di].y;
+        }
+        
+        // 篩選下半部且非右邊緣的點 (y > 0.5, x < 0.85 * max)
         const bottomPts = pts.filter(function(p){
-          if (p.y < _tMaxY * 0.5) return false;
-          if (p.x > _tMaxX * 0.8) return false;
+          if (p.y < 0.5) return false; 
+          if (p.x > _dustMaxX * 0.85) return false; 
           return true;
         });
+        
         if(bottomPts.length > 0){
-          const srcPt = bottomPts[Math.floor(Math.random() * bottomPts.length)];
-          _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
+          let minY = 2;
+          for(let i=0; i<bottomPts.length; i++){ if(bottomPts[i].y < minY) minY = bottomPts[i].y; }
+          // 找出貼地直邊的點群（容差 0.05）
+          const bottomLine = bottomPts.filter(p => Math.abs(p.y - minY) < 0.05);
+          if (bottomLine.length >= 2) {
+              // 沿直邊插值隨機取點
+              const p1 = bottomLine[0], p2 = bottomLine[bottomLine.length - 1];
+              const t = Math.random();
+              const cx = p1.x + (p2.x - p1.x) * t;
+              const cy = p1.y + (p2.y - p1.y) * t;
+              _dustSrc = { cx: cx, cy: cy, r: 0.015 };
+          } else {
+              // 退化為隨機選點
+              const srcPt = bottomPts[Math.floor(Math.random() * bottomPts.length)];
+              _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
+          }
         }
       } else if (ann.wheels && ann.wheels.length > 0) {
         // [整理] 排除最右侧轮子（cx >= 0.95）
@@ -1836,26 +1861,44 @@ window._openBTRSupportDetail = function(log){
   // ★ v88：严格还原物理参数
 // ★ v89：动态适配比例
 // ★ v90：100%纯净还原
-window._vsMakeSmokeJet = function(x, y, weaponId){
+window._vsMakeSmokeJet = function(x, y, weaponId, angle){
   const _base = 300;
   const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
   const isATGM = (weaponId === 'atgm');
+  
+  let vx = 0, vy = 0;
+  let sizeX = 0, sizeY = 0, growX = 0, growY = 0;
+  let offsetX = -30;
+
   if (isATGM) {
-    return { x: x + 15, y: y, vx: _base * 30, vy: (Math.random() - 0.5) * _base * 0.02,
-      life: 1, rate: 1 / 0.25, sizeX: _base * 0.2, sizeY: _base * 0.02,
-      growX: _base * 4.0, growY: _base * 0.1, alpha0: 1.0, isJet: true, isCore: true,
-      friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: false };
+    vx = _base * 40; vy = (Math.random() - 0.5) * _base * 0.01;
+    sizeX = _base * 0.2; sizeY = _base * 0.01;
+    growX = _base * 6.0; growY = _base * 0.1;
+    offsetX = -60;
+  } else if (isHeavy) {
+    vx = _base * 40; vy = (Math.random() - 0.5) * _base * 0.02;
+    sizeX = _base * 0.25; sizeY = _base * 0.035;
+    growX = _base * 10.0; growY = _base * 0.6;
+    offsetX = -60;
+  } else {
+    vx = _base * 30; vy = (Math.random() - 0.5) * _base * 0.01;
+    sizeX = _base * 0.2; sizeY = _base * 0.015;
+    growX = _base * 8.0; growY = _base * 0.4;
   }
-  if (isHeavy) {
-    return { x: x + 15, y: y, vx: _base * 25, vy: (Math.random() - 0.5) * _base * 0.1,
-      life: 1, rate: 1 / 0.25, sizeX: _base * 0.15, sizeY: _base * 0.05,
-      growX: _base * 10.0, growY: _base * 2.0, alpha0: 1.0, isJet: true, isCore: true,
-      friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: false };
+
+  if (angle) {
+    const rad = angle * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const nx = vx * cos - vy * sin;
+    const ny = vx * sin + vy * cos;
+    vx = nx; vy = ny;
   }
-  return { x: x + 10, y: y, vx: _base * 18, vy: (Math.random() - 0.5) * _base * 0.05,
-    life: 1, rate: 1 / 0.2, sizeX: _base * 0.1, sizeY: _base * 0.03,
-    growX: _base * 8.0, growY: _base * 1.5, alpha0: 1.0, isJet: true, isCore: true,
-    friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: false };
+
+  return { x: x + offsetX, y: y, vx: vx, vy: vy,
+    life: 1, rate: 1 / 0.15, sizeX: sizeX, sizeY: sizeY,
+    growX: growX, growY: growY, alpha0: 1.0, isJet: true, isCore: true,
+    friction: 0.92, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: false };
 };
 
   window._vsMakeSmokeSpread = function(x, y, weaponId){
@@ -1905,6 +1948,11 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
       }
       if (a < 0.005) continue;
       ctx.save();
+      if (p.isJet && p._muzzleX !== undefined) {
+          ctx.beginPath();
+          ctx.rect(p._muzzleX, 0, ctx.canvas.width, ctx.canvas.height);
+          ctx.clip();
+      }
       ctx.translate(p.x, p.y);
       if (p.isJet) {
         ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
@@ -1931,7 +1979,11 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
   };
 
   /* 改造 BTRSupport.fx 使用共用函數 */
-  BTRSupport.fx.spawnJetOne = function(x, y, weaponId){ this.smoke.push(window._vsMakeSmokeJet(x, y, weaponId)); };
+  BTRSupport.fx.spawnJetOne = function(x, y, weaponId, angle, muzzleX){
+    var p = window._vsMakeSmokeJet(x, y, weaponId, angle);
+    if(p) p._muzzleX = muzzleX;
+    this.smoke.push(p);
+};
   BTRSupport.fx.spawnSpreadOne = function(x, y, weaponId){ this.smoke.push(window._vsMakeSmokeSpread(x, y, weaponId)); };
   BTRSupport.fx.update = function(now, dt, worldSpeed){ window._vsUpdateSmoke(this.smoke, dt, worldSpeed); };
   BTRSupport.fx.draw = function(ctx){ window._vsDrawSmoke(ctx, this.smoke); };

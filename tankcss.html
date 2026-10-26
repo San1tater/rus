@@ -2736,5 +2736,135 @@ console.log('載具標注編輯器 v2.0 (TrackLoop) 已啟動');
 })();
 
 </script>
+
+
+
+
+<script>
+(function(){
+  if(window._muzzleAnglePatched) return;
+  window._muzzleAnglePatched = true;
+
+  const origUpdatePropPanel = window.updatePropPanel;
+  window.updatePropPanel = function(){
+    origUpdatePropPanel();
+    const o = getObjById(S.selectedId);
+    if (o && o.type === 'muzzle') {
+      const panel = document.getElementById('propPanel');
+      if(!panel) return;
+      const xRow = panel.querySelector('#pMx')?.closest('.propRow');
+      if (xRow && !document.getElementById('pAngle')) {
+        const html = `<div class="propRow"><label>砲管仰角</label><input type="number" id="pAngle" value="${o.angle || 0}" step="1" min="-90" max="90"><span class="unit">°</span></div>`;
+        xRow.insertAdjacentHTML('afterend', html);
+        document.getElementById('pAngle').oninput = function(e) {
+          o.angle = parseFloat(e.target.value) || 0;
+          render();
+        };
+      }
+    }
+  };
+
+  const origDrawMuzzle = window.drawMuzzle;
+  window.drawMuzzle = function(o, isSel) {
+    origDrawMuzzle(o, isSel);
+    if (isSel) {
+      const cvs = document.getElementById('canvas');
+      if(!cvs) return;
+      const w = cvs.width, h = cvs.height;
+      const mx = o.muzzle.x * w, my = o.muzzle.y * h;
+      const ang = (o.angle || 0) * Math.PI / 180;
+      const len = 60 / S.view.scale;
+      
+      // 砲尾端點（與噴射方向相反）
+      const ex = mx - Math.cos(ang) * len;
+      const ey = my - Math.sin(ang) * len;
+      
+      ctx.save();
+      
+      // 畫砲管線（從砲尾到砲口）
+      ctx.strokeStyle = '#4af0ff';
+      ctx.lineWidth = 2 / S.view.scale;
+      ctx.setLineDash([4/S.view.scale, 4/S.view.scale]);
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(mx, my);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // 砲口處的小箭頭（指示噴射方向）
+      const arrowSize = 8 / S.view.scale;
+      ctx.beginPath();
+      ctx.moveTo(mx + arrowSize * Math.cos(ang), my + arrowSize * Math.sin(ang));
+      ctx.lineTo(mx - arrowSize * 0.5 * Math.cos(ang - Math.PI/6), my - arrowSize * 0.5 * Math.sin(ang - Math.PI/6));
+      ctx.lineTo(mx - arrowSize * 0.5 * Math.cos(ang + Math.PI/6), my - arrowSize * 0.5 * Math.sin(ang + Math.PI/6));
+      ctx.closePath();
+      ctx.fillStyle = '#4af0ff';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1 / S.view.scale;
+      ctx.stroke();
+
+      // 砲尾拖拽端點
+      ctx.beginPath();
+      ctx.arc(ex, ey, 6 / S.view.scale, 0, Math.PI*2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.strokeStyle = '#4af0ff';
+      ctx.stroke();
+      
+      ctx.restore();
+    }
+  };
+
+  const cvsEl = document.getElementById('canvas');
+  if(cvsEl) {
+    cvsEl.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const n = screenToNorm(e.clientX, e.clientY);
+      if (S.tool === 'select' && S.selectedId) {
+        const o = getObjById(S.selectedId);
+        if (o && o.type === 'muzzle') {
+          const w = cvsEl.width, h = cvsEl.height;
+          const mx = o.muzzle.x * w, my = o.muzzle.y * h;
+          const ang = (o.angle || 0) * Math.PI / 180;
+          const len = 60 / S.view.scale;
+          const ex = mx - Math.cos(ang) * len;
+          const ey = my - Math.sin(ang) * len;
+          const s = normToScreen(ex/w, ey/h);
+          
+          if (Math.hypot(e.clientX - s.x, e.clientY - s.y) <= 15) {
+            window._dragMuzzleAngle = o;
+            cvsEl.setPointerCapture(e.pointerId);
+            e.stopImmediatePropagation(); 
+          }
+        }
+      }
+    }, true);
+
+    cvsEl.addEventListener('pointermove', (e) => {
+      if (window._dragMuzzleAngle) {
+        const o = window._dragMuzzleAngle;
+        const n = screenToNorm(e.clientX, e.clientY);
+        // 反轉角度計算：使用滑鼠位置減去砲口位置的反向
+        const dx = (n.x - o.muzzle.x) * cvsEl.width;
+        const dy = (n.y - o.muzzle.y) * cvsEl.height;
+        o.angle = Math.round(Math.atan2(-dy, -dx) * 180 / Math.PI);
+        const inp = document.getElementById('pAngle');
+        if(inp) inp.value = o.angle;
+        render();
+        e.stopImmediatePropagation();
+      }
+    }, true);
+
+    cvsEl.addEventListener('pointerup', (e) => {
+      if (window._dragMuzzleAngle) {
+        window._dragMuzzleAngle = null;
+        e.stopImmediatePropagation();
+      }
+    }, true);
+  }
+})();
+</script>
+
 </body>
 </html>

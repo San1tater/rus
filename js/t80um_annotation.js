@@ -3,7 +3,8 @@
  * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關
  * - trackLoop：履帶環多邊形（閉合），遊戲端需按此多邊形執行擦除與貼圖
  * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
- * - 渲染順序：image → eraseOriginalTrack（trackLoop） → trackScroll → wheels → trackMask → doors → muzzles → effects
+ * - fusion：融合車門（純實色多邊形）
+ * - missiles：單發實體導彈
  */
 const VEHICLE_ANNOTATION_T80UM = {
   "id": "t80um",
@@ -252,8 +253,10 @@ const VEHICLE_ANNOTATION_T80UM = {
         "backUses": "solid_color",
         "flipDirection": "outward"
       }
-    ]
+    ],
+    "fusion": []
   },
+  "missiles": [],
   "weaponAreas": [
     {
       "id": "o9zszfkn",

@@ -56,28 +56,7 @@
   <script src="js/06-core.js"></script>
 
  
-<div id="debug-ui" style="position:fixed;top:10px;left:10px;z-index:99999;background:rgba(0,0,0,0.85);border:1px solid #e8a33d;padding:10px;border-radius:8px;color:#fff;font-size:12px;font-family:monospace;display:flex;flex-direction:column;gap:6px;">
-  <div style="color:#e8a33d;font-weight:bold;">調試定位比例</div>
-  <div style="display:flex;align-items:center;gap:8px;">
-    <input type="range" id="debug-ratio-slider" min="0.3" max="1.0" step="0.01" value="0.65" style="width:140px;">
-    <span id="debug-ratio-val">0.65</span>
-  </div>
-  <button id="debug-close" style="background:#3a2f25;color:#a89a85;border:1px solid #5a4f45;border-radius:4px;padding:4px;cursor:pointer;">隱藏面板</button>
-</div>
-<script>
-  window._debugMuzzleRatio = 0.65;
-  document.getElementById('debug-ratio-slider').addEventListener('input', function(e) {
-    var v = parseFloat(e.target.value);
-    window._debugMuzzleRatio = v;
-    document.getElementById('debug-ratio-val').textContent = v.toFixed(2);
-    if (window.BTRSupport && window.BTRSupport.active) {
-      window.BTRSupport._setupCanvas();
-    }
-  });
-  document.getElementById('debug-close').addEventListener('click', function() {
-    document.getElementById('debug-ui').style.display = 'none';
-  });
-</script>
+
 
 </body>
 </html>
