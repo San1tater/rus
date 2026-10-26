@@ -1,3 +1,5 @@
+// ★ v94：无画蛇添足
+// ★ v93：精准恢复发射筒
 // [rev874] 闭环履带渲染
 // [rev873] 履带环扬尘与机炮节奏
 // [rev871] 机炮节奏调整
@@ -66,7 +68,9 @@
   if(typeof window.VEHICLE_REAL_HEIGHTS === 'undefined'){
     window.VEHICLE_REAL_HEIGHTS = {
       btr80: 2.41, btr80a: 2.80, btr82: 2.725, btr82a: 2.725, btr90: 2.98,
-      t80: 2.74, t80b: 2.74, t80bv: 2.74, t80u: 2.74, t80uk: 2.74, t80um: 2.74
+      t80: 2.74, t80b: 2.74, t80bv: 2.74, t80u: 2.74, t80uk: 2.74, t80um: 2.74,
+      // ★ v91：补全真实高度
+      bmp1: 2.15, bmp1m: 2.25, bmp2: 2.25, bmp3: 2.40, bmd4: 2.17
     };
   }
 
@@ -1739,7 +1743,7 @@ window._openBTRSupportDetail = function(log){
         return (ad.name || '').localeCompare(bd.name || '', 'zh-Hant');
       });
     }
-    const names = { weapon:'⚔️ 武器', armor:'🛡️ 裝備', ammo:'🔫 彈藥', consume:'💊 消耗品', material:'🔧 材料', misc:'📦 其他' };
+    const names = { weapon: '⚔️ 武器', armor:'🛡️ 裝備', ammo:'🔫 彈藥', consume:'💊 消耗品', material:'🔧 材料', misc:'📦 其他' };
     for(const g in groups){
       if(!groups[g].length) continue;
       const col = !!window._btrCollapsed[g];
@@ -3938,11 +3942,11 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
   };
   if(typeof VEHICLES !== 'undefined'){
     function _ensure(id, def){ if(!VEHICLES[id]){ VEHICLES[id] = def; return true; } return false; }
-    _ensure('bmp1',{id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon:'73mm 2A28 + 7.62mm PKT + ATGM',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
-    _ensure('bmp1m',{id:'bmp1m',name:'BMP-1M',tier:2,line:'bmp',weapon:'30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:32,next:['bmp2'],researchCost:{ammoCal:'5.45',ammoCount:1500,liquor:150,exp:800}});
-    _ensure('bmp2',{id:'bmp2',name:'BMP-2',tier:3,line:'bmp',weapon:'30mm 2A42 + 7.62mm PKT',weaponSpecial:'9M113 Konkurs ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:35,next:['bmp3'],researchCost:{ammoCal:'7.62',ammoCount:2000,liquor:500,exp:3000}});
-    _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
-    _ensure('bmd4',{id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
+    _ensure('bmp1',{id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon: '100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
+    _ensure('bmp1m',{id:'bmp1m',name:'BMP-1M',tier:2,line:'bmp',weapon: '30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:32,next:['bmp2'],researchCost:{ammoCal:'5.45',ammoCount:1500,liquor:150,exp:800}});
+    _ensure('bmp2',{id:'bmp2',name:'BMP-2',tier:3,line:'bmp',weapon: '30mm 2A42 + 7.62mm PKT + ATGM 發射筒',weaponSpecial:'9M113 Konkurs ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:35,next:['bmp3'],researchCost:{ammoCal:'7.62',ammoCount:2000,liquor:500,exp:3000}});
+    _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon: '100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
+    _ensure('bmd4',{id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon: '100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
     if(VEHICLES.btr80){
       var b0 = VEHICLES.btr80.next = VEHICLES.btr80.next || [];
       if(b0.indexOf('btr80a')<0) b0.push('btr80a');
@@ -4142,23 +4146,10 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
    * Part 2: 導彈中文譯名
    * ============================================================ */
   var WEAPON_SPECIAL_ZH = {
-    btr80:  '無',
-    btr80a: '無',
-    btr82:  '無',
-    btr82a: '無',
-    btr90:  '9M113 競賽',
-    bmp1:   '9M14 嬰兒',
-    bmp1m:  '無',
-    bmp2:   '9M113 競賽',
-    bmp3:   '無',
-    bmd4:   '無',
-    t80:    '無',
-    t80b:   '無',
-    t80bv:  '無',
-    t80u:   '無',
-    t80uk:  '無',
-    t80um:  '無'
-  };
+    btr80: '無', btr80a: '無', btr82: '無', btr82a: '無', btr90: '9M113 競賽',
+    bmp1: '9M14 嬰兒', bmp1m: '無', bmp2: '9M113 競賽', bmp3: '無', bmd4: '無',
+    t80: '無', t80b: '無', t80bv: '無', t80u: '無', t80uk: '無', t80um: '無'
+};
 
   /* ============================================================
    * Part 3: 速度（前進/倒車）
@@ -4521,3 +4512,1261 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
 
 
 
+
+// ★ v111：无副作用贴边
+(function(){
+  if(window._v111TechTreePatched) return;
+  window._v111TechTreePatched = true;
+
+  // 清除历史错误样式
+  for(var i=100; i<=110; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    // 坐标为绝对原点，x=0
+    var nodes = [
+      { vid:'btr80',  x:110, y:4   },
+      { vid:'btr80a', x:0,   y:76  },
+      { vid:'btr82',  x:0,   y:148 },
+      { vid:'btr82a', x:0,   y:220 },
+      { vid:'btr90',  x:0,   y:292 },
+      { vid:'bmp1',   x:110, y:76  },
+      { vid:'bmp1m',  x:110, y:148 },
+      { vid:'bmp2',   x:110, y:220 },
+      { vid:'bmp3',   x:110, y:292 },
+      { vid:'t80',    x:220, y:76  },
+      { vid:'t80b',   x:220, y:148 },
+      { vid:'t80bv',  x:220, y:220 },
+      { vid:'t80u',   x:220, y:292 },
+      { vid:'t80uk',  x:110, y:364 },
+      { vid:'t80um',  x:220, y:364 }
+    ];
+
+    var svg = '<svg width="320" height="440" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<path d="M 160 68 L 160 72 L 50 72 L 50 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="160" y1="68" x2="160" y2="76" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 160 68 L 160 72 L 270 72 L 270 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="50" y1="140" x2="50" y2="148" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="50" y1="212" x2="50" y2="220" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="50" y1="284" x2="50" y2="292" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="160" y1="140" x2="160" y2="148" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="160" y1="212" x2="160" y2="220" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="160" y1="284" x2="160" y2="292" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="270" y1="140" x2="270" y2="148" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="270" y1="212" x2="270" y2="220" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="270" y1="284" x2="270" y2="292" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="270" y1="356" x2="270" y2="364" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 270 356 L 270 360 L 160 360 L 160 364" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    // 关键：用内联负边距吃掉 padding，不修改 bd.style
+    var body = '<div style="display:block; width:calc(100% + 24px); height:calc(100% + 20px); margin:-10px -12px; overflow:auto; -webkit-overflow-scrolling:touch;">' +
+               '<div style="position:relative; width:320px; height:440px; margin:0; padding:0;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '🌳 科技樹', body: body });
+    
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(){
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v112：科技树完美布局
+(function(){
+  if(window._v112TechTreePatched) return;
+  window._v112TechTreePatched = true;
+
+  // 清除历史错误样式
+  for(var i=100; i<=111; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    // 重新设计的三列阵型，右侧延伸
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 }, // 补上 BMD-4
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:380, y:330 }, // 向右延展
+      { vid:'t80um',  x:380, y:410 }  // 向右下延展
+    ];
+
+    var svg = '<svg width="500" height="500" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    // btr80 中心 (190, 74) 分三路
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    
+    // BTR 竖线 (x=70)
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // BMP 竖线 (x=190)
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>'; // 连 BMD-4
+    
+    // T80 竖线 (x=310)
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // t80u 分叉 (t80uk 向右，t80um 向右下)
+    svg += '<line x1="360" y1="362" x2="380" y2="362" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 310 394 L 310 402 L 430 402 L 430 410" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    // 保留负边距吃掉弹窗 padding，但给内部画布加上 20px 左内边距，实现“留一定边界”
+    var body = '<div style="display:block; width:calc(100% + 24px); height:calc(100% + 20px); margin:-10px -12px; overflow:auto; -webkit-overflow-scrolling:touch;">' +
+               '<div style="position:relative; width:500px; height:500px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '🌳 科技樹', body: body });
+    
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(){
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v113：完美平级
+(function(){
+  if(window._v113TechTreePatched) return;
+  window._v113TechTreePatched = true;
+
+  // 清除历史错误样式
+  for(var i=100; i<=112; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  // 注入隐藏滚动条的样式
+  if(!document.getElementById('wt-tech-v113-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v113-style';
+    st.textContent = `
+      .wt-tech-custom-scroll {
+        scrollbar-width: none !important; /* Firefox */
+        -ms-overflow-style: none !important; /* IE/Edge */
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important; /* Chrome/Safari */
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    // 重新设计的坐标，T80UK 与 T80UM 并列
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:380, y:290 }, // 平级分支上
+      { vid:'t80um',  x:380, y:370 }  // 平级分支下
+    ];
+
+    var svg = '<svg width="500" height="500" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    // btr80 中心 (190, 74) 分三路
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    
+    // BTR 竖线 (x=70)
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // BMP 竖线 (x=190)
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // T80 竖线 (x=310)
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // T80U 的分叉逻辑 (平级)
+    // 从 t80u 底部 (310, 394) 往下，走到 y=402 再向右
+    svg += '<path d="M 310 394 L 310 402 L 430 402" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    // 垂直向上连接到 t80uk 底部 (430, 354)
+    svg += '<line x1="430" y1="402" x2="430" y2="354" stroke="#8a5f18" stroke-width="2"/>';
+    // 垂直向下连接到 t80um 顶部 (430, 370)
+    svg += '<line x1="430" y1="402" x2="430" y2="370" stroke="#8a5f18" stroke-width="2"/>';
+    
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    // 滚动条隐藏，左侧留白
+    var body = '<div class="wt-tech-custom-scroll" style="display:block; width:calc(100% + 24px); height:calc(100% + 20px); margin:-10px -12px; overflow:auto; -webkit-overflow-scrolling:touch;">' +
+               '<div style="position:relative; width:500px; height:500px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '🌳 科技樹', body: body });
+    
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(){
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v114：完美平级与恢复拖拽
+(function(){
+  if(window._v114TechTreePatched) return;
+  window._v114TechTreePatched = true;
+
+  // 清除历史错误样式
+  for(var i=100; i<=113; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  // 注入隐藏滚动条的样式
+  if(!document.getElementById('wt-tech-v114-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v114-style';
+    st.textContent = `
+      .wt-tech-custom-scroll {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        cursor: grab;
+      }
+      .wt-tech-custom-scroll:active {
+        cursor: grabbing;
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    // 重新设计的平级坐标
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:260, y:440 }, // 正下方
+      { vid:'t80um',  x:380, y:440 }  // 右下角
+    ];
+
+    var svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    // btr80 中心 (190, 74)
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    
+    // BTR 竖线 (x=70)
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // BMP 竖线 (x=190)
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // T80 竖线 (x=310)
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // T80U 平级分叉
+    // t80uk 在正下方 (310, 440)
+    svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
+    // t80um 在右侧 (430, 440)
+    svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    // 滚动条隐藏，左侧留白
+    var body = '<div class="wt-tech-custom-scroll" style="display:block; width:calc(100% + 24px); height:calc(100% + 20px); margin:-10px -12px; overflow:auto; -webkit-overflow-scrolling:touch;">' +
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '🌳 科技樹', body: body });
+    
+    // --- 绑定拖拽逻辑 ---
+    var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
+    if (scrollEl) {
+      var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
+      scrollEl.addEventListener('pointerdown', function(e){
+        if (e.button !== 0 && e.pointerType !== 'touch') return;
+        // 如果点到了节点，不触发拖拽，以免影响点击
+        if (e.target.closest && e.target.closest('[data-tech-node]')) return;
+        isDown = true;
+        startX = e.clientX; 
+        startY = e.clientY;
+        scrollLeft = scrollEl.scrollLeft; 
+        scrollTop = scrollEl.scrollTop;
+        scrollEl.style.cursor = 'grabbing';
+        try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
+      });
+      scrollEl.addEventListener('pointermove', function(e){
+        if (!isDown) return;
+        var dx = e.clientX - startX, dy = e.clientY - startY;
+        scrollEl.scrollLeft = scrollLeft - dx;
+        scrollEl.scrollTop = scrollTop - dy;
+      });
+      function endPan(e) {
+        if (!isDown) return;
+        isDown = false;
+        scrollEl.style.cursor = 'grab';
+        try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
+      }
+      scrollEl.addEventListener('pointerup', endPan);
+      scrollEl.addEventListener('pointercancel', endPan);
+    }
+
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(){
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v115：丝滑拖拽
+(function(){
+  if(window._v115TechTreePatched) return;
+  window._v115TechTreePatched = true;
+
+  // 清除历史错误样式
+  for(var i=100; i<=114; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  if(!document.getElementById('wt-tech-v115-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v115-style';
+    st.textContent = `
+      /* 专属弹窗隔离，仅影响当前弹窗 */
+      .modal-bd-inner.wt-tech-modal {
+        padding: 0 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      .wt-tech-custom-scroll {
+        flex: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: auto !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none; /* 彻底接管触控，防止原生手势干扰 */
+      }
+      .wt-tech-custom-scroll:active {
+        cursor: grabbing;
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:260, y:440 }, // 左下方
+      { vid:'t80um',  x:380, y:440 }  // 右下方
+    ];
+
+    var svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    // btr80 中心 (190, 74)
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    
+    // BTR 竖线 (x=70)
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // BMP 竖线 (x=190)
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // T80 竖线 (x=310)
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    
+    // T80U 平级分叉
+    // t80uk 在正下方 (310, 440)
+    svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
+    // t80um 在右侧 (430, 440)
+    svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    var body = '<div class="wt-tech-custom-scroll">' +
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '🌳 科技樹', body: body });
+    
+    if(bd) {
+      bd.classList.add('wt-tech-modal'); // 添加专属类名隔离样式
+
+      var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
+      if (scrollEl) {
+        var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
+        scrollEl.addEventListener('pointerdown', function(e){
+          // 阻止浏览器默认的文本选中、图片原生拖拽，否则 pointermove 会中断
+          e.preventDefault(); 
+          if (e.button !== 0 && e.pointerType !== 'touch') return;
+          if (e.target.closest && e.target.closest('[data-tech-node]')) return;
+          
+          isDown = true;
+          startX = e.clientX; 
+          startY = e.clientY;
+          scrollLeft = scrollEl.scrollLeft; 
+          scrollTop = scrollEl.scrollTop;
+          scrollEl.style.cursor = 'grabbing';
+          try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
+        });
+        scrollEl.addEventListener('pointermove', function(e){
+          if (!isDown) return;
+          var dx = e.clientX - startX, dy = e.clientY - startY;
+          scrollEl.scrollLeft = scrollLeft - dx;
+          scrollEl.scrollTop = scrollTop - dy;
+        });
+        function endPan(e) {
+          if (!isDown) return;
+          isDown = false;
+          scrollEl.style.cursor = 'grab';
+          try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
+        }
+        scrollEl.addEventListener('pointerup', endPan);
+        scrollEl.addEventListener('pointercancel', endPan);
+      }
+    }
+
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(){
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v116：触控鼠标兼容
+(function(){
+  if(window._v116TechTreePatched) return;
+  window._v116TechTreePatched = true;
+
+  // 清理旧样式
+  for(var i=100; i<=115; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  if(!document.getElementById('wt-tech-v116-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v116-style';
+    st.textContent = `
+      .modal-bd-inner.wt-tech-modal {
+        padding: 0 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      .wt-tech-custom-scroll {
+        flex: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: auto !important;
+        scrollbar-width: none !important; /* 隐藏滚动条 */
+        -ms-overflow-style: none !important;
+        -webkit-overflow-scrolling: touch; /* 触控惯性 */
+      }
+      .wt-tech-custom-scroll:active {
+        cursor: grabbing;
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:260, y:440 },
+      { vid:'t80um',  x:380, y:440 }
+    ];
+
+    var svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    // T80U 平级分叉
+    svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    var body = '<div class="wt-tech-custom-scroll">' +
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '🌳 科技樹', body: body });
+    
+    if(bd) {
+      bd.classList.add('wt-tech-modal');
+      var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
+      if (scrollEl) {
+        var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
+        scrollEl.addEventListener('pointerdown', function(e){
+          // 如果是触控或者点在节点上，直接返回，把控制权交还给浏览器原生滑动和点击
+          if (e.pointerType === 'touch' || e.button !== 0 || (e.target.closest && e.target.closest('[data-tech-node]'))) return;
+          
+          // 只有鼠标在空白处按住，才启动拖拽
+          isDown = true;
+          startX = e.clientX; 
+          startY = e.clientY;
+          scrollLeft = scrollEl.scrollLeft; 
+          scrollTop = scrollEl.scrollTop;
+          scrollEl.style.cursor = 'grabbing';
+          e.preventDefault(); // 阻止原生文本选中和图片拖拽
+          try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
+        });
+        scrollEl.addEventListener('pointermove', function(e){
+          if (!isDown) return;
+          e.preventDefault();
+          var dx = e.clientX - startX, dy = e.clientY - startY;
+          scrollEl.scrollLeft = scrollLeft - dx;
+          scrollEl.scrollTop = scrollTop - dy;
+        });
+        function endPan(e) {
+          if (!isDown) return;
+          isDown = false;
+          scrollEl.style.cursor = '';
+          try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
+        }
+        scrollEl.addEventListener('pointerup', endPan);
+        scrollEl.addEventListener('pointercancel', endPan);
+      }
+    }
+
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(){
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v117：完美拖拽
+(function(){
+  if(window._v117TechTreePatched) return;
+  window._v117TechTreePatched = true;
+
+  // 清理旧样式
+  for(var i=100; i<=116; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  if(!document.getElementById('wt-tech-v117-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v117-style';
+    st.textContent = `
+      .modal-bd-inner.wt-tech-modal {
+        padding: 0 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      .wt-tech-custom-scroll {
+        flex: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: auto !important;
+        scrollbar-width: none !important; /* 隐藏滚动条 */
+        -ms-overflow-style: none !important;
+        -webkit-overflow-scrolling: touch; 
+        user-select: none; 
+        -webkit-user-select: none;
+      }
+      .wt-tech-custom-scroll:active {
+        cursor: grabbing;
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:260, y:440 },
+      { vid:'t80um',  x:380, y:440 }
+    ];
+
+    var svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    // T80U 平级分叉
+    svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      
+      // 给图片添加 draggable="false" 防止浏览器原生图片拖拽
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img draggable="false" src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    var body = '<div class="wt-tech-custom-scroll">' +
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    // 移除 Emoji
+    var bd = openModal({ title: '科技樹', body: body });
+    
+    if(bd) {
+      bd.classList.add('wt-tech-modal');
+      var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
+      if (scrollEl) {
+        // 彻底封杀浏览器原生的拖拽图片和选中文本行为
+        scrollEl.addEventListener('dragstart', function(e) { e.preventDefault(); });
+
+        var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
+        var hasMoved = false;
+
+        scrollEl.addEventListener('pointerdown', function(e){
+          // 触控交给原生，鼠标才走下面的拖拽逻辑
+          if (e.pointerType === 'touch' || e.button !== 0) return;
+          
+          isDown = true;
+          hasMoved = false;
+          startX = e.clientX; 
+          startY = e.clientY;
+          scrollLeft = scrollEl.scrollLeft; 
+          scrollTop = scrollEl.scrollTop;
+          scrollEl.style.cursor = 'grabbing';
+          
+          // 阻止默认行为（如果点在图片上，阻止原生图片拖拽）
+          e.preventDefault();
+          try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
+        });
+        
+        scrollEl.addEventListener('pointermove', function(e){
+          if (!isDown) return;
+          e.preventDefault();
+          var dx = e.clientX - startX, dy = e.clientY - startY;
+          
+          // 拖动超过 3 像素才算真正的拖拽，防止点击时轻微抖动导致误触
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+            hasMoved = true;
+          }
+          
+          if (hasMoved) {
+            scrollEl.scrollLeft = scrollLeft - dx;
+            scrollEl.scrollTop = scrollTop - dy;
+          }
+        });
+        
+        function endPan(e) {
+          if (!isDown) return;
+          isDown = false;
+          scrollEl.style.cursor = '';
+          
+          if (hasMoved) {
+            // 如果发生了拖拽，在 pointerup 时拦截事件，防止触发底层节点的点击
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
+        }
+        scrollEl.addEventListener('pointerup', endPan);
+        scrollEl.addEventListener('pointercancel', endPan);
+      }
+    }
+
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(e){
+          // 如果刚才是在拖拽，就不触发点击
+          // （pointerup 里的 stopPropagation 已经拦截了，这层只是为了双保险）
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v118：屏蔽双击
+(function(){
+  if(window._v118TechTreePatched) return;
+  window._v118TechTreePatched = true;
+
+  // 清理历史样式
+  for(var i=100; i<=117; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  if(!document.getElementById('wt-tech-v118-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v118-style';
+    st.textContent = `
+      .modal-bd-inner.wt-tech-modal {
+        padding: 0 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      .wt-tech-custom-scroll {
+        flex: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: auto !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        -webkit-overflow-scrolling: touch; 
+        user-select: none; 
+        -webkit-user-select: none;
+        touch-action: manipulation; /* 阻止双击放大 */
+      }
+      .wt-tech-custom-scroll:active {
+        cursor: grabbing;
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:260, y:440 },
+      { vid:'t80um',  x:380, y:440 }
+    ];
+
+    var svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    // T80U 平级分叉
+    svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img draggable="false" src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    var body = '<div class="wt-tech-custom-scroll">' +
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '科技樹', body: body });
+    
+    if(bd) {
+      bd.classList.add('wt-tech-modal');
+      var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
+      if (scrollEl) {
+        // 彻底封杀浏览器原生的拖拽图片和选中文本行为
+        scrollEl.addEventListener('dragstart', function(e) { e.preventDefault(); });
+        
+        // 拦截双击，防止意外缩放或选中
+        scrollEl.addEventListener('dblclick', function(e) { e.preventDefault(); });
+
+        var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
+        var hasMoved = false;
+        var lastClickTime = 0;
+
+        scrollEl.addEventListener('pointerdown', function(e){
+          if (e.pointerType === 'touch' || e.button !== 0) return;
+          
+          isDown = true;
+          hasMoved = false;
+          startX = e.clientX; 
+          startY = e.clientY;
+          scrollLeft = scrollEl.scrollLeft; 
+          scrollTop = scrollEl.scrollTop;
+          scrollEl.style.cursor = 'grabbing';
+          
+          e.preventDefault();
+          try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
+        });
+        
+        scrollEl.addEventListener('pointermove', function(e){
+          if (!isDown) return;
+          e.preventDefault();
+          var dx = e.clientX - startX, dy = e.clientY - startY;
+          
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+            hasMoved = true;
+          }
+          
+          if (hasMoved) {
+            scrollEl.scrollLeft = scrollLeft - dx;
+            scrollEl.scrollTop = scrollTop - dy;
+          }
+        });
+        
+        function endPan(e) {
+          if (!isDown) return;
+          isDown = false;
+          scrollEl.style.cursor = '';
+          
+          if (hasMoved) {
+            e.preventDefault();
+            e.stopPropagation();
+            lastClickTime = 0; // 如果拖拽了，清空点击记录
+          } else {
+            lastClickTime = performance.now(); // 记录普通点击时间
+          }
+          try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
+        }
+        scrollEl.addEventListener('pointerup', endPan);
+        scrollEl.addEventListener('pointercancel', endPan);
+      }
+    }
+
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(e){
+          // 如果距离上次点击不到 300ms（双击），则拦截
+          if (performance.now() - (lastClickTime || 0) < 300 && lastClickTime !== 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          lastClickTime = performance.now();
+          
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
