@@ -1165,7 +1165,7 @@ const BTRSupport = {
     const zone = document.getElementById('zone1'); if(!zone) return;
     let c = document.getElementById('btr-support-canvas'); if(!c){ c = document.createElement('canvas'); c.id = 'btr-support-canvas'; zone.appendChild(c); }
     this.canvas = c; const dpr = window.devicePixelRatio || 1; const w = zone.clientWidth, h = zone.clientHeight;
-    c.width = Math.floor((w + 500) * dpr); c.height = Math.floor(h * dpr); c.style.width = w + 'px'; c.style.height = h + 'px';
+    c.width = Math.floor(w * dpr); c.height = Math.floor(h * dpr); c.style.width = w + 'px'; c.style.height = h + 'px';
     this.ctx = c.getContext('2d'); this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.width = w; this.height = h; this.dpr = dpr;
     const ann = ANN[this.vehicleId];
@@ -1500,7 +1500,7 @@ const BTRSupport = {
     }
   },
   _render(now) {
-    const ctx = this.ctx; if (!ctx) return; ctx.clearRect(0, 0, this.width + 500, this.height);
+    const ctx = this.ctx; if (!ctx) return; ctx.clearRect(0, 0, this.width, this.height);
     const ann = ANN[this.vehicleId]; if (!ann) return;
     
     const px = this.x * this.width + this.shakeX; 
@@ -1796,6 +1796,8 @@ window._openBTRSupportDetail = function(log){
   window.MUZZLE_PROFILES = MUZZLE_PROFILES;
 
   // ★ v88：严格还原物理参数
+// ★ v89：动态适配比例
+// ★ v90：100%纯净还原
 window._vsMakeSmokeJet = function(x, y, weaponId){
   const _base = 300;
   const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
