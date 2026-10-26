@@ -1456,26 +1456,21 @@ const BTRSupport = {
       
       const p = Math.min(1, t / rs.duration);
       const _rcP = p < 0.08 ? p / 0.08 : Math.pow(1 - (p - 0.08) / 0.92, 2.4);
-      const _rcPx = rs.dist * this.targetW * _rcP;
+      const _rcPx = 0; // [Patch] 鎖定粒子生成起點為靜態炮口
       
       // 實時炮口位置
       const _muzzleXNow = basePx + m.mx * this.targetW - _rcPx;
       const _muzzleYNow = basePy + m.my * this.targetH;
-      
       const isMain = rs._isMain;
       const JET_INTERVAL = isMain ? 16 : 24;
       const SPREAD_INTERVAL = isMain ? 24 : 32;
       const JET_MAX_TIME = isMain ? 150 : 250;
-      
-      // 導彈飛行位移：每秒前進 8 個車身寬度
       const _jetXNow = _muzzleXNow;
       const _jetYNow = _muzzleYNow;
-      
       while (now - rs._lastJetTime >= JET_INTERVAL && t <= JET_MAX_TIME) {
         this.fx.spawnJetOne(_jetXNow, _jetYNow, m.weaponId);
         rs._lastJetTime += JET_INTERVAL;
       }
-      
       const SPREAD_OFFSET = isMain ? this.targetW * 0.45 : this.targetW * 0.25;
       const _spreadXNow = _muzzleXNow + SPREAD_OFFSET;
       while (now - rs._lastSpreadTime >= SPREAD_INTERVAL && t <= rs.duration) {
@@ -1817,7 +1812,7 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
     return { x: x + 15, y: y, vx: _base * 30, vy: (Math.random() - 0.5) * _base * 0.02,
       life: 1, rate: 1 / 0.25, sizeX: _base * 0.2, sizeY: _base * 0.02,
       growX: _base * 4.0, growY: _base * 0.1, alpha0: 1.0, isJet: true, isCore: true,
-      friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: false };
+      friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
   }
   if (isHeavy) {
     return { x: x + 15, y: y, vx: _base * 25, vy: (Math.random() - 0.5) * _base * 0.1,
