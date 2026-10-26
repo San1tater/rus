@@ -2755,7 +2755,7 @@ function renderExplore(){
 }
 
 /* ===== rev563: 電台次數系統 ===== */
-const RADIO_COOLDOWN_MS = 2 * 60 * 1000;
+const RADIO_COOLDOWN_MS = 1 * 60 * 1000;
 
 function _radioEnsureInit(){
   const max = (typeof getBuildingLv === 'function') ? getBuildingLv('garage') : 0;

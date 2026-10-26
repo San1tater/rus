@@ -863,8 +863,8 @@ const MUZZLE_PROFILES = {
   kpvt:    { burst: 3,  intervalMs: 100,   pauseMs: 300,   flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
   pkt:     { burst: 3,  intervalMs: 80,    pauseMs: 300,   flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
   nsvt:    { burst: 3,  intervalMs: 80,    pauseMs: 300,   flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470, projectileType: 'bullet' },
-  '2a72':  { burst: 15, intervalMs: 200,   pauseMs: 500,   flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
-  '2a42':  { burst: 15, intervalMs: 92,    pauseMs: 500,   flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
+  '2a72':  { burst: 7, intervalMs: 200,   pauseMs: 500,   flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
+  '2a42':  { burst: 7, intervalMs: 92,    pauseMs: 500,   flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
   '2a46':  { burst: 1,  intervalMs: 7500,  pauseMs: 7500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   '2a46m1':{ burst: 1,  intervalMs: 7500,  pauseMs: 7500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   atgm:    { burst: 1,  intervalMs: 20000, pauseMs: 20000, flashSize: 30, flashColor: '255,200,100', bulletSize: 5,   bulletSpeed: 280, projectileType: 'missile' },
@@ -1197,10 +1197,17 @@ const BTRSupport = {
         if(_sumN > 0) _doorCenterRatio = _sumX / _sumN;
       }
       this.doorOffsetRatio = _doorCenterRatio; this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
-      let maxMuzzleX = 0; if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
-      // [Patch-NarrowScreen] 窄屏时强制炮口左移，留出空间给发射烟
-      const targetMuzzleRatio = (w < 600) ? 0.70 : 1.0;
-      const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW; const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
+      let maxMuzzleX = 0; let is30mm = false; 
+      if(ann.muzzles){ 
+        for(const m of ann.muzzles){ 
+          if(m.x > maxMuzzleX) maxMuzzleX = m.x; 
+          if(m.weaponId === '2a42' || m.weaponId === '2a72') is30mm = true; 
+        } 
+      }
+      // [Patch-NarrowScreen] 僅針對30炮在手機端進行左移
+      const targetMuzzleRatio = (w < 600 && is30mm) ? 0.75 : 1.0;
+      const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW; 
+      const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
       this.centerPX = leftPx / w;
       const groundY = h * 0.95; const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
       this.sinkOffset = py0 < 4 ? (4 - py0) : 0;
