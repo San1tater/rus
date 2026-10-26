@@ -1978,3 +1978,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
   line-height: 1.2 !important;
   padding: 1px 0 !important;
 }
+
+
+/* [v74-stat-pair] emoji 與當前值綁成一個不可拆的 flex item */
+.player-stat-panel .stat-pair{display:inline-flex;align-items:center;gap:2px;white-space:nowrap;flex:0 0 auto}
