@@ -908,7 +908,7 @@ const BTRSupport = {
           x: x + 15, y: y,
           vx: _base * 25, vy: (Math.random() - 0.5) * _base * 0.1,
           life: 1, rate: 1 / 0.25,
-          sizeX: _base * 0.5, sizeY: _base * 0.05,
+          sizeX: _base * 0.15, sizeY: _base * 0.05,
           growX: _base * 10.0, growY: _base * 2.0,
           alpha0: 0.95, isJet: true, isCore: true,
           friction: 0.7,
@@ -920,7 +920,7 @@ const BTRSupport = {
           x: x + 10, y: y,
           vx: _base * 18, vy: (Math.random() - 0.5) * _base * 0.05,
           life: 1, rate: 1 / 0.2,
-          sizeX: _base * 0.3, sizeY: _base * 0.03,
+          sizeX: _base * 0.1, sizeY: _base * 0.03,
           growX: _base * 8.0, growY: _base * 1.5,
           alpha0: 0.95, isJet: true, isCore: true,
           friction: 0.7,
@@ -1044,24 +1044,21 @@ const BTRSupport = {
       for (const p of this.smoke) {
         let a = 0;
         if (p.isJet) {
-          a = p.alpha0 * Math.pow(Math.max(0, p.life), 2.0);
-        } else {
-          a = p.alpha0 * Math.pow(Math.max(0, p.life), 4.0); // rev805 加快消散 // rev803 恢復快速淡出 
-        }
-        if (a < 0.005) continue;
-        
-        ctx.save(); 
-        ctx.translate(p.x, p.y); 
-        
-        if (p.isJet) {
-          ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1); 
-          ctx.globalAlpha = a; 
-          const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
-          g.addColorStop(0, 'rgba(255, 255, 255, 1)');
-          g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)'); 
-          g.addColorStop(1, 'rgba(200, 210, 220, 0)');
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2); ctx.fill();
+      ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
+      ctx.globalAlpha = a;
+      
+      // 將繪製原點移到左邊界，讓最左側剛好頂住炮口 (p.x)
+      ctx.translate(1, 0); 
+      
+      // 漸變從 0（左側炮口，純白）到 2（右側擴散端，透明）
+      const g = ctx.createLinearGradient(0, 0, 2, 0);
+      g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      g.addColorStop(0.6, 'rgba(230, 240, 255, 0.5)');
+      g.addColorStop(1, 'rgba(200, 210, 220, 0)');
+      ctx.fillStyle = g;
+      
+      // 畫圓，此時圓的 X 範圍剛好是 0 到 2
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
         } else {
           ctx.rotate(p.angle);
           ctx.globalAlpha = a; 
@@ -1612,11 +1609,26 @@ this.fx.drawTracers(ctx, now);
       // [rev873] 优先使用 trackLoop（闭合环）的底部点生成扬尘
       if (ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2) {
         const pts = ann.trackLoop.points;
-        const bottomPts = pts.filter(function(p){ return p.y > 0.4; });
-        const srcPt = bottomPts.length ? bottomPts[Math.floor(Math.random() * bottomPts.length)] : pts[Math.floor(Math.random() * pts.length)];
-        _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
+        // [dust-no-right-top] 履带环右上角不生成扬尘：
+        //   排除 x ≥ maxX - 0.15 且 y < 0.65 的顶点
+        //   右侧底部导轮（y ≥ 0.65）、左侧、中央照常生成
+        let _tMaxX = 0;
+        for(let _i = 0; _i < pts.length; _i++){ if(pts[_i].x > _tMaxX) _tMaxX = pts[_i].x; }
+        const bottomPts = pts.filter(function(p){
+          if(p.y <= 0.4) return false;
+          if(p.x >= _tMaxX - 0.15 && p.y < 0.72) return false; // [整理] 阈值放宽至 0.72
+          return true;
+        });
+        if(bottomPts.length > 0){
+          const srcPt = bottomPts[Math.floor(Math.random() * bottomPts.length)];
+          _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
+        }
       } else if (ann.wheels && ann.wheels.length > 0) {
-        _dustSrc = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
+        // [整理] 排除最右侧轮子（cx >= 0.95）
+        const _wArr = ann.wheels.filter(function(w){ return w.cx < 0.95; });
+        if(_wArr.length > 0){
+          _dustSrc = _wArr[Math.floor(Math.random() * _wArr.length)];
+        }
       }
       if(_dustSrc) window.spawnDust(this.dustParticles, px, py, _dustSrc, this.targetW, this.targetH, wheelSpd);
     }
@@ -1912,8 +1924,6 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
 
 //
 
-// [patcher-v11-block-start]
-
 // [patcher-v21-patch]
 // [patcher-fix-v21] 恢复 stat panel 原始布局 + 装甲完整语义多行
 (function(){
@@ -1961,13 +1971,7 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
   }
   _resetStatPanelInline();
 
-  // 监听重建（不修改，只是重置 inline 残留）
-  if(typeof MutationObserver !== 'undefined'){
-    if(window._v21ResetObs){ try{ window._v21ResetObs.disconnect(); }catch(_){} }
-    var mo = new MutationObserver(function(){ _resetStatPanelInline(); });
-    mo.observe(document.body, { childList: true, subtree: true });
-    window._v21ResetObs = mo;
-  }
+  // [整理] _v21ResetObs 已删除（无对象可清理，性能税）
 
   var A = window.VEHICLE_ANNOTATIONS = window.VEHICLE_ANNOTATIONS || {};
 
@@ -2005,27 +2009,10 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
   /* ============================================================
    * VEHICLES 重建 + 装甲完整语义多行
    * ============================================================ */
-  var ARMOR_MULTI = {
-    btr80:  ['鋼 7-10mm'],
-    btr80a: ['鋼 7-10mm（車體）', '鋼 23mm（炮塔正面）'],
-    btr82:  ['鋼 7-10mm'],
-    btr82a: ['鋼 10-15mm（車體）', '鋼 23mm（炮塔正面）', '防崩落襯層'],
-    btr90:  ['鋼 前 30mm AP', '鋼 側 14.5mm AP'],
-    bmp1:   ['鋼 5-19mm（車體）', '鋼 23mm（炮塔正面）', '鋼 19mm（炮塔側面）'],
-    bmp1m:  ['鋼 5-19mm（車體）', '鋼 23mm（炮塔正面）', '鋼 19mm（炮塔側面）'],
-    bmp2:   ['鋼 5-19mm（車體）', '鋼 23mm（炮塔正面）', '鋼 19mm（炮塔側面）'],
-    bmp3:   ['鋼 22 + 鋁 60mm（車體正面）', '鋁 43mm（車體側面）', '鋼 16 + 鋁 50mm（炮塔）'],
-    bmd4:   ['鋁 40mm（車體正面）', '鋁 30mm（車體側面）', '鋼 23mm（炮塔）'],
-    t80:    ['複合裝甲', '炮塔 500mm 等效', '車體 450mm 等效'],
-    t80b:   ['複合裝甲 + 30mm 鋼首上', '炮塔 500mm 等效', '車體 480mm 等效'],
-    t80bv:  ['複合裝甲 + Kontakt-1 ERA', '炮塔 500mm 等效', '車體 480mm 等效'],
-    t80u:   ['複合裝甲 + Kontakt-5 ERA', '炮塔 600mm 等效', '車體 500mm 等效'],
-    t80uk:  ['複合裝甲 + Kontakt-5 ERA', '炮塔 600mm 等效', '車體 500mm 等效'],
-    t80um:  ['複合裝甲 + Kontakt-5 ERA', '炮塔 600mm 等效', '車體 500mm 等效']
-  };
+  // [整理] ARMOR_MULTI 已删除（v30 ARMOR_GRID 覆盖）
   if(typeof VEHICLES !== 'undefined'){
     function _ensure(id, def){ if(!VEHICLES[id]){ VEHICLES[id] = def; return true; } return false; }
-    _ensure('bmp1',{id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon: '100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
+    _ensure('bmp1',{id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon: '73mm 2A28 + 7.62mm PKT',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
     _ensure('bmp1m',{id:'bmp1m',name:'BMP-1M',tier:2,line:'bmp',weapon: '30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:32,next:['bmp2'],researchCost:{ammoCal:'5.45',ammoCount:1500,liquor:150,exp:800}});
     _ensure('bmp2',{id:'bmp2',name:'BMP-2',tier:3,line:'bmp',weapon: '30mm 2A42 + 7.62mm PKT + ATGM 發射筒',weaponSpecial:'9M113 Konkurs ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:35,next:['bmp3'],researchCost:{ammoCal:'7.62',ammoCount:2000,liquor:500,exp:3000}});
     _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon: '100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
@@ -2042,9 +2029,6 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
       var cur = VEHICLES[_chain[ci][0]];
       if(cur){ var cn = cur.next = cur.next || []; if(cn.indexOf(_chain[ci][1])<0) cn.push(_chain[ci][1]); }
     }
-    Object.keys(ARMOR_MULTI).forEach(function(id){
-      if(VEHICLES[id]) VEHICLES[id].armor = ARMOR_MULTI[id].join('\n');
-    });
     ['t80','t80b','t80bv','t80u','t80uk','t80um','btr80','btr80a','btr82','btr82a','bmp1m'].forEach(function(id){
       if(VEHICLES[id]) VEHICLES[id].weaponSpecial = '無';
     });
@@ -2168,8 +2152,6 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
     '.garage-stat-row .v-cur-only.armor-val{color:#e8a33d !important;font-weight:bold !important}',
     '.garage-stat-row .v-new.armor-val{color:#e8a33d !important;font-weight:bold !important}',
     '.garage-stat-row .v-new.armor-val.diff{color:#a45ede !important}',
-    '.wt-tech-canvas{width:450px !important;height:440px !important}',
-    '.wt-tech-wrap{cursor:grab;user-select:none;-webkit-user-select:none}',
     '.wt-node{user-select:none;-webkit-user-select:none}'
   ].join('\n');
   document.head.appendChild(st);
@@ -2279,7 +2261,7 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
    * ============================================================ */
   function _esc(v){
     if(v == null) return '';
-    return String(v).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>');
+    return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
   function _armorRows(curGrid, tgtGrid){
     var CG = curGrid || [];
@@ -2347,13 +2329,7 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
    *   _garageShowTechDetail 每次打開詳情都會重新生成 #garage-transfer-row
    *   用 MutationObserver 檢測並重整 DOM 結構
    * ============================================================ */
-  function _styleNum(el, color){
-    if(!el) return;
-    el.style.fontSize = '13px';
-    el.style.fontFamily = 'Menlo,Consolas,monospace';
-    el.style.color = color;
-    el.style.fontWeight = 'bold';
-  }
+  // [整理] _styleNum 已删除（v32 _restore 清 inline style，调用无实际效果）
   function _integrateTransferRow(){
     var row = document.getElementById('garage-transfer-row');
     if(!row || row._integrated) return;
@@ -2382,9 +2358,7 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
     geDiv.style.cssText = 'display:inline-flex;align-items:baseline;gap:4px;font-size:11px;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     qtyRow.style.cssText = 'display:inline-flex;align-items:baseline;gap:4px;font-size:11px;flex:0 1 auto;min-width:0;white-space:nowrap';
 
-    _styleNum(geDiv.querySelector('span:last-child'), '#a45ede');
-    _styleNum(qtyRow.querySelector('span:last-child'), '#e8a33d');
-
+        
     sliderWrap.removeChild(qtyRow);
     line1.appendChild(geDiv);
     line1.appendChild(qtyRow);
