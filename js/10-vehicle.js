@@ -1892,8 +1892,8 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
         ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
         ctx.globalAlpha = a;
         const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
-        g.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)');
+        g.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+        g.addColorStop(0.4, 'rgba(230, 240, 255, 0.3)');
         g.addColorStop(1, 'rgba(200, 210, 220, 0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2); ctx.fill();
