@@ -1197,9 +1197,9 @@ const BTRSupport = {
       }
       this.doorOffsetRatio = _doorCenterRatio; this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
       let maxMuzzleX = 0; if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
-      // [Patch] 使用图片最右侧像素与炮口位置中更靠右的值
-      const effectiveRightX = Math.max(maxMuzzleX, _contentMaxX);
-      const maxAllowedLeft = w - 12 - effectiveRightX * this.targetW; 
+      // [Debug] 接入實時滑動條比例
+      const targetMuzzleRatio = window._debugMuzzleRatio || 0.65; 
+      const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW; 
       const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
       this.centerPX = leftPx / w;
       const groundY = h * 0.95; const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
@@ -1312,7 +1312,14 @@ const BTRSupport = {
       this.fx.spawnMG(muzzleX, muzzleY);
     }
 
-    if (!isATGM) this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon');
+    // [Debug] 降低曳光彈概率
+    if (!isATGM) {
+      let showTracer = false;
+      if (isMain) showTracer = Math.random() < 0.5;
+      else if (isMG) showTracer = Math.random() < 0.1;
+      else showTracer = Math.random() < 0.15;
+      if (showTracer) this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon');
+    }
 
     // 火光随机化：主炮100%，机炮首发100%后续15%，机枪10%
     let triggerFlash = false;
@@ -1619,9 +1626,12 @@ this.fx.drawTracers(ctx, now);
         //   右侧底部导轮（y ≥ 0.65）、左侧、中央照常生成
         let _tMaxX = 0;
         for(let _i = 0; _i < pts.length; _i++){ if(pts[_i].x > _tMaxX) _tMaxX = pts[_i].x; }
+        // [Debug] 排除上緣（y < maxY * 0.5）與右側（x > maxX * 0.8）
+        let _tMaxY = 0;
+        for(let _i = 0; _i < pts.length; _i++){ if(pts[_i].y > _tMaxY) _tMaxY = pts[_i].y; }
         const bottomPts = pts.filter(function(p){
-          if(p.y <= 0.4) return false;
-          if(p.x >= _tMaxX - 0.15 && p.y < 0.72) return false; // [整理] 阈值放宽至 0.72
+          if (p.y < _tMaxY * 0.5) return false;
+          if (p.x > _tMaxX * 0.8) return false;
           return true;
         });
         if(bottomPts.length > 0){
