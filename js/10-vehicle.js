@@ -1044,21 +1044,24 @@ const BTRSupport = {
       for (const p of this.smoke) {
         let a = 0;
         if (p.isJet) {
-      ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
-      ctx.globalAlpha = a;
-      
-      // 將繪製原點移到左邊界，讓最左側剛好頂住炮口 (p.x)
-      ctx.translate(1, 0); 
-      
-      // 漸變從 0（左側炮口，純白）到 2（右側擴散端，透明）
-      const g = ctx.createLinearGradient(0, 0, 2, 0);
-      g.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      g.addColorStop(0.6, 'rgba(230, 240, 255, 0.5)');
-      g.addColorStop(1, 'rgba(200, 210, 220, 0)');
-      ctx.fillStyle = g;
-      
-      // 畫圓，此時圓的 X 範圍剛好是 0 到 2
-      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+          a = p.alpha0 * Math.pow(Math.max(0, p.life), 2.0);
+        } else {
+          a = p.alpha0 * Math.pow(Math.max(0, p.life), 4.0); // rev805 加快消散 // rev803 恢復快速淡出 
+        }
+        if (a < 0.005) continue;
+        
+        ctx.save(); 
+        ctx.translate(p.x, p.y); 
+        
+        if (p.isJet) {
+          ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1); 
+          ctx.globalAlpha = a; 
+          const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
+          g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+          g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)'); 
+          g.addColorStop(1, 'rgba(200, 210, 220, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2); ctx.fill();
         } else {
           ctx.rotate(p.angle);
           ctx.globalAlpha = a; 
@@ -1177,8 +1180,8 @@ const BTRSupport = {
     this.width = w; this.height = h; this.dpr = dpr;
     const ann = ANN[this.vehicleId];
     if(ann){
-      let _contentMinY = 0, _contentMaxY = 1, _contentH = 1.0;
-      try { const _m = _loadVehicleImg(this.vehicleId); if(_m && _m.complete && _m.naturalWidth && typeof _measureImgContentBounds === 'function'){ const _b = _measureImgContentBounds(_m); if(_b){ _contentMinY = _b.minY; _contentMaxY = _b.maxY; _contentH = _b.maxY - _b.minY; } } } catch(_e){}
+      let _contentMinY = 0, _contentMaxY = 1, _contentH = 1.0, _contentMaxX = 1.0;
+      try { const _m = _loadVehicleImg(this.vehicleId); if(_m && _m.complete && _m.naturalWidth && typeof _measureImgContentBounds === 'function'){ const _b = _measureImgContentBounds(_m); if(_b){ _contentMinY = _b.minY; _contentMaxY = _b.maxY; _contentH = _b.maxY - _b.minY; _contentMaxX = _b.maxX; } } } catch(_e){}
       if(!isFinite(_contentH) || _contentH < 0.1){ _contentH = 1.0; _contentMinY = 0; _contentMaxY = 1; }
       this._contentMinYRatio = _contentMinY; this._contentBottomRatio = _contentMaxY; this._contentH = _contentH;
       const _realH = (window.VEHICLE_REAL_HEIGHTS && window.VEHICLE_REAL_HEIGHTS[this.vehicleId]) || 2.5;
@@ -1194,7 +1197,9 @@ const BTRSupport = {
       }
       this.doorOffsetRatio = _doorCenterRatio; this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
       let maxMuzzleX = 0; if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
-      const maxAllowedLeft = w - 12 - maxMuzzleX * this.targetW; 
+      // [Patch] 使用图片最右侧像素与炮口位置中更靠右的值
+      const effectiveRightX = Math.max(maxMuzzleX, _contentMaxX);
+      const maxAllowedLeft = w - 12 - effectiveRightX * this.targetW; 
       const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
       this.centerPX = leftPx / w;
       const groundY = h * 0.95; const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
