@@ -1,3 +1,4 @@
+/* [v71-hpslash] 等級框初始 HTML 帶 "/" */
 /* ============================================================
    ★ BOSS MODULE — 繪製區
    ============================================================ */
@@ -2947,8 +2948,8 @@ function renderEquipZone(z2){
   const _statFont = Math.max(9, fontSize);
   html += '<div class="player-stat-panel" style="left:' + colX[0] + 'px;top:' + rowY[0] + 'px;width:' + cellSize + 'px;height:' + statH + 'px;font-size:' + _statFont + 'px;text-align:right">'
     + '<div class="row lv-row"><b class="lv-v">Lv.' + state.player.level + '</b></div>'
-    + '<div class="row"><span>❤️</span><b class="hp-v">' + _fmt(state.player.hp) + '</b><b class="hp-m" style="color:#7a6f60">' + _fmt(state.player.maxHp) + '</b></div>'
-    + '<div class="row"><span>🛡️</span><b class="ap-v">' + _fmt(state.player.armor) + '</b><b class="ap-m" style="color:#7a6f60">' + _fmt(state.player.maxArmor) + '</b></div>'
+    + '<div class="row"><span class="stat-pair"><span>❤️</span><b class="hp-v">' + _fmt(state.player.hp) + '</b></span><b class="hp-m" style="color:#7a6f60">/ ' + _fmt(state.player.maxHp) + '</b></div>'
+    + '<div class="row"><span class="stat-pair"><span>🛡️</span><b class="ap-v">' + _fmt(state.player.armor) + '</b></span><b class="ap-m" style="color:#7a6f60">/ ' + _fmt(state.player.maxArmor) + '</b></div>'
     + '</div>';
 
   const wt = getTotalWeight();

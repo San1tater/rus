@@ -540,6 +540,8 @@ function _makeDoorClip(img, pts, cw, ch){
     ctx.restore();
   }
 
+
+
   function _renderDoor(ctx, img, ann, door, cw, ch, openAngle, backColor){
   if(!door || !door.polygon || door.polygon.length < 3) return;
   const pts = door.polygon;
@@ -601,7 +603,45 @@ function _makeDoorClip(img, pts, cw, ch){
 
     var _drawSrc = (opts && opts.baseImage) || img;
 
-    const hasTrackLoop = ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 3;
+    
+  // ★ v85：融合门绘制（显示门内测，纯色多边形，在原图之前绘制）
+  if (ann.doors && ann.doors.fusion && ann.doors.fusion.length > 0) {
+    const doorOpen = opts.doorOpen || 0;
+    for (const d of ann.doors.fusion) {
+      if (!d.polygon || d.polygon.length < 3) continue;
+      const ang = 90 - doorOpen * 0.5; 
+      const cosA = Math.cos(ang * Math.PI / 180);
+      if (Math.abs(cosA) < 0.05) continue; // 压成直线时跳过
+
+      const pts = d.polygon;
+      const x1 = d.hingeP1.x * cw, y1 = d.hingeP1.y * ch;
+      const x2 = d.hingeP2.x * cw, y2 = d.hingeP2.y * ch;
+      if (Math.hypot(x2 - x1, y2 - y1) < 0.01) continue;
+
+      const alpha = Math.atan2(y2 - y1, x2 - x1);
+      
+      ctx.save();
+      ctx.translate(x1, y1);
+      ctx.rotate(alpha);
+      ctx.scale(1, cosA);
+      ctx.rotate(-alpha);
+      ctx.translate(-x1, -y1);
+
+      ctx.fillStyle = d.fillColor || "#000000";
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x * cw, pts[0].y * ch);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * cw, pts[i].y * ch);
+      ctx.closePath();
+      ctx.fill();
+      
+      ctx.strokeStyle = "rgba(180,180,180,0.55)";
+      ctx.lineWidth = Math.max(1, cw * 0.0016);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  const hasTrackLoop = ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 3;
     const hasTrackLine = ann.trackLine && ann.trackLine.points && ann.trackLine.points.length >= 2;
     const hasTrackScroll = ann.trackScroll && ann.trackScroll.enabled;
 
@@ -1125,7 +1165,7 @@ const BTRSupport = {
     const zone = document.getElementById('zone1'); if(!zone) return;
     let c = document.getElementById('btr-support-canvas'); if(!c){ c = document.createElement('canvas'); c.id = 'btr-support-canvas'; zone.appendChild(c); }
     this.canvas = c; const dpr = window.devicePixelRatio || 1; const w = zone.clientWidth, h = zone.clientHeight;
-    c.width = Math.floor(w * dpr); c.height = Math.floor(h * dpr); c.style.width = w + 'px'; c.style.height = h + 'px';
+    c.width = Math.floor((w + 500) * dpr); c.height = Math.floor(h * dpr); c.style.width = w + 'px'; c.style.height = h + 'px';
     this.ctx = c.getContext('2d'); this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.width = w; this.height = h; this.dpr = dpr;
     const ann = ANN[this.vehicleId];
@@ -1460,7 +1500,7 @@ const BTRSupport = {
     }
   },
   _render(now) {
-    const ctx = this.ctx; if (!ctx) return; ctx.clearRect(0, 0, this.width, this.height);
+    const ctx = this.ctx; if (!ctx) return; ctx.clearRect(0, 0, this.width + 500, this.height);
     const ann = ANN[this.vehicleId]; if (!ann) return;
     
     const px = this.x * this.width + this.shakeX; 
@@ -1755,64 +1795,65 @@ window._openBTRSupportDetail = function(log){
      ============================================================ */
   window.MUZZLE_PROFILES = MUZZLE_PROFILES;
 
-  window._vsMakeSmokeJet = function(x, y, weaponId){
-    const _base = 300;
-    const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
-    const isATGM = (weaponId === 'atgm');
-    if (isATGM) {
-      return { x: x + 15, y: y, vx: _base * 30, vy: (Math.random() - 0.5) * _base * 0.02,
-        life: 1, rate: 1 / 0.25, sizeX: _base * 0.2, sizeY: _base * 0.02,
-        growX: _base * 4.0, growY: _base * 0.1, alpha0: 1.0, isJet: true, isCore: true,
-        friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
-    }
-    if (isHeavy) {
-      return { x: x + 15, y: y, vx: _base * 25, vy: (Math.random() - 0.5) * _base * 0.1,
-        life: 1, rate: 1 / 0.25, sizeX: _base * 0.15, sizeY: _base * 0.05,
-        growX: _base * 10.0, growY: _base * 2.0, alpha0: 1.0, isJet: true, isCore: true,
-        friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
-    }
-    return { x: x + 10, y: y, vx: _base * 18, vy: (Math.random() - 0.5) * _base * 0.05,
-      life: 1, rate: 1 / 0.2, sizeX: _base * 0.1, sizeY: _base * 0.03,
-      growX: _base * 8.0, growY: _base * 1.5, alpha0: 1.0, isJet: true, isCore: true,
+  // ★ v88：严格还原物理参数
+window._vsMakeSmokeJet = function(x, y, weaponId){
+  const _base = 300;
+  const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
+  const isATGM = (weaponId === 'atgm');
+  if (isATGM) {
+    return { x: x + 15, y: y, vx: _base * 30, vy: (Math.random() - 0.5) * _base * 0.02,
+      life: 1, rate: 1 / 0.25, sizeX: _base * 0.2, sizeY: _base * 0.02,
+      growX: _base * 4.0, growY: _base * 0.1, alpha0: 1.0, isJet: true, isCore: true,
       friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
-  };
+  }
+  if (isHeavy) {
+    return { x: x + 15, y: y, vx: _base * 25, vy: (Math.random() - 0.5) * _base * 0.1,
+      life: 1, rate: 1 / 0.25, sizeX: _base * 0.15, sizeY: _base * 0.05,
+      growX: _base * 10.0, growY: _base * 2.0, alpha0: 1.0, isJet: true, isCore: true,
+      friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
+  }
+  return { x: x + 10, y: y, vx: _base * 18, vy: (Math.random() - 0.5) * _base * 0.05,
+    life: 1, rate: 1 / 0.2, sizeX: _base * 0.1, sizeY: _base * 0.03,
+    growX: _base * 8.0, growY: _base * 1.5, alpha0: 1.0, isJet: true, isCore: true,
+    friction: 0.7, angle: 0, spin: 0, worldFactor: 0.1, skipUpdate: true };
+};
 
   window._vsMakeSmokeSpread = function(x, y, weaponId){
-    const _base = 300;
-    const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
-    if (isHeavy) {
-      return { x: x + (Math.random() - 0.5) * _base * 0.2, y: y + (Math.random() - 0.5) * _base * 0.2,
-        vx: (Math.random() - 0.5) * _base * 0.5, vy: (Math.random() - 0.5) * _base * 0.5,
-        life: 1, rate: 1 / (2.0 + Math.random() * 0.8), sizeX: _base * 0.3, sizeY: _base * 0.3,
-        growX: _base * 3.5, growY: _base * 3.5, alpha0: 0.22, isJet: false, isCore: false,
-        friction: 0.92, angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
-        worldFactor: 1.5, skipUpdate: true };
-    }
-    return { x: x + (Math.random() - 0.5) * _base * 0.2, y: y + (Math.random() - 0.5) * _base * 0.15,
-      vx: (Math.random() - 0.5) * _base * 0.4, vy: (Math.random() - 0.5) * _base * 0.4,
-      life: 1, rate: 1 / (1.5 + Math.random() * 0.6), sizeX: _base * 0.2, sizeY: _base * 0.2,
-      growX: _base * 2.5, growY: _base * 2.5, alpha0: 0.18, isJet: false, isCore: false,
-      friction: 0.94, angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
+  const _base = 300;
+  const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
+  if (isHeavy) {
+    return { x: x + (Math.random() - 0.5) * _base * 0.2, y: y + (Math.random() - 0.5) * _base * 0.2,
+      vx: (Math.random() - 0.5) * _base * 0.5, vy: (Math.random() - 0.5) * _base * 0.5,
+      life: 1, rate: 1 / (2.0 + Math.random() * 0.8), sizeX: _base * 0.3, sizeY: _base * 0.3,
+      growX: _base * 3.5, growY: _base * 3.5, alpha0: 0.22, isJet: false, isCore: false,
+      friction: 0.92, angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
       worldFactor: 1.5, skipUpdate: true };
-  };
+  }
+  return { x: x + (Math.random() - 0.5) * _base * 0.2, y: y + (Math.random() - 0.5) * _base * 0.15,
+    vx: (Math.random() - 0.5) * _base * 0.4, vy: (Math.random() - 0.5) * _base * 0.4,
+    life: 1, rate: 1 / (1.5 + Math.random() * 0.6), sizeX: _base * 0.2, sizeY: _base * 0.2,
+    growX: _base * 2.5, growY: _base * 2.5, alpha0: 0.18, isJet: false, isCore: false,
+    friction: 0.94, angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
+    worldFactor: 1.5, skipUpdate: true };
+};
 
   window._vsUpdateSmoke = function(particles, dt, worldSpeed){
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      if (p.skipUpdate) { p.skipUpdate = false; continue; }
-      const driftSpeed = worldSpeed * (p.worldFactor || 0);
-      p.x += (p.vx - driftSpeed) * dt;
-      p.y += p.vy * dt;
-      const _fric = Math.pow(p.friction, dt * 60);
-      p.vx *= _fric;
-      p.vy *= _fric;
-      p.sizeX += p.growX * dt;
-      p.sizeY += p.growY * dt;
-      p.life -= p.rate * dt;
-      p.angle += p.spin * dt;
-      if (p.life <= 0) particles.splice(i, 1);
-    }
-  };
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    if (p.skipUpdate) { p.skipUpdate = false; continue; }
+    const driftSpeed = worldSpeed * (p.worldFactor || 0);
+    p.x += (p.vx - driftSpeed) * dt;
+    p.y += p.vy * dt;
+    const _fric = Math.pow(p.friction, dt * 60);
+    p.vx *= _fric;
+    p.vy *= _fric;
+    p.sizeX += p.growX * dt;
+    p.sizeY += p.growY * dt;
+    p.life -= p.rate * dt;
+    p.angle += p.spin * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+};
 
   window._vsDrawSmoke = function(ctx, particles){
     for (const p of particles) {
@@ -3784,769 +3825,6 @@ window._openBTRSupportDetail = function(log){
 };
 
 
-// [patcher-v11-patch]
-// [patcher-fix-v11] BMP 接人 + 科技樹 + 裝甲 + 鼠標拖動
-(function(){
-  "use strict";
-  if(window._patcherFixV11Installed) return;
-  window._patcherFixV11Installed = true;
-
-  var A = window.VEHICLE_ANNOTATIONS = window.VEHICLE_ANNOTATIONS || {};
-
-  /* ============================================================
-   * Part 1: BMP 接人 —— fusion door 中心點對準玩家
-   * ============================================================ */
-
-
-  /* ============================================================
-   * Part 2: 裝甲 + weaponSpecial
-   *   裝甲統一為「材料 + 等效均質鋼數值」
-   *   T-80 系列不裝備炮射導彈（weaponSpecial = 無）
-   * ============================================================ */
-  if(typeof VEHICLES !== 'undefined'){
-    function _applyArmor(id, armor, weaponSpecial){
-      if(!VEHICLES[id]) return;
-      VEHICLES[id].armor = armor;
-      VEHICLES[id].weaponSpecial = weaponSpecial;
-    }
-    // BTR 線
-    _applyArmor('btr80',  '裝甲鋼 7-10mm', '無');
-    _applyArmor('btr80a', '裝甲鋼 7-10mm（車體）\n鋼 23mm（炮塔正面）', '無');
-    _applyArmor('btr82',  '裝甲鋼 7-10mm', '無');
-    _applyArmor('btr82a', '裝甲鋼 10-15mm（車體）\n鋼 23mm（炮塔正面）\n防崩落襯層', '無');
-    _applyArmor('btr90',  '裝甲鋼 正面 30mm AP 防護\n裝甲鋼 側面 14.5mm AP 防護', 'ATGM 發射筒');
-    // T-80 線（不裝備炮射導彈）
-    _applyArmor('t80',   '複合裝甲\n炮塔 500mm 等效均質鋼\n車體 450mm 等效均質鋼', '無');
-    _applyArmor('t80b',  '複合裝甲 + 30mm 鋼首上\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
-    _applyArmor('t80bv', '複合裝甲 + Kontakt-1 ERA\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
-    _applyArmor('t80u',  '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-    _applyArmor('t80uk', '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-    _applyArmor('t80um', '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-  }
-
-  /* ============================================================
-   * Part 3: _garageDetailHtml（裝甲多行 + 轉義）
-   * ============================================================ */
-
-
-  /* ============================================================
-   * Part 4: 科技樹 —— t80uk/t80um 同層級 + PC 鼠標拖動
-   * ============================================================ */
-  function _bindTechTreePan(container){
-    if(!container || container._panBound) return;
-    container._panBound = true;
-    var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
-    container.addEventListener('pointerdown', function(e){
-      if(e.pointerType === 'touch') return;
-      if(e.button !== 0) return;
-      if(e.target.closest && e.target.closest('.wt-node')) return;
-      isDown = true;
-      startX = e.clientX; startY = e.clientY;
-      scrollLeft = container.scrollLeft; scrollTop = container.scrollTop;
-      container.style.cursor = 'grabbing';
-      try{ container.setPointerCapture(e.pointerId); }catch(_){}
-    });
-    container.addEventListener('pointermove', function(e){
-      if(!isDown) return;
-      var dx = e.clientX - startX, dy = e.clientY - startY;
-      container.scrollLeft = scrollLeft - dx;
-      container.scrollTop = scrollTop - dy;
-    });
-    function endPan(e){
-      if(!isDown) return;
-      isDown = false;
-      container.style.cursor = 'grab';
-      try{ container.releasePointerCapture(e.pointerId); }catch(_){}
-    }
-    container.addEventListener('pointerup', endPan);
-    container.addEventListener('pointercancel', function(e){ isDown = false; container.style.cursor = 'grab'; try{ container.releasePointerCapture(e.pointerId); }catch(_){} });
-    container.style.cursor = 'grab';
-  }
-
-
-
-  /* ============================================================
-   * Part 5: CSS
-   * ============================================================ */
-  if(!document.getElementById('patcher-v11-style')){
-    var st = document.createElement('style');
-    st.id = 'patcher-v11-style';
-    st.textContent = 
-      '.garage-stat-row.armor-row { align-items: flex-start; }' +
-      '.garage-stat-row.armor-row .k { align-self: flex-start; padding-top: 1px; }' +
-      '.garage-stat-row .armor-val { white-space: normal; text-overflow: clip; overflow: visible; line-height: 1.35; word-break: break-word; text-align: right; }' +
-      '.wt-tech-canvas { width: 450px !important; height: 440px !important; }' +
-      '.wt-tech-wrap { cursor: grab; user-select: none; -webkit-user-select: none; }' +
-      '.wt-tech-wrap.panning { cursor: grabbing; }' +
-      '.wt-node { user-select: none; -webkit-user-select: none; }';
-    document.head.appendChild(st);
-  }
-
-  })();
-
-
-// [patcher-v12-patch]
-// [patcher-fix-v12] 保留 v11 全部功能，仅追加，不截断历史
-(function(){
-  "use strict";
-  if(window._patcherFixV12Installed) return;
-  window._patcherFixV12Installed = true;
-
-  var A = window.VEHICLE_ANNOTATIONS = window.VEHICLE_ANNOTATIONS || {};
-
-  /* Part 1: BMP door（幂等，v11 已执行则跳过） */
-
-
-  /* Part 2: 装甲 + weaponSpecial */
-  if(typeof VEHICLES !== 'undefined'){
-    function _applyArmor(id, armor, weaponSpecial){
-      if(!VEHICLES[id]) return;
-      VEHICLES[id].armor = armor;
-      VEHICLES[id].weaponSpecial = weaponSpecial;
-    }
-    _applyArmor('btr80',  '裝甲鋼 7-10mm', '無');
-    _applyArmor('btr80a', '裝甲鋼 7-10mm（車體）\n鋼 23mm（炮塔正面）', '無');
-    _applyArmor('btr82',  '裝甲鋼 7-10mm', '無');
-    _applyArmor('btr82a', '裝甲鋼 10-15mm（車體）\n鋼 23mm（炮塔正面）\n防崩落襯層', '無');
-    _applyArmor('btr90',  '裝甲鋼 正面 30mm AP 防護\n裝甲鋼 側面 14.5mm AP 防護', 'ATGM 發射筒');
-    _applyArmor('bmp1',  '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '9M14 Malyutka ATGM');
-    _applyArmor('bmp1m', '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '無');
-    _applyArmor('bmp2',  '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '9M113 Konkurs ATGM');
-    _applyArmor('bmp3',  '鋼 22 + 鋁 60mm（車體正面）\n鋁 43mm（車體側面/後部）\n鋼 16 + 空 70 + 鋁 50mm（炮塔正面）', '無');
-    _applyArmor('bmd4',  '鋁 40mm（車體正面）\n鋁 30mm（車體側面）\n鋼 23mm（炮塔）', '無');
-    _applyArmor('t80',   '複合裝甲\n炮塔 500mm 等效均質鋼\n車體 450mm 等效均質鋼', '無');
-    _applyArmor('t80b',  '複合裝甲 + 30mm 鋼首上\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
-    _applyArmor('t80bv', '複合裝甲 + Kontakt-1 ERA\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
-    _applyArmor('t80u',  '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-    _applyArmor('t80uk', '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-    _applyArmor('t80um', '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-  }
-
-  /* Part 3: _garageDetailHtml */
-
-
-  /* Part 4: 科技樹 + PC 拖動 */
-  function _bindTechTreePan(container){
-    if(!container || container._panBound) return;
-    container._panBound = true;
-    var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
-    container.addEventListener('pointerdown', function(e){
-      if(e.pointerType === 'touch') return;
-      if(e.button !== 0) return;
-      if(e.target.closest && e.target.closest('.wt-node')) return;
-      isDown = true;
-      startX = e.clientX; startY = e.clientY;
-      scrollLeft = container.scrollLeft; scrollTop = container.scrollTop;
-      container.style.cursor = 'grabbing';
-      try{ container.setPointerCapture(e.pointerId); }catch(_){}
-    });
-    container.addEventListener('pointermove', function(e){
-      if(!isDown) return;
-      container.scrollLeft = scrollLeft - (e.clientX - startX);
-      container.scrollTop = scrollTop - (e.clientY - startY);
-    });
-    function endPan(e){
-      if(!isDown) return;
-      isDown = false;
-      container.style.cursor = 'grab';
-      try{ container.releasePointerCapture(e.pointerId); }catch(_){}
-    }
-    container.addEventListener('pointerup', endPan);
-    container.addEventListener('pointercancel', endPan);
-    container.style.cursor = 'grab';
-  }
-
-
-
-  /* Part 5: CSS */
-  if(!document.getElementById('patcher-v12-style')){
-    var st = document.createElement('style');
-    st.id = 'patcher-v12-style';
-    st.textContent = 
-      '.garage-stat-row.armor-row { align-items: flex-start; }' +
-      '.garage-stat-row.armor-row .k { align-self: flex-start; padding-top: 1px; }' +
-      '.garage-stat-row .armor-val { white-space: normal; text-overflow: clip; overflow: visible; line-height: 1.35; word-break: break-word; text-align: right; }' +
-      '.wt-tech-canvas { width: 450px !important; height: 440px !important; }' +
-      '.wt-tech-wrap { cursor: grab; user-select: none; -webkit-user-select: none; }' +
-      '.wt-node { user-select: none; -webkit-user-select: none; }';
-    document.head.appendChild(st);
-  }
-
-  /* 診斷輸出 */
-  var bmpIds = ['bmp1','bmp1m','bmp2','bmp3','bmd4'];
-  var bmpStatus = bmpIds.map(function(id){ return id + ':' + (A[id] ? '✅' : '❌'); }).join(' ');
-  if(bmpIds.some(function(id){ return !A[id]; })){
-    console.error('[patcher-v12] ❌ 部分 BMP annotation 缺失！遊戲將 fallback btr80');
-    console.error('   這意味著 Inlined bmp annotation 段丟失，請檢查 10-vehicle.js 是否還有 // ===== Inlined: bmp1_annotation.js =====');
-  }
-})();
-
-
-// [patcher-v13-patch]
-// [patcher-fix-v13] 硬編碼 BMP annotation + 重建 VEHICLES + 科技樹
-(function(){
-  "use strict";
-  if(window._patcherFixV13Installed) return;
-  window._patcherFixV13Installed = true;
-
-  var A = window.VEHICLE_ANNOTATIONS = window.VEHICLE_ANNOTATIONS || {};
-
-  /* ============================================================
-   * Part 0: 硬編碼 BMP annotation（5 個完整 JSON）
-   * ============================================================ */
-  var BMP_ANN_DATA = {
-    bmp1: {
-      id:'bmp1', imageSize:{w:545,h:187},
-      doors:{fusion:[{polygon:[
-        {x:0.0106,y:0.3654},{x:0.0202,y:0.4017},{x:0.0197,y:0.5499},{x:0.0091,y:0.5778},
-        {x:-0.0213,y:0.5763},{x:-0.0314,y:0.5624},{x:-0.0329,y:0.389},{x:-0.0296,y:0.3644}
-      ]}]},
-      wheels:[
-        {cx:0.0925,cy:0.6852,r:0.0411,rotSpeed:1},
-        {cx:0.1933,cy:0.8409,r:0.0456,rotSpeed:1},
-        {cx:0.3012,cy:0.8443,r:0.0456,rotSpeed:1},
-        {cx:0.4115,cy:0.8448,r:0.0456,rotSpeed:1},
-        {cx:0.5107,cy:0.8417,r:0.0456,rotSpeed:1},
-        {cx:0.6082,cy:0.8463,r:0.0456,rotSpeed:1},
-        {cx:0.7056,cy:0.8487,r:0.0456,rotSpeed:1},
-        {cx:0.8169,cy:0.6486,r:0.0456,rotSpeed:1},
-        {cx:0.2422,cy:0.5922,r:0.0136,rotSpeed:1},
-        {cx:0.4611,cy:0.5941,r:0.0116,rotSpeed:1},
-        {cx:0.6564,cy:0.5876,r:0.0108,rotSpeed:1}
-      ],
-      muzzles:[
-        {x:0.7598,y:0.1971,weaponId:'2a28',layerOrder:'above'},
-        {x:0.5196,y:0.1989,weaponId:'pkt',layerOrder:'above'},
-        {x:0.5501,y:0.0706,weaponId:'atgm',layerOrder:'above'}
-      ],
-      weaponAreas:[{id:'o8tz1ypo',polygon:[
-        {x:0.5915,y:0.1587},{x:0.592,y:0.2436},{x:0.5992,y:0.2317},{x:0.6134,y:0.2193},
-        {x:0.7608,y:0.2219},{x:0.7596,y:0.1702},{x:0.6181,y:0.1809}
-      ],weaponId:'2a28',recoilDist:0.055}],
-      missiles:[{polygon:[
-        {x:0.551,y:0.051},{x:0.5514,y:0.0898},{x:0.5616,y:0.0895},{x:0.5552,y:0.1258},
-        {x:0.5755,y:0.1244},{x:0.5852,y:0.0856},{x:0.6397,y:0.0866},{x:0.6627,y:0.0627},
-        {x:0.6621,y:0.0549},{x:0.6374,y:0.036},{x:0.5815,y:0.0421},{x:0.5734,y:0.0121},
-        {x:0.5513,y:0.0169},{x:0.551,y:0.0286},{x:0.5556,y:0.0476}
-      ],weaponId:'atgm'}]
-    },
-    bmp1m: {
-      id:'bmp1m', imageSize:{w:545,h:204},
-      doors:{fusion:[{polygon:[
-        {x:0.0076,y:0.42},{x:0.0227,y:0.4817},{x:0.0227,y:0.6053},{x:0.0144,y:0.6329},
-        {x:-0.023,y:0.6322},{x:-0.0332,y:0.6148},{x:-0.0339,y:0.4541},{x:-0.0291,y:0.4219}
-      ]}]},
-      wheels:[
-        {cx:0.0932,cy:0.7104,r:0.0411,rotSpeed:1},
-        {cx:0.1941,cy:0.8617,r:0.0468,rotSpeed:1},
-        {cx:0.3015,cy:0.8587,r:0.0468,rotSpeed:1},
-        {cx:0.4103,cy:0.8546,r:0.0468,rotSpeed:1},
-        {cx:0.5084,cy:0.8571,r:0.0468,rotSpeed:1},
-        {cx:0.607,cy:0.8635,r:0.0468,rotSpeed:1},
-        {cx:0.7042,cy:0.8607,r:0.0468,rotSpeed:1},
-        {cx:0.8198,cy:0.6641,r:0.0412,rotSpeed:1}
-      ],
-      muzzles:[
-        {x:0.4134,y:0.141,weaponId:'pkt',layerOrder:'above'},
-        {x:0.6953,y:0.1156,weaponId:'2a42',layerOrder:'above'}
-      ],
-      weaponAreas:[{id:'onpjf5i7',polygon:[
-        {x:0.4033,y:0.0894},{x:0.4025,y:0.1345},{x:0.6976,y:0.1439},{x:0.7049,y:0.1373},
-        {x:0.7049,y:0.1055},{x:0.6955,y:0.09},{x:0.4358,y:0.0905}
-      ],weaponId:'2a42',recoilDist:0.015}],
-      missiles:[]
-    },
-    bmp2: {
-      id:'bmp2', imageSize:{w:545,h:215},
-      doors:{fusion:[{polygon:[
-        {x:0.0168,y:0.5241},{x:0.0191,y:0.6018},{x:0.0067,y:0.6455},{x:-0.0443,y:0.6466},
-        {x:-0.0505,y:0.6178},{x:-0.0501,y:0.4665},{x:-0.0398,y:0.4459},{x:0.0016,y:0.4434}
-      ]}]},
-      wheels:[
-        {cx:0.0954,cy:0.7234,r:0.0482,rotSpeed:1},
-        {cx:0.1947,cy:0.867,r:0.0482,rotSpeed:1},
-        {cx:0.306,cy:0.8648,r:0.0482,rotSpeed:1},
-        {cx:0.4142,cy:0.8666,r:0.0482,rotSpeed:1},
-        {cx:0.511,cy:0.8634,r:0.0482,rotSpeed:1},
-        {cx:0.6095,cy:0.8678,r:0.0482,rotSpeed:1},
-        {cx:0.7095,cy:0.8641,r:0.0482,rotSpeed:1},
-        {cx:0.8159,cy:0.6889,r:0.0353,rotSpeed:1}
-      ],
-      muzzles:[
-        {x:0.8428,y:0.2535,weaponId:'2a42',layerOrder:'above'},
-        {x:0.5435,y:0.2579,weaponId:'pkt',layerOrder:'above'},
-        {x:0.4309,y:0.0347,weaponId:'atgm',layerOrder:'above'}
-      ],
-      weaponAreas:[{id:'ov6a9s2x',polygon:[
-        {x:0.5965,y:0.234},{x:0.5962,y:0.2836},{x:0.8454,y:0.2749},{x:0.8453,y:0.2329}
-      ],weaponId:'2a42',recoilDist:0.015}],
-      missiles:[{polygon:[
-        {x:0.551,y:0.051},{x:0.5514,y:0.0898},{x:0.5616,y:0.0895},{x:0.5552,y:0.1258},
-        {x:0.5755,y:0.1244},{x:0.5852,y:0.0856},{x:0.6397,y:0.0866},{x:0.6627,y:0.0627},
-        {x:0.6621,y:0.0549},{x:0.6374,y:0.036},{x:0.5815,y:0.0421},{x:0.5734,y:0.0121},
-        {x:0.5513,y:0.0169},{x:0.551,y:0.0286},{x:0.5556,y:0.0476}
-      ],weaponId:'atgm'}]
-    },
-    bmp3: {
-      id:'bmp3', imageSize:{w:592,h:234},
-      doors:{fusion:[{polygon:[
-        {x:0.0202,y:0.4219},{x:0.0217,y:0.7016},{x:-0.0397,y:0.7009},{x:-0.0501,y:0.6707},
-        {x:-0.0491,y:0.4412},{x:-0.0345,y:0.4188}
-      ]}]},
-      wheels:[
-        {cx:0.081,cy:0.7308,r:0.0353,rotSpeed:1},
-        {cx:0.1735,cy:0.8718,r:0.042,rotSpeed:1},
-        {cx:0.2893,cy:0.8687,r:0.042,rotSpeed:1},
-        {cx:0.3861,cy:0.8737,r:0.042,rotSpeed:1},
-        {cx:0.4988,cy:0.8735,r:0.042,rotSpeed:1},
-        {cx:0.6343,cy:0.8733,r:0.042,rotSpeed:1},
-        {cx:0.7413,cy:0.8709,r:0.042,rotSpeed:1},
-        {cx:0.8759,cy:0.6859,r:0.0351,rotSpeed:1},
-        {cx:0.2092,cy:0.6732,r:0.0175,rotSpeed:1},
-        {cx:0.4348,cy:0.6617,r:0.0189,rotSpeed:1},
-        {cx:0.6719,cy:0.6454,r:0.018,rotSpeed:1}
-      ],
-      muzzles:[
-        {x:0.9952,y:0.2548,weaponId:'2a70',layerOrder:'above'},
-        {x:0.6899,y:0.265,weaponId:'pkt',layerOrder:'below'},
-        {x:0.9385,y:0.2507,weaponId:'2a72',layerOrder:'above'}
-      ],
-      weaponAreas:[{id:'ocb56di9',polygon:[
-        {x:0.717,y:0.2309},{x:0.7161,y:0.2423},{x:0.7072,y:0.2428},{x:0.7071,y:0.2658},
-        {x:0.7163,y:0.2648},{x:0.7162,y:0.284},{x:0.8445,y:0.2829},{x:0.8447,y:0.2953},
-        {x:0.9986,y:0.2902},{x:0.9976,y:0.2285},{x:0.9186,y:0.22},{x:0.8423,y:0.2196}
-      ],weaponId:'2a70',recoilDist:0.048}],
-      missiles:[]
-    },
-    bmd4: {
-      id:'bmd4', imageSize:{w:556,h:193},
-      doors:{fusion:[{polygon:[
-        {x:0.0267,y:0.3753},{x:0.0293,y:0.6204},{x:-0.02,y:0.6197},{x:-0.029,y:0.5997},
-        {x:-0.0287,y:0.4092},{x:-0.023,y:0.3833}
-      ]}]},
-      wheels:[
-        {cx:0.0877,cy:0.7247,r:0.0353,rotSpeed:1},
-        {cx:0.1796,cy:0.8469,r:0.042,rotSpeed:1},
-        {cx:0.297,cy:0.8466,r:0.042,rotSpeed:1},
-        {cx:0.412,cy:0.8492,r:0.042,rotSpeed:1},
-        {cx:0.5246,cy:0.8438,r:0.042,rotSpeed:1},
-        {cx:0.6401,cy:0.8415,r:0.042,rotSpeed:1},
-        {cx:0.759,cy:0.6839,r:0.042,rotSpeed:1},
-        {cx:0.2332,cy:0.6188,r:0.0175,rotSpeed:1},
-        {cx:0.3435,cy:0.6204,r:0.0189,rotSpeed:1},
-        {cx:0.5775,cy:0.6149,r:0.018,rotSpeed:1},
-        {cx:0.4602,cy:0.6166,r:0.0182,rotSpeed:1}
-      ],
-      muzzles:[
-        {x:0.9926,y:0.2389,weaponId:'2a70',layerOrder:'above'},
-        {x:0.6229,y:0.246,weaponId:'pkt',layerOrder:'below'},
-        {x:0.9449,y:0.2423,weaponId:'2a72',layerOrder:'above'}
-      ],
-      weaponAreas:[{id:'omtiwlzc',polygon:[
-        {x:0.6394,y:0.1963},{x:0.6389,y:0.2177},{x:0.6639,y:0.2172},{x:0.6636,y:0.2601},
-        {x:0.639,y:0.2607},{x:0.6378,y:0.2805},{x:0.8764,y:0.2816},{x:1.0026,y:0.2794},
-        {x:0.9958,y:0.2044}
-      ],weaponId:'2a70',recoilDist:0.048}],
-      missiles:[]
-    }
-  };
-
-  Object.keys(BMP_ANN_DATA).forEach(function(id){
-    if(!A[id]) A[id] = BMP_ANN_DATA[id];
-  });
-  /* ============================================================
-   * Part 0.5: 重建 VEHICLES.bmp1/1m/2/3/bmd4（修復科技樹消失）
-   * ============================================================ */
-  if(typeof VEHICLES !== 'undefined'){
-    function _ensure(id, def){
-      if(!VEHICLES[id]){ VEHICLES[id] = def; return true; }
-      return false;
-    }
-    var created = [];
-    if(_ensure('bmp1', { id:'bmp1', name:'BMP-1', tier:1, line:'bmp',
-      weapon:'73mm 2A28 + 7.62mm PKT + ATGM', weaponSpecial:'9M14 Malyutka ATGM',
-      armor:'鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）',
-      speedRoad:65, speedOffroad:'45-50', supportDuration:30, next:['bmp1m'],
-      researchCost:{ ammoCal:'5.45', ammoCount:1000, liquor:100, exp:500 } })) created.push('bmp1');
-    if(_ensure('bmp1m', { id:'bmp1m', name:'BMP-1M', tier:2, line:'bmp',
-      weapon:'30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
-      armor:'鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）',
-      speedRoad:65, speedOffroad:'45-50', supportDuration:32, next:['bmp2'],
-      researchCost:{ ammoCal:'5.45', ammoCount:1500, liquor:150, exp:800 } })) created.push('bmp1m');
-    if(_ensure('bmp2', { id:'bmp2', name:'BMP-2', tier:3, line:'bmp',
-      weapon:'30mm 2A42 + 7.62mm PKT', weaponSpecial:'9M113 Konkurs ATGM',
-      armor:'鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）',
-      speedRoad:65, speedOffroad:'45-50', supportDuration:35, next:['bmp3'],
-      researchCost:{ ammoCal:'7.62', ammoCount:2000, liquor:500, exp:3000 } })) created.push('bmp2');
-    if(_ensure('bmp3', { id:'bmp3', name:'BMP-3', tier:4, line:'bmp',
-      weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
-      armor:'鋼 22 + 鋁 60mm（車體正面）\n鋁 43mm（車體側面/後部）\n鋼 16 + 空 70 + 鋁 50mm（炮塔正面）',
-      speedRoad:70, speedOffroad:'45-50', supportDuration:40, next:['bmd4'],
-      researchCost:{ ammoCal:'7.62x54', ammoCount:2500, liquor:2500, exp:12000 } })) created.push('bmp3');
-    if(_ensure('bmd4', { id:'bmd4', name:'BMD-4', tier:5, line:'bmp',
-      weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
-      armor:'鋁 40mm（車體正面）\n鋁 30mm（車體側面）\n鋼 23mm（炮塔）',
-      speedRoad:70, speedOffroad:'45-50', supportDuration:42, next:[],
-      researchCost:{ ammoCal:'7.62x54', ammoCount:3000, liquor:3000, exp:15000 } })) created.push('bmd4');
-    if(created.length){
-      } else {
-      }
-
-    /* Part 0.6: 恢復 btr80.next 鏈接 */
-    if(VEHICLES.btr80){
-      var b0 = VEHICLES.btr80.next = VEHICLES.btr80.next || [];
-      if(b0.indexOf('btr80a') < 0) b0.push('btr80a');
-      if(b0.indexOf('bmp1') < 0) b0.push('bmp1');
-      if(b0.indexOf('t80') < 0) b0.push('t80');
-      VEHICLES.btr80.next = b0.filter(function(v){ return v !== 'bmp1am'; });
-      }
-    var _chain = [['bmp1','bmp1m'],['bmp1m','bmp2'],['bmp2','bmp3'],['bmp3','bmd4']];
-    for(var ci = 0; ci < _chain.length; ci++){
-      var cur = VEHICLES[_chain[ci][0]];
-      if(cur){
-        var cn = cur.next = cur.next || [];
-        if(cn.indexOf(_chain[ci][1]) < 0) cn.push(_chain[ci][1]);
-      }
-    }
-  }
-
-  /* ============================================================
-   * Part 1: BMP 接人 —— fusion door 中心點對準玩家
-   * ============================================================ */
-
-
-  /* ============================================================
-   * Part 2: 裝甲 + weaponSpecial（覆蓋 v11）
-   * ============================================================ */
-  if(typeof VEHICLES !== 'undefined'){
-    function _applyArmor(id, armor, weaponSpecial){
-      if(!VEHICLES[id]) return;
-      VEHICLES[id].armor = armor;
-      VEHICLES[id].weaponSpecial = weaponSpecial;
-    }
-    _applyArmor('btr80',  '裝甲鋼 7-10mm', '無');
-    _applyArmor('btr80a', '裝甲鋼 7-10mm（車體）\n鋼 23mm（炮塔正面）', '無');
-    _applyArmor('btr82',  '裝甲鋼 7-10mm', '無');
-    _applyArmor('btr82a', '裝甲鋼 10-15mm（車體）\n鋼 23mm（炮塔正面）\n防崩落襯層', '無');
-    _applyArmor('btr90',  '裝甲鋼 正面 30mm AP 防護\n裝甲鋼 側面 14.5mm AP 防護', 'ATGM 發射筒');
-    _applyArmor('bmp1',  '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '9M14 Malyutka ATGM');
-    _applyArmor('bmp1m', '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '無');
-    _applyArmor('bmp2',  '鋼 5-19mm（車體）\n鋼 23mm（炮塔正面）\n鋼 19mm（炮塔側面）', '9M113 Konkurs ATGM');
-    _applyArmor('bmp3',  '鋼 22 + 鋁 60mm（車體正面）\n鋁 43mm（車體側面/後部）\n鋼 16 + 空 70 + 鋁 50mm（炮塔正面）', '無');
-    _applyArmor('bmd4',  '鋁 40mm（車體正面）\n鋁 30mm（車體側面）\n鋼 23mm（炮塔）', '無');
-    _applyArmor('t80',   '複合裝甲\n炮塔 500mm 等效均質鋼\n車體 450mm 等效均質鋼', '無');
-    _applyArmor('t80b',  '複合裝甲 + 30mm 鋼首上\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
-    _applyArmor('t80bv', '複合裝甲 + Kontakt-1 ERA\n炮塔 500mm 等效均質鋼\n車體 480mm 等效均質鋼', '無');
-    _applyArmor('t80u',  '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-    _applyArmor('t80uk', '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-    _applyArmor('t80um', '複合裝甲 + Kontakt-5 ERA\n炮塔 600mm 等效均質鋼\n車體 500mm 等效均質鋼', '無');
-  }
-
-  /* ============================================================
-   * Part 3: _garageDetailHtml
-   * ============================================================ */
-
-
-  /* ============================================================
-   * Part 4: 科技樹 + PC 拖動
-   * ============================================================ */
-  function _bindTechTreePan(container){
-    if(!container || container._panBound) return;
-    container._panBound = true;
-    var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
-    container.addEventListener('pointerdown', function(e){
-      if(e.pointerType === 'touch') return;
-      if(e.button !== 0) return;
-      if(e.target.closest && e.target.closest('.wt-node')) return;
-      isDown = true;
-      startX = e.clientX; startY = e.clientY;
-      scrollLeft = container.scrollLeft; scrollTop = container.scrollTop;
-      container.style.cursor = 'grabbing';
-      try{ container.setPointerCapture(e.pointerId); }catch(_){}
-    });
-    container.addEventListener('pointermove', function(e){
-      if(!isDown) return;
-      container.scrollLeft = scrollLeft - (e.clientX - startX);
-      container.scrollTop = scrollTop - (e.clientY - startY);
-    });
-    function endPan(e){
-      if(!isDown) return;
-      isDown = false;
-      container.style.cursor = 'grab';
-      try{ container.releasePointerCapture(e.pointerId); }catch(_){}
-    }
-    container.addEventListener('pointerup', endPan);
-    container.addEventListener('pointercancel', endPan);
-    container.style.cursor = 'grab';
-  }
-
-
-
-  /* ============================================================
-   * Part 5: CSS
-   * ============================================================ */
-  if(!document.getElementById('patcher-v13-style')){
-    var st = document.createElement('style');
-    st.id = 'patcher-v13-style';
-    st.textContent = 
-      '.garage-stat-row.armor-row { align-items: flex-start; }' +
-      '.garage-stat-row.armor-row .k { align-self: flex-start; padding-top: 1px; }' +
-      '.garage-stat-row .armor-val { white-space: normal; text-overflow: clip; overflow: visible; line-height: 1.35; word-break: break-word; text-align: right; }' +
-      '.wt-tech-canvas { width: 450px !important; height: 440px !important; }' +
-      '.wt-tech-wrap { cursor: grab; user-select: none; -webkit-user-select: none; }' +
-      '.wt-node { user-select: none; -webkit-user-select: none; }';
-    document.head.appendChild(st);
-  }
-
-  /* 診斷輸出 */
-  var bmpIds = ['bmp1','bmp1m','bmp2','bmp3','bmd4'];
-  var annStatus = bmpIds.map(function(id){ return id + ':' + (A[id] ? '✅' : '❌'); }).join(' ');
-  var vehStatus = (typeof VEHICLES !== 'undefined') ? bmpIds.map(function(id){ return id + ':' + (VEHICLES[id] ? '✅' : '❌'); }).join(' ') : 'VEHICLES 未定義';
-  if(typeof VEHICLES !== 'undefined' && VEHICLES.btr80){
-    }
-  })();
-
-// [patcher-v20-patch]
-// [patcher-fix-v20] stat panel 每次执行+inline兜底 + 装甲完整语义多行
-(function(){
-  "use strict";
-  var A = window.VEHICLE_ANNOTATIONS = window.VEHICLE_ANNOTATIONS || {};
-
-  /* 清理旧 style */
-  ['patcher-v15-style','patcher-v16-style','patcher-v17-style','patcher-v18-style','patcher-v19-style'].forEach(function(id){
-    var el = document.getElementById(id); if(el) el.remove();
-  });
-
-  /* ============================================================
-   * BMP annotation 硬编码（幂等，已存在则跳过）
-   * ============================================================ */
-  if(!A.bmp1) A.bmp1 = {id:'bmp1',imageSize:{w:545,h:187},
-    doors:{fusion:[{polygon:[{x:0.0106,y:0.3654},{x:0.0202,y:0.4017},{x:0.0197,y:0.5499},{x:0.0091,y:0.5778},{x:-0.0213,y:0.5763},{x:-0.0314,y:0.5624},{x:-0.0329,y:0.389},{x:-0.0296,y:0.3644}],hingeP1:{x:0.0202,y:0.4017},hingeP2:{x:0.0197,y:0.5499},hingeEdgeIdx:1,openRotation:90,fillColor:'#000'}]},
-    wheels:[{cx:0.0925,cy:0.6852,r:0.0411},{cx:0.1933,cy:0.8409,r:0.0456},{cx:0.3012,cy:0.8443,r:0.0456},{cx:0.4115,cy:0.8448,r:0.0456},{cx:0.5107,cy:0.8417,r:0.0456},{cx:0.6082,cy:0.8463,r:0.0456},{cx:0.7056,cy:0.8487,r:0.0456},{cx:0.8169,cy:0.6486,r:0.0456},{cx:0.2422,cy:0.5922,r:0.0136},{cx:0.4611,cy:0.5941,r:0.0116},{cx:0.6564,cy:0.5876,r:0.0108}],
-    muzzles:[{x:0.7598,y:0.1971,weaponId:'2a28',layerOrder:'above'},{x:0.5196,y:0.1989,weaponId:'pkt',layerOrder:'above'},{x:0.5501,y:0.0706,weaponId:'atgm',layerOrder:'above'}],
-    weaponAreas:[{id:'o8tz1ypo',polygon:[{x:0.5915,y:0.1587},{x:0.592,y:0.2436},{x:0.5992,y:0.2317},{x:0.6134,y:0.2193},{x:0.7608,y:0.2219},{x:0.7596,y:0.1702},{x:0.6181,y:0.1809}],weaponId:'2a28',recoilDist:0.055}],
-    missiles:[{polygon:[{x:0.551,y:0.051},{x:0.5514,y:0.0898},{x:0.5616,y:0.0895},{x:0.5552,y:0.1258},{x:0.5755,y:0.1244},{x:0.5852,y:0.0856},{x:0.6397,y:0.0866},{x:0.6627,y:0.0627},{x:0.6621,y:0.0549},{x:0.6374,y:0.036},{x:0.5815,y:0.0421},{x:0.5734,y:0.0121},{x:0.5513,y:0.0169},{x:0.551,y:0.0286},{x:0.5556,y:0.0476}],weaponId:'atgm'}]};
-  if(!A.bmp1m) A.bmp1m = {id:'bmp1m',imageSize:{w:545,h:204},
-    doors:{fusion:[{polygon:[{x:0.0076,y:0.42},{x:0.0227,y:0.4817},{x:0.0227,y:0.6053},{x:0.0144,y:0.6329},{x:-0.023,y:0.6322},{x:-0.0332,y:0.6148},{x:-0.0339,y:0.4541},{x:-0.0291,y:0.4219}],hingeP1:{x:0.0227,y:0.4817},hingeP2:{x:0.0227,y:0.6053},hingeEdgeIdx:1,openRotation:90,fillColor:'#000'}]},
-    wheels:[{cx:0.0932,cy:0.7104,r:0.0411},{cx:0.1941,cy:0.8617,r:0.0468},{cx:0.3015,cy:0.8587,r:0.0468},{cx:0.4103,cy:0.8546,r:0.0468},{cx:0.5084,cy:0.8571,r:0.0468},{cx:0.607,cy:0.8635,r:0.0468},{cx:0.7042,cy:0.8607,r:0.0468},{cx:0.8198,cy:0.6641,r:0.0412}],
-    muzzles:[{x:0.4134,y:0.141,weaponId:'pkt',layerOrder:'above'},{x:0.6953,y:0.1156,weaponId:'2a42',layerOrder:'above'}],
-    weaponAreas:[{id:'onpjf5i7',polygon:[{x:0.4033,y:0.0894},{x:0.4025,y:0.1345},{x:0.6976,y:0.1439},{x:0.7049,y:0.1373},{x:0.7049,y:0.1055},{x:0.6955,y:0.09},{x:0.4358,y:0.0905}],weaponId:'2a42',recoilDist:0.015}],missiles:[]};
-  if(!A.bmp2) A.bmp2 = {id:'bmp2',imageSize:{w:545,h:215},
-    doors:{fusion:[{polygon:[{x:0.0168,y:0.5241},{x:0.0191,y:0.6018},{x:0.0067,y:0.6455},{x:-0.0443,y:0.6466},{x:-0.0505,y:0.6178},{x:-0.0501,y:0.4665},{x:-0.0398,y:0.4459},{x:0.0016,y:0.4434}],hingeP1:{x:0.0168,y:0.5241},hingeP2:{x:0.0191,y:0.6018},hingeEdgeIdx:0,openRotation:90,fillColor:'#000'}]},
-    wheels:[{cx:0.0954,cy:0.7234,r:0.0482},{cx:0.1947,cy:0.867,r:0.0482},{cx:0.306,cy:0.8648,r:0.0482},{cx:0.4142,cy:0.8666,r:0.0482},{cx:0.511,cy:0.8634,r:0.0482},{cx:0.6095,cy:0.8678,r:0.0482},{cx:0.7095,cy:0.8641,r:0.0482},{cx:0.8159,cy:0.6889,r:0.0353}],
-    muzzles:[{x:0.8428,y:0.2535,weaponId:'2a42',layerOrder:'above'},{x:0.5435,y:0.2579,weaponId:'pkt',layerOrder:'above'},{x:0.4309,y:0.0347,weaponId:'atgm',layerOrder:'above'}],
-    weaponAreas:[{id:'ov6a9s2x',polygon:[{x:0.5965,y:0.234},{x:0.5962,y:0.2836},{x:0.8454,y:0.2749},{x:0.8453,y:0.2329}],weaponId:'2a42',recoilDist:0.015}],
-    missiles:[{polygon:[{x:0.551,y:0.051},{x:0.5514,y:0.0898},{x:0.5616,y:0.0895},{x:0.5552,y:0.1258},{x:0.5755,y:0.1244},{x:0.5852,y:0.0856},{x:0.6397,y:0.0866},{x:0.6627,y:0.0627},{x:0.6621,y:0.0549},{x:0.6374,y:0.036},{x:0.5815,y:0.0421},{x:0.5734,y:0.0121},{x:0.5513,y:0.0169},{x:0.551,y:0.0286},{x:0.5556,y:0.0476}],weaponId:'atgm'}]};
-  if(!A.bmp3) A.bmp3 = {id:'bmp3',imageSize:{w:592,h:234},
-    doors:{fusion:[{polygon:[{x:0.0202,y:0.4219},{x:0.0217,y:0.7016},{x:-0.0397,y:0.7009},{x:-0.0501,y:0.6707},{x:-0.0491,y:0.4412},{x:-0.0345,y:0.4188}],hingeP1:{x:0.0202,y:0.4219},hingeP2:{x:0.0217,y:0.7016},hingeEdgeIdx:0,openRotation:90,fillColor:'#000'}]},
-    wheels:[{cx:0.081,cy:0.7308,r:0.0353},{cx:0.1735,cy:0.8718,r:0.042},{cx:0.2893,cy:0.8687,r:0.042},{cx:0.3861,cy:0.8737,r:0.042},{cx:0.4988,cy:0.8735,r:0.042},{cx:0.6343,cy:0.8733,r:0.042},{cx:0.7413,cy:0.8709,r:0.042},{cx:0.8759,cy:0.6859,r:0.0351},{cx:0.2092,cy:0.6732,r:0.0175},{cx:0.4348,cy:0.6617,r:0.0189},{cx:0.6719,cy:0.6454,r:0.018}],
-    muzzles:[{x:0.9952,y:0.2548,weaponId:'2a70',layerOrder:'above'},{x:0.6899,y:0.265,weaponId:'pkt',layerOrder:'below'},{x:0.9385,y:0.2507,weaponId:'2a72',layerOrder:'above'}],
-    weaponAreas:[{id:'ocb56di9',polygon:[{x:0.717,y:0.2309},{x:0.7161,y:0.2423},{x:0.7072,y:0.2428},{x:0.7071,y:0.2658},{x:0.7163,y:0.2648},{x:0.7162,y:0.284},{x:0.8445,y:0.2829},{x:0.8447,y:0.2953},{x:0.9986,y:0.2902},{x:0.9976,y:0.2285},{x:0.9186,y:0.22},{x:0.8423,y:0.2196}],weaponId:'2a70',recoilDist:0.048}],missiles:[]};
-  if(!A.bmd4) A.bmd4 = {id:'bmd4',imageSize:{w:556,h:193},
-    doors:{fusion:[{polygon:[{x:0.0267,y:0.3753},{x:0.0293,y:0.6204},{x:-0.02,y:0.6197},{x:-0.029,y:0.5997},{x:-0.0287,y:0.4092},{x:-0.023,y:0.3833}],hingeP1:{x:0.0267,y:0.3753},hingeP2:{x:0.0293,y:0.6204},hingeEdgeIdx:0,openRotation:90,fillColor:'#000'}]},
-    wheels:[{cx:0.0877,cy:0.7247,r:0.0353},{cx:0.1796,cy:0.8469,r:0.042},{cx:0.297,cy:0.8466,r:0.042},{cx:0.412,cy:0.8492,r:0.042},{cx:0.5246,cy:0.8438,r:0.042},{cx:0.6401,cy:0.8415,r:0.042},{cx:0.759,cy:0.6839,r:0.042},{cx:0.2332,cy:0.6188,r:0.0175},{cx:0.3435,cy:0.6204,r:0.0189},{cx:0.5775,cy:0.6149,r:0.018},{cx:0.4602,cy:0.6166,r:0.0182}],
-    muzzles:[{x:0.9926,y:0.2389,weaponId:'2a70',layerOrder:'above'},{x:0.6229,y:0.246,weaponId:'pkt',layerOrder:'below'},{x:0.9449,y:0.2423,weaponId:'2a72',layerOrder:'above'}],
-    weaponAreas:[{id:'omtiwlzc',polygon:[{x:0.6394,y:0.1963},{x:0.6389,y:0.2177},{x:0.6639,y:0.2172},{x:0.6636,y:0.2601},{x:0.639,y:0.2607},{x:0.6378,y:0.2805},{x:0.8764,y:0.2816},{x:1.0026,y:0.2794},{x:0.9958,y:0.2044}],weaponId:'2a70',recoilDist:0.048}],missiles:[]};
-
-  /* ============================================================
-   * VEHICLES 重建 + 装甲完整语义多行
-   * ============================================================ */
-  var ARMOR_MULTI = {
-    btr80:  ['鋼 7-10mm'],
-    btr80a: ['鋼 7-10mm（車體）', '鋼 23mm（炮塔正面）'],
-    btr82:  ['鋼 7-10mm'],
-    btr82a: ['鋼 10-15mm（車體）', '鋼 23mm（炮塔正面）', '防崩落襯層'],
-    btr90:  ['鋼 前 30mm AP', '鋼 側 14.5mm AP'],
-    bmp1:   ['鋼 5-19mm（車體）', '鋼 23mm（炮塔正面）', '鋼 19mm（炮塔側面）'],
-    bmp1m:  ['鋼 5-19mm（車體）', '鋼 23mm（炮塔正面）', '鋼 19mm（炮塔側面）'],
-    bmp2:   ['鋼 5-19mm（車體）', '鋼 23mm（炮塔正面）', '鋼 19mm（炮塔側面）'],
-    bmp3:   ['鋼 22 + 鋁 60mm（車體正面）', '鋁 43mm（車體側面）', '鋼 16 + 鋁 50mm（炮塔）'],
-    bmd4:   ['鋁 40mm（車體正面）', '鋁 30mm（車體側面）', '鋼 23mm（炮塔）'],
-    t80:    ['複合裝甲', '炮塔 500mm 等效', '車體 450mm 等效'],
-    t80b:   ['複合裝甲 + 30mm 鋼首上', '炮塔 500mm 等效', '車體 480mm 等效'],
-    t80bv:  ['複合裝甲 + Kontakt-1 ERA', '炮塔 500mm 等效', '車體 480mm 等效'],
-    t80u:   ['複合裝甲 + Kontakt-5 ERA', '炮塔 600mm 等效', '車體 500mm 等效'],
-    t80uk:  ['複合裝甲 + Kontakt-5 ERA', '炮塔 600mm 等效', '車體 500mm 等效'],
-    t80um:  ['複合裝甲 + Kontakt-5 ERA', '炮塔 600mm 等效', '車體 500mm 等效']
-  };
-  if(typeof VEHICLES !== 'undefined'){
-    function _ensure(id, def){ if(!VEHICLES[id]){ VEHICLES[id] = def; return true; } return false; }
-    _ensure('bmp1',{id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon:'73mm 2A28 + 7.62mm PKT + ATGM',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
-    _ensure('bmp1m',{id:'bmp1m',name:'BMP-1M',tier:2,line:'bmp',weapon:'30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:32,next:['bmp2'],researchCost:{ammoCal:'5.45',ammoCount:1500,liquor:150,exp:800}});
-    _ensure('bmp2',{id:'bmp2',name:'BMP-2',tier:3,line:'bmp',weapon:'30mm 2A42 + 7.62mm PKT',weaponSpecial:'9M113 Konkurs ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:35,next:['bmp3'],researchCost:{ammoCal:'7.62',ammoCount:2000,liquor:500,exp:3000}});
-    _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
-    _ensure('bmd4',{id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
-    if(VEHICLES.btr80){
-      var b0 = VEHICLES.btr80.next = VEHICLES.btr80.next || [];
-      if(b0.indexOf('btr80a')<0) b0.push('btr80a');
-      if(b0.indexOf('bmp1')<0) b0.push('bmp1');
-      if(b0.indexOf('t80')<0) b0.push('t80');
-      VEHICLES.btr80.next = b0.filter(function(v){ return v !== 'bmp1am'; });
-    }
-    var _chain = [['bmp1','bmp1m'],['bmp1m','bmp2'],['bmp2','bmp3'],['bmp3','bmd4']];
-    for(var ci = 0; ci < _chain.length; ci++){
-      var cur = VEHICLES[_chain[ci][0]];
-      if(cur){ var cn = cur.next = cur.next || []; if(cn.indexOf(_chain[ci][1])<0) cn.push(_chain[ci][1]); }
-    }
-    // 应用装甲（\n 分隔）
-    Object.keys(ARMOR_MULTI).forEach(function(id){
-      if(VEHICLES[id]) VEHICLES[id].armor = ARMOR_MULTI[id].join('\n');
-    });
-    // T-80 系列无炮射
-    ['t80','t80b','t80bv','t80u','t80uk','t80um'].forEach(function(id){
-      if(VEHICLES[id]) VEHICLES[id].weaponSpecial = '無';
-    });
-    ['btr80','btr80a','btr82','btr82a'].forEach(function(id){
-      if(VEHICLES[id]) VEHICLES[id].weaponSpecial = '無';
-    });
-    if(VEHICLES.btr90) VEHICLES.btr90.weaponSpecial = 'ATGM 發射筒';
-    if(VEHICLES.bmp1)  VEHICLES.bmp1.weaponSpecial = '9M14 Malyutka ATGM';
-    if(VEHICLES.bmp1m) VEHICLES.bmp1m.weaponSpecial = '無';
-    if(VEHICLES.bmp2)  VEHICLES.bmp2.weaponSpecial = '9M113 Konkurs ATGM';
-    if(VEHICLES.bmp3)  VEHICLES.bmp3.weaponSpecial = '無';
-    if(VEHICLES.bmd4)  VEHICLES.bmd4.weaponSpecial = '無';
-  }
-
-  /* BMP door 对准 */
-
-
-  /* ============================================================
-   * _garageDetailHtml —— 装甲多行利用左侧空间
-   * ============================================================ */
-
-
-  /* 科技树 */
-  function _pan(c){
-    if(!c || c._pb) return; c._pb = true;
-    var d=false, sx=0, sy=0, sl=0, st=0;
-    c.addEventListener('pointerdown', function(e){
-      if(e.pointerType==='touch'||e.button!==0) return;
-      if(e.target.closest && e.target.closest('.wt-node')) return;
-      d=true; sx=e.clientX; sy=e.clientY; sl=c.scrollLeft; st=c.scrollTop;
-      c.style.cursor='grabbing'; try{ c.setPointerCapture(e.pointerId); }catch(_){}
-    });
-    c.addEventListener('pointermove', function(e){
-      if(!d) return;
-      c.scrollLeft = sl-(e.clientX-sx); c.scrollTop = st-(e.clientY-sy);
-    });
-    function end(e){ if(!d) return; d=false; c.style.cursor='grab'; try{ c.releasePointerCapture(e.pointerId); }catch(_){} }
-    c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
-    c.style.cursor='grab';
-  }
-
-
-  /* ============================================================
-   * ★ stat panel：CSS + inline 双保险 + MutationObserver
-   * ============================================================ */
-  var styleEl = document.getElementById('patcher-v20-style');
-  if(styleEl) styleEl.remove();
-  styleEl = document.createElement('style');
-  styleEl.id = 'patcher-v20-style';
-  styleEl.textContent = [
-    '.player-stat-panel{overflow:hidden !important}',
-    '.player-stat-panel .row{flex-wrap:nowrap !important;white-space:nowrap !important;overflow:hidden !important}',
-    '.player-stat-panel .row>span,.player-stat-panel .row>b{white-space:nowrap !important;flex-shrink:0 !important}',
-    // 装甲多行
-    '.garage-stat-row.armor-row{display:flex !important;align-items:center !important;gap:4px !important;min-width:0 !important;overflow:hidden !important;padding:1px 0 !important}',
-    '.garage-stat-row.armor-row .k{flex:0 0 26px !important;white-space:nowrap !important;color:#7a6f60 !important;line-height:1.4 !important;min-height:1.4em !important}',
-    '.garage-stat-row .armor-val{flex:1 1 0 !important;min-width:0 !important;white-space:nowrap !important;text-overflow:ellipsis !important;overflow:hidden !important;line-height:1.4 !important;text-align:right !important}',
-    '.garage-stat-row .v-arrow{flex:0 0 auto !important}',
-    '.garage-stat-row .v-cur.armor-val{color:#7a6f60 !important}',
-    '.garage-stat-row .v-cur-only.armor-val{color:#e8a33d !important;font-weight:bold !important}',
-    '.garage-stat-row .v-new.armor-val{color:#e8a33d !important;font-weight:bold !important}',
-    '.garage-stat-row .v-new.armor-val.diff{color:#a45ede !important}',
-    // 科技树
-    '.wt-tech-canvas{width:450px !important;height:440px !important}',
-    '.wt-tech-wrap{cursor:grab;user-select:none;-webkit-user-select:none}',
-    '.wt-node{user-select:none;-webkit-user-select:none}'
-  ].join('\n');
-  document.head.appendChild(styleEl);
-  /* inline 兜底（不改字号/颜色/粗细/DOM） */
-  function _forcePanel(){
-    var panels = document.querySelectorAll('.player-stat-panel');
-    for(var i = 0; i < panels.length; i++){
-      var p = panels[i];
-      p.style.overflow = 'hidden';
-      var rows = p.querySelectorAll('.row');
-      for(var j = 0; j < rows.length; j++){
-        var r = rows[j];
-        r.style.flexWrap = 'nowrap';
-        r.style.whiteSpace = 'nowrap';
-        r.style.overflow = 'hidden';
-        // 子元素只加 flex-shrink:0，不改字号/颜色/粗细
-        for(var k = 0; k < r.children.length; k++){
-          r.children[k].style.flexShrink = '0';
-        }
-      }
-    }
-  }
-  _forcePanel();
-
-  /* MutationObserver 监听 DOM 重建 */
-  if(window._v20Obs){ try{ window._v20Obs.disconnect(); }catch(_){} }
-  if(typeof MutationObserver !== 'undefined'){
-    var mo = new MutationObserver(function(){ _forcePanel(); });
-    mo.observe(document.body, { childList: true, subtree: true });
-    window._v20Obs = mo;
-  }
-
-  /* 诊断 */
-  setTimeout(function(){
-    var panel = document.querySelector('.player-stat-panel');
-    if(!panel){ return; }
-    var cs = getComputedStyle(panel);
-    var rows = panel.querySelectorAll('.row');
-    for(var i = 0; i < rows.length; i++){
-      var rcs = getComputedStyle(rows[i]);
-      }
-  }, 500);
-
-  /* fusion door */
-  if(window.VehicleRenderer && !window.VehicleRenderer._v20FusionPatched){
-    window.VehicleRenderer._v20FusionPatched = true;
-    var _prev = window.VehicleRenderer.render;
-    window.VehicleRenderer.render = function(ctx, id, x, y, w, h, animT, opts){
-      var ann = A[id];
-      var hasFusion = ann && ann.doors && ann.doors.fusion && ann.doors.fusion.length;
-      if(!hasFusion){ _prev.call(this, ctx, id, x, y, w, h, animT, opts); return; }
-      var tmpC = document.createElement('canvas');
-      tmpC.width = w; tmpC.height = h;
-      var tmpX = tmpC.getContext('2d');
-      _prev.call(this, tmpX, id, 0, 0, w, h, animT, opts);
-      tmpX.globalCompositeOperation = 'destination-out';
-      tmpX.fillStyle = '#000';
-      for(var i = 0; i < ann.doors.fusion.length; i++){
-        var d = ann.doors.fusion[i];
-        if(!d.polygon || d.polygon.length < 3) continue;
-        tmpX.beginPath();
-        tmpX.moveTo(d.polygon[0].x * w, d.polygon[0].y * h);
-        for(var j = 1; j < d.polygon.length; j++) tmpX.lineTo(d.polygon[j].x * w, d.polygon[j].y * h);
-        tmpX.closePath(); tmpX.fill();
-      }
-      tmpX.globalCompositeOperation = 'source-over';
-      ctx.save(); ctx.translate(x, y); ctx.drawImage(tmpC, 0, 0);
-      var doorOpen = (opts && opts.doorOpen) || 0;
-      if(doorOpen > 3){
-        ctx.fillStyle = '#000';
-        for(var k = 0; k < ann.doors.fusion.length; k++){
-          var dk = ann.doors.fusion[k];
-          if(!dk.polygon || dk.polygon.length < 3) continue;
-          ctx.beginPath();
-          ctx.moveTo(dk.polygon[0].x * w, dk.polygon[0].y * h);
-          for(var l = 1; l < dk.polygon.length; l++) ctx.lineTo(dk.polygon[l].x * w, dk.polygon[l].y * h);
-          ctx.closePath(); ctx.fill();
-        }
-      }
-      ctx.restore();
-    };
-  }
-
-  var bmpIds = ['bmp1','bmp1m','bmp2','bmp3','bmd4'];
-  if(typeof VEHICLES !== 'undefined'){
-    }
-  })();
-
-
 // [patcher-v21-patch]
 // [patcher-fix-v21] 恢复 stat panel 原始布局 + 装甲完整语义多行
 (function(){
@@ -4808,44 +4086,7 @@ window._openBTRSupportDetail = function(log){
   document.head.appendChild(st);
 
   /* fusion door（v20 逻辑） */
-  if(window.VehicleRenderer && !window.VehicleRenderer._v21FusionPatched){
-    window.VehicleRenderer._v21FusionPatched = true;
-    var _prev = window.VehicleRenderer.render;
-    window.VehicleRenderer.render = function(ctx, id, x, y, w, h, animT, opts){
-      var ann = A[id];
-      var hasFusion = ann && ann.doors && ann.doors.fusion && ann.doors.fusion.length;
-      if(!hasFusion){ _prev.call(this, ctx, id, x, y, w, h, animT, opts); return; }
-      var tmpC = document.createElement('canvas');
-      tmpC.width = w; tmpC.height = h;
-      var tmpX = tmpC.getContext('2d');
-      _prev.call(this, tmpX, id, 0, 0, w, h, animT, opts);
-      tmpX.globalCompositeOperation = 'destination-out';
-      tmpX.fillStyle = '#000';
-      for(var i = 0; i < ann.doors.fusion.length; i++){
-        var d = ann.doors.fusion[i];
-        if(!d.polygon || d.polygon.length < 3) continue;
-        tmpX.beginPath();
-        tmpX.moveTo(d.polygon[0].x * w, d.polygon[0].y * h);
-        for(var j = 1; j < d.polygon.length; j++) tmpX.lineTo(d.polygon[j].x * w, d.polygon[j].y * h);
-        tmpX.closePath(); tmpX.fill();
-      }
-      tmpX.globalCompositeOperation = 'source-over';
-      ctx.save(); ctx.translate(x, y); ctx.drawImage(tmpC, 0, 0);
-      var doorOpen = (opts && opts.doorOpen) || 0;
-      if(doorOpen > 3){
-        ctx.fillStyle = '#000';
-        for(var k = 0; k < ann.doors.fusion.length; k++){
-          var dk = ann.doors.fusion[k];
-          if(!dk.polygon || dk.polygon.length < 3) continue;
-          ctx.beginPath();
-          ctx.moveTo(dk.polygon[0].x * w, dk.polygon[0].y * h);
-          for(var l = 1; l < dk.polygon.length; l++) ctx.lineTo(dk.polygon[l].x * w, dk.polygon[l].y * h);
-          ctx.closePath(); ctx.fill();
-        }
-      }
-      ctx.restore();
-    };
-  }
+  
 
   var bmpIds = ['bmp1','bmp1m','bmp2','bmp3','bmd4'];
   if(typeof VEHICLES !== 'undefined'){
@@ -5272,4 +4513,9 @@ window._openBTRSupportDetail = function(log){
   }
 
   })();
+
+
+
+
+
 
