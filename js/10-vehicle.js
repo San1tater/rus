@@ -76,8 +76,7 @@
     window.VEHICLE_REAL_HEIGHTS = {
       btr80: 2.41, btr80a: 2.80, btr82: 2.725, btr82a: 2.725, btr90: 2.98,
       t80: 2.74, t80b: 2.74, t80bv: 2.74, t80u: 2.74, t80uk: 2.74, t80um: 2.74,
-      // ★ v91：补全真实高度
-      bmp1: 2.15, bmp1m: 2.25, bmp2: 2.25, bmp3: 2.40, bmd4: 2.17
+      bmp1: 2.15, bmp1m: 2.25, bmp2: 2.45, bmp3: 2.40, bmd4: 2.17
     };
   }
 
@@ -899,7 +898,7 @@ const BTRSupport = {
           life: 1, rate: 1 / 0.25,
           sizeX: _base * 0.2, sizeY: _base * 0.02,
           growX: _base * 4.0, growY: _base * 0.1, // Y 幾乎不長，保持柱狀
-          alpha0: 1.0, isJet: true, isCore: true,
+          alpha0: 0.95, isJet: true, isCore: true,
           friction: 0.7,
           angle: 0, spin: 0, worldFactor: 0.1,
           skipUpdate: true
@@ -911,7 +910,7 @@ const BTRSupport = {
           life: 1, rate: 1 / 0.25,
           sizeX: _base * 0.15, sizeY: _base * 0.05,
           growX: _base * 10.0, growY: _base * 2.0,
-          alpha0: 1.0, isJet: true, isCore: true,
+          alpha0: 0.95, isJet: true, isCore: true,
           friction: 0.7,
           angle: 0, spin: 0, worldFactor: 0.1,
           skipUpdate: true
@@ -923,7 +922,7 @@ const BTRSupport = {
           life: 1, rate: 1 / 0.2,
           sizeX: _base * 0.1, sizeY: _base * 0.03,
           growX: _base * 8.0, growY: _base * 1.5,
-          alpha0: 1.0, isJet: true, isCore: true,
+          alpha0: 0.95, isJet: true, isCore: true,
           friction: 0.7,
           angle: 0, spin: 0, worldFactor: 0.1,
           skipUpdate: true
@@ -998,7 +997,7 @@ const BTRSupport = {
         life: 1, rate: 1 / 0.15,
         sizeX: 20, sizeY: 8,
         growX: 0, growY: 0, // 不膨脹
-        alpha0: 1.0, isJet: true, isCore: true,
+        alpha0: 0.95, isJet: true, isCore: true,
         friction: 0.8,
         angle: 0, spin: 0, worldFactor: 0.5,
         skipUpdate: true
@@ -1197,16 +1196,8 @@ const BTRSupport = {
         if(_sumN > 0) _doorCenterRatio = _sumX / _sumN;
       }
       this.doorOffsetRatio = _doorCenterRatio; this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
-      let maxMuzzleX = 0; let is30mm = false; 
-      if(ann.muzzles){ 
-        for(const m of ann.muzzles){ 
-          if(m.x > maxMuzzleX) maxMuzzleX = m.x; 
-          if(m.weaponId === '2a42' || m.weaponId === '2a72') is30mm = true; 
-        } 
-      }
-      // [Patch-NarrowScreen] 僅針對30炮在手機端進行左移
-      const targetMuzzleRatio = (w < 600 && is30mm) ? 0.75 : 1.0;
-      const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW; 
+      let maxMuzzleX = 0; if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
+      const maxAllowedLeft = w - 12 - maxMuzzleX * this.targetW; 
       const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
       this.centerPX = leftPx / w;
       const groundY = h * 0.95; const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
@@ -1892,8 +1883,8 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
         ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
         ctx.globalAlpha = a;
         const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
-        g.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
-        g.addColorStop(0.4, 'rgba(230, 240, 255, 0.3)');
+        g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)');
         g.addColorStop(1, 'rgba(200, 210, 220, 0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2); ctx.fill();
