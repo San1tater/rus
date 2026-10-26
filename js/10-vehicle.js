@@ -48,6 +48,7 @@
   window._vehicleRendererInstalled = true;
 
   /* rev622: ANN 补全到 11 款（原缺 btr82 / btr90 / t80b / t80bv / t80uk） */
+  // ★ v122：补全 BMP 标注挂载
   if(!window.VEHICLE_ANNOTATIONS){
     window.VEHICLE_ANNOTATIONS = {
       btr80:  typeof VEHICLE_ANNOTATION_BTR80  !== 'undefined' ? VEHICLE_ANNOTATION_BTR80  : null,
@@ -60,7 +61,13 @@
       t80bv:  typeof VEHICLE_ANNOTATION_T80BV  !== 'undefined' ? VEHICLE_ANNOTATION_T80BV  : null,
       t80u:   typeof VEHICLE_ANNOTATION_T80U   !== 'undefined' ? VEHICLE_ANNOTATION_T80U   : null,
       t80uk:  typeof VEHICLE_ANNOTATION_T80UK  !== 'undefined' ? VEHICLE_ANNOTATION_T80UK  : null,
-      t80um:  typeof VEHICLE_ANNOTATION_T80UM  !== 'undefined' ? VEHICLE_ANNOTATION_T80UM  : null
+      t80um:  typeof VEHICLE_ANNOTATION_T80UM  !== 'undefined' ? VEHICLE_ANNOTATION_T80UM  : null,
+      // ★ 补全 BMP 系列
+      bmp1:   typeof VEHICLE_ANNOTATION_BMP1   !== 'undefined' ? VEHICLE_ANNOTATION_BMP1   : null,
+      bmp1m:  typeof VEHICLE_ANNOTATION_BMP1M  !== 'undefined' ? VEHICLE_ANNOTATION_BMP1M  : null,
+      bmp2:   typeof VEHICLE_ANNOTATION_BMP2   !== 'undefined' ? VEHICLE_ANNOTATION_BMP2   : null,
+      bmp3:   typeof VEHICLE_ANNOTATION_BMP3   !== 'undefined' ? VEHICLE_ANNOTATION_BMP3   : null,
+      bmd4:   typeof VEHICLE_ANNOTATION_BMD4   !== 'undefined' ? VEHICLE_ANNOTATION_BMD4   : null
     };
   }
   const ANN = window.VEHICLE_ANNOTATIONS;
@@ -1191,7 +1198,9 @@ const BTRSupport = {
       }
       this.doorOffsetRatio = _doorCenterRatio; this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
       let maxMuzzleX = 0; if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
-      const maxAllowedLeft = w - 12 - maxMuzzleX * this.targetW; const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
+      // [Patch-NarrowScreen] 窄屏时强制炮口左移，留出空间给发射烟
+      const targetMuzzleRatio = (w < 600) ? 0.70 : 1.0;
+      const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW; const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
       this.centerPX = leftPx / w;
       const groundY = h * 0.95; const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
       this.sinkOffset = py0 < 4 ? (4 - py0) : 0;
@@ -3839,6 +3848,661 @@ window._vsMakeSmokeJet = function(x, y, weaponId){
           }
           lastClickTime = performance.now();
           
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v123：补全 BMP 载具数据
+(function(){
+  if(typeof VEHICLES === 'undefined') return;
+  if(window._v123VehDataPatched) return;
+  window._v123VehDataPatched = true;
+
+  if(!VEHICLES.bmp1){
+    VEHICLES.bmp1 = {
+      id:'bmp1', name:'BMP-1', tier:1, line:'bmp',
+      weapon:'73mm 2A28 + 7.62mm PKT + ATGM',
+      speedRoad:65, speedOffroad:'45-50', supportDuration:30,
+      next:['bmp1m'],
+      researchCost:{ ammoCal:'5.45', ammoCount:1000, liquor:100, exp:500 }
+    };
+  }
+  if(!VEHICLES.bmp1m){
+    VEHICLES.bmp1m = {
+      id:'bmp1m', name:'BMP-1M', tier:2, line:'bmp',
+      weapon:'30mm 2A72 + 7.62mm PKT',
+      speedRoad:65, speedOffroad:'45-50', supportDuration:32,
+      next:['bmp2'],
+      researchCost:{ ammoCal:'5.45', ammoCount:1500, liquor:150, exp:800 }
+    };
+  }
+  if(!VEHICLES.bmp2){
+    VEHICLES.bmp2 = {
+      id:'bmp2', name:'BMP-2', tier:3, line:'bmp',
+      weapon:'30mm 2A42 + 7.62mm PKT + ATGM',
+      speedRoad:65, speedOffroad:'45-50', supportDuration:35,
+      next:['bmp3'],
+      researchCost:{ ammoCal:'7.62', ammoCount:2000, liquor:500, exp:3000 }
+    };
+  }
+  if(!VEHICLES.bmp3){
+    VEHICLES.bmp3 = {
+      id:'bmp3', name:'BMP-3', tier:4, line:'bmp',
+      weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',
+      speedRoad:70, speedOffroad:'45-50', supportDuration:40,
+      next:['bmd4'],
+      researchCost:{ ammoCal:'7.62x54', ammoCount:2500, liquor:2500, exp:12000 }
+    };
+  }
+  if(!VEHICLES.bmd4){
+    VEHICLES.bmd4 = {
+      id:'bmd4', name:'BMD-4', tier:5, line:'bmp',
+      weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',
+      speedRoad:70, speedOffroad:'45-50', supportDuration:42,
+      next:[],
+      researchCost:{ ammoCal:'7.62x54', ammoCount:3000, liquor:3000, exp:15000 }
+    };
+  }
+  
+  if(VEHICLES.btr80){
+    var b0 = VEHICLES.btr80.next = VEHICLES.btr80.next || [];
+    if(b0.indexOf('btr80a') < 0) b0.push('btr80a');
+    if(b0.indexOf('bmp1') < 0) b0.push('bmp1');
+    if(b0.indexOf('t80') < 0) b0.push('t80');
+    VEHICLES.btr80.next = b0.filter(function(v){ return v !== 'bmp1am'; });
+  }
+})();
+
+// ★ v124：修复点击失效
+(function(){
+  if(window._v124TechTreePatched) return;
+  window._v124TechTreePatched = true;
+
+  // 清理旧样式
+  for(var i=100; i<=123; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  if(!document.getElementById('wt-tech-v124-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v124-style';
+    st.textContent = `
+      .modal-bd-inner.wt-tech-modal {
+        padding: 0 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      .wt-tech-custom-scroll {
+        flex: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: auto !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        -webkit-overflow-scrolling: touch; 
+        user-select: none; 
+        -webkit-user-select: none;
+        touch-action: manipulation; /* 阻止双击放大 */
+      }
+      .wt-tech-custom-scroll:active {
+        cursor: grabbing;
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:260, y:440 },
+      { vid:'t80um',  x:380, y:440 }
+    ];
+
+    var svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    // T80U 平级分叉
+    svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img draggable="false" src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    var body = '<div class="wt-tech-custom-scroll">' +
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '科技樹', body: body });
+    
+    if(bd) {
+      bd.classList.add('wt-tech-modal');
+      var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
+      if (scrollEl) {
+        scrollEl.addEventListener('dragstart', function(e) { e.preventDefault(); });
+        scrollEl.addEventListener('dblclick', function(e) { e.preventDefault(); });
+
+        var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
+        var hasMoved = false;
+
+        scrollEl.addEventListener('pointerdown', function(e){
+          if (e.pointerType === 'touch' || e.button !== 0) return;
+          isDown = true;
+          hasMoved = false;
+          startX = e.clientX; 
+          startY = e.clientY;
+          scrollLeft = scrollEl.scrollLeft; 
+          scrollTop = scrollEl.scrollTop;
+          scrollEl.style.cursor = 'grabbing';
+          
+          // 【已移除】 e.preventDefault() 
+          // 这里不再阻止默认行为，让 click 事件有机会正常生成
+          
+          try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
+        });
+        
+        scrollEl.addEventListener('pointermove', function(e){
+          if (!isDown) return;
+          if (e.cancelable) e.preventDefault(); // 只有在滑动时才阻止默认选中
+          var dx = e.clientX - startX, dy = e.clientY - startY;
+          
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+            hasMoved = true;
+          }
+          
+          if (hasMoved) {
+            scrollEl.scrollLeft = scrollLeft - dx;
+            scrollEl.scrollTop = scrollTop - dy;
+          }
+        });
+        
+        function endPan(e) {
+          if (!isDown) return;
+          isDown = false;
+          scrollEl.style.cursor = '';
+          try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
+          
+          // 延迟重置 hasMoved，以便拦截松手瞬间触发的 click
+          if (hasMoved) {
+            setTimeout(function(){ hasMoved = false; }, 50);
+          }
+        }
+        scrollEl.addEventListener('pointerup', endPan);
+        scrollEl.addEventListener('pointercancel', endPan);
+
+        // 【新增】在捕获阶段拦截拖拽后误触发的 click
+        scrollEl.addEventListener('click', function(e) {
+          if (hasMoved) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }, true);
+      }
+    }
+
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(e){
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v125：完美点击与拖拽
+(function(){
+  if(window._v125TechTreePatched) return;
+  window._v125TechTreePatched = true;
+
+  // 清理旧样式
+  for(var i=100; i<=124; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  if(!document.getElementById('wt-tech-v125-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v125-style';
+    st.textContent = `
+      .modal-bd-inner.wt-tech-modal {
+        padding: 0 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      .wt-tech-custom-scroll {
+        flex: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: auto !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        -webkit-overflow-scrolling: touch; 
+        user-select: none; 
+        -webkit-user-select: none;
+        touch-action: manipulation; 
+      }
+      .wt-tech-custom-scroll:active {
+        cursor: grabbing;
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:260, y:440 },
+      { vid:'t80um',  x:380, y:440 }
+    ];
+
+    var svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    // T80U 平级分叉
+    svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img draggable="false" src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    var body = '<div class="wt-tech-custom-scroll">' +
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '科技樹', body: body });
+    
+    if(bd) {
+      bd.classList.add('wt-tech-modal');
+      var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
+      if (scrollEl) {
+        scrollEl.addEventListener('dragstart', function(e) { e.preventDefault(); });
+        scrollEl.addEventListener('dblclick', function(e) { e.preventDefault(); });
+
+        var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
+        var hasMoved = false;
+
+        scrollEl.addEventListener('pointerdown', function(e){
+          if (e.pointerType === 'touch' || e.button !== 0) return;
+          isDown = true;
+          hasMoved = false;
+          startX = e.clientX; 
+          startY = e.clientY;
+          scrollLeft = scrollEl.scrollLeft; 
+          scrollTop = scrollEl.scrollTop;
+          // 不在此时 setPointerCapture
+        });
+        
+        scrollEl.addEventListener('pointermove', function(e){
+          if (!isDown) return;
+          var dx = e.clientX - startX, dy = e.clientY - startY;
+          
+          // 移动超过 4 像素才开启拖拽捕获
+          if (!hasMoved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+            hasMoved = true;
+            scrollEl.style.cursor = 'grabbing';
+            try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
+          }
+          
+          if (hasMoved) {
+            if (e.cancelable) e.preventDefault();
+            scrollEl.scrollLeft = scrollLeft - dx;
+            scrollEl.scrollTop = scrollTop - dy;
+          }
+        });
+        
+        function endPan(e) {
+          if (!isDown) return;
+          isDown = false;
+          scrollEl.style.cursor = '';
+          
+          if (hasMoved) {
+            try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
+            // 延迟重置，避免后续生成的 click 被拦截
+            setTimeout(function(){ hasMoved = false; }, 50);
+          }
+        }
+        scrollEl.addEventListener('pointerup', endPan);
+        scrollEl.addEventListener('pointercancel', endPan);
+
+        // 捕获阶段拦截拖拽后引发的 click
+        scrollEl.addEventListener('click', function(e) {
+          if (hasMoved) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }, true);
+      }
+    }
+
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(e){
+          var vid = btn.getAttribute('data-tech-node');
+          _garageShowTechDetail(vid);
+        };
+      })(btns[bi]);
+    }
+  };
+})();
+
+// ★ v126：完美触控
+(function(){
+  if(window._v126TechTreePatched) return;
+  window._v126TechTreePatched = true;
+
+  // 清理历史样式
+  for(var i=100; i<=125; i++){
+    var el = document.getElementById('wt-tech-v'+i+'-style');
+    if(el) el.remove();
+  }
+
+  if(!document.getElementById('wt-tech-v126-style')){
+    var st = document.createElement('style');
+    st.id = 'wt-tech-v126-style';
+    st.textContent = `
+      .modal-bd-inner.wt-tech-modal {
+        padding: 0 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      .wt-tech-custom-scroll {
+        flex: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: auto !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        -webkit-overflow-scrolling: touch; 
+        user-select: none; 
+        -webkit-user-select: none;
+        touch-action: manipulation; 
+      }
+      .wt-tech-custom-scroll:active {
+        cursor: grabbing;
+      }
+      .wt-tech-custom-scroll::-webkit-scrollbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  window._garageOpenTechTree = function(){
+    var NW = 100, NH = 64;
+    var nodes = [
+      { vid:'btr80',  x:140, y:10  },
+      { vid:'btr80a', x:20,  y:90  },
+      { vid:'btr82',  x:20,  y:170 },
+      { vid:'btr82a', x:20,  y:250 },
+      { vid:'btr90',  x:20,  y:330 },
+      { vid:'bmp1',   x:140, y:90  },
+      { vid:'bmp1m',  x:140, y:170 },
+      { vid:'bmp2',   x:140, y:250 },
+      { vid:'bmp3',   x:140, y:330 },
+      { vid:'bmd4',   x:140, y:410 },
+      { vid:'t80',    x:260, y:90  },
+      { vid:'t80b',   x:260, y:170 },
+      { vid:'t80bv',  x:260, y:250 },
+      { vid:'t80u',   x:260, y:330 },
+      { vid:'t80uk',  x:260, y:440 },
+      { vid:'t80um',  x:380, y:440 }
+    ];
+
+    var svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
+    // T80U 平级分叉
+    svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
+    svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+    svg += '</svg>';
+
+    var g = _garageInitState();
+    var research = _garageGetResearchInfo();
+    var researchId = research ? research.targetId : null;
+    var nodesHtml = '';
+    for(var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      var v = VEHICLES[n.vid];
+      if(!v) continue;
+      var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
+      var isCurrent = g.currentVehicle === n.vid;
+      var isResearch = (researchId === n.vid);
+      var prereqs = Object.keys(VEHICLES).filter(function(pvid){
+        return (VEHICLES[pvid].next || []).indexOf(n.vid) >= 0;
+      });
+      var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
+      var cls = 'wt-node';
+      var mark = '';
+      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
+      else if(owned){ cls += ' owned'; mark = '✓'; }
+      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
+      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
+      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      else { cls += ' locked'; mark = '?'; }
+      
+      nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
+        + '<div class="wt-node-img"><img draggable="false" src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+        + '<div class="wt-node-name">' + v.name + '</div>'
+        + '<div class="wt-node-mark">' + mark + '</div>'
+        + '</div>';
+    }
+
+    var body = '<div class="wt-tech-custom-scroll">' +
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
+               svg + nodesHtml + 
+               '</div></div>';
+
+    var bd = openModal({ title: '科技樹', body: body });
+    
+    if(bd) {
+      bd.classList.add('wt-tech-modal');
+      var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
+      if (scrollEl) {
+        scrollEl.addEventListener('dragstart', function(e) { e.preventDefault(); });
+        scrollEl.addEventListener('dblclick', function(e) { e.preventDefault(); });
+
+        var isDown = false, startX = 0, startY = 0, scrollLeft = 0, scrollTop = 0;
+        var hasMoved = false;
+
+        scrollEl.addEventListener('pointerdown', function(e){
+          isDown = true;
+          hasMoved = false;
+          startX = e.clientX; 
+          startY = e.clientY;
+          scrollLeft = scrollEl.scrollLeft; 
+          scrollTop = scrollEl.scrollTop;
+        });
+        
+        scrollEl.addEventListener('pointermove', function(e){
+          if (!isDown) return;
+          var dx = e.clientX - startX, dy = e.clientY - startY;
+          
+          // 移动超过 5 像素才视为拖拽
+          if (!hasMoved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+            hasMoved = true;
+            if (e.pointerType === 'mouse') {
+              scrollEl.style.cursor = 'grabbing';
+              try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
+            }
+          }
+          
+          // 只有鼠标拖拽才在这里手动滚动，触控交给浏览器原生
+          if (hasMoved && e.pointerType === 'mouse') {
+            if (e.cancelable) e.preventDefault();
+            scrollEl.scrollLeft = scrollLeft - dx;
+            scrollEl.scrollTop = scrollTop - dy;
+          }
+        });
+        
+        function endPan(e) {
+          if (!isDown) return;
+          isDown = false;
+          
+          if (hasMoved) {
+            scrollEl.style.cursor = '';
+            try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
+            // 延迟重置，以便拦截紧随其后的 click
+            setTimeout(function(){ hasMoved = false; }, 50);
+          }
+        }
+        scrollEl.addEventListener('pointerup', endPan);
+        scrollEl.addEventListener('pointercancel', endPan);
+
+        // 捕获阶段拦截误触
+        scrollEl.addEventListener('click', function(e) {
+          if (hasMoved) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }, true);
+      }
+    }
+
+    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    var btns = bd.querySelectorAll('[data-tech-node]');
+    for(var bi = 0; bi < btns.length; bi++){
+      (function(btn){
+        btn.onclick = function(e){
           var vid = btn.getAttribute('data-tech-node');
           _garageShowTechDetail(vid);
         };
