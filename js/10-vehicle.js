@@ -1171,6 +1171,19 @@ const BTRSupport = {
       const groundY = h * 0.95; const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
       this.sinkOffset = py0 < 4 ? (4 - py0) : 0;
     }
+    
+    if (!this._dbgBtn) {
+        var _dbg = document.createElement('div');
+        _dbg.textContent = 'DBG';
+        _dbg.style.cssText = 'position:absolute;right:8px;top:8px;padding:6px 12px;background:rgba(0,0,0,0.8);color:#0f0;border:1px solid #0f0;border-radius:4px;font:bold 12px monospace;z-index:9999;cursor:pointer;user-select:none;';
+        _dbg.onclick = function() {
+            window._BTR_CLIP_DEBUG = !window._BTR_CLIP_DEBUG;
+            _dbg.style.background = window._BTR_CLIP_DEBUG ? 'rgba(0,80,0,0.9)' : 'rgba(0,0,0,0.8)';
+        };
+        zone.appendChild(_dbg);
+        this._dbgBtn = _dbg;
+    }
+    if (typeof window._BTR_CLIP_DEBUG === 'undefined') window._BTR_CLIP_DEBUG = true;
   },
   _loop(t) {
     if(!this.active) return;
@@ -1685,6 +1698,44 @@ const BTRSupport = {
       if(_dustSrc) window.spawnDust(this.dustParticles, px, py, _dustSrc, this.targetW, this.targetH, wheelSpd);
     }
     window.updateAndDrawDust(ctx, this.dustParticles, dt);
+    /* rev908-diag-lines: 红/蓝/绿 三色竖线 */
+    if (window._BTR_CLIP_DEBUG) {
+      try {
+        ctx.save();
+        var _m30x = -1, _m100x = -1;
+        for (var _mi = 0; _mi < this.muzzles.length; _mi++) {
+          var _mm = this.muzzles[_mi];
+          if (_mm.weaponId === '2a72' || _mm.weaponId === '2a42') _m30x = this.x * this.width + _mm.mx * this.targetW;
+          if (_mm.weaponId === '2a70') _m100x = this.x * this.width + _mm.mx * this.targetW;
+        }
+        if (_m30x > 0) {
+          ctx.strokeStyle = 'red'; ctx.lineWidth = 2; ctx.setLineDash([10, 6]);
+          ctx.beginPath(); ctx.moveTo(_m30x, 0); ctx.lineTo(_m30x, this.height); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = 'red'; ctx.font = 'bold 11px monospace';
+          ctx.fillText('30mm', _m30x + 4, 14);
+        }
+        if (_m100x > 0) {
+          ctx.strokeStyle = 'blue'; ctx.lineWidth = 2; ctx.setLineDash([10, 6]);
+          ctx.beginPath(); ctx.moveTo(_m100x, 0); ctx.lineTo(_m100x, this.height); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = 'blue'; ctx.font = 'bold 11px monospace';
+          ctx.fillText('100mm', _m100x + 4, 14);
+        }
+        var _jets = (this.fx && this.fx.smoke) ? this.fx.smoke.filter(function(p){ return p.isJet; }) : [];
+        if (_jets.length) {
+          var _last = _jets[_jets.length - 1];
+          if (_last._muzzleX != null && isFinite(_last._muzzleX)) {
+            ctx.strokeStyle = 'lime'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(_last._muzzleX, 0); ctx.lineTo(_last._muzzleX, this.height); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = 'lime'; ctx.font = 'bold 11px monospace';
+            ctx.fillText('jet', _last._muzzleX + 4, 26);
+          }
+        }
+        ctx.restore();
+      } catch(e) {}
+    }
     /* rev907-diag: 屏幕右上角诊断文本 */
     {
       var _d = window._vsDiag;
@@ -1763,6 +1814,7 @@ const BTRSupport = {
     if(this.canvas){ this.canvas.remove(); this.canvas = null; this.ctx = null; }
     if(this.streamBgEl){ this.streamBgEl.remove(); this.streamBgEl = null; }
     this.fireFx = []; this.muzzles = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = []; this.missiles = [];
+    if (this._dbgBtn) { try { this._dbgBtn.remove(); } catch(e) {} this._dbgBtn = null; }
   },
   stop() { this._cleanup(); this.active = false; }
 };
@@ -2037,6 +2089,13 @@ window._vsDrawSmoke = function(ctx, particles){
     var p = window._vsMakeSmokeJet(x, y, weaponId, angle);
     if(p) { 
         p._muzzleX = muzzleX; 
+        p._muzzleY = y;
+        // 30mm 機炮與 100mm 並排時，傾斜裁切在手機 dpr 下易漂移，強制水平裁切
+        if (weaponId === '2a72' || weaponId === '2a42') {
+            p._muzzleAngle = 0;
+        } else {
+            p._muzzleAngle = angle || 0;
+        }
         p._layerOrder = layerOrder || 'above';
     }
     this.smoke.push(p);
