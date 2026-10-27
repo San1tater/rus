@@ -859,11 +859,11 @@ const BTR_TIMELINE = {
 const PHASE_ORDER = ['enter', 'arrive', 'sink', 'center', 'support', 'lift', 'exit', 'leave'];
 
 const MUZZLE_PROFILES = {
-  kpvt:    { burst: 3,  intervalMs: 100,   pauseMs: 300,   flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
-  pkt:     { burst: 3,  intervalMs: 80,    pauseMs: 300,   flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
-  nsvt:    { burst: 3,  intervalMs: 80,    pauseMs: 300,   flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470, projectileType: 'bullet' },
-  '2a72':  { burst: 5, intervalMs: 300,   pauseMs: 600,   flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
-  '2a42':  { burst: 5, intervalMs: 150,   pauseMs: 600,   flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
+  kpvt:    { burst: 5,  intervalMs: 100,   pauseMs: 300,   flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
+  pkt:     { burst: 5,  intervalMs: 80,    pauseMs: 300,   flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
+  nsvt:    { burst: 5,  intervalMs: 80,    pauseMs: 300,   flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470, projectileType: 'bullet' },
+  '2a72':  { burst: 8, intervalMs: 300,   pauseMs: 600,   flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
+  '2a42':  { burst: 8, intervalMs: 150,   pauseMs: 600,   flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
   '2a46':  { burst: 1,  intervalMs: 7500,  pauseMs: 7500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   '2a46m1':{ burst: 1,  intervalMs: 7500,  pauseMs: 7500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   atgm:    { burst: 1,  intervalMs: 20000, pauseMs: 20000, flashSize: 30, flashColor: '255,200,100', bulletSize: 5,   bulletSpeed: 280, projectileType: 'missile' },
@@ -974,14 +974,15 @@ const BTRSupport = {
         _layerOrder: layerOrder || 'above'
       });
     },
-    spawnTracer(x, y, speed, type, layerOrder) {
+    spawnTracer(x, y, speed, type, layerOrder, angleDeg) {
       this.tracers.push({
         startX: x, startY: y, born: performance.now(),
         speed: speed,
         len:   type === 'cannon' ? 80 : 40,
         width: type === 'cannon' ? 3  : 1.5,
         type:  type,
-        _layerOrder: layerOrder || 'above'
+        _layerOrder: layerOrder || 'above',
+        _ang: (angleDeg || 0) * Math.PI / 180
       });
     },
     spawnMissileJet(x, y) {
@@ -1036,16 +1037,24 @@ const BTRSupport = {
       ctx.save(); ctx.shadowColor = 'rgba(255,200,50,0.8)'; ctx.shadowBlur = 10;
       for (let i = this.tracers.length - 1; i >= 0; i--) {
         const t = this.tracers[i];
-        const tipX = t.startX + (now - t.born) / 1000 * t.speed;
+        const _c = Math.cos(t._ang || 0), _s = Math.sin(t._ang || 0);
+        const _dist = (now - t.born) / 1000 * t.speed;
+        const tipX = t.startX + _c * _dist;
+        const tipY = t.startY + _s * _dist;
         if (tipX - t.len > ctx.canvas.width + 200) { this.tracers.splice(i, 1); continue; }
         if (layerOrder && (t._layerOrder || 'above') !== layerOrder) continue;
-        const tailX = Math.max(t.startX, tipX - t.len);
-        const grad = ctx.createLinearGradient(tailX, t.startY, tipX, t.startY);
+        /* rev905: 炮口裁切（与发射烟共用） */
+        ctx.save();
+        window._vsClipAtMuzzle(ctx, t.startX, t.startY, t._ang || 0);
+        const tailX = tipX - _c * t.len;
+        const tailY = tipY - _s * t.len;
+        const grad = ctx.createLinearGradient(tailX, tailY, tipX, tipY);
         grad.addColorStop(0, 'rgba(255,200,50,0)');
         grad.addColorStop(0.8, 'rgba(255,255,200,0.9)');
         grad.addColorStop(1, '#fff');
         ctx.strokeStyle = grad; ctx.lineWidth = t.width;
-        ctx.beginPath(); ctx.moveTo(tailX, t.startY); ctx.lineTo(tipX, t.startY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(tailX, tailY); ctx.lineTo(tipX, tipY); ctx.stroke();
+        ctx.restore();
       }
       ctx.restore();
     }
@@ -1073,16 +1082,18 @@ const BTRSupport = {
   },
   _setupMuzzles() {
     const ann = ANN[this.vehicleId]; this.muzzles = []; if(!ann || !ann.muzzles) return;
+    // 只有 100mm 2A70 與 30mm 2A72 是剛性並列安裝（bmp3 / bmd4）
+    // 125mm 2A46 / 73mm 2A28 沒有並列機炮，不需要 parent 綁定
     let mainWid = null;
     for(const mm of ann.muzzles){
-        if(mm.weaponId === '2a70' || mm.weaponId === '2a46' || mm.weaponId === '2a46m1' || mm.weaponId === '2a28') {
+        if(mm.weaponId === '2a70') {
             mainWid = mm.weaponId;
             break;
         }
     }
     for(const m of ann.muzzles){
       let pid = null;
-      if ((m.weaponId === '2a72' || m.weaponId === '2a42') && mainWid && m.weaponId !== mainWid) {
+      if ((m.weaponId === '2a72' || m.weaponId === '2a42') && mainWid) {
           pid = mainWid;
       }
       this.muzzles.push({ 
@@ -1255,8 +1266,8 @@ const BTRSupport = {
   _fireMuzzle(m, now) {
     m.lastFireAt = now;
     const ann = ANN[this.vehicleId];
-    const basePx = this.x * this.width;
-    const basePy = this.height * 0.95 - (this._contentBottomRatio || 1) * this.targetH + this.yOffset;
+    const basePx = this.x * this.width + (this.shakeX || 0);
+    const basePy = this.height * 0.95 - (this._contentBottomRatio || 1) * this.targetH + this.yOffset + (this.shakeY || 0);
     const isMG = (m.weaponId === 'pkt' || m.weaponId === 'nsvt' || m.weaponId === 'kpvt');
     const isATGM = (m.weaponId === 'atgm');
     const isMain = (m.weaponId === '2a46' || m.weaponId === '2a46m1' || m.weaponId === '2a28' || m.weaponId === '2a70');
@@ -1279,10 +1290,22 @@ const BTRSupport = {
 
     if (!isATGM) {
       let showTracer = false;
-      if (isMain) showTracer = Math.random() < 0.5;
-      else if (isMG) showTracer = Math.random() < 0.1;
-      else showTracer = Math.random() < 0.15;
-      if (showTracer) this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon', m.layerOrder);
+      const _shotIdx = m.profile.burst - m.shotsLeft + 1;
+      if (isMain) {
+        showTracer = Math.random() < 0.5;
+      } else if (isMG) {
+        // 機槍：每 5 發中的第 5 發
+        showTracer = (_shotIdx % 5 === 0);
+      } else {
+        // 機炮：每 4 發中的第 4 發
+        showTracer = (_shotIdx % 4 === 0);
+      }
+      if (showTracer) {
+        let _trAng = 0;
+        if (typeof m.angle === 'number') _trAng = m.angle;
+        else if (window.MUZZLE_ANGLES && window.MUZZLE_ANGLES[m.weaponId]) _trAng = window.MUZZLE_ANGLES[m.weaponId];
+        this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon', m.layerOrder, _trAng);
+      }
     }
 
     let triggerFlash = false;
@@ -1330,8 +1353,8 @@ const BTRSupport = {
         else if (m.weaponId === 'atgm') { rcDist = 0.040; }
     }
 
-    if (m.weaponId === '2a72' || m.weaponId === '2a42') {
-        rcDist = 0;
+    if (!foundDist && (m.weaponId === '2a72' || m.weaponId === '2a42')) {
+        rcDist = 0.015; // 預設給予微小的獨立管退，若配置了 recoilDist 則不覆蓋
     }
 
     if (m.weaponId === '2a46' || m.weaponId === '2a46m1' || m.weaponId === '2a70' || m.weaponId === '2a28') rcDur = 900;
@@ -1913,7 +1936,21 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
   }
 };
 
-  window._vsDrawSmoke = function(ctx, particles){
+  /* rev905: 炮口裁切共用（发射烟 + 曳光弹） */
+window._vsClipAtMuzzle = function(ctx, mx, my, angleRad){
+  const _c = Math.cos(angleRad), _s = Math.sin(angleRad);
+  const _px = -_s, _py = _c;
+  const _BIG = 10000;
+  ctx.beginPath();
+  ctx.moveTo(mx + _px * _BIG, my + _py * _BIG);
+  ctx.lineTo(mx - _px * _BIG, my - _py * _BIG);
+  ctx.lineTo(mx - _px * _BIG + _c * _BIG, my - _py * _BIG + _s * _BIG);
+  ctx.lineTo(mx + _px * _BIG + _c * _BIG, my + _py * _BIG + _s * _BIG);
+  ctx.closePath();
+  ctx.clip();
+};
+
+window._vsDrawSmoke = function(ctx, particles){
     for (const p of particles) {
       let a = 0;
       if (p.isJet) {
@@ -1924,9 +1961,13 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
       if (a < 0.005) continue;
       ctx.save();
       if (p.isJet && p._muzzleX !== undefined) {
-          ctx.beginPath();
-          ctx.rect(p._muzzleX, 0, ctx.canvas.width, ctx.canvas.height);
-          ctx.clip();
+          if (p._muzzleAngle !== undefined) {
+              window._vsClipAtMuzzle(ctx, p._muzzleX, p._muzzleY !== undefined ? p._muzzleY : p.y, p._muzzleAngle * Math.PI / 180);
+          } else {
+              ctx.beginPath();
+              ctx.rect(p._muzzleX, 0, ctx.canvas.width, ctx.canvas.height);
+              ctx.clip();
+          }
       }
       ctx.translate(p.x, p.y);
       if (p.isJet) {
