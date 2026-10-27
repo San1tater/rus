@@ -862,8 +862,8 @@ const MUZZLE_PROFILES = {
   kpvt:    { burst: 3,  intervalMs: 100,   pauseMs: 300,   flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
   pkt:     { burst: 3,  intervalMs: 80,    pauseMs: 300,   flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
   nsvt:    { burst: 3,  intervalMs: 80,    pauseMs: 300,   flashSize: 24, flashColor: '255,220,120', bulletSize: 3.5, bulletSpeed: 470, projectileType: 'bullet' },
-  '2a72':  { burst: 7, intervalMs: 200,   pauseMs: 500,   flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
-  '2a42':  { burst: 7, intervalMs: 92,    pauseMs: 500,   flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
+  '2a72':  { burst: 5, intervalMs: 300,   pauseMs: 600,   flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
+  '2a42':  { burst: 5, intervalMs: 150,   pauseMs: 600,   flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
   '2a46':  { burst: 1,  intervalMs: 7500,  pauseMs: 7500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   '2a46m1':{ burst: 1,  intervalMs: 7500,  pauseMs: 7500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   atgm:    { burst: 1,  intervalMs: 20000, pauseMs: 20000, flashSize: 30, flashColor: '255,200,100', bulletSize: 5,   bulletSpeed: 280, projectileType: 'missile' },
@@ -879,25 +879,20 @@ const BTRSupport = {
   supportRegion: null, routeCursor: { pathIdx: 0, nodeIdx: 0 }, kills: {}, loot: [], killCount: 0, lastTickSec: -1,
   muzzles: [], fireFx: [], dustParticles: [], recoilStates: {},
   playerClipH: 1.0, playerXOffset: 0, doorOpen: 0, shakeX: 0, shakeY: 0, _finished: false,
-  
-                        fx: {
+
+  fx: {
     smoke: [], tracers: [],
-    // [rev799] 发射烟（激波）：单个粒子，由 _updateRecoilSmoke 在 t=0 调用
-    // 不设 skipUpdate —— 首帧被 fx.update 推进到炮口前方 125~250px，不遮挡炮口
-    // [rev801] 發射煙：高不透明度柱狀射流
-    // [rev802] 發射煙：拉長錐形，連接擴散點
     spawnJetOne(x, y, weaponId) {
       const _base = 300;
       const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
       const isATGM = (weaponId === 'atgm');
       if (isATGM) {
-        // ATGM 專屬：扁平矩形柱狀噴射
         this.smoke.push({
           x: x + 15, y: y,
-          vx: _base * 30, vy: (Math.random() - 0.5) * _base * 0.02, // 縱向極小
+          vx: _base * 30, vy: (Math.random() - 0.5) * _base * 0.02,
           life: 1, rate: 1 / 0.25,
           sizeX: _base * 0.2, sizeY: _base * 0.02,
-          growX: _base * 4.0, growY: _base * 0.1, // Y 幾乎不長，保持柱狀
+          growX: _base * 4.0, growY: _base * 0.1,
           alpha0: 0.95, isJet: true, isCore: true,
           friction: 0.7,
           angle: 0, spin: 0, worldFactor: 0.1,
@@ -929,13 +924,6 @@ const BTRSupport = {
         });
       }
     },
-    // [rev799] 扩散烟：单个粒子，由 _updateRecoilSmoke 在管退全程按进度调用
-    // 设 skipUpdate: true —— 首帧不推进，fx.draw 第一次就画在「当时炮口」位置
-    // [rev801] 擴散煙：向左（車尾方向）擴散，半透明
-    // [rev802] 擴散煙：半透明，原地爆開膨脹後向左拖曳
-    // [rev803] 擴散煙：半透明（降低 alpha0），原地爆開膨脹後向左拖曳
-    // [rev805] 擴散煙：極淡、快速消散、向後拖曳
-    // [rev806] 擴散煙：長壽命確保覆蓋範圍，高 grow 快速膨脹，pow 4.0 快速淡出
     spawnSpreadOne(x, y, weaponId) {
       const _base = 300;
       const isHeavy = (weaponId === '2a46' || weaponId === '2a46m1' || weaponId === 'atgm');
@@ -945,9 +933,9 @@ const BTRSupport = {
           y: y + (Math.random() - 0.5) * _base * 0.2,
           vx: (Math.random() - 0.5) * _base * 0.5, 
           vy: (Math.random() - 0.5) * _base * 0.5,
-          life: 1, rate: 1 / (2.0 + Math.random() * 0.8), // 恢復長壽命 2.0~2.8s
+          life: 1, rate: 1 / (2.0 + Math.random() * 0.8),
           sizeX: _base * 0.3, sizeY: _base * 0.3,
-          growX: _base * 3.5, growY: _base * 3.5, // 加快膨脹
+          growX: _base * 3.5, growY: _base * 3.5,
           alpha0: 0.22, isJet: false, isCore: false,
           friction: 0.92,
           angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
@@ -960,9 +948,9 @@ const BTRSupport = {
           y: y + (Math.random() - 0.5) * _base * 0.15,
           vx: (Math.random() - 0.5) * _base * 0.4,
           vy: (Math.random() - 0.5) * _base * 0.4,
-          life: 1, rate: 1 / (1.5 + Math.random() * 0.6), // 恢復長壽命 1.5~2.1s
+          life: 1, rate: 1 / (1.5 + Math.random() * 0.6),
           sizeX: _base * 0.2, sizeY: _base * 0.2,
-          growX: _base * 2.5, growY: _base * 2.5, // 加快膨脹
+          growX: _base * 2.5, growY: _base * 2.5,
           alpha0: 0.18, isJet: false, isCore: false,
           friction: 0.94,
           angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 0.5,
@@ -971,9 +959,8 @@ const BTRSupport = {
         });
       }
     },
-    spawnMG(x, y) {
+    spawnMG(x, y, layerOrder) {
       const _base = this.targetW || 300;
-      // 机枪发射烟 - 加入 worldFactor: 1.0 实现向后飘
       this.smoke.push({ 
         x: x, y: y, 
         vx: 0, vy: -_base * 0.2 - Math.random() * _base * 0.1, 
@@ -983,20 +970,20 @@ const BTRSupport = {
         alpha0: 0.3, isJet: false, isCore: false, 
         friction: 0.96, 
         angle: Math.random() * 6.28, spin: (Math.random() - 0.5) * 1,
-        worldFactor: 1.0
+        worldFactor: 1.0,
+        _layerOrder: layerOrder || 'above'
       });
     },
     spawnTracer(x, y, speed, type) {
       this.tracers.push({ startX: x, startY: y, born: performance.now(), speed: speed, len: type === 'cannon' ? 80 : 40, width: type === 'cannon' ? 3 : 1.5, type: type });
     },
     spawnMissileJet(x, y) {
-      // 導彈推力尾焰：短暫、不膨脹、完全覆蓋
       this.smoke.push({
         x: x - 15, y: y,
         vx: -100, vy: (Math.random() - 0.5) * 6,
         life: 1, rate: 1 / 0.15,
         sizeX: 20, sizeY: 8,
-        growX: 0, growY: 0, // 不膨脹
+        growX: 0, growY: 0,
         alpha0: 0.95, isJet: true, isCore: true,
         friction: 0.8,
         angle: 0, spin: 0, worldFactor: 0.5,
@@ -1004,13 +991,12 @@ const BTRSupport = {
       });
     },
     spawnMissileSpread(x, y) {
-      // 導彈擴散尾跡：半透明、長壽命、緩慢膨脹
       this.smoke.push({
         x: x - 20 + (Math.random() - 0.5) * 20,
         y: y + (Math.random() - 0.5) * 10,
         vx: -50 + Math.random() * 20,
         vy: (Math.random() - 0.5) * 20,
-        life: 1, rate: 1 / (2.0 + Math.random() * 1.0), // 壽命 2~3 秒
+        life: 1, rate: 1 / (2.0 + Math.random() * 1.0),
         sizeX: 15, sizeY: 15,
         growX: 30, growY: 30,
         alpha0: 0.35, isJet: false, isCore: false,
@@ -1020,16 +1006,13 @@ const BTRSupport = {
         skipUpdate: true
       });
     },
-
     update(now, dt, worldSpeed) {
       for (let i = this.smoke.length - 1; i >= 0; i--) {
         const p = this.smoke[i];
-        // [rev799] 首帧不推进（扩散烟专用：让首次 draw 画在出生点）
         if (p.skipUpdate) { p.skipUpdate = false; continue; }
         const driftSpeed = worldSpeed * (p.worldFactor || 0);
         p.x += (p.vx - driftSpeed) * dt; 
         p.y += p.vy * dt;
-        // [rev799] friction 时间基：任何帧率下衰减曲线等效 60fps
         const _fric = Math.pow(p.friction, dt * 60);
         p.vx *= _fric;
         p.vy *= _fric;
@@ -1040,37 +1023,7 @@ const BTRSupport = {
         if (p.life <= 0) this.smoke.splice(i, 1);
       }
     },
-    draw(ctx) {
-      for (const p of this.smoke) {
-        let a = 0;
-        if (p.isJet) {
-        if (p._muzzleX !== undefined) {
-            ctx.beginPath();
-            ctx.rect(p._muzzleX, -20000, 40000, 40000);
-            ctx.clip();
-        }
-        ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
-        ctx.globalAlpha = a; 
-          const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
-          g.addColorStop(0, 'rgba(255, 255, 255, 1)');
-          g.addColorStop(0.4, 'rgba(230, 240, 255, 0.8)'); 
-          g.addColorStop(1, 'rgba(200, 210, 220, 0)');
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2); ctx.fill();
-        } else {
-          ctx.rotate(p.angle);
-          ctx.globalAlpha = a; 
-          const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeX);
-          g.addColorStop(0, 'rgba(235, 235, 240, 0.9)');
-          g.addColorStop(0.5, 'rgba(210, 210, 215, 0.2)'); 
-          g.addColorStop(1, 'rgba(190, 190, 195, 0)');
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(0, 0, p.sizeX, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.restore();
-      }
-      ctx.globalAlpha = 1;
-    },
+    draw(ctx) { },
     drawTracers(ctx, now) {
       if (!this.tracers || !this.tracers.length) return;
       ctx.save(); ctx.shadowColor = 'rgba(255,200,50,0.8)'; ctx.shadowBlur = 10;
@@ -1089,28 +1042,6 @@ const BTRSupport = {
       ctx.restore();
     }
   },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   start(vid) {
     if(this.active) return;
@@ -1134,8 +1065,30 @@ const BTRSupport = {
   },
   _setupMuzzles() {
     const ann = ANN[this.vehicleId]; this.muzzles = []; if(!ann || !ann.muzzles) return;
+    let mainWid = null;
+    for(const mm of ann.muzzles){
+        if(mm.weaponId === '2a70' || mm.weaponId === '2a46' || mm.weaponId === '2a46m1' || mm.weaponId === '2a28') {
+            mainWid = mm.weaponId;
+            break;
+        }
+    }
     for(const m of ann.muzzles){
-      this.muzzles.push({ weaponId: m.weaponId, mx: m.x, my: m.y, angle: m.angle, profile: MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default, shotsLeft: (MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default).burst, nextFireAt: 0, lastFireAt: 0 });
+      let pid = null;
+      if ((m.weaponId === '2a72' || m.weaponId === '2a42') && mainWid && m.weaponId !== mainWid) {
+          pid = mainWid;
+      }
+      this.muzzles.push({ 
+        weaponId: m.weaponId, 
+        mx: m.x, 
+        my: m.y, 
+        angle: m.angle, 
+        layerOrder: m.layerOrder || 'above', 
+        _parentId: pid, 
+        profile: MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default, 
+        shotsLeft: (MUZZLE_PROFILES[m.weaponId] || MUZZLE_PROFILES.default).burst, 
+        nextFireAt: 0, 
+        lastFireAt: 0 
+      });
     }
   },
   _setupStreamBg() {
@@ -1192,7 +1145,6 @@ const BTRSupport = {
       }
       this.doorOffsetRatio = _doorCenterRatio; this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
       let maxMuzzleX = 0; if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
-      // [Debug] 接入實時滑動條比例
       const targetMuzzleRatio = 0.9; 
       const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW; 
       const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
@@ -1292,22 +1244,31 @@ const BTRSupport = {
     const idx = regions.indexOf(this.supportRegion); const nextIdx = (idx + 1) % regions.length; const nextRegion = regions[nextIdx];
     if(nextRegion !== this.supportRegion){ this.supportRegion = nextRegion; this._logRegionEntry(); }
   },
-    _fireMuzzle(m, now) {
+  _fireMuzzle(m, now) {
     m.lastFireAt = now;
+    const ann = ANN[this.vehicleId];
     const basePx = this.x * this.width;
     const basePy = this.height * 0.95 - (this._contentBottomRatio || 1) * this.targetH + this.yOffset;
     const isMG = (m.weaponId === 'pkt' || m.weaponId === 'nsvt' || m.weaponId === 'kpvt');
     const isATGM = (m.weaponId === 'atgm');
     const isMain = (m.weaponId === '2a46' || m.weaponId === '2a46m1' || m.weaponId === '2a28' || m.weaponId === '2a70');
-    const muzzleX = basePx + m.mx * this.targetW;
+    let parentRc = 0;
+    if (m._parentId && this.recoilStates[m._parentId]) {
+        const prs = this.recoilStates[m._parentId];
+        const pt = now - prs.startTime;
+        if (pt >= 0 && pt <= prs.duration) {
+            const pp = Math.min(1, pt / prs.duration);
+            const pRcP = pp < 0.08 ? pp / 0.08 : Math.pow(1 - (pp - 0.08) / 0.92, 2.4);
+            parentRc = prs.dist * this.targetW * pRcP;
+        }
+    }
+    const muzzleX = basePx + m.mx * this.targetW - parentRc;
     const muzzleY = basePy + m.my * this.targetH;
     
-    // 生成烟雾（[rev799] 机炮/主炮/ATGM 改由 _updateRecoilSmoke 按管退进度逐帧生成）
     if (isMG) {
-      this.fx.spawnMG(muzzleX, muzzleY);
+      this.fx.spawnMG(muzzleX, muzzleY, m.layerOrder);
     }
 
-    // [Debug] 降低曳光彈概率
     if (!isATGM) {
       let showTracer = false;
       if (isMain) showTracer = Math.random() < 0.5;
@@ -1316,17 +1277,16 @@ const BTRSupport = {
       if (showTracer) this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon');
     }
 
-    // 火光随机化：主炮100%，机炮首发100%后续15%，机枪10%
     let triggerFlash = false;
     if (isMain) {
       triggerFlash = true;
     } else if (isMG) {
-      triggerFlash = Math.random() < 0.1;
+      triggerFlash = Math.random() < 0.05;
     } else {
       if (m.shotsLeft === m.profile.burst) {
-        triggerFlash = true;
+        triggerFlash = Math.random() < 0.3;
       } else {
-        triggerFlash = Math.random() < 0.15;
+        triggerFlash = Math.random() < 0.05;
       }
     }
 
@@ -1334,7 +1294,7 @@ const BTRSupport = {
       mx: m.mx, my: m.my, 
       spawnX: muzzleX, spawnY: muzzleY, 
       startTime: now, endTime: now + 600, size: m.profile.flashSize, 
-      layerOrder: 'above', weaponId: m.weaponId, triggerFlash: triggerFlash
+      layerOrder: m.layerOrder || 'above', weaponId: m.weaponId, triggerFlash: triggerFlash
     });
 
     m.shotsLeft--;
@@ -1342,17 +1302,36 @@ const BTRSupport = {
     else { m.nextFireAt = now + m.profile.intervalMs; }
 
     if (!this.recoilStates) this.recoilStates = {};
-    let rcDist = 0, rcDur = 0;
-    if (m.weaponId === '2a46' || m.weaponId === '2a46m1') { rcDist = 0.10; rcDur = 900; }
-    else if (m.weaponId === '2a28') { rcDist = 0.055; rcDur = 900; }
-    else if (m.weaponId === '2a70') { rcDist = 0.048; rcDur = 900; }
-    else if (m.weaponId === '2a72') { rcDist = 0.055; rcDur = 500; }
-    else if (m.weaponId === '2a42') { rcDist = 0.045; rcDur = 500; }
-    else if (m.weaponId === 'atgm') { rcDist = 0.040; rcDur = 600; }
+    let rcDist = 0, rcDur = 500;
+    
+    let foundDist = false;
+    if (ann && ann.weaponAreas) {
+        for (const area of ann.weaponAreas) {
+            if (area.weaponId === m.weaponId && typeof area.recoilDist === 'number') {
+                rcDist = area.recoilDist;
+                foundDist = true;
+                break;
+            }
+        }
+    }
+
+    if (!foundDist) {
+        if (m.weaponId === '2a46' || m.weaponId === '2a46m1') { rcDist = 0.10; }
+        else if (m.weaponId === '2a28') { rcDist = 0.055; }
+        else if (m.weaponId === '2a70') { rcDist = 0.085; }
+        else if (m.weaponId === 'atgm') { rcDist = 0.040; }
+    }
+
+    if (m.weaponId === '2a72' || m.weaponId === '2a42') {
+        rcDist = 0;
+    }
+
+    if (m.weaponId === '2a46' || m.weaponId === '2a46m1' || m.weaponId === '2a70' || m.weaponId === '2a28') rcDur = 900;
+    else if (m.weaponId === 'atgm') rcDur = 600;
     
     this.recoilStates[m.weaponId] = {
       startTime: now, duration: rcDur, dist: rcDist,
-      _smokeActive: !isMG && !isATGM, // ATGM 不在此處生成
+      _smokeActive: !isMG && !isATGM, 
       _lastJetTime: now,
       _lastSpreadTime: now,
       _staticMuzzleX: muzzleX,
@@ -1361,7 +1340,6 @@ const BTRSupport = {
     };
     
     if (isATGM) {
-      // _isAtgmBranch_v49：每次检查图像，未加载则回退椭圆
       if(!this.erasedMissileImgs) this.erasedMissileImgs = [];
       var _ann49 = ANN[this.vehicleId];
       var _pushed49 = false;
@@ -1428,10 +1406,7 @@ const BTRSupport = {
     }
     m.recoilDur = rcDur;
     m.smokeDur = isMG ? 200 : rcDur; 
-
   },
-
-
 
   _getBTRWorldSpeed() {
     if (this.phase === 'support') return 100; 
@@ -1441,14 +1416,7 @@ const BTRSupport = {
     return 0;
   },
 
-  // [rev799] 管退全程持续生成烟雾：位置跟随「当时炮口」
-  // 发射烟 t=0 一次（原位），扩散烟按管退进度 p ∈ [0.05, 0.98] 均匀分布
-  // [rev801] 管退全程持續生成發射煙與擴散煙
-  // [rev802] 管退全程持續生成，擴散點前移對接發射煙
-  // [rev804] 擴散點基於物理尺寸（targetW），無論是否出界皆完整計算
-  // [rev805] 擴散點拉遠，與發射煙區隔
   _updateRecoilSmoke(now) {
-    // 實時計算基礎座標（包含抖動），修正位置脫節
     const basePx = this.x * this.width + this.shakeX;
     const basePy = this.height * 0.95 - (this._contentBottomRatio || 1) * this.targetH + this.yOffset + this.shakeY;
     
@@ -1460,10 +1428,21 @@ const BTRSupport = {
       
       const p = Math.min(1, t / rs.duration);
       const _rcP = p < 0.08 ? p / 0.08 : Math.pow(1 - (p - 0.08) / 0.92, 2.4);
-      const _rcPx = rs.dist * this.targetW * _rcP;
+      let _totalRcPx = rs.dist * this.targetW * _rcP;
       
-      // 實時炮口位置
-      const _muzzleXNow = basePx + m.mx * this.targetW - _rcPx;
+      if (m._parentId) {
+          const prs = this.recoilStates[m._parentId];
+          if (prs) {
+              const pt = now - prs.startTime;
+              if (pt >= 0 && pt <= prs.duration) {
+                  const pp = Math.min(1, pt / prs.duration);
+                  const pRcP = pp < 0.08 ? pp / 0.08 : Math.pow(1 - (pp - 0.08) / 0.92, 2.4);
+                  _totalRcPx += prs.dist * this.targetW * pRcP;
+              }
+          }
+      }
+
+      const _muzzleXNow = basePx + m.mx * this.targetW - _totalRcPx;
       const _muzzleYNow = basePy + m.my * this.targetH;
       
       const isMain = rs._isMain;
@@ -1471,7 +1450,6 @@ const BTRSupport = {
       const SPREAD_INTERVAL = isMain ? 24 : 32;
       const JET_MAX_TIME = isMain ? 150 : 250;
       
-      // 導彈飛行位移：每秒前進 8 個車身寬度
       const _jetXNow = _muzzleXNow;
       const _jetYNow = _muzzleYNow;
       
@@ -1479,14 +1457,14 @@ const BTRSupport = {
         let jetAngle = 0;
         if (typeof m.angle === 'number') jetAngle = m.angle;
         else if (window.MUZZLE_ANGLES && window.MUZZLE_ANGLES[m.weaponId]) jetAngle = window.MUZZLE_ANGLES[m.weaponId];
-        this.fx.spawnJetOne(_jetXNow, _jetYNow, m.weaponId, jetAngle, _muzzleXNow);
+        this.fx.spawnJetOne(_jetXNow, _jetYNow, m.weaponId, jetAngle, _muzzleXNow, m.layerOrder);
         rs._lastJetTime += JET_INTERVAL;
       }
       
       const SPREAD_OFFSET = isMain ? this.targetW * 0.45 : this.targetW * 0.25;
       const _spreadXNow = _muzzleXNow + SPREAD_OFFSET;
       while (now - rs._lastSpreadTime >= SPREAD_INTERVAL && t <= rs.duration) {
-        this.fx.spawnSpreadOne(_spreadXNow, _muzzleYNow, m.weaponId);
+        this.fx.spawnSpreadOne(_spreadXNow, _muzzleYNow, m.weaponId, m.layerOrder);
         rs._lastSpreadTime += SPREAD_INTERVAL;
       }
       
@@ -1536,10 +1514,14 @@ const BTRSupport = {
         } else if (wid !== '__default__') { delete this.recoilStates[wid]; } 
       } 
     }
+    for (const m of this.muzzles) {
+        if (m._parentId && recoilsPx[m._parentId]) {
+            recoilsPx[m.weaponId] = (recoilsPx[m.weaponId] || 0) + recoilsPx[m._parentId];
+        }
+    }
     const dt = Math.min(0.05, (now - (this._lastTick || now)) / 1000); this._lastTick = now;
     this._updateMissiles(now, dt); const worldSpeed = this._getBTRWorldSpeed();
     
-    // [rev799] 管退全程持续生成烟雾（位置跟随当时炮口），回位时停止
     this._updateRecoilSmoke(now);
     this.fx.update(now, dt, worldSpeed);
     
@@ -1569,14 +1551,27 @@ const BTRSupport = {
       }
       if(this.erasedBaseImg) _renderOpts.baseImage = this.erasedBaseImg;
     }
-    // [圖層分層] 1. 先畫發射煙 (在下層，被炮管遮擋)
+    
+    // 1. below 層煙霧
     if (this.fx && this.fx.smoke) {
-        const _jets = this.fx.smoke.filter(p => p.isJet);
-        window._vsDrawSmoke(ctx, _jets);
+        const _smokeBelow = this.fx.smoke.filter(p => p._layerOrder === 'below');
+        window._vsDrawSmoke(ctx, _smokeBelow);
+    }
+    
+    // 2. below 層火光
+    for (const fx of this.fireFx) { 
+      if (fx.layerOrder !== 'below') continue; 
+      this._drawOneFireFx(ctx, fx, now, px, py); 
     }
 
-    // [圖層分層] 2. 畫載具 (炮管蓋住發射煙內部)
+    // 3. 畫載具本體
     (window.VehicleRenderer && window.VehicleRenderer.render || renderVehicle)(ctx, this.vehicleId, px, py, this.targetW, this.targetH, (now - this.startTime) / 1000, _renderOpts);
+    
+    // 4. above 層煙霧
+    if (this.fx && this.fx.smoke) {
+        const _smokeAbove = this.fx.smoke.filter(p => p._layerOrder !== 'below');
+        window._vsDrawSmoke(ctx, _smokeAbove);
+    }
     
     if (this.missiles && this.missiles.length) {
       for (const mis of this.missiles) {
@@ -1609,62 +1604,47 @@ const BTRSupport = {
       }
     }
     
-    // [圖層分層] 3. 畫擴散煙 (在上層)
-    if (this.fx && this.fx.smoke) {
-        const _spreads = this.fx.smoke.filter(p => !p.isJet);
-        window._vsDrawSmoke(ctx, _spreads);
-    }
+    // 5. above 層火光
     for (const fx of this.fireFx) { 
-      if (fx.layerOrder !== 'above') continue; 
+      if (fx.layerOrder === 'below') continue; 
       this._drawOneFireFx(ctx, fx, now, px, py); 
     }
     
-this.fx.drawTracers(ctx, now);
+    this.fx.drawTracers(ctx, now);
     
-    // [rev868] 使用共用扬尘系统
     if(!this.dustParticles) this.dustParticles = [];
     const wheelSpd = (this.phase === 'support') ? 20 : 6;
     const intensity = (wheelSpd === 20) ? 1.0 : 0.6;
     if(intensity > 0 && Math.random() < intensity){
       let _dustSrc = null;
-      // [rev873] 优先使用 trackLoop（闭合环）的底部点生成扬尘
       if (ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2) {
         const pts = ann.trackLoop.points;
-        
-        // [精準直邊揚塵] 換用不易衝突的變數名
         let _dustMaxX = 0, _dustMaxY = 0;
         for(let _di = 0; _di < pts.length; _di++){ 
             if(pts[_di].x > _dustMaxX) _dustMaxX = pts[_di].x; 
             if(pts[_di].y > _dustMaxY) _dustMaxY = pts[_di].y;
         }
-        
-        // 篩選下半部且非右邊緣的點 (y > 0.5, x < 0.85 * max)
         const bottomPts = pts.filter(function(p){
           if (p.y < 0.5) return false; 
           if (p.x > _dustMaxX * 0.85) return false; 
           return true;
         });
-        
         if(bottomPts.length > 0){
           let minY = 2;
           for(let i=0; i<bottomPts.length; i++){ if(bottomPts[i].y < minY) minY = bottomPts[i].y; }
-          // 找出貼地直邊的點群（容差 0.05）
           const bottomLine = bottomPts.filter(p => Math.abs(p.y - minY) < 0.05);
           if (bottomLine.length >= 2) {
-              // 沿直邊插值隨機取點
               const p1 = bottomLine[0], p2 = bottomLine[bottomLine.length - 1];
               const t = Math.random();
               const cx = p1.x + (p2.x - p1.x) * t;
               const cy = p1.y + (p2.y - p1.y) * t;
               _dustSrc = { cx: cx, cy: cy, r: 0.015 };
           } else {
-              // 退化為隨機選點
               const srcPt = bottomPts[Math.floor(Math.random() * bottomPts.length)];
               _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
           }
         }
       } else if (ann.wheels && ann.wheels.length > 0) {
-        // [整理] 排除最右侧轮子（cx >= 0.95）
         const _wArr = ann.wheels.filter(function(w){ return w.cx < 0.95; });
         if(_wArr.length > 0){
           _dustSrc = _wArr[Math.floor(Math.random() * _wArr.length)];
@@ -1684,8 +1664,8 @@ this.fx.drawTracers(ctx, now);
       const ft = t / 0.15; 
       const isCannon = (fx.weaponId === '2a42' || fx.weaponId === '2a72' || fx.weaponId === '2a46' || fx.weaponId === '2a46m1' || fx.weaponId === '2a28' || fx.weaponId === '2a70');
       const isMain = (fx.weaponId === '2a46' || fx.weaponId === '2a46m1');
-      const fxX = x + (isCannon ? 60 : 15);
-      const fxY = y + (Math.random() - 0.5) * (isMain ? 10 : 4);
+      const fxX = x + this.targetW * (isCannon ? 0.12 : 0.04) + (Math.random() - 0.5) * 10;
+      const fxY = y + (Math.random() - 0.5) * (isMain ? 12 : 6);
       const baseR = fx.size * (isMain ? 3.0 : (isCannon ? 2.0 : 0.8));
       const fade = 1 - ft;
       ctx.save();
@@ -1708,20 +1688,6 @@ this.fx.drawTracers(ctx, now);
       ctx.restore();
     }
   },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   _finishSupportAndLog() {
     const exp = this.killCount * 10;
@@ -1979,12 +1945,19 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
   };
 
   /* 改造 BTRSupport.fx 使用共用函數 */
-  BTRSupport.fx.spawnJetOne = function(x, y, weaponId, angle, muzzleX){
+  BTRSupport.fx.spawnJetOne = function(x, y, weaponId, angle, muzzleX, layerOrder){
     var p = window._vsMakeSmokeJet(x, y, weaponId, angle);
-    if(p) p._muzzleX = muzzleX;
+    if(p) { 
+        p._muzzleX = muzzleX; 
+        p._layerOrder = layerOrder || 'above';
+    }
     this.smoke.push(p);
 };
-  BTRSupport.fx.spawnSpreadOne = function(x, y, weaponId){ this.smoke.push(window._vsMakeSmokeSpread(x, y, weaponId)); };
+  BTRSupport.fx.spawnSpreadOne = function(x, y, weaponId, layerOrder){ 
+    var p = window._vsMakeSmokeSpread(x, y, weaponId);
+    if(p) p._layerOrder = layerOrder || 'above';
+    this.smoke.push(p); 
+};
   BTRSupport.fx.update = function(now, dt, worldSpeed){ window._vsUpdateSmoke(this.smoke, dt, worldSpeed); };
   BTRSupport.fx.draw = function(ctx){ window._vsDrawSmoke(ctx, this.smoke); };
 })();

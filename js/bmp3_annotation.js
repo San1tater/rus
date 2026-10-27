@@ -295,7 +295,7 @@ const VEHICLE_ANNOTATION_BMP3 = {
       ],
       "name": "武器 1",
       "weaponId": "2a70",
-      "recoilDist": 0.048
+      "recoilDist": 0.085
     }
   ],
   "muzzles": [

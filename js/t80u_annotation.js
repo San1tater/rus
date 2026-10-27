@@ -276,7 +276,7 @@ const VEHICLE_ANNOTATION_T80U = {
       ],
       "name": "武器 1",
       "weaponId": "2a46m1",
-      "recoilDist": 0.06
+      "recoilDist": 0.10
     }
   ],
   "muzzles": [
