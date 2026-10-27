@@ -1685,6 +1685,30 @@ const BTRSupport = {
       if(_dustSrc) window.spawnDust(this.dustParticles, px, py, _dustSrc, this.targetW, this.targetH, wheelSpd);
     }
     window.updateAndDrawDust(ctx, this.dustParticles, dt);
+    /* rev907-diag: 屏幕右上角诊断文本 */
+    {
+      var _d = window._vsDiag;
+      if (_d){
+        var _tn = performance.now();
+        if (_d.lastNow > 0){
+          _d.frameDelta += (_tn - _d.lastNow); _d.frameCount++;
+          if (_d.frameCount >= 15){ _d.fps = 1000 / (_d.frameDelta / _d.frameCount); _d.frameDelta = 0; _d.frameCount = 0; }
+        }
+        _d.lastNow = _tn;
+        var _txt = "dt=" + _d.dt.toFixed(4) + "  fps=" + _d.fps.toFixed(0) + "\n" +
+                   "jets=" + _d.jetCount + "  gap=" + _d.gapAvg.toFixed(1) + "px";
+        ctx.save();
+        ctx.font = "13px monospace";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "rgba(0,0,0,0.65)";
+        ctx.fillRect(this.width - 200, 4, 196, 42);
+        ctx.fillStyle = "#e8a33d";
+        var _lines = _txt.split("\n");
+        for (var _li = 0; _li < _lines.length; _li++){ ctx.fillText(_lines[_li], this.width - 8, 8 + _li * 16); }
+        ctx.restore();
+      }
+    }
   },
 
   _drawOneFireFx(ctx, fx, now, px, py) {
@@ -1919,6 +1943,20 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
 };
 
   window._vsUpdateSmoke = function(particles, dt, worldSpeed){
+  /* rev907-diag: 采样 dt 与 jet 粒子间距（供屏幕显示） */
+  if (!window._vsDiag) window._vsDiag = { dt: 0, jetCount: 0, gapAvg: 0, frameDelta: 0, frameCount: 0, fps: 0, lastNow: 0 };
+  window._vsDiag.dt = dt;
+  {
+    var _jets = [];
+    for (var _i = 0; _i < particles.length; _i++){ if (particles[_i].isJet) _jets.push(particles[_i]); }
+    window._vsDiag.jetCount = _jets.length;
+    if (_jets.length >= 2){
+      var _sum = 0, _n = 0;
+      for (var _j = 1; _j < _jets.length; _j++){ _sum += Math.abs(_jets[_j].x - _jets[_j-1].x); _n++; }
+      window._vsDiag.gapAvg = _n > 0 ? _sum / _n : 0;
+    } else { window._vsDiag.gapAvg = 0; }
+  }
+
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     if (p.skipUpdate) { p.skipUpdate = false; continue; }
