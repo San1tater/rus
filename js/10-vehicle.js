@@ -1367,7 +1367,9 @@ const BTRSupport = {
     }
 
     if (!foundDist && (m.weaponId === '2a72' || m.weaponId === '2a42')) {
-        rcDist = 0.015; // 預設給予微小的獨立管退，若配置了 recoilDist 則不覆蓋
+        // 绑定到 100mm 主炮的 30mm 并排机炮（bmp3 / bmd4）：自身无管退，仅跟随父级连带
+        // 未绑定的 30mm（bmp1m / bmp2）：保留 0.015 独立管退
+        rcDist = m._parentId ? 0 : 0.015;
     }
 
     if (m.weaponId === '2a46' || m.weaponId === '2a46m1' || m.weaponId === '2a70' || m.weaponId === '2a28') rcDur = 900;
@@ -1958,6 +1960,10 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
     vx = _base * 30; vy = (Math.random() - 0.5) * _base * 0.01;
     sizeX = _base * 0.2; sizeY = _base * 0.015;
     growX = _base * 8.0; growY = _base * 0.4;
+    // 机炮/机枪：从炮口生成（不做 -30 偏移，否则粒子第一帧在炮口左侧被裁切，
+    // 下一帧因 vx 过高直接越过红蓝线区间，导致红蓝线之间无烟雾）
+    offsetX = 0; /* smoke-from-muzzle */
+
   }
 
   if (angle) {
