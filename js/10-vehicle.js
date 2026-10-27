@@ -974,8 +974,15 @@ const BTRSupport = {
         _layerOrder: layerOrder || 'above'
       });
     },
-    spawnTracer(x, y, speed, type) {
-      this.tracers.push({ startX: x, startY: y, born: performance.now(), speed: speed, len: type === 'cannon' ? 80 : 40, width: type === 'cannon' ? 3 : 1.5, type: type });
+    spawnTracer(x, y, speed, type, layerOrder) {
+      this.tracers.push({
+        startX: x, startY: y, born: performance.now(),
+        speed: speed,
+        len:   type === 'cannon' ? 80 : 40,
+        width: type === 'cannon' ? 3  : 1.5,
+        type:  type,
+        _layerOrder: layerOrder || 'above'
+      });
     },
     spawnMissileJet(x, y) {
       this.smoke.push({
@@ -1024,17 +1031,18 @@ const BTRSupport = {
       }
     },
     draw(ctx) { },
-    drawTracers(ctx, now) {
+    drawTracers(ctx, now, layerOrder) {
       if (!this.tracers || !this.tracers.length) return;
       ctx.save(); ctx.shadowColor = 'rgba(255,200,50,0.8)'; ctx.shadowBlur = 10;
       for (let i = this.tracers.length - 1; i >= 0; i--) {
         const t = this.tracers[i];
         const tipX = t.startX + (now - t.born) / 1000 * t.speed;
         if (tipX - t.len > ctx.canvas.width + 200) { this.tracers.splice(i, 1); continue; }
+        if (layerOrder && (t._layerOrder || 'above') !== layerOrder) continue;
         const tailX = Math.max(t.startX, tipX - t.len);
         const grad = ctx.createLinearGradient(tailX, t.startY, tipX, t.startY);
-        grad.addColorStop(0, 'rgba(255,200,50,0)'); 
-        grad.addColorStop(0.8, 'rgba(255,255,200,0.9)'); 
+        grad.addColorStop(0, 'rgba(255,200,50,0)');
+        grad.addColorStop(0.8, 'rgba(255,255,200,0.9)');
         grad.addColorStop(1, '#fff');
         ctx.strokeStyle = grad; ctx.lineWidth = t.width;
         ctx.beginPath(); ctx.moveTo(tailX, t.startY); ctx.lineTo(tipX, t.startY); ctx.stroke();
@@ -1274,7 +1282,7 @@ const BTRSupport = {
       if (isMain) showTracer = Math.random() < 0.5;
       else if (isMG) showTracer = Math.random() < 0.1;
       else showTracer = Math.random() < 0.15;
-      if (showTracer) this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon');
+      if (showTracer) this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon', m.layerOrder);
     }
 
     let triggerFlash = false;
@@ -1565,6 +1573,7 @@ const BTRSupport = {
     }
 
     // 3. 畫載具本體
+    this.fx.drawTracers(ctx, now, 'below');
     (window.VehicleRenderer && window.VehicleRenderer.render || renderVehicle)(ctx, this.vehicleId, px, py, this.targetW, this.targetH, (now - this.startTime) / 1000, _renderOpts);
     
     // 4. above 層煙霧
@@ -1610,7 +1619,7 @@ const BTRSupport = {
       this._drawOneFireFx(ctx, fx, now, px, py); 
     }
     
-    this.fx.drawTracers(ctx, now);
+    this.fx.drawTracers(ctx, now, 'above');
     
     if(!this.dustParticles) this.dustParticles = [];
     const wheelSpd = (this.phase === 'support') ? 20 : 6;
