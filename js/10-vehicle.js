@@ -1172,18 +1172,7 @@ const BTRSupport = {
       this.sinkOffset = py0 < 4 ? (4 - py0) : 0;
     }
     
-    if (!this._dbgBtn) {
-        var _dbg = document.createElement('div');
-        _dbg.textContent = 'DBG';
-        _dbg.style.cssText = 'position:absolute;right:8px;top:8px;padding:6px 12px;background:rgba(0,0,0,0.8);color:#0f0;border:1px solid #0f0;border-radius:4px;font:bold 12px monospace;z-index:9999;cursor:pointer;user-select:none;';
-        _dbg.onclick = function() {
-            window._BTR_CLIP_DEBUG = !window._BTR_CLIP_DEBUG;
-            _dbg.style.background = window._BTR_CLIP_DEBUG ? 'rgba(0,80,0,0.9)' : 'rgba(0,0,0,0.8)';
-        };
-        zone.appendChild(_dbg);
-        this._dbgBtn = _dbg;
-    }
-    if (typeof window._BTR_CLIP_DEBUG === 'undefined') window._BTR_CLIP_DEBUG = true;
+    
   },
   _loop(t) {
     if(!this.active) return;
@@ -1700,69 +1689,7 @@ const BTRSupport = {
       if(_dustSrc) window.spawnDust(this.dustParticles, px, py, _dustSrc, this.targetW, this.targetH, wheelSpd);
     }
     window.updateAndDrawDust(ctx, this.dustParticles, dt);
-    /* rev908-diag-lines: 红/蓝/绿 三色竖线 */
-    if (window._BTR_CLIP_DEBUG) {
-      try {
-        ctx.save();
-        var _m30x = -1, _m100x = -1;
-        for (var _mi = 0; _mi < this.muzzles.length; _mi++) {
-          var _mm = this.muzzles[_mi];
-          if (_mm.weaponId === '2a72' || _mm.weaponId === '2a42') _m30x = this.x * this.width + _mm.mx * this.targetW;
-          if (_mm.weaponId === '2a70') _m100x = this.x * this.width + _mm.mx * this.targetW;
-        }
-        if (_m30x > 0) {
-          ctx.strokeStyle = 'red'; ctx.lineWidth = 2; ctx.setLineDash([10, 6]);
-          ctx.beginPath(); ctx.moveTo(_m30x, 0); ctx.lineTo(_m30x, this.height); ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle = 'red'; ctx.font = 'bold 11px monospace';
-          ctx.fillText('30mm', _m30x + 4, 14);
-        }
-        if (_m100x > 0) {
-          ctx.strokeStyle = 'blue'; ctx.lineWidth = 2; ctx.setLineDash([10, 6]);
-          ctx.beginPath(); ctx.moveTo(_m100x, 0); ctx.lineTo(_m100x, this.height); ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle = 'blue'; ctx.font = 'bold 11px monospace';
-          ctx.fillText('100mm', _m100x + 4, 14);
-        }
-        var _jets = (this.fx && this.fx.smoke) ? this.fx.smoke.filter(function(p){ return p.isJet; }) : [];
-        if (_jets.length) {
-          var _last = _jets[_jets.length - 1];
-          if (_last._muzzleX != null && isFinite(_last._muzzleX)) {
-            ctx.strokeStyle = 'lime'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
-            ctx.beginPath(); ctx.moveTo(_last._muzzleX, 0); ctx.lineTo(_last._muzzleX, this.height); ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.fillStyle = 'lime'; ctx.font = 'bold 11px monospace';
-            ctx.fillText('jet', _last._muzzleX + 4, 26);
-          }
-        }
-        ctx.restore();
-      } catch(e) {}
-    }
-    /* rev907-diag: 屏幕右上角诊断文本 */
-    {
-      var _d = window._vsDiag;
-      if (_d){
-        var _tn = performance.now();
-        if (_d.lastNow > 0){
-          _d.frameDelta += (_tn - _d.lastNow); _d.frameCount++;
-          if (_d.frameCount >= 15){ _d.fps = 1000 / (_d.frameDelta / _d.frameCount); _d.frameDelta = 0; _d.frameCount = 0; }
-        }
-        _d.lastNow = _tn;
-        var _txt = "dt=" + _d.dt.toFixed(4) + "  fps=" + _d.fps.toFixed(0) + "\n" +
-                   "jets=" + _d.jetCount + "  gap=" + _d.gapAvg.toFixed(1) + "px";
-        ctx.save();
-        ctx.font = "13px monospace";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "top";
-        ctx.fillStyle = "rgba(0,0,0,0.65)";
-        ctx.fillRect(this.width - 200, 4, 196, 42);
-        ctx.fillStyle = "#e8a33d";
-        var _lines = _txt.split("\n");
-        for (var _li = 0; _li < _lines.length; _li++){ ctx.fillText(_lines[_li], this.width - 8, 8 + _li * 16); }
-        ctx.restore();
-      }
-    }
-  },
+      },
 
   _drawOneFireFx(ctx, fx, now, px, py) {
     const age = now - fx.startTime, total = fx.endTime - fx.startTime; if (age > total) return;
@@ -1816,7 +1743,7 @@ const BTRSupport = {
     if(this.canvas){ this.canvas.remove(); this.canvas = null; this.ctx = null; }
     if(this.streamBgEl){ this.streamBgEl.remove(); this.streamBgEl = null; }
     this.fireFx = []; this.muzzles = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = []; this.missiles = [];
-    if (this._dbgBtn) { try { this._dbgBtn.remove(); } catch(e) {} this._dbgBtn = null; }
+    
   },
   stop() { this._cleanup(); this.active = false; }
 };
@@ -1960,9 +1887,7 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
     vx = _base * 30; vy = (Math.random() - 0.5) * _base * 0.01;
     sizeX = _base * 0.2; sizeY = _base * 0.015;
     growX = _base * 8.0; growY = _base * 0.4;
-    // 机炮/机枪：从炮口生成（不做 -30 偏移，否则粒子第一帧在炮口左侧被裁切，
-    // 下一帧因 vx 过高直接越过红蓝线区间，导致红蓝线之间无烟雾）
-    offsetX = 0; /* smoke-from-muzzle */
+    offsetX = -60; // 向左偏移，利用裁切填补间隙
 
   }
 
@@ -2001,18 +1926,7 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
 };
 
   window._vsUpdateSmoke = function(particles, dt, worldSpeed){
-  /* rev907-diag: 采样 dt 与 jet 粒子间距（供屏幕显示） */
-  if (!window._vsDiag) window._vsDiag = { dt: 0, jetCount: 0, gapAvg: 0, frameDelta: 0, frameCount: 0, fps: 0, lastNow: 0 };
-  window._vsDiag.dt = dt;
-  {
-    var _jets = [];
-    for (var _i = 0; _i < particles.length; _i++){ if (particles[_i].isJet) _jets.push(particles[_i]); }
-    window._vsDiag.jetCount = _jets.length;
-    if (_jets.length >= 2){
-      var _sum = 0, _n = 0;
-      for (var _j = 1; _j < _jets.length; _j++){ _sum += Math.abs(_jets[_j].x - _jets[_j-1].x); _n++; }
-      window._vsDiag.gapAvg = _n > 0 ? _sum / _n : 0;
-    } else { window._vsDiag.gapAvg = 0; }
+  
   }
 
   for (let i = particles.length - 1; i >= 0; i--) {
@@ -2097,11 +2011,7 @@ window._vsDrawSmoke = function(ctx, particles){
         p._muzzleX = muzzleX; 
         p._muzzleY = y;
         // 30mm 機炮與 100mm 並排時，傾斜裁切在手機 dpr 下易漂移，強制水平裁切
-        if (weaponId === '2a72' || weaponId === '2a42') {
-            p._muzzleAngle = 0;
-        } else {
-            p._muzzleAngle = angle || 0;
-        }
+        p._muzzleAngle = angle || 0;
         p._layerOrder = layerOrder || 'above';
     }
     this.smoke.push(p);
