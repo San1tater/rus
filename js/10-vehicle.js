@@ -1172,7 +1172,7 @@ const BTRSupport = {
       this.sinkOffset = py0 < 4 ? (4 - py0) : 0;
     }
     
-    
+    true;
   },
   _loop(t) {
     if(!this.active) return;
@@ -1689,7 +1689,7 @@ const BTRSupport = {
       if(_dustSrc) window.spawnDust(this.dustParticles, px, py, _dustSrc, this.targetW, this.targetH, wheelSpd);
     }
     window.updateAndDrawDust(ctx, this.dustParticles, dt);
-      },
+    },
 
   _drawOneFireFx(ctx, fx, now, px, py) {
     const age = now - fx.startTime, total = fx.endTime - fx.startTime; if (age > total) return;
@@ -1887,7 +1887,9 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
     vx = _base * 30; vy = (Math.random() - 0.5) * _base * 0.01;
     sizeX = _base * 0.2; sizeY = _base * 0.015;
     growX = _base * 8.0; growY = _base * 0.4;
-    offsetX = -60; // 向左偏移，利用裁切填补间隙
+    // 机炮/机枪：从炮口生成（不做 -30 偏移，否则粒子第一帧在炮口左侧被裁切，
+    // 下一帧因 vx 过高直接越过红蓝线区间，导致红蓝线之间无烟雾）
+    offsetX = -60;
 
   }
 
@@ -1926,9 +1928,6 @@ window._vsMakeSmokeJet = function(x, y, weaponId, angle){
 };
 
   window._vsUpdateSmoke = function(particles, dt, worldSpeed){
-  
-  }
-
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     if (p.skipUpdate) { p.skipUpdate = false; continue; }
