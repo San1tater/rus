@@ -14,7 +14,12 @@
    ============================================================ */
 function profDisplay(v){v=v||0;if(v>=MAX_PROF_LEVEL)return `Lv.${MAX_PROF_LEVEL} (MAX)`;const capped=Math.min(MAX_PROF_LEVEL,v);const lv=Math.floor(capped),pct=Math.round((capped-lv)*100);return `Lv.${lv} (${pct}%)`;}
 /* rev125: 家園輔助函式（偏好設定內嵌為第 4 折疊區） */
-const _ccFolded = { weapons: true, types: true, other: true, pref: true };
+
+const _ccFolded = new Proxy({}, {
+  get: function(_, k){ var v = window._collapseStates['cc.'+k]; return v === undefined ? true : !!v; },
+  set: function(_, k, v){ window._collapseStates['cc.'+k] = !!v; return true; }
+});
+
 function _ccToggle(sec){
   _ccFolded[sec] = !_ccFolded[sec];
   const body = document.getElementById('cc-body-' + sec);
@@ -974,7 +979,7 @@ function _garageRenderHtml(){
   const curUses = state.radioUses || 0;
   const research = _garageGetResearchInfo();
   const tgt = research ? research.target : null;
-  const _globalExpVal = typeof fmtNum === 'function' ? fmtNum(g.globalExp || 0) : (g.globalExp || 0);
+  const _globalExpVal = fmtNum(g.globalExp || 0);
 
   let h = "";
   h += "<div class='garage-main'>";
@@ -1003,16 +1008,16 @@ function _garageRenderHtml(){
     h += "</div>";
     const pct = research.need > 0 ? Math.min(100, Math.round(research.have / research.need * 100)) : 0;
     h += "<div class='garage-research-bar'><div class='fill' style='width:" + pct + "%'></div></div>";
-    h += "<div class='garage-research-exp'>" + (typeof fmtNum === 'function' ? fmtNum(research.have) : research.have) + " / " + (typeof fmtNum === 'function' ? fmtNum(research.need) : research.need) + "</div>";
+    h += "<div class='garage-research-exp'>" + (fmtNum(research.have)) + " / " + (fmtNum(research.need)) + "</div>";
     if(tgt && tgt.researchCost){
       const ammo = _garageAmmoEquiv();
       const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
       const cal = tgt.researchCost.ammoCal;
       const ammoIcon = (typeof AMMO_ICON_BY_CAL !== 'undefined' && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : '545.png';
-      const _fAmmo = typeof fmtNum === 'function' ? fmtNum(ammo) : Math.floor(ammo);
-      const _fAmmoMax = typeof fmtNum === 'function' ? fmtNum(tgt.researchCost.ammoCount) : tgt.researchCost.ammoCount;
-      const _fLiq = typeof fmtNum === 'function' ? fmtNum(liq) : Math.floor(liq);
-      const _fLiqMax = typeof fmtNum === 'function' ? fmtNum(tgt.researchCost.liquor) : tgt.researchCost.liquor;
+      const _fAmmo = fmtNum(ammo);
+      const _fAmmoMax = fmtNum(tgt.researchCost.ammoCount);
+      const _fLiq = fmtNum(liq);
+      const _fLiqMax = fmtNum(tgt.researchCost.liquor);
       h += "<div class='garage-req-row'>";
       h += "<span class='" + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + "'><img src='icons/items/" + ammoIcon + assetSuffix() + "' class='req-icon' alt=''> " + _fAmmo + "/" + _fAmmoMax + "</span>";
       h += "<span class='" + (liq >= tgt.researchCost.liquor ? 'ok' : 'bad') + "'><img src='icons/garden/liquor.png" + assetSuffix() + "' class='req-icon' alt=''> " + _fLiq + "/" + _fLiqMax + "</span>";
@@ -1789,7 +1794,7 @@ function openModding(workbenchLv){
     }
   }
   candidates.sort((a,b)=>{
-    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const ra = sortByRarityDesc(a, b);
     if(ra !== 0) return ra;
     const an = (a.def && a.def.name) || '';
     const bn = (b.def && b.def.name) || '';

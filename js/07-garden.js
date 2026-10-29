@@ -411,7 +411,7 @@ function _gardenPickServantForPlot(idx, type){
     const bAs = (b.assignedPlots && b.assignedPlots.length > 0) ? 1 : 0;
     if(aAs !== bAs) return bAs - aAs;
     if((b.lv || 1) !== (a.lv || 1)) return (b.lv || 1) - (a.lv || 1);
-    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const ra = sortByRarityDesc(a, b);
     if(ra !== 0) return ra;
     return servantLabel(a).localeCompare(servantLabel(b), 'zh-Hant');
   });
@@ -593,7 +593,7 @@ function openGardenSeedPickerWithRemove(idx, returnFn){
     list.push({id: id, rarity: rar, count: cnt, def: SEEDS[id]});
   }
   list.sort(function(a, b){
-    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const ra = sortByRarityDesc(a, b);
     if(ra !== 0) return ra;
     return (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
   });
@@ -864,7 +864,7 @@ function renderGardenStorage(box){
     }
   }
   const sortFn = function(a, b){
-    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const ra = sortByRarityDesc(a, b);
     if(ra !== 0) return ra;
     return (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
   };
@@ -1147,7 +1147,7 @@ function _gardenLogMapToArray(map){
   const arr = [];
   for(const k in map) arr.push(map[k]);
   arr.sort(function(a, b){
-    const rd = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const rd = sortByRarityDesc(a, b);
     if(rd !== 0) return rd;
     const ad = itemDef(a.id) || { name: a.id };
     const bd = itemDef(b.id) || { name: b.id };
@@ -2114,7 +2114,7 @@ function _gardenTowerPickEquip(idx, slot){
     list.push({ id: id, rarity: rar, def: d });
   }
   list.sort(function(a, b){
-    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const ra = sortByRarityDesc(a, b);
     if(ra !== 0) return ra;
     return (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
   });
@@ -3049,7 +3049,7 @@ function _gardenTowerResolveAmmo(cfg, wDef){
   }
   if(!list.length) return null;
   list.sort(function(a, b){
-    const ra = RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity);
+    const ra = sortByRarityDesc(b, a);
     if(ra !== 0) return ra;
     return b.count - a.count;
   });
@@ -3781,7 +3781,7 @@ function renderGardenServants(box){
     const wb = _isServantWorking(b) ? 1 : 0;
     if(wb !== wa) return wb - wa;
     if(b.lv !== a.lv) return b.lv - a.lv;
-    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const ra = sortByRarityDesc(a, b);
     if(ra !== 0) return ra;
     const typeOrder = ['farmer', 'guard', 'foreman'];
     return typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type);
@@ -5781,9 +5781,8 @@ function _bindGardenLogItems(bd, entry){
   for(let _i = 0; _i < _hds.length; _i++){
     (function(h){
       h.onclick = function(){
-        if(!window._gLogCollapsed) window._gLogCollapsed = {};
-        const _kk = h.getAttribute('data-gcat');
-        window._gLogCollapsed[_kk] = !window._gLogCollapsed[_kk];
+                const _kk = h.getAttribute('data-gcat');
+        window._collapseStates['gl.'+_kk] = !window._collapseStates['gl.'+_kk];
         closeModal(); _openGardenLogDetail(entry);
       };
     })(_hds[_i]);
@@ -5824,13 +5823,12 @@ function _openGardenLogDetail(entry){
 function _openMerchantBatchDetail(entry){
   const d = entry.detail;
   const _keys = ['food','seed','throw','ammo'];
-  if(!window._gLogCollapsed) window._gLogCollapsed = {};
-  let body = '';
+    let body = '';
   for(const _k of _keys){
     const _line = d.lines && d.lines[_k];
     if(!_line || !_line.items || !_line.items.length) continue;
     const _meta = _gardenMerchantLineMeta(_k) || { icon: '?', title: _k };
-    const _col = !!window._gLogCollapsed['mb_' + _k];
+    const _col = !!window._collapseStates['gl.mb_' + _k];
     body += '<div class="cat-header" data-gcat="mb_' + _k + '" style="cursor:pointer"><span>' + _meta.icon + ' ' + _meta.title + ' · ' + (_line.batches||0) + ' 批</span><span>' + (_col ? '▶' : '▼') + '</span></div>';
     if(!_col){
       for(const _it of _line.items){
@@ -5855,10 +5853,9 @@ function _openMerchantBatchDetail(entry){
 function _openOfflineGardenDetail(entry){
   const d = entry.detail;
   let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + _esc(entry.text || '') + '</div>';
-  if(!window._gLogCollapsed) window._gLogCollapsed = {};
-  function _catHtml(key, title, items){
+    function _catHtml(key, title, items){
     if(!items || !items.length) return '';
-    const col = !!window._gLogCollapsed['og_' + key];
+    const col = !!window._collapseStates['gl.og_' + key];
     let h = '<div class="cat-header" data-gcat="og_' + key + '" style="cursor:pointer"><span>' + title + ' (' + items.length + ')</span><span>' + (col ? '▶' : '▼') + '</span></div>';
     if(!col){
       for(const it of items){
@@ -6050,10 +6047,14 @@ function _truncateServantName(s){
   return out;
 }
 
+
 function _servantEscHtml(s){
-  if(s == null) return '';
-  return String(s).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;');
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, function(c){
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
 }
+
 
 function openServantRename(srvId, returnFn){
   const srv = (state.servants || []).find(function(s){ return s.id === srvId; });

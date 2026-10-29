@@ -423,7 +423,7 @@ function openAmmoPicker(slot, idx){
   const available = getAvailableAmmoForSlot(slot);
   if(!available.length){ openModal({title: '選擇彈種（優先級 ' + (idx + 1) + '）', body: '<div class="empty-hint">沒有可用的彈藥</div>'}); return; }
   available.sort((a, b) => {
-    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const ra = sortByRarityDesc(a, b);
     if(ra !== 0) return ra;
     return (a.def.name || '').localeCompare(b.def.name || '');
   });
@@ -854,8 +854,8 @@ function startBossBattle(bid){
   refreshPlayerStats();
   const w=chooseCombatWeapon('combat');
   const startSlot=w?w.slot:'melee';
-  const _isRT=(bid==='road_tyrant'||bid==='road_tyrant_ii');
-  const _isCO=(bid==='core_omega'||bid==='core_omega_ii');
+  const _isRT=(isBossType(bid, 'tyrant'));
+  const _isCO=(isBossType(bid, 'omega'));
   const _hasShield=(_isRT||_isCO);
   const _shieldHp=_isRT?12500:(_isCO?30000:0);
   battle={active:true,bossId:bid,bossName:b.name,bossHp:b.hp,bossMaxHp:b.hp,bossArmor:b.armor,bossMaxArmor:b.armor,bossDmg:b.dmg,bossDmgMult:1,bossPen:b.pen||0,bossCritRate:b.critRate||0,bossCritMult:b.critMult||1,
@@ -868,8 +868,8 @@ function startBossBattle(bid){
     aimPart:defaultAimPartForBoss(bid),lastManualClick:0,
     players:[{id:'local',isLocal:true}],lastH:0,
     healDisabledUntil:0,healTimer:null,autoHealing:false,chainShots:0,lastShotTime:0,chainResetMs:600,shotLockUntil:0};
-  if(bid==='swamp_hydra'||bid==='swamp_hydra_ii') initHydraHeads();
-  if(bid==='core_omega'||bid==='core_omega_ii') initOmegaArms();
+  if(isBossType(bid, 'hydra')) initHydraHeads();
+  if(isBossType(bid, 'omega')) initOmegaArms();
   battleHeroAnim.name='idle';
   battleHeroAnim.frame=0;
   battleHeroAnim.lastUpdate=performance.now();
@@ -1320,25 +1320,16 @@ if(typeof window._vsUpdateSmoke === 'function'){
       }
       _sweepMissiles = _sweepMissiles.filter(function(_m){ return _m.x + (now - _m.born) / 1000 * _m.speed <= ZW + 200; });
       
-            // [rev878] 掃蕩揚塵：優先 trackLoop 底部點，走共用 spawnDust
-      if(!window._sweepDustParticles) window._sweepDustParticles = [];
-      if (ann && elapsed < totalMoveMs && Math.random() < 0.8) {
-        let _dustSrc = null;
-        if (ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2) {
-          const pts = ann.trackLoop.points;
-          const bottomPts = pts.filter(function(p){ return p.y > 0.4; });
-          const srcPt = bottomPts.length
-            ? bottomPts[Math.floor(Math.random() * bottomPts.length)]
-            : pts[Math.floor(Math.random() * pts.length)];
-          _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
-        } else if (ann.wheels && ann.wheels.length > 0) {
-          _dustSrc = ann.wheels[Math.floor(Math.random() * ann.wheels.length)];
-        }
-        if (_dustSrc) {
-          window.spawnDust(window._sweepDustParticles, vehCenterPx - vehW/2, ZH - vehH, _dustSrc, vehW, vehH, 20);
-        }
-      }
-      window.updateAndDrawDust(fcCtx, window._sweepDustParticles, dt);
+            
+if(!window._sweepDustParticles) window._sweepDustParticles = [];
+if (ann && elapsed < totalMoveMs && Math.random() < 0.8) {
+  const _dustSrc = window.computeVehicleDustSource(ann);
+  if (_dustSrc) {
+    window.spawnDust(window._sweepDustParticles, vehCenterPx - vehW/2, ZH - vehH, _dustSrc, vehW, vehH, 20);
+  }
+}
+window.updateAndDrawDust(fcCtx, window._sweepDustParticles, dt);
+
       
 if(typeof window._vsDrawSmoke === 'function'){
         window._vsDrawSmoke(fcCtx, sweepSmoke);
@@ -1398,7 +1389,7 @@ function _finishBatchSweep(bid, vid, level, count, allLoot, servantGained, expTa
     }
     for(var gg in groups){
       groups[gg].sort(function(a, b){
-        var rd = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+        var rd = sortByRarityDesc(a, b);
         if(rd !== 0) return rd;
         var ad = itemDef(a.id) || { name: a.id };
         var bd = itemDef(b.id) || { name: b.id };

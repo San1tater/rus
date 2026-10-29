@@ -107,7 +107,7 @@ function computeBossFit(def, bossId, canvasW, canvasH){
   const anims = BOSS_ANIMS[bossId];
   if(!anims){ def._fitCached = null; return null; }
   /* rev534: core_omega 全局 fit 不含 death（death 有独立 fit，见 computeBossDeathFit） */
-  const _isOmega = (bossId === 'core_omega' || bossId === 'core_omega_ii');
+  const _isOmega = (isBossType(bossId, 'omega'));
   let aMinX = Infinity, aMinY = Infinity, aMaxX = -Infinity, aMaxY = -Infinity;
   let iMinX = Infinity, iMinY = Infinity, iMaxX = -Infinity, iMaxY = -Infinity;
   for(const animName in anims){
@@ -201,7 +201,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   ctx.save();
   /* rev534: core_omega death 動畫用独立 fit，確保所有部件在畫布內 */
   let _tf;
-  if((bossId === 'core_omega' || bossId === 'core_omega_ii') && animName === 'death'){
+  if((isBossType(bossId, 'omega')) && animName === 'death'){
     const _df = computeBossDeathFit(def, bossId, canvasW, canvasH);
     _tf = _df ? { sx: _df.fitScale, sy: _df.fitScale, ox: _df.offsetX, oy: _df.offsetY } : getBossCanvasTransform(def, bossId, canvasW, canvasH);
   } else {
@@ -211,8 +211,8 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
   ctx.scale(_tf.sx, _tf.sy);
 
   const _SHIELD_LIDS = ['shield','shield_2','shield_3','shield_4'];
-  const _hideShield = ((bossId === 'road_tyrant' || bossId === 'road_tyrant_ii') && battle && battle.shieldBroken);
-  const _hideHydraHead = ((bossId === 'swamp_hydra' || bossId === 'swamp_hydra_ii') && battle && battle.heads);
+  const _hideShield = ((isBossType(bossId, 'tyrant')) && battle && battle.shieldBroken);
+  const _hideHydraHead = ((isBossType(bossId, 'hydra')) && battle && battle.heads);
   let _hydraOwnerMap = null;
   if(_hideHydraHead){
     _hydraOwnerMap = {};
@@ -272,7 +272,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
       const _owner = _hydraOwnerMap[L.id];
       if(_owner && !battle.heads[_owner].alive) continue;
     }
-    if((bossId === 'core_omega' || bossId === 'core_omega_ii') && battle && battle.arms){
+    if((isBossType(bossId, 'omega')) && battle && battle.arms){
       const _arm = getOmegaArmIdOfLayer(L.id);
       if(_arm && !battle.arms[_arm].alive) continue;
     }
@@ -283,7 +283,7 @@ function drawBlockBoss(ctx, canvasW, canvasH, bossId, animName, frameIdx){
     const px = w * L.pivot.x;
     const py = h * L.pivot.y;
     /* rev533: core_omega 死亡動畫時，完全飞出畫布的部件跳過绘製 */
-    if((bossId === 'core_omega' || bossId === 'core_omega_ii') && animName === 'death'){
+    if((isBossType(bossId, 'omega')) && animName === 'death'){
       const _cd = Math.cos(wp.rot * BOSS_DEG2RAD);
       const _sd = Math.sin(wp.rot * BOSS_DEG2RAD);
       let _allOut = true;
@@ -2702,7 +2702,7 @@ function offlineSettle(){
     totalCount += it.count;
   }
   lootList.sort((a, b) => {
-    const rd = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const rd = sortByRarityDesc(a, b);
     if(rd !== 0) return rd;
     const ad = itemDef(a.id), bd = itemDef(b.id);
     return ((ad && ad.name) || '').localeCompare((bd && bd.name) || '', 'zh-Hant');
@@ -3121,7 +3121,7 @@ function openSlotPicker(slot,returnFn){
   const list=[];
   for(const it of invList()){const d=it.def;if(!d)continue;if(d.slot===slot)list.push(it);}
   list.sort((a,b)=>{
-    const ra = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const ra = sortByRarityDesc(a, b);
     if(ra !== 0) return ra;
     const an = (a.def && a.def.name) || '';
     const bn = (b.def && b.def.name) || '';
@@ -3238,7 +3238,7 @@ function _subCatOrder(it){
 }
 function openInventory(){
   const list=invList().sort((a,b)=>{
-    const rd = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+    const rd = sortByRarityDesc(a, b);
     if(rd !== 0) return rd;
     const so=_subCatOrder(a)-_subCatOrder(b);
     if(so!==0) return so;

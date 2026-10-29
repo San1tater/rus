@@ -369,15 +369,17 @@ function assetSuffix(){ return ASSET_VERSION ? ('?v=' + ASSET_VERSION) : ''; }
 function rarityBg(rarity){return RARITY_BG[rarity]||'#151210';}
 
 /* ===== rev293: 数字缩写 ===== */
+
 function fmtNum(n){
   if(n == null || isNaN(n)) return "0";
   const v = Math.floor(Math.abs(n));
   const sign = n < 0 ? "-" : "";
-  if(v < 100000) return sign + v;
-  if(v < 1000000) return sign + Math.round(v / 1000) + "k";
-  if(v < 1000000000) return sign + (v / 1000000).toFixed(1) + "M";
-  return sign + (v / 1000000000).toFixed(1) + "B";
+  if(v < 10000) return sign + v;
+  if(v < 1000000) return sign + Math.round(v / 1000) + "K";
+  if(v < 10000000) return sign + (v / 1000000).toFixed(1) + "M";
+  return sign + Math.round(v / 1000000) + "M";
 }
+
 /* ===== end rev293 ===== */
 
 function itemIcon(id,size){

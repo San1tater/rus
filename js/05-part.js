@@ -64,7 +64,7 @@ function updateBossAI(dt, now){
   if(!b) return;
   if(b.settling) return;
   /* v66-omega-disable: 四臂全破禁用移動+攻擊 */
-  if((b.bossId === 'core_omega' || b.bossId === 'core_omega_ii') && b.arms){
+  if((isBossType(b.bossId, 'omega')) && b.arms){
     const _anyAlive = OMEGA_ARM_IDS.some(function(id){ return b.arms[id] && b.arms[id].alive; });
     if(!_anyAlive){
       if(BATTLE_BOSS_ONESHOT.indexOf(battleBossAnim.name) === -1){
@@ -137,7 +137,7 @@ function updateBossAI(dt, now){
   const skills = getBossSkillList(b.bossId);
   /* rev535: 當前階段可用的手臂技能若全因手臂被打爆而失效，提前解鎖下一階段技能 */
   let _effectivePhase = b.phaseIdx;
-  if(b.bossId === 'core_omega' || b.bossId === 'core_omega_ii'){
+  if(isBossType(b.bossId, 'omega')){
     let _guard = 0;
     while(_guard++ < 4){
       const _usable = skills.some(function(sk){
@@ -173,7 +173,7 @@ function updateBossAI(dt, now){
   const bRange = _isII ? 0.22 : 0.18;
   let bossMoving = false;
 
-  if(b.bossId === 'swamp_hydra' || b.bossId === 'swamp_hydra_ii'){
+  if(isBossType(b.bossId, 'hydra')){
     /* rev533: 近戰触發距离與 doBossMeleeSwipe 內部判定一致（0.30） */
     if(playerRightN >= b.bx - 0.30){
       if(now - (b.lastMeleeAt || 0) > 1500){
@@ -355,8 +355,8 @@ function doBossMeleeSwipe(){
   if(!battle || !battle.active) return;
   const b = battle;
   /* v66-melee: ring_l 被破則禁用近戰 */
-  if((b.bossId === 'core_omega' || b.bossId === 'core_omega_ii') && typeof isOmegaArmBroken === 'function' && isOmegaArmBroken('ring_l')) return;
-  if((b.bossId === 'core_omega' || b.bossId === 'core_omega_ii') && isOmegaArmBroken('ring_l')) return;
+  if((isBossType(b.bossId, 'omega')) && typeof isOmegaArmBroken === 'function' && isOmegaArmBroken('ring_l')) return;
+  if((isBossType(b.bossId, 'omega')) && isOmegaArmBroken('ring_l')) return;
   if(getPlayerRightBoundaryN() < b.bx - 0.30) return;
   playBossOneshot('attack_swipe', 500);
   setTimeout(()=>{
@@ -639,7 +639,7 @@ function battleLoop(now){
       else battle.burstLeft=0;
     }
   }
-  updateBullets(dt);updateFighterPos();if(battle.bossId==='swamp_hydra'||battle.bossId==='swamp_hydra_ii')updateHeadBarsUI();
+  updateBullets(dt);updateFighterPos();if(isBossType(battle.bossId, 'hydra'))updateHeadBarsUI();
   updateBattleHeroAnim(now);
   updateBattleBossAnim(now);
   renderBattleHeroCanvas();
@@ -971,7 +971,7 @@ function playerShoot(){
           battle.bossHp = Math.max(0, battle.bossHp - dmg);
           battle.damageDealt += dmg;
           spawnHitFx(battle.bx, battle.by, `-${dmg}${isCrit?'!':''}`, isCrit?'crit':'weak');
-          if((battle.bossId === 'core_omega' || battle.bossId === 'core_omega_ii') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
+          if((isBossType(battle.bossId, 'omega')) && battle.arms) damageOmegaArm(battle.aimPart, dmg);
           if(battle.bossHp <= 0){ endBattle(true); return true; }
         } else {
           applyBossDamage(dmg,isCrit,ammoPen);
@@ -1014,7 +1014,7 @@ function playerShoot(){
             battle.engaged = true;
             battle.bossHp = Math.max(0, battle.bossHp - _d);
             battle.damageDealt += _d;
-            if((battle.bossId === 'core_omega' || battle.bossId === 'core_omega_ii') && battle.arms) damageOmegaArm(battle.aimPart, _d);
+            if((isBossType(battle.bossId, 'omega')) && battle.arms) damageOmegaArm(battle.aimPart, _d);
             if(battle.bossHp <= 0){ endBattle(true); return true; }
           } else {
             applyBossDamage(_d, _isCrit, def.pen||0, true);
@@ -1050,7 +1050,7 @@ function playerShoot(){
           battle.bossHp = Math.max(0, battle.bossHp - dmg);
           battle.damageDealt += dmg;
           spawnHitFx(battle.bx, battle.by, `-${dmg}${isCrit?'!':''}`, isCrit?'crit':'weak');
-          if((battle.bossId === 'core_omega' || battle.bossId === 'core_omega_ii') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
+          if((isBossType(battle.bossId, 'omega')) && battle.arms) damageOmegaArm(battle.aimPart, dmg);
           if(battle.bossHp <= 0){ endBattle(true); return true; }
         } else {
           applyBossDamage(dmg,isCrit,def.pen||0,def.slot==="throwable");
@@ -1098,7 +1098,7 @@ function isOmegaArmBroken(armId){
   return !!arm && !arm.alive;
 }
 function isOmegaSkillDisabled(sk){
-  if(!battle || (battle.bossId !== 'core_omega' && battle.bossId !== 'core_omega_ii')) return false;
+  if(!battle || (!isBossType(battle.bossId, 'omega'))) return false;
   if(!sk.armRequired) return false;
   return isOmegaArmBroken(sk.armRequired);
 }
@@ -1248,7 +1248,7 @@ function playHeadBreakFx(headId){
   if(bar) bar.remove();
 }
 function updateHeadBarsUI(){
-  if(!battle || (battle.bossId !== 'swamp_hydra' && battle.bossId !== 'swamp_hydra_ii') || !battle.heads) return;
+  if(!battle || (!isBossType(battle.bossId, 'hydra')) || !battle.heads) return;
   const container = document.getElementById('head-bars'); if(!container) return;
   const def = BOSS_LAYERS[battle.bossId]; if(!def) return;
   const anims = BOSS_ANIMS[battle.bossId];
@@ -1348,7 +1348,7 @@ function applyHydraDamage(dmg, isCrit, pen, isThrowable){
 
 function applyBossDamage(dmg,isCrit,pen,isThrowable){
   battle.engaged = true;
-  if((battle.bossId==='swamp_hydra'||battle.bossId==='swamp_hydra_ii') && battle.heads){ applyHydraDamage(dmg,isCrit,pen,isThrowable); return; }
+  if((isBossType(battle.bossId, 'hydra')) && battle.heads){ applyHydraDamage(dmg,isCrit,pen,isThrowable); return; }
   if(battle.shieldMaxHp>0 && !battle.shieldBroken && battle.shieldHp>0){
     const _pen=pen||0;
     const _shieldScale=Math.min(1,Math.exp((_pen-7)*0.4));
@@ -1384,7 +1384,7 @@ function applyBossDamage(dmg,isCrit,pen,isThrowable){
   const shownDmg = res.hpLost > 0 ? res.hpLost : res.armorLost;
   spawnHitFx(battle.bx,battle.by,`-${Math.round(shownDmg)}${isCrit?'!':''}`,isCrit?'crit':(res.hpLost>0?'':'armor'));
   if(res.hpLost > 0 && !battle.bossRetreat
-     && battle.bossId !== 'swamp_hydra' && battle.bossId !== 'swamp_hydra_ii'){
+     && !isBossType(battle.bossId, 'hydra')){
     const hpPct = res.hpLost / Math.max(1, battle.bossMaxHp);
     const retreatDist = Math.min(0.20, hpPct * 8);
     if(retreatDist >= 0.01){

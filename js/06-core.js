@@ -174,7 +174,9 @@ function _tickHeroWalkSwitch(now){
 function updatePlayerStatPanel(){
   const panel = document.querySelector('#zone2 .player-stat-panel');
   if(!panel) return;
-  const _f = function(v){ v = Math.round(v); if(v >= 1e7) return Math.round(v/1e6) + 'M'; if(v >= 1e6) return (v/1e6).toFixed(1) + 'M'; if(v >= 1e4) return Math.round(v/1e3) + 'K'; return v.toString(); };
+  
+const _f = fmtNum;
+
   const lv = panel.querySelector('.lv-v');
   const hpv = panel.querySelector('.hp-v');
   const hpm = panel.querySelector('.hp-m');

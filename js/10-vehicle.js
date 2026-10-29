@@ -813,7 +813,43 @@ function _makeDoorClip(img, pts, cw, ch){
   window.VehicleRenderer = { render: renderVehicle };
 
   // [rev868] 共用扬尘系统
-  window.spawnDust = function(particles, px, py, wheel, targetW, targetH, wheelSpd) {
+  
+window.computeVehicleDustSource = function(ann){
+  if (!ann) return null;
+  if (ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2) {
+    var pts = ann.trackLoop.points;
+    var _dustMaxX = 0, _dustMaxY = 0;
+    for (var _di = 0; _di < pts.length; _di++) {
+      if (pts[_di].x > _dustMaxX) _dustMaxX = pts[_di].x;
+      if (pts[_di].y > _dustMaxY) _dustMaxY = pts[_di].y;
+    }
+    var bottomPts = pts.filter(function(p) {
+      return p.y >= _dustMaxY - 0.15 && p.x <= _dustMaxX * 0.85;
+    });
+    if (bottomPts.length > 0) {
+      var maxY = 0;
+      for (var i = 0; i < bottomPts.length; i++) {
+        if (bottomPts[i].y > maxY) maxY = bottomPts[i].y;
+      }
+      var bottomLine = bottomPts.filter(function(p) { return Math.abs(p.y - maxY) < 0.05; });
+      if (bottomLine.length >= 2) {
+        var p1 = bottomLine[0], p2 = bottomLine[bottomLine.length - 1];
+        var t = Math.random();
+        return { cx: p1.x + (p2.x - p1.x) * t, cy: p1.y + (p2.y - p1.y) * t, r: 0.015 };
+      }
+      var srcPt = bottomPts[Math.floor(Math.random() * bottomPts.length)];
+      return { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
+    }
+  }
+  if (ann.wheels && ann.wheels.length > 0) {
+    var _wArr = ann.wheels.filter(function(w) { return w.cx < 0.95; });
+    if (_wArr.length > 0) {
+      return _wArr[Math.floor(Math.random() * _wArr.length)];
+    }
+  }
+  return null;
+};
+window.spawnDust = function(particles, px, py, wheel, targetW, targetH, wheelSpd) {
     const mult = (wheelSpd === 20) ? 1.5 : 1.0;
     const baseVx = -(5.0 + Math.random() * 4.0) * mult; // 强力的向左初速
     const baseVy = -(1.5 + Math.random() * 2.0) * mult;
@@ -1648,47 +1684,16 @@ const BTRSupport = {
     
     this.fx.drawTracers(ctx, now, 'above');
     
-    if(!this.dustParticles) this.dustParticles = [];
-    const wheelSpd = (this.phase === 'support') ? 20 : 6;
-    const intensity = (wheelSpd === 20) ? 1.0 : 0.6;
-    if(intensity > 0 && Math.random() < intensity){
-      let _dustSrc = null;
-      if (ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2) {
-        const pts = ann.trackLoop.points;
-        let _dustMaxX = 0, _dustMaxY = 0;
-        for(let _di = 0; _di < pts.length; _di++){ 
-            if(pts[_di].x > _dustMaxX) _dustMaxX = pts[_di].x; 
-            if(pts[_di].y > _dustMaxY) _dustMaxY = pts[_di].y;
-        }
-        const bottomPts = pts.filter(function(p){
-          if (p.y < 0.5) return false; 
-          if (p.x > _dustMaxX * 0.85) return false; 
-          return true;
-        });
-        if(bottomPts.length > 0){
-          let minY = 2;
-          for(let i=0; i<bottomPts.length; i++){ if(bottomPts[i].y < minY) minY = bottomPts[i].y; }
-          const bottomLine = bottomPts.filter(p => Math.abs(p.y - minY) < 0.05);
-          if (bottomLine.length >= 2) {
-              const p1 = bottomLine[0], p2 = bottomLine[bottomLine.length - 1];
-              const t = Math.random();
-              const cx = p1.x + (p2.x - p1.x) * t;
-              const cy = p1.y + (p2.y - p1.y) * t;
-              _dustSrc = { cx: cx, cy: cy, r: 0.015 };
-          } else {
-              const srcPt = bottomPts[Math.floor(Math.random() * bottomPts.length)];
-              _dustSrc = { cx: srcPt.x, cy: srcPt.y, r: 0.015 };
-          }
-        }
-      } else if (ann.wheels && ann.wheels.length > 0) {
-        const _wArr = ann.wheels.filter(function(w){ return w.cx < 0.95; });
-        if(_wArr.length > 0){
-          _dustSrc = _wArr[Math.floor(Math.random() * _wArr.length)];
-        }
-      }
-      if(_dustSrc) window.spawnDust(this.dustParticles, px, py, _dustSrc, this.targetW, this.targetH, wheelSpd);
-    }
-    window.updateAndDrawDust(ctx, this.dustParticles, dt);
+    
+if(!this.dustParticles) this.dustParticles = [];
+const wheelSpd = (this.phase === 'support') ? 20 : 6;
+const intensity = (wheelSpd === 20) ? 1.0 : 0.6;
+if(intensity > 0 && Math.random() < intensity){
+  const _dustSrc = window.computeVehicleDustSource(ann);
+  if(_dustSrc) window.spawnDust(this.dustParticles, px, py, _dustSrc, this.targetW, this.targetH, wheelSpd);
+}
+window.updateAndDrawDust(ctx, this.dustParticles, dt);
+
     },
 
   _drawOneFireFx(ctx, fx, now, px, py) {
@@ -1769,10 +1774,9 @@ window._openBTRSupportDetail = function(log){
   const summary = vehName + ' 橫衝直撞 · 擊殺 ' + totalKills + ' 隻 · 獲得 ' + totalLoot + ' 件物資' + (exp > 0 ? ' · 經驗 +' + exp : '');
   let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + summary + '</div>';
 
-  if(!window._btrCollapsed) window._btrCollapsed = {};
-
+  
   if(Object.keys(kills).length){
-    const kc = !!window._btrCollapsed['__kills__'];
+    const kc = !!window._collapseStates['btr.__kills__'];
     body += '<div class="cat-header" data-btr-cat="__kills__" style="cursor:pointer"><span>💀 擊殺記錄 (' + Object.keys(kills).length + ')</span><span>' + (kc ? '▶' : '▼') + '</span></div>';
     if(!kc){
       for(const eid in kills){
@@ -1808,7 +1812,7 @@ window._openBTRSupportDetail = function(log){
     const names = { weapon: '⚔️ 武器', armor:'🛡️ 裝備', ammo:'🔫 彈藥', consume:'💊 消耗品', material:'🔧 材料', misc:'📦 其他' };
     for(const g in groups){
       if(!groups[g].length) continue;
-      const col = !!window._btrCollapsed[g];
+      const col = !!window._collapseStates['btr.'+g];
       body += '<div class="cat-header" data-btr-cat="' + g + '" style="cursor:pointer"><span>' + names[g] + ' (' + groups[g].length + ')</span><span>' + (col ? '▶' : '▼') + '</span></div>';
       if(!col){
         for(const it of groups[g]){
@@ -1831,7 +1835,7 @@ window._openBTRSupportDetail = function(log){
     (function(h){
       h.onclick = function(){
         const key = h.getAttribute('data-btr-cat');
-        window._btrCollapsed[key] = !window._btrCollapsed[key];
+        window._collapseStates['btr.'+key] = !window._collapseStates['btr.'+key];
         closeModal();
         window._openBTRSupportDetail(log);
       };
@@ -2026,143 +2030,159 @@ window._vsDrawSmoke = function(ctx, particles){
 
 //
 
-// [patcher-v21-patch]
-// [patcher-fix-v21] 恢复 stat panel 原始布局 + 装甲完整语义多行
+
+/* ============================================================
+ * v17.5-r4 扩展补丁（原 v21/v30/v32/v126 patcher 内联重组）
+ * 依赖：VEHICLES / BTRSupport / _garageDetailRowMulti / _splitVehicleWeaponList
+ * ============================================================ */
 (function(){
-  "use strict";
-
-  /* ============================================================
-   * Part 0: 彻底清理 v15~v20 所有 style 和 inline 修改
-   * ============================================================ */
-  var styleIds = [
-    'patcher-v15-style','patcher-v16-style','patcher-v17-style',
-    'patcher-v18-style','patcher-v19-style','patcher-v20-style'
-  ];
-  styleIds.forEach(function(id){
-    var el = document.getElementById(id);
-    if(el){ el.remove(); }
-  });
-
-  // 断开 v17/v18/v20 的 MutationObserver
-  if(window._v17PanelObserver){ try{ window._v17PanelObserver.disconnect(); }catch(_){} }
-  if(window._v18Observer){ try{ window._v18Observer.disconnect(); }catch(_){} }
-  if(window._v20Obs){ try{ window._v20Obs.disconnect(); }catch(_){} }
-
-  // 清除 stat panel 上被 inline style 强加的属性（恢复原始 flex-wrap:wrap）
-  function _resetStatPanelInline(){
-    var panels = document.querySelectorAll('.player-stat-panel');
-    for(var i = 0; i < panels.length; i++){
-      var p = panels[i];
-      p.style.removeProperty('font-size');
-      p.style.removeProperty('line-height');
-      p.style.removeProperty('overflow');
-      var rows = p.querySelectorAll('.row');
-      for(var j = 0; j < rows.length; j++){
-        var r = rows[j];
-        r.style.removeProperty('flex-wrap');
-        r.style.removeProperty('white-space');
-        r.style.removeProperty('overflow');
-        for(var k = 0; k < r.children.length; k++){
-          r.children[k].style.removeProperty('flex-shrink');
-          r.children[k].style.removeProperty('font-size');
-          r.children[k].style.removeProperty('color');
-          r.children[k].style.removeProperty('font-weight');
-        }
-      }
-    }
-  }
-  _resetStatPanelInline();
-
-  // [整理] _v21ResetObs 已删除（无对象可清理，性能税）
+  'use strict';
+  if (window._extendedPatchesInstalled) return;
+  window._extendedPatchesInstalled = true;
 
   var A = window.VEHICLE_ANNOTATIONS = window.VEHICLE_ANNOTATIONS || {};
 
-  /* ============================================================
-   * BMP annotation 硬编码（幂等）
-   * ============================================================ */
-  if(!A.bmp1) A.bmp1 = {id:'bmp1',imageSize:{w:545,h:187},
+  /* ① BMP 系列 annotations */
+  if (!A.bmp1) A.bmp1 = {
+    id:'bmp1', imageSize:{w:545,h:187},
     doors:{fusion:[{polygon:[{x:0.0106,y:0.3654},{x:0.0202,y:0.4017},{x:0.0197,y:0.5499},{x:0.0091,y:0.5778},{x:-0.0213,y:0.5763},{x:-0.0314,y:0.5624},{x:-0.0329,y:0.389},{x:-0.0296,y:0.3644}],hingeP1:{x:0.0202,y:0.4017},hingeP2:{x:0.0197,y:0.5499},hingeEdgeIdx:1,openRotation:90,fillColor:'#000'}]},
     wheels:[{cx:0.0925,cy:0.6852,r:0.0411},{cx:0.1933,cy:0.8409,r:0.0456},{cx:0.3012,cy:0.8443,r:0.0456},{cx:0.4115,cy:0.8448,r:0.0456},{cx:0.5107,cy:0.8417,r:0.0456},{cx:0.6082,cy:0.8463,r:0.0456},{cx:0.7056,cy:0.8487,r:0.0456},{cx:0.8169,cy:0.6486,r:0.0456},{cx:0.2422,cy:0.5922,r:0.0136},{cx:0.4611,cy:0.5941,r:0.0116},{cx:0.6564,cy:0.5876,r:0.0108}],
     muzzles:[{x:0.7598,y:0.1971,weaponId:'2a28',layerOrder:'above'},{x:0.5196,y:0.1989,weaponId:'pkt',layerOrder:'above'},{x:0.5501,y:0.0706,weaponId:'atgm',layerOrder:'above'}],
     weaponAreas:[{id:'o8tz1ypo',polygon:[{x:0.5915,y:0.1587},{x:0.592,y:0.2436},{x:0.5992,y:0.2317},{x:0.6134,y:0.2193},{x:0.7608,y:0.2219},{x:0.7596,y:0.1702},{x:0.6181,y:0.1809}],weaponId:'2a28',recoilDist:0.055}],
-    missiles:[{polygon:[{x:0.551,y:0.051},{x:0.5514,y:0.0898},{x:0.5616,y:0.0895},{x:0.5552,y:0.1258},{x:0.5755,y:0.1244},{x:0.5852,y:0.0856},{x:0.6397,y:0.0866},{x:0.6627,y:0.0627},{x:0.6621,y:0.0549},{x:0.6374,y:0.036},{x:0.5815,y:0.0421},{x:0.5734,y:0.0121},{x:0.5513,y:0.0169},{x:0.551,y:0.0286},{x:0.5556,y:0.0476}],weaponId:'atgm'}]};
-  if(!A.bmp1m) A.bmp1m = {id:'bmp1m',imageSize:{w:545,h:204},
+    missiles:[{polygon:[{x:0.551,y:0.051},{x:0.5514,y:0.0898},{x:0.5616,y:0.0895},{x:0.5552,y:0.1258},{x:0.5755,y:0.1244},{x:0.5852,y:0.0856},{x:0.6397,y:0.0866},{x:0.6627,y:0.0627},{x:0.6621,y:0.0549},{x:0.6374,y:0.036},{x:0.5815,y:0.0421},{x:0.5734,y:0.0121},{x:0.5513,y:0.0169},{x:0.551,y:0.0286},{x:0.5556,y:0.0476}],weaponId:'atgm'}]
+  };
+  if (!A.bmp1m) A.bmp1m = {
+    id:'bmp1m', imageSize:{w:545,h:204},
     doors:{fusion:[{polygon:[{x:0.0076,y:0.42},{x:0.0227,y:0.4817},{x:0.0227,y:0.6053},{x:0.0144,y:0.6329},{x:-0.023,y:0.6322},{x:-0.0332,y:0.6148},{x:-0.0339,y:0.4541},{x:-0.0291,y:0.4219}],hingeP1:{x:0.0227,y:0.4817},hingeP2:{x:0.0227,y:0.6053},hingeEdgeIdx:1,openRotation:90,fillColor:'#000'}]},
     wheels:[{cx:0.0932,cy:0.7104,r:0.0411},{cx:0.1941,cy:0.8617,r:0.0468},{cx:0.3015,cy:0.8587,r:0.0468},{cx:0.4103,cy:0.8546,r:0.0468},{cx:0.5084,cy:0.8571,r:0.0468},{cx:0.607,cy:0.8635,r:0.0468},{cx:0.7042,cy:0.8607,r:0.0468},{cx:0.8198,cy:0.6641,r:0.0412}],
     muzzles:[{x:0.4134,y:0.141,weaponId:'pkt',layerOrder:'above'},{x:0.6953,y:0.1156,weaponId:'2a42',layerOrder:'above'}],
-    weaponAreas:[{id:'onpjf5i7',polygon:[{x:0.4033,y:0.0894},{x:0.4025,y:0.1345},{x:0.6976,y:0.1439},{x:0.7049,y:0.1373},{x:0.7049,y:0.1055},{x:0.6955,y:0.09},{x:0.4358,y:0.0905}],weaponId:'2a42',recoilDist:0.015}],missiles:[]};
-  if(!A.bmp2) A.bmp2 = {id:'bmp2',imageSize:{w:545,h:215},
+    weaponAreas:[{id:'onpjf5i7',polygon:[{x:0.4033,y:0.0894},{x:0.4025,y:0.1345},{x:0.6976,y:0.1439},{x:0.7049,y:0.1373},{x:0.7049,y:0.1055},{x:0.6955,y:0.09},{x:0.4358,y:0.0905}],weaponId:'2a42',recoilDist:0.015}],
+    missiles:[]
+  };
+  if (!A.bmp2) A.bmp2 = {
+    id:'bmp2', imageSize:{w:545,h:215},
     doors:{fusion:[{polygon:[{x:0.0168,y:0.5241},{x:0.0191,y:0.6018},{x:0.0067,y:0.6455},{x:-0.0443,y:0.6466},{x:-0.0505,y:0.6178},{x:-0.0501,y:0.4665},{x:-0.0398,y:0.4459},{x:0.0016,y:0.4434}],hingeP1:{x:0.0168,y:0.5241},hingeP2:{x:0.0191,y:0.6018},hingeEdgeIdx:0,openRotation:90,fillColor:'#000'}]},
     wheels:[{cx:0.0954,cy:0.7234,r:0.0482},{cx:0.1947,cy:0.867,r:0.0482},{cx:0.306,cy:0.8648,r:0.0482},{cx:0.4142,cy:0.8666,r:0.0482},{cx:0.511,cy:0.8634,r:0.0482},{cx:0.6095,cy:0.8678,r:0.0482},{cx:0.7095,cy:0.8641,r:0.0482},{cx:0.8159,cy:0.6889,r:0.0353}],
     muzzles:[{x:0.8428,y:0.2535,weaponId:'2a42',layerOrder:'above'},{x:0.5435,y:0.2579,weaponId:'pkt',layerOrder:'above'},{x:0.4309,y:0.0347,weaponId:'atgm',layerOrder:'above'}],
     weaponAreas:[{id:'ov6a9s2x',polygon:[{x:0.5965,y:0.234},{x:0.5962,y:0.2836},{x:0.8454,y:0.2749},{x:0.8453,y:0.2329}],weaponId:'2a42',recoilDist:0.015}],
-    missiles:[{polygon:[{x:0.551,y:0.051},{x:0.5514,y:0.0898},{x:0.5616,y:0.0895},{x:0.5552,y:0.1258},{x:0.5755,y:0.1244},{x:0.5852,y:0.0856},{x:0.6397,y:0.0866},{x:0.6627,y:0.0627},{x:0.6621,y:0.0549},{x:0.6374,y:0.036},{x:0.5815,y:0.0421},{x:0.5734,y:0.0121},{x:0.5513,y:0.0169},{x:0.551,y:0.0286},{x:0.5556,y:0.0476}],weaponId:'atgm'}]};
-  if(!A.bmp3) A.bmp3 = {id:'bmp3',imageSize:{w:592,h:234},
+    missiles:[{polygon:[{x:0.551,y:0.051},{x:0.5514,y:0.0898},{x:0.5616,y:0.0895},{x:0.5552,y:0.1258},{x:0.5755,y:0.1244},{x:0.5852,y:0.0856},{x:0.6397,y:0.0866},{x:0.6627,y:0.0627},{x:0.6621,y:0.0549},{x:0.6374,y:0.036},{x:0.5815,y:0.0421},{x:0.5734,y:0.0121},{x:0.5513,y:0.0169},{x:0.551,y:0.0286},{x:0.5556,y:0.0476}],weaponId:'atgm'}]
+  };
+  if (!A.bmp3) A.bmp3 = {
+    id:'bmp3', imageSize:{w:592,h:234},
     doors:{fusion:[{polygon:[{x:0.0202,y:0.4219},{x:0.0217,y:0.7016},{x:-0.0397,y:0.7009},{x:-0.0501,y:0.6707},{x:-0.0491,y:0.4412},{x:-0.0345,y:0.4188}],hingeP1:{x:0.0202,y:0.4219},hingeP2:{x:0.0217,y:0.7016},hingeEdgeIdx:0,openRotation:90,fillColor:'#000'}]},
     wheels:[{cx:0.081,cy:0.7308,r:0.0353},{cx:0.1735,cy:0.8718,r:0.042},{cx:0.2893,cy:0.8687,r:0.042},{cx:0.3861,cy:0.8737,r:0.042},{cx:0.4988,cy:0.8735,r:0.042},{cx:0.6343,cy:0.8733,r:0.042},{cx:0.7413,cy:0.8709,r:0.042},{cx:0.8759,cy:0.6859,r:0.0351},{cx:0.2092,cy:0.6732,r:0.0175},{cx:0.4348,cy:0.6617,r:0.0189},{cx:0.6719,cy:0.6454,r:0.018}],
     muzzles:[{x:0.9952,y:0.2548,weaponId:'2a70',layerOrder:'above'},{x:0.6899,y:0.265,weaponId:'pkt',layerOrder:'below'},{x:0.9385,y:0.2507,weaponId:'2a72',layerOrder:'above'}],
-    weaponAreas:[{id:'ocb56di9',polygon:[{x:0.717,y:0.2309},{x:0.7161,y:0.2423},{x:0.7072,y:0.2428},{x:0.7071,y:0.2658},{x:0.7163,y:0.2648},{x:0.7162,y:0.284},{x:0.8445,y:0.2829},{x:0.8447,y:0.2953},{x:0.9986,y:0.2902},{x:0.9976,y:0.2285},{x:0.9186,y:0.22},{x:0.8423,y:0.2196}],weaponId:'2a70',recoilDist:0.048}],missiles:[]};
-  if(!A.bmd4) A.bmd4 = {id:'bmd4',imageSize:{w:556,h:193},
+    weaponAreas:[{id:'ocb56di9',polygon:[{x:0.717,y:0.2309},{x:0.7161,y:0.2423},{x:0.7072,y:0.2428},{x:0.7071,y:0.2658},{x:0.7163,y:0.2648},{x:0.7162,y:0.284},{x:0.8445,y:0.2829},{x:0.8447,y:0.2953},{x:0.9986,y:0.2902},{x:0.9976,y:0.2285},{x:0.9186,y:0.22},{x:0.8423,y:0.2196}],weaponId:'2a70',recoilDist:0.048}],
+    missiles:[]
+  };
+  if (!A.bmd4) A.bmd4 = {
+    id:'bmd4', imageSize:{w:556,h:193},
     doors:{fusion:[{polygon:[{x:0.0267,y:0.3753},{x:0.0293,y:0.6204},{x:-0.02,y:0.6197},{x:-0.029,y:0.5997},{x:-0.0287,y:0.4092},{x:-0.023,y:0.3833}],hingeP1:{x:0.0267,y:0.3753},hingeP2:{x:0.0293,y:0.6204},hingeEdgeIdx:0,openRotation:90,fillColor:'#000'}]},
     wheels:[{cx:0.0877,cy:0.7247,r:0.0353},{cx:0.1796,cy:0.8469,r:0.042},{cx:0.297,cy:0.8466,r:0.042},{cx:0.412,cy:0.8492,r:0.042},{cx:0.5246,cy:0.8438,r:0.042},{cx:0.6401,cy:0.8415,r:0.042},{cx:0.759,cy:0.6839,r:0.042},{cx:0.2332,cy:0.6188,r:0.0175},{cx:0.3435,cy:0.6204,r:0.0189},{cx:0.5775,cy:0.6149,r:0.018},{cx:0.4602,cy:0.6166,r:0.0182}],
     muzzles:[{x:0.9926,y:0.2389,weaponId:'2a70',layerOrder:'above'},{x:0.6229,y:0.246,weaponId:'pkt',layerOrder:'below'},{x:0.9449,y:0.2423,weaponId:'2a72',layerOrder:'above'}],
-    weaponAreas:[{id:'omtiwlzc',polygon:[{x:0.6394,y:0.1963},{x:0.6389,y:0.2177},{x:0.6639,y:0.2172},{x:0.6636,y:0.2601},{x:0.639,y:0.2607},{x:0.6378,y:0.2805},{x:0.8764,y:0.2816},{x:1.0026,y:0.2794},{x:0.9958,y:0.2044}],weaponId:'2a70',recoilDist:0.048}],missiles:[]};
+    weaponAreas:[{id:'omtiwlzc',polygon:[{x:0.6394,y:0.1963},{x:0.6389,y:0.2177},{x:0.6639,y:0.2172},{x:0.6636,y:0.2601},{x:0.639,y:0.2607},{x:0.6378,y:0.2805},{x:0.8764,y:0.2816},{x:1.0026,y:0.2794},{x:0.9958,y:0.2044}],weaponId:'2a70',recoilDist:0.048}],
+    missiles:[]
+  };
 
-  /* ============================================================
-   * VEHICLES 重建 + 装甲完整语义多行
-   * ============================================================ */
-  // [整理] ARMOR_MULTI 已删除（v30 ARMOR_GRID 覆盖）
-  if(typeof VEHICLES !== 'undefined'){
-    function _ensure(id, def){ if(!VEHICLES[id]){ VEHICLES[id] = def; return true; } return false; }
-    _ensure('bmp1',{id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon: '73mm 2A28 + 7.62mm PKT',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
-    _ensure('bmp1m',{id:'bmp1m',name:'BMP-1M',tier:2,line:'bmp',weapon: '30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:32,next:['bmp2'],researchCost:{ammoCal:'5.45',ammoCount:1500,liquor:150,exp:800}});
-    _ensure('bmp2',{id:'bmp2',name:'BMP-2',tier:3,line:'bmp',weapon: '30mm 2A42 + 7.62mm PKT + ATGM 發射筒',weaponSpecial:'9M113 Konkurs ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:35,next:['bmp3'],researchCost:{ammoCal:'7.62',ammoCount:2000,liquor:500,exp:3000}});
-    _ensure('bmp3',{id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon: '100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
-    _ensure('bmd4',{id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon: '100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
-    if(VEHICLES.btr80){
+  /* ② VEHICLES 扩展 */
+  if (typeof VEHICLES !== 'undefined') {
+    var _ensure = function(id, def){ if (!VEHICLES[id]) VEHICLES[id] = def; };
+    _ensure('bmp1', {id:'bmp1',name:'BMP-1',tier:1,line:'bmp',weapon:'73mm 2A28 + 7.62mm PKT',weaponSpecial:'9M14 Malyutka ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:30,next:['bmp1m'],researchCost:{ammoCal:'5.45',ammoCount:1000,liquor:100,exp:500}});
+    _ensure('bmp1m', {id:'bmp1m',name:'BMP-1M',tier:2,line:'bmp',weapon:'30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:32,next:['bmp2'],researchCost:{ammoCal:'5.45',ammoCount:1500,liquor:150,exp:800}});
+    _ensure('bmp2', {id:'bmp2',name:'BMP-2',tier:3,line:'bmp',weapon:'30mm 2A42 + 7.62mm PKT + ATGM 發射筒',weaponSpecial:'9M113 Konkurs ATGM',armor:'',speedRoad:65,speedOffroad:'45-50',supportDuration:35,next:['bmp3'],researchCost:{ammoCal:'7.62',ammoCount:2000,liquor:500,exp:3000}});
+    _ensure('bmp3', {id:'bmp3',name:'BMP-3',tier:4,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:40,next:['bmd4'],researchCost:{ammoCal:'7.62x54',ammoCount:2500,liquor:2500,exp:12000}});
+    _ensure('bmd4', {id:'bmd4',name:'BMD-4',tier:5,line:'bmp',weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT',weaponSpecial:'無',armor:'',speedRoad:70,speedOffroad:'45-50',supportDuration:42,next:[],researchCost:{ammoCal:'7.62x54',ammoCount:3000,liquor:3000,exp:15000}});
+    if (VEHICLES.btr80) {
       var b0 = VEHICLES.btr80.next = VEHICLES.btr80.next || [];
-      if(b0.indexOf('btr80a')<0) b0.push('btr80a');
-      if(b0.indexOf('bmp1')<0) b0.push('bmp1');
-      if(b0.indexOf('t80')<0) b0.push('t80');
+      if (b0.indexOf('btr80a') < 0) b0.push('btr80a');
+      if (b0.indexOf('bmp1') < 0) b0.push('bmp1');
+      if (b0.indexOf('t80') < 0) b0.push('t80');
       VEHICLES.btr80.next = b0.filter(function(v){ return v !== 'bmp1am'; });
     }
-    var _chain = [['bmp1','bmp1m'],['bmp1m','bmp2'],['bmp2','bmp3'],['bmp3','bmd4']];
-    for(var ci = 0; ci < _chain.length; ci++){
-      var cur = VEHICLES[_chain[ci][0]];
-      if(cur){ var cn = cur.next = cur.next || []; if(cn.indexOf(_chain[ci][1])<0) cn.push(_chain[ci][1]); }
+    var chain = [['bmp1','bmp1m'],['bmp1m','bmp2'],['bmp2','bmp3'],['bmp3','bmd4']];
+    for (var ci = 0; ci < chain.length; ci++) {
+      var cu = VEHICLES[chain[ci][0]];
+      if (cu) { var cn = cu.next = cu.next || []; if (cn.indexOf(chain[ci][1]) < 0) cn.push(chain[ci][1]); }
     }
     ['t80','t80b','t80bv','t80u','t80uk','t80um','btr80','btr80a','btr82','btr82a','bmp1m'].forEach(function(id){
-      if(VEHICLES[id]) VEHICLES[id].weaponSpecial = '無';
+      if (VEHICLES[id]) VEHICLES[id].weaponSpecial = '無';
     });
-    if(VEHICLES.btr90) VEHICLES.btr90.weaponSpecial = 'ATGM 發射筒';
-    if(VEHICLES.bmp1)  VEHICLES.bmp1.weaponSpecial = '9M14 Malyutka ATGM';
-    if(VEHICLES.bmp2)  VEHICLES.bmp2.weaponSpecial = '9M113 Konkurs ATGM';
-    if(VEHICLES.bmp3)  VEHICLES.bmp3.weaponSpecial = '無';
-    if(VEHICLES.bmd4)  VEHICLES.bmd4.weaponSpecial = '無';
+    if (VEHICLES.btr90) VEHICLES.btr90.weaponSpecial = 'ATGM 發射筒';
+    if (VEHICLES.bmp1) VEHICLES.bmp1.weaponSpecial = '9M14 Malyutka ATGM';
+    if (VEHICLES.bmp2) VEHICLES.bmp2.weaponSpecial = '9M113 Konkurs ATGM';
+    if (VEHICLES.bmp3) VEHICLES.bmp3.weaponSpecial = '無';
+    if (VEHICLES.bmd4) VEHICLES.bmd4.weaponSpecial = '無';
   }
 
-  /* BMP door 对准 */
-  if(window.BTRSupport && !window.BTRSupport._v21DoorPatched){
-    window.BTRSupport._v21DoorPatched = true;
+  /* ③ 装甲/速度/特殊武器数据 */
+  var ARMOR_PARTS = ['車體', '炮塔', '附加'];
+  var ARMOR_GRID = {
+    btr80:['10/10/7','10/10/10','—'],
+    btr80a:['10/10/7','23/10/10','—'],
+    btr82:['10/10/7','10/10/10','—'],
+    btr82a:['15/10/7','23/10/10','—'],
+    btr90:['30/15/10','30/15/10','—'],
+    bmp1:['19/16/6','23/19/13','—'],
+    bmp1m:['19/16/6','23/19/13','—'],
+    bmp2:['19/16/6','23/19/13','—'],
+    bmp3:['60/43/30','50/40/30','—'],
+    bmd4:['40/30/20','23/20/15','—'],
+    t80:['450/80/60','500/200/80','—'],
+    t80b:['480/80/60','500/200/80','—'],
+    t80bv:['480/80/60','500/200/80','接觸-1'],
+    t80u:['500/80/60','600/250/80','接觸-5'],
+    t80uk:['500/80/60','600/250/80','接觸-5'],
+    t80um:['500/80/60','600/250/80','接觸-5']
+  };
+  var WEAPON_SPECIAL_ZH = {
+    btr80:'無',btr80a:'無',btr82:'無',btr82a:'無',btr90:'9M113 競賽',
+    bmp1:'9M14 嬰兒',bmp1m:'無',bmp2:'9M113 競賽',bmp3:'無',bmd4:'無',
+    t80:'無',t80b:'無',t80bv:'無',t80u:'無',t80uk:'無',t80um:'無'
+  };
+  var SPEED_DATA = {
+    btr80:{fwd:80,rev:20},btr80a:{fwd:87,rev:20},btr82:{fwd:100,rev:20},btr82a:{fwd:100,rev:20},btr90:{fwd:100,rev:20},
+    bmp1:{fwd:65,rev:10},bmp1m:{fwd:65,rev:10},bmp2:{fwd:65,rev:10},bmp3:{fwd:70,rev:20},bmd4:{fwd:70,rev:20},
+    t80:{fwd:70,rev:11},t80b:{fwd:78,rev:11},t80bv:{fwd:70,rev:11},t80u:{fwd:70,rev:11},t80uk:{fwd:70,rev:11},t80um:{fwd:70,rev:11}
+  };
+  if (typeof VEHICLES !== 'undefined') {
+    Object.keys(ARMOR_GRID).forEach(function(id){
+      if (!VEHICLES[id]) return;
+      VEHICLES[id].armorGrid = ARMOR_GRID[id].slice();
+      VEHICLES[id].armor = ARMOR_PARTS.map(function(p, i){ return p + ' ' + ARMOR_GRID[id][i]; }).join('\n');
+    });
+    Object.keys(WEAPON_SPECIAL_ZH).forEach(function(id){
+      if (VEHICLES[id]) VEHICLES[id].weaponSpecial = WEAPON_SPECIAL_ZH[id];
+    });
+    Object.keys(SPEED_DATA).forEach(function(id){
+      if (!VEHICLES[id]) return;
+      VEHICLES[id].speedFwd = SPEED_DATA[id].fwd;
+      VEHICLES[id].speedRev = SPEED_DATA[id].rev;
+      if (typeof VEHICLES[id].speedRoad === 'undefined') VEHICLES[id].speedRoad = SPEED_DATA[id].fwd;
+    });
+  }
+
+  /* ④ BTRSupport door 对齐 */
+  if (window.BTRSupport && !window.BTRSupport._extDoorPatched) {
+    window.BTRSupport._extDoorPatched = true;
     var _origSetup = window.BTRSupport._setupCanvas;
     window.BTRSupport._setupCanvas = function(){
       _origSetup.call(this);
       var ann = A[this.vehicleId];
-      if(!ann || !ann.doors) return;
+      if (!ann || !ann.doors) return;
       var doors = [];
-      if(ann.doors.fusion && ann.doors.fusion.length){ doors = ann.doors.fusion; }
+      if (ann.doors.fusion && ann.doors.fusion.length) doors = ann.doors.fusion;
       else {
-        if(ann.doors.upper) doors = doors.concat(ann.doors.upper);
-        if(ann.doors.lower) doors = doors.concat(ann.doors.lower);
-        if(ann.doors.hatch) doors = doors.concat(ann.doors.hatch);
+        if (ann.doors.upper) doors = doors.concat(ann.doors.upper);
+        if (ann.doors.lower) doors = doors.concat(ann.doors.lower);
+        if (ann.doors.hatch) doors = doors.concat(ann.doors.hatch);
       }
-      if(!doors.length) return;
+      if (!doors.length) return;
       var sx = 0, sn = 0;
-      for(var i = 0; i < doors.length; i++){
-        var d = doors[i]; if(!d.polygon) continue;
-        for(var j = 0; j < d.polygon.length; j++){ sx += d.polygon[j].x; sn++; }
+      for (var i = 0; i < doors.length; i++) {
+        var d = doors[i]; if (!d.polygon) continue;
+        for (var j = 0; j < d.polygon.length; j++) { sx += d.polygon[j].x; sn++; }
       }
-      if(sn === 0) return;
+      if (sn === 0) return;
       var r = sx / sn;
       var w = this.width;
       var pcx = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
@@ -2171,210 +2191,18 @@ window._vsDrawSmoke = function(ctx, particles){
     };
   }
 
-  /* ============================================================
-   * _garageDetailHtml —— 装甲完整语义多行（利用左侧空间）
-   * ============================================================ */
-
-
-  /* 科技树 */
-  function _pan(c){
-    if(!c || c._pb) return; c._pb = true;
-    var d=false, sx=0, sy=0, sl=0, st=0;
-    c.addEventListener('pointerdown', function(e){
-      if(e.pointerType==='touch'||e.button!==0) return;
-      if(e.target.closest && e.target.closest('.wt-node')) return;
-      d=true; sx=e.clientX; sy=e.clientY; sl=c.scrollLeft; st=c.scrollTop;
-      c.style.cursor='grabbing'; try{ c.setPointerCapture(e.pointerId); }catch(_){}
-    });
-    c.addEventListener('pointermove', function(e){
-      if(!d) return;
-      c.scrollLeft = sl-(e.clientX-sx); c.scrollTop = st-(e.clientY-sy);
-    });
-    function end(e){ if(!d) return; d=false; c.style.cursor='grab'; try{ c.releasePointerCapture(e.pointerId); }catch(_){} }
-    c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
-    c.style.cursor='grab';
-  }
-  window._garageOpenTechTree = function(){
-    var NW=100, NH=64;
-    var nodes = [
-      {vid:'btr80',x:120,y:4},{vid:'btr80a',x:10,y:76},{vid:'btr82',x:10,y:148},{vid:'btr82a',x:10,y:220},{vid:'btr90',x:10,y:292},
-      {vid:'bmp1',x:120,y:76},{vid:'bmp1m',x:120,y:148},{vid:'bmp2',x:120,y:220},{vid:'bmp3',x:120,y:292},{vid:'bmd4',x:120,y:364},
-      {vid:'t80',x:230,y:76},{vid:'t80b',x:230,y:148},{vid:'t80bv',x:230,y:220},{vid:'t80u',x:230,y:292},{vid:'t80uk',x:230,y:364},{vid:'t80um',x:340,y:364}
-    ];
-    var s = '<svg width="450" height="440" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
-    s += '<path d="M 170 68 L 170 72 L 60 72 L 60 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="170" y1="68" x2="170" y2="76" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 170 68 L 170 72 L 280 72 L 280 76" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-    s += '<line x1="60" y1="140" x2="60" y2="148" stroke="#8a5f18" stroke-width="2"/><line x1="60" y1="212" x2="60" y2="220" stroke="#8a5f18" stroke-width="2"/><line x1="60" y1="284" x2="60" y2="292" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="170" y1="140" x2="170" y2="148" stroke="#8a5f18" stroke-width="2"/><line x1="170" y1="212" x2="170" y2="220" stroke="#8a5f18" stroke-width="2"/><line x1="170" y1="284" x2="170" y2="292" stroke="#8a5f18" stroke-width="2"/><line x1="170" y1="356" x2="170" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<line x1="280" y1="140" x2="280" y2="148" stroke="#8a5f18" stroke-width="2"/><line x1="280" y1="212" x2="280" y2="220" stroke="#8a5f18" stroke-width="2"/><line x1="280" y1="284" x2="280" y2="292" stroke="#8a5f18" stroke-width="2"/><line x1="280" y1="356" x2="280" y2="364" stroke="#8a5f18" stroke-width="2"/>';
-    s += '<path d="M 280 356 L 280 360 L 390 360 L 390 364" stroke="#8a5f18" stroke-width="2" fill="none"/></svg>';
-    var g = _garageInitState();
-    var res = _garageGetResearchInfo();
-    var rId = res ? res.targetId : null;
-    var h = '';
-    for(var i = 0; i < nodes.length; i++){
-      var n = nodes[i];
-      var v = VEHICLES[n.vid]; if(!v) continue;
-      var own = g.ownedVehicles.indexOf(n.vid) >= 0;
-      var cur = g.currentVehicle === n.vid;
-      var isR = (rId === n.vid);
-      var pre = Object.keys(VEHICLES).filter(function(p){ return (VEHICLES[p].next||[]).indexOf(n.vid)>=0; });
-      var hasAll = pre.length === 0 || pre.every(function(p){ return g.ownedVehicles.indexOf(p)>=0; });
-      var cls = 'wt-node', mk = '';
-      if(own && cur){ cls += ' current'; mk = '✓'; }
-      else if(own){ cls += ' owned'; mk = '✓'; }
-      else if(!hasAll){ cls += ' locked'; mk = '🔒'; }
-      else if(isR){ cls += ' researching'; mk = '🔬'; }
-      else if(v.researchCost){ cls += ' researchable'; mk = '🔬'; }
-      else { cls += ' locked'; mk = '?'; }
-      h += '<div class="'+cls+'" data-tech-node="'+n.vid+'" style="left:'+n.x+'px;top:'+n.y+'px;width:'+NW+'px;height:'+NH+'px"><div class="wt-node-img"><img src="icons/vehicles/'+n.vid+'.png'+assetSuffix()+'" data-fallback="1" alt=""></div><div class="wt-node-name">'+v.name+'</div><div class="wt-node-mark">'+mk+'</div></div>';
-    }
-    var bd = openModal({ title:'科技樹', body:'<div class="wt-tech-wrap"><div class="wt-tech-canvas" style="width:450px;height:440px">'+s+h+'</div></div>' });
-    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
-    var wrap = bd.querySelector('.wt-tech-wrap');
-    if(wrap) _pan(wrap);
-    var btns = bd.querySelectorAll('[data-tech-node]');
-    for(var bi = 0; bi < btns.length; bi++){
-      (function(b){ b.onclick = function(){ _garageShowTechDetail(b.getAttribute('data-tech-node')); }; })(btns[bi]);
-    }
-  };
-
-  /* ============================================================
-   * CSS：只保留装甲多行 + 科技树，不动 stat panel
-   * ============================================================ */
-  var st = document.createElement('style');
-  st.id = 'patcher-v21-style';
-  st.textContent = [
-    '.garage-stat-row.armor-row{display:flex !important;align-items:center !important;gap:4px !important;min-width:0 !important;padding:1px 0 !important}',
-    '.garage-stat-row.armor-row .k{flex:0 0 26px !important;white-space:nowrap !important;color:#7a6f60 !important;line-height:1.4 !important;min-height:1.4em !important}',
-    '.garage-stat-row .armor-val{flex:1 1 0 !important;min-width:0 !important;white-space:nowrap !important;text-overflow:ellipsis !important;overflow:hidden !important;line-height:1.4 !important;text-align:right !important}',
-    '.garage-stat-row .v-arrow{flex:0 0 auto !important}',
-    '.garage-stat-row .v-cur.armor-val{color:#7a6f60 !important}',
-    '.garage-stat-row .v-cur-only.armor-val{color:#e8a33d !important;font-weight:bold !important}',
-    '.garage-stat-row .v-new.armor-val{color:#e8a33d !important;font-weight:bold !important}',
-    '.garage-stat-row .v-new.armor-val.diff{color:#a45ede !important}',
-    '.wt-node{user-select:none;-webkit-user-select:none}'
-  ].join('\n');
-  document.head.appendChild(st);
-
-  /* fusion door（v20 逻辑） */
-  
-  })();
-
-
-// [patcher-v30-patch]
-// [patcher-fix-v30] 裝甲 3 行 + 導彈中文譯名 + 速度合併 + 全局經驗整合單行
-(function(){
-  "use strict";
-  if(window._patcherFixV30Installed) return;
-  window._patcherFixV30Installed = true;
-
-  /* ============================================================
-   * Part 0: 清理 v22~v29 裝甲 style
-   * ============================================================ */
-  ['patcher-v22-style','patcher-v23-style','patcher-v24-style',
-   'patcher-v25-style','patcher-v26-style','patcher-v27-style',
-   'patcher-v28-style','patcher-v29-style'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(el){ el.remove(); }
-  });
-  var oldV21 = document.getElementById('patcher-v21-style');
-  if(oldV21) oldV21.remove();
-
-  /* ============================================================
-   * Part 1: 裝甲 3 行（車體/炮塔/附加）
-   * ============================================================ */
-  var ARMOR_PARTS = ['車體', '炮塔', '附加'];
-  var ARMOR_GRID = {
-    btr80:  ['10/10/7',      '10/10/10',    '—'],
-    btr80a: ['10/10/7',      '23/10/10',    '—'],
-    btr82:  ['10/10/7',      '10/10/10',    '—'],
-    btr82a: ['15/10/7',      '23/10/10',    '—'],
-    btr90:  ['30/15/10',     '30/15/10',    '—'],
-    bmp1:   ['19/16/6',      '23/19/13',    '—'],
-    bmp1m:  ['19/16/6',      '23/19/13',    '—'],
-    bmp2:   ['19/16/6',      '23/19/13',    '—'],
-    bmp3:   ['60/43/30',     '50/40/30',    '—'],
-    bmd4:   ['40/30/20',     '23/20/15',    '—'],
-    t80:    ['450/80/60',    '500/200/80',  '—'],
-    t80b:   ['480/80/60',    '500/200/80',  '—'],
-    t80bv:  ['480/80/60',    '500/200/80',  '接觸-1'],
-    t80u:   ['500/80/60',    '600/250/80',  '接觸-5'],
-    t80uk:  ['500/80/60',    '600/250/80',  '接觸-5'],
-    t80um:  ['500/80/60',    '600/250/80',  '接觸-5']
-  };
-
-  /* ============================================================
-   * Part 2: 導彈中文譯名
-   * ============================================================ */
-  var WEAPON_SPECIAL_ZH = {
-    btr80: '無', btr80a: '無', btr82: '無', btr82a: '無', btr90: '9M113 競賽',
-    bmp1: '9M14 嬰兒', bmp1m: '無', bmp2: '9M113 競賽', bmp3: '無', bmd4: '無',
-    t80: '無', t80b: '無', t80bv: '無', t80u: '無', t80uk: '無', t80um: '無'
-};
-
-  /* ============================================================
-   * Part 3: 速度（前進/倒車）
-   * ============================================================ */
-  var SPEED_DATA = {
-    btr80:  { fwd: 80,  rev: 20 },
-    btr80a: { fwd: 87,  rev: 20 },
-    btr82:  { fwd: 100, rev: 20 },
-    btr82a: { fwd: 100, rev: 20 },
-    btr90:  { fwd: 100, rev: 20 },
-    bmp1:   { fwd: 65,  rev: 10 },
-    bmp1m:  { fwd: 65,  rev: 10 },
-    bmp2:   { fwd: 65,  rev: 10 },
-    bmp3:   { fwd: 70,  rev: 20 },
-    bmd4:   { fwd: 70,  rev: 20 },
-    t80:    { fwd: 70,  rev: 11 },
-    t80b:   { fwd: 78,  rev: 11 },
-    t80bv:  { fwd: 70,  rev: 11 },
-    t80u:   { fwd: 70,  rev: 11 },
-    t80uk:  { fwd: 70,  rev: 11 },
-    t80um:  { fwd: 70,  rev: 11 }
-  };
-
-  /* ============================================================
-   * Part 4: 寫入 VEHICLES
-   * ============================================================ */
-  if(typeof VEHICLES !== 'undefined'){
-    Object.keys(ARMOR_GRID).forEach(function(id){
-      if(!VEHICLES[id]) return;
-      VEHICLES[id].armorGrid = ARMOR_GRID[id].slice();
-      VEHICLES[id].armor = ARMOR_PARTS.map(function(p, i){
-        return p + ' ' + ARMOR_GRID[id][i];
-      }).join('\n');
-    });
-    Object.keys(WEAPON_SPECIAL_ZH).forEach(function(id){
-      if(VEHICLES[id]) VEHICLES[id].weaponSpecial = WEAPON_SPECIAL_ZH[id];
-    });
-    Object.keys(SPEED_DATA).forEach(function(id){
-      if(!VEHICLES[id]) return;
-      VEHICLES[id].speedFwd = SPEED_DATA[id].fwd;
-      VEHICLES[id].speedRev = SPEED_DATA[id].rev;
-      if(typeof VEHICLES[id].speedRoad === 'undefined') VEHICLES[id].speedRoad = SPEED_DATA[id].fwd;
-    });
-  }
-
-  /* ============================================================
-   * Part 5: 重寫 _garageDetailHtml
-   * ============================================================ */
+  /* ⑤ _garageDetailHtml */
   function _esc(v){
-    if(v == null) return '';
+    if (v == null) return '';
     return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
   function _armorRows(curGrid, tgtGrid){
-    var CG = curGrid || [];
-    var TG = tgtGrid || null;
-    var out = '';
-    for(var i = 0; i < ARMOR_PARTS.length; i++){
-      var part = ARMOR_PARTS[i];
-      var cv = CG[i] != null ? CG[i] : '—';
+    var CG = curGrid || []; var TG = tgtGrid || null; var out = '';
+    for (var i = 0; i < ARMOR_PARTS.length; i++) {
+      var part = ARMOR_PARTS[i]; var cv = CG[i] != null ? CG[i] : '—';
       var row = '<div class="garage-stat-row armor-row" title="' + part + ' 正/側/背 (mm)">';
       row += '<span class="k">' + part + '</span>';
-      if(TG){
+      if (TG) {
         var tv = TG[i] != null ? TG[i] : '—';
         row += '<span class="v-cur armor-val">' + _esc(cv) + '</span>';
         row += '<span class="v-arrow">→</span>';
@@ -2388,18 +2216,16 @@ window._vsDrawSmoke = function(ctx, particles){
     return out;
   }
   function _spdText(v){
-    if(!v) return '—';
+    if (!v) return '—';
     var f = (v.speedFwd != null) ? v.speedFwd : v.speedRoad;
     var r = (v.speedRev != null) ? v.speedRev : '—';
-    if(f == null) return '—';
+    if (f == null) return '—';
     return f + ' / ' + r + ' km/h';
   }
   function _spdRow(cur, tgt){
-    var cv = _spdText(cur);
-    var tv = tgt ? _spdText(tgt) : null;
-    var h = '<div class="garage-stat-row" title="前進 / 倒車">';
-    h += '<span class="k">速度</span>';
-    if(tv !== null){
+    var cv = _spdText(cur); var tv = tgt ? _spdText(tgt) : null;
+    var h = '<div class="garage-stat-row" title="前進 / 倒車"><span class="k">速度</span>';
+    if (tv !== null) {
       h += '<span class="v-cur">' + _esc(cv) + '</span>';
       h += '<span class="v-arrow">→</span>';
       h += '<span class="v-new' + (cv !== tv ? ' diff' : '') + '">' + _esc(tv) + '</span>';
@@ -2409,7 +2235,6 @@ window._vsDrawSmoke = function(ctx, particles){
     h += '</div>';
     return h;
   }
-
   window._garageDetailHtml = function(cur, tgt, cu, mu){
     var h = '';
     var cw = _splitVehicleWeaponList(cur);
@@ -2420,295 +2245,77 @@ window._vsDrawSmoke = function(ctx, particles){
     h += _armorRows(cur.armorGrid, tgt ? tgt.armorGrid : null);
     h += _spdRow(cur, tgt);
     h += _garageDetailRow('支援', cur.supportDuration + 's', tgt ? tgt.supportDuration + 's' : null);
-    if(cu != null && mu > 0){
+    if (cu != null && mu > 0) {
       h += '<div class="garage-stat-row"><span class="k">電台</span><span class="v-cur-only">' + cu + ' / ' + mu + '</span></div>';
     }
     return h;
   };
 
-  /* ============================================================
-   * Part 6: 全局經驗 / 轉入數量整合到一行
-   *   _garageShowTechDetail 每次打開詳情都會重新生成 #garage-transfer-row
-   *   用 MutationObserver 檢測並重整 DOM 結構
-   * ============================================================ */
-  // [整理] _styleNum 已删除（v32 _restore 清 inline style，调用无实际效果）
-  function _integrateTransferRow(){
+  /* ⑥ transfer row 最终布局 */
+  function _buildFinalTransferLayout(){
     var row = document.getElementById('garage-transfer-row');
-    if(!row || row._integrated) return;
-
+    if (!row || row._extFinalLayout) return;
     var geDiv = row.querySelector(':scope > div:first-child');
-    var sliderWrap = row.querySelector('.garage-transfer-slider-wrap');
-    if(!geDiv || !sliderWrap){ return; }
+    var wrap = row.querySelector('.garage-transfer-slider-wrap');
+    if (!geDiv || !wrap) return;
+    var infoRows = Array.prototype.slice.call(wrap.querySelectorAll('.garage-transfer-slider-info'));
+    if (infoRows.length < 3) return;
+    row._extFinalLayout = true;
 
-    var infoRows = [];
-    var _nodes = sliderWrap.querySelectorAll('.garage-transfer-slider-info');
-    for(var i = 0; i < _nodes.length; i++) infoRows.push(_nodes[i]);
-    if(infoRows.length < 3){ return; }
+    var qtyRow = infoRows[0], afterGeRow = infoRows[1], afterProgRow = infoRows[2];
 
-    row._integrated = true;
-
-    var qtyRow = infoRows[0];
-    var afterGeRow = infoRows[1];
-    var afterProgRow = infoRows[2];
-
-    /* --- 第一行：全局經驗 + 轉入數量 --- */
     row.style.cssText = 'display:flex;flex-direction:column;gap:5px;margin-top:10px';
     var line1 = document.createElement('div');
     line1.className = 'gt-line1';
     line1.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;gap:8px;min-width:0';
-
     geDiv.style.cssText = 'display:inline-flex;align-items:baseline;gap:4px;font-size:11px;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     qtyRow.style.cssText = 'display:inline-flex;align-items:baseline;gap:4px;font-size:11px;flex:0 1 auto;min-width:0;white-space:nowrap';
-
-        
-    sliderWrap.removeChild(qtyRow);
+    wrap.removeChild(qtyRow);
     line1.appendChild(geDiv);
     line1.appendChild(qtyRow);
-    row.insertBefore(line1, sliderWrap);
+    row.insertBefore(line1, wrap);
 
-    /* --- 第二行：滑塊 --- */
-    sliderWrap.style.cssText = 'display:flex;flex-direction:column;gap:3px;align-self:stretch';
-    var slider = sliderWrap.querySelector('#gt-slider');
-    if(slider){
-      slider.style.cssText = 'width:100%;margin:0;accent-color:#e8a33d';
-    }
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:3px;align-self:stretch';
+    var slider = wrap.querySelector('#gt-slider');
+    if (slider) slider.style.cssText = 'width:100%;margin:0;accent-color:#e8a33d';
 
-    /* --- 第三行：轉入後預覽（左右並列） --- */
-    var afterLine = document.createElement('div');
-    afterLine.style.cssText = 'display:flex;justify-content:space-between;gap:8px;font-size:10px;color:#7a6f60;min-width:0';
-
-    if(afterGeRow){
-      sliderWrap.removeChild(afterGeRow);
-      afterGeRow.style.cssText = 'display:inline-flex;align-items:baseline;gap:3px;font-size:10px;color:#7a6f60;white-space:nowrap;min-width:0';
-      var b1 = afterGeRow.querySelector('b');
-      if(b1){ b1.style.color = '#a45ede'; b1.style.fontSize = '11px'; b1.style.fontFamily = 'Menlo,Consolas,monospace'; b1.style.fontWeight = 'bold'; }
-      afterLine.appendChild(afterGeRow);
-    }
-    if(afterProgRow){
-      sliderWrap.removeChild(afterProgRow);
-      afterProgRow.style.cssText = 'display:inline-flex;align-items:baseline;gap:3px;font-size:10px;color:#7a6f60;white-space:nowrap;min-width:0';
-      var b2 = afterProgRow.querySelector('b');
-      if(b2){ b2.style.color = '#e8a33d'; b2.style.fontSize = '11px'; b2.style.fontFamily = 'Menlo,Consolas,monospace'; b2.style.fontWeight = 'bold'; }
-      afterLine.appendChild(afterProgRow);
-    }
-    sliderWrap.appendChild(afterLine);
-
-    /* --- 第四行：確認按鈕（右對齊） --- */
-    var actions = sliderWrap.querySelector('.garage-transfer-slider-actions');
-    if(actions){
-      actions.style.cssText = 'display:flex;justify-content:flex-end;margin-top:2px';
-      var btn = actions.querySelector('#gt-confirm');
-      if(btn) btn.style.cssText = 'padding:5px 16px;font-size:11px;border-radius:5px';
-    }
-  }
-
-  /* 初次檢查 */
-  _integrateTransferRow();
-
-  /* MutationObserver：每次詳情彈窗重建時重新整合 */
-  if(typeof MutationObserver !== 'undefined'){
-    if(window._v30TransferObs){ try{ window._v30TransferObs.disconnect(); }catch(_){} }
-    var _obs = new MutationObserver(function(){
-      _integrateTransferRow();
-    });
-    _obs.observe(document.body, { childList: true, subtree: true });
-    window._v30TransferObs = _obs;
-  }
-
-  /* ============================================================
-   * Part 7: CSS
-   * ============================================================ */
-  var st = document.createElement('style');
-  st.id = 'patcher-v30-style';
-  st.textContent = [
-    /* 裝甲 3 行 */
-    '.garage-stat-row.armor-row{display:flex !important;align-items:center !important;gap:4px !important;min-width:0 !important;padding:1px 0 !important}',
-    '.garage-stat-row.armor-row .k{flex:0 0 36px !important;white-space:nowrap !important;color:#a89a85 !important;font-size:10px !important;line-height:1.4 !important;text-align:left !important}',
-    '.garage-stat-row .armor-val{flex:1 1 0 !important;min-width:0 !important;white-space:nowrap !important;text-overflow:ellipsis !important;overflow:hidden !important;line-height:1.4 !important;text-align:right !important;font-size:10px !important;font-variant-numeric:tabular-nums !important}',
-    '.garage-stat-row .v-arrow{flex:0 0 auto !important;font-size:9px !important}',
-    '.garage-stat-row .v-cur.armor-val{color:#7a6f60 !important}',
-    '.garage-stat-row .v-cur-only.armor-val{color:#e8a33d !important;font-weight:bold !important}',
-    '.garage-stat-row .v-new.armor-val{color:#e8a33d !important;font-weight:bold !important}',
-    '.garage-stat-row .v-new.armor-val.diff{color:#a45ede !important}',
-    '.garage-bottom-left,.garage-tech-detail-left{overflow-x:hidden !important}',
-    '@media (max-width:380px){.garage-stat-row .armor-val{font-size:9px !important}}',
-    /* transfer row */
-    '#garage-transfer-row{display:flex !important;flex-direction:column !important;gap:5px !important}',
-    '#garage-transfer-row .gt-line1{display:flex !important;justify-content:space-between !important;align-items:baseline !important;gap:8px !important;min-width:0 !important}',
-    '#garage-transfer-row .garage-transfer-slider-wrap{display:flex !important;flex-direction:column !important;gap:3px !important}',
-    '#garage-transfer-row .garage-transfer-slider-actions{display:flex !important;justify-content:flex-end !important;margin-top:2px !important}',
-    /* 科技樹 */
-    '.wt-tech-canvas{width:450px !important;height:440px !important}',
-    '.wt-tech-wrap{cursor:grab;user-select:none;-webkit-user-select:none}',
-    '.wt-node{user-select:none;-webkit-user-select:none}'
-  ].join('\n');
-  document.head.appendChild(st);
-
-  /* ============================================================
-   * Part 8: 若當前在車場頁，重繪
-   * ============================================================ */
-  try{
-    var p = document.getElementById('garage-page');
-    if(p && p.classList.contains('on') && typeof _garageRenderHtml === 'function'){
-      p.innerHTML = _garageRenderHtml();
-      if(typeof _garageBind === 'function') _garageBind();
-    }
-  }catch(e){}
-
-  /* ============================================================
-   * 診斷
-   * ============================================================ */
-  try{
-    var _long = [];
-    Object.keys(ARMOR_GRID).forEach(function(id){
-      ARMOR_GRID[id].forEach(function(v){
-        var _en = (v.match(/[A-Za-z0-9]/g) || []).length;
-        if(_en > 8) _long.push(id + ':' + v + '(' + _en + ')');
-      });
-    });
-    var _bad = Object.keys(ARMOR_GRID).filter(function(id){
-      return typeof VEHICLES === 'undefined' || !VEHICLES[id] || !Array.isArray(VEHICLES[id].armorGrid) || VEHICLES[id].armorGrid.length !== 3;
-    });
-    }catch(e){ }
-  })();
-
-// [patcher-v32-patch]
-// [patcher-fix-v32] 轉入後全局經驗 / 轉入後研發進度 各自獨立一行，位於確認按鈕上方
-(function(){
-  "use strict";
-  if(window._patcherFixV32Installed) return;
-  window._patcherFixV32Installed = true;
-
-  /* 斷開 v30 的 observer，避免它又把兩行合併 */
-  if(window._v30TransferObs){
-    try{ window._v30TransferObs.disconnect(); }catch(_){}
-    window._v30TransferObs = null;
-  }
-
-  function _fix(){
-    var row = document.getElementById('garage-transfer-row');
-    if(!row) return;
-    if(row._v32fixed) return;
-
-    var wrap = row.querySelector('.garage-transfer-slider-wrap');
-    if(!wrap) return;
+    wrap.removeChild(afterGeRow);
+    wrap.removeChild(afterProgRow);
+    afterGeRow.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;gap:4px;font-size:11px;color:#7a6f60;line-height:1.4;min-width:0';
+    afterProgRow.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;gap:4px;font-size:11px;color:#7a6f60;line-height:1.4;min-width:0';
+    var b1 = afterGeRow.querySelector('b'); if (b1) b1.removeAttribute('style');
+    var b2 = afterProgRow.querySelector('b'); if (b2) b2.removeAttribute('style');
 
     var actions = wrap.querySelector('.garage-transfer-slider-actions');
-    var afterGeRow = null, afterProgRow = null;
-
-    /* v30 若合併過，先拆開 */
-    var line2 = row.querySelector('.gt-line2');
-    if(line2){
-      var kids = Array.prototype.slice.call(line2.children);
-      for(var i = 0; i < kids.length; i++){
-        var k = kids[i];
-        if(k.querySelector('#gt-after-ge')) afterGeRow = k;
-        else if(k.querySelector('#gt-after-prog')) afterProgRow = k;
-      }
-      line2.remove();
-    }
-
-    /* 若沒在 line2，直接在 wrap 裡找 */
-    if(!afterGeRow){
-      var ge = wrap.querySelector('#gt-after-ge');
-      if(ge) afterGeRow = ge.parentNode;
-    }
-    if(!afterProgRow){
-      var prog = wrap.querySelector('#gt-after-prog');
-      if(prog) afterProgRow = prog.parentNode;
-    }
-    if(!afterGeRow && !afterProgRow) return;
-
-    row._v32fixed = true;
-
-    /* 恢復原樣：label 文字、flex 佈局、b 標籤清 inline */
-    function _restore(elm, labelText){
-      if(!elm) return;
-      elm.style.display = 'flex';
-      elm.style.justifyContent = 'space-between';
-      elm.style.alignItems = 'baseline';
-      elm.style.gap = '4px';
-      elm.style.fontSize = '11px';
-      elm.style.color = '#7a6f60';
-      elm.style.lineHeight = '1.4';
-      elm.style.minWidth = '0';
-      var sp = elm.querySelector('span');
-      if(sp) sp.textContent = labelText;
-      var b = elm.querySelector('b');
-      if(b) b.removeAttribute('style');
-    }
-
-    _restore(afterGeRow, '轉入後全局經驗');
-    _restore(afterProgRow, '轉入後研發進度');
-
-    /* 順序：slider → afterGe → afterProg → actions */
-    if(actions){
-      if(afterGeRow) wrap.insertBefore(afterGeRow, actions);
-      if(afterProgRow) wrap.insertBefore(afterProgRow, actions);
+    if (actions) {
+      wrap.insertBefore(afterGeRow, actions);
+      wrap.insertBefore(afterProgRow, actions);
+      actions.style.cssText = 'display:flex;justify-content:flex-end;margin-top:2px';
+      var btn = actions.querySelector('#gt-confirm');
+      if (btn) btn.style.cssText = 'padding:5px 16px;font-size:11px;border-radius:5px';
     } else {
-      if(afterGeRow && afterGeRow.parentNode !== wrap) wrap.appendChild(afterGeRow);
-      if(afterProgRow && afterProgRow.parentNode !== wrap) wrap.appendChild(afterProgRow);
+      wrap.appendChild(afterGeRow);
+      wrap.appendChild(afterProgRow);
     }
   }
-
-  _fix();
-
-  if(typeof MutationObserver !== 'undefined'){
-    if(window._v32Obs){ try{ window._v32Obs.disconnect(); }catch(_){ } }
-    var o = new MutationObserver(_fix);
-    o.observe(document.body, { childList: true, subtree: true });
-    window._v32Obs = o;
+  _buildFinalTransferLayout();
+  if (typeof MutationObserver !== 'undefined') {
+    if (window._extPatchesTransferObs) { try { window._extPatchesTransferObs.disconnect(); } catch(_){} }
+    window._extPatchesTransferObs = new MutationObserver(_buildFinalTransferLayout);
+    window._extPatchesTransferObs.observe(document.body, { childList: true, subtree: true });
   }
 
-  })();
-
-
-
-
-
-
-
-// ★ v126：完美触控
-(function(){
-  if(window._v126TechTreePatched) return;
-  window._v126TechTreePatched = true;
-
-  // 清理历史样式
-  for(var i=100; i<=125; i++){
-    var el = document.getElementById('wt-tech-v'+i+'-style');
-    if(el) el.remove();
-  }
-
-  if(!document.getElementById('wt-tech-v126-style')){
-    var st = document.createElement('style');
-    st.id = 'wt-tech-v126-style';
-    st.textContent = `
-      .modal-bd-inner.wt-tech-modal {
-        padding: 0 !important;
-        overflow: hidden !important;
-        display: flex !important;
-        flex-direction: column !important;
-      }
-      .wt-tech-custom-scroll {
-        flex: 1 !important;
-        width: 100% !important;
-        height: 100% !important;
-        overflow: auto !important;
-        scrollbar-width: none !important;
-        -ms-overflow-style: none !important;
-        -webkit-overflow-scrolling: touch; 
-        user-select: none; 
-        -webkit-user-select: none;
-        touch-action: manipulation; 
-      }
-      .wt-tech-custom-scroll:active {
-        cursor: grabbing;
-      }
-      .wt-tech-custom-scroll::-webkit-scrollbar {
-        display: none !important;
-      }
-    `;
-    document.head.appendChild(st);
+  /* ⑦ 科技树 UI */
+  if (!document.getElementById('ext-tech-tree-style')) {
+    var stTree = document.createElement('style');
+    stTree.id = 'ext-tech-tree-style';
+    stTree.textContent = [
+      '.modal-bd-inner.wt-tech-modal{padding:0 !important;overflow:hidden !important;display:flex !important;flex-direction:column !important}',
+      '.wt-tech-custom-scroll{flex:1 !important;width:100% !important;height:100% !important;overflow:auto !important;scrollbar-width:none !important;-ms-overflow-style:none !important;-webkit-overflow-scrolling:touch;user-select:none;-webkit-user-select:none;touch-action:manipulation}',
+      '.wt-tech-custom-scroll:active{cursor:grabbing}',
+      '.wt-tech-custom-scroll::-webkit-scrollbar{display:none !important}'
+    ].join('\n');
+    document.head.appendChild(stTree);
   }
 
   window._garageOpenTechTree = function(){
@@ -2746,7 +2353,6 @@ window._vsDrawSmoke = function(ctx, particles){
     svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
     svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
     svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
-    // T80U 平级分叉
     svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
     svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
     svg += '</svg>';
@@ -2755,10 +2361,10 @@ window._vsDrawSmoke = function(ctx, particles){
     var research = _garageGetResearchInfo();
     var researchId = research ? research.targetId : null;
     var nodesHtml = '';
-    for(var i = 0; i < nodes.length; i++){
+    for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
       var v = VEHICLES[n.vid];
-      if(!v) continue;
+      if (!v) continue;
       var owned = g.ownedVehicles.indexOf(n.vid) >= 0;
       var isCurrent = g.currentVehicle === n.vid;
       var isResearch = (researchId === n.vid);
@@ -2768,13 +2374,13 @@ window._vsDrawSmoke = function(ctx, particles){
       var hasAllPrereq = (prereqs.length === 0) || prereqs.every(function(pid){ return g.ownedVehicles.indexOf(pid) >= 0; });
       var cls = 'wt-node';
       var mark = '';
-      if(owned && isCurrent){ cls += ' current'; mark = '✓'; }
-      else if(owned){ cls += ' owned'; mark = '✓'; }
-      else if(!hasAllPrereq){ cls += ' locked'; mark = '🔒'; }
-      else if(isResearch){ cls += ' researching'; mark = '🔬'; }
-      else if(v.researchCost){ cls += ' researchable'; mark = '🔬'; }
+      if (owned && isCurrent) { cls += ' current'; mark = '✓'; }
+      else if (owned) { cls += ' owned'; mark = '✓'; }
+      else if (!hasAllPrereq) { cls += ' locked'; mark = '🔒'; }
+      else if (isResearch) { cls += ' researching'; mark = '🔬'; }
+      else if (v.researchCost) { cls += ' researchable'; mark = '🔬'; }
       else { cls += ' locked'; mark = '?'; }
-      
+
       nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
         + '<div class="wt-node-img"><img draggable="false" src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
         + '<div class="wt-node-name">' + v.name + '</div>'
@@ -2783,13 +2389,13 @@ window._vsDrawSmoke = function(ctx, particles){
     }
 
     var body = '<div class="wt-tech-custom-scroll">' +
-               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + 
-               svg + nodesHtml + 
+               '<div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' +
+               svg + nodesHtml +
                '</div></div>';
 
     var bd = openModal({ title: '科技樹', body: body });
-    
-    if(bd) {
+
+    if (bd) {
       bd.classList.add('wt-tech-modal');
       var scrollEl = bd.querySelector('.wt-tech-custom-scroll');
       if (scrollEl) {
@@ -2802,17 +2408,15 @@ window._vsDrawSmoke = function(ctx, particles){
         scrollEl.addEventListener('pointerdown', function(e){
           isDown = true;
           hasMoved = false;
-          startX = e.clientX; 
+          startX = e.clientX;
           startY = e.clientY;
-          scrollLeft = scrollEl.scrollLeft; 
+          scrollLeft = scrollEl.scrollLeft;
           scrollTop = scrollEl.scrollTop;
         });
-        
+
         scrollEl.addEventListener('pointermove', function(e){
           if (!isDown) return;
           var dx = e.clientX - startX, dy = e.clientY - startY;
-          
-          // 移动超过 5 像素才视为拖拽
           if (!hasMoved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
             hasMoved = true;
             if (e.pointerType === 'mouse') {
@@ -2820,30 +2424,25 @@ window._vsDrawSmoke = function(ctx, particles){
               try { scrollEl.setPointerCapture(e.pointerId); } catch(_){}
             }
           }
-          
-          // 只有鼠标拖拽才在这里手动滚动，触控交给浏览器原生
           if (hasMoved && e.pointerType === 'mouse') {
             if (e.cancelable) e.preventDefault();
             scrollEl.scrollLeft = scrollLeft - dx;
             scrollEl.scrollTop = scrollTop - dy;
           }
         });
-        
+
         function endPan(e) {
           if (!isDown) return;
           isDown = false;
-          
           if (hasMoved) {
             scrollEl.style.cursor = '';
             try { scrollEl.releasePointerCapture(e.pointerId); } catch(_){}
-            // 延迟重置，以便拦截紧随其后的 click
             setTimeout(function(){ hasMoved = false; }, 50);
           }
         }
         scrollEl.addEventListener('pointerup', endPan);
         scrollEl.addEventListener('pointercancel', endPan);
 
-        // 捕获阶段拦截误触
         scrollEl.addEventListener('click', function(e) {
           if (hasMoved) {
             e.preventDefault();
@@ -2853,9 +2452,9 @@ window._vsDrawSmoke = function(ctx, particles){
       }
     }
 
-    if(typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
+    if (typeof _garageBindTechImgs === 'function') _garageBindTechImgs(bd);
     var btns = bd.querySelectorAll('[data-tech-node]');
-    for(var bi = 0; bi < btns.length; bi++){
+    for (var bi = 0; bi < btns.length; bi++) {
       (function(btn){
         btn.onclick = function(e){
           var vid = btn.getAttribute('data-tech-node');
@@ -2864,4 +2463,30 @@ window._vsDrawSmoke = function(ctx, particles){
       })(btns[bi]);
     }
   };
+
+  /* ⑧ 主 CSS */
+  if (!document.getElementById('ext-patches-style')) {
+    var stMain = document.createElement('style');
+    stMain.id = 'ext-patches-style';
+    stMain.textContent = [
+      '.garage-stat-row.armor-row{display:flex !important;align-items:center !important;gap:4px !important;min-width:0 !important;padding:1px 0 !important}',
+      '.garage-stat-row.armor-row .k{flex:0 0 36px !important;white-space:nowrap !important;color:#a89a85 !important;font-size:10px !important;line-height:1.4 !important;text-align:left !important}',
+      '.garage-stat-row .armor-val{flex:1 1 0 !important;min-width:0 !important;white-space:nowrap !important;text-overflow:ellipsis !important;overflow:hidden !important;line-height:1.4 !important;text-align:right !important;font-size:10px !important;font-variant-numeric:tabular-nums !important}',
+      '.garage-stat-row .v-arrow{flex:0 0 auto !important;font-size:9px !important}',
+      '.garage-stat-row .v-cur.armor-val{color:#7a6f60 !important}',
+      '.garage-stat-row .v-cur-only.armor-val{color:#e8a33d !important;font-weight:bold !important}',
+      '.garage-stat-row .v-new.armor-val{color:#e8a33d !important;font-weight:bold !important}',
+      '.garage-stat-row .v-new.armor-val.diff{color:#a45ede !important}',
+      '.garage-bottom-left,.garage-tech-detail-left{overflow-x:hidden !important}',
+      '@media (max-width:380px){.garage-stat-row .armor-val{font-size:9px !important}}',
+      '#garage-transfer-row{display:flex !important;flex-direction:column !important;gap:5px !important}',
+      '#garage-transfer-row .gt-line1{display:flex !important;justify-content:space-between !important;align-items:baseline !important;gap:8px !important;min-width:0 !important}',
+      '#garage-transfer-row .garage-transfer-slider-wrap{display:flex !important;flex-direction:column !important;gap:3px !important}',
+      '#garage-transfer-row .garage-transfer-slider-actions{display:flex !important;justify-content:flex-end !important;margin-top:2px !important}',
+      '.wt-node{user-select:none;-webkit-user-select:none}'
+    ].join('\n');
+    document.head.appendChild(stMain);
+  }
+
 })();
+
