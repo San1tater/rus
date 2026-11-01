@@ -113,7 +113,7 @@ const VEHICLE_ANNOTATION_BMP1M = {
       "caliber": "7.62mm"
     },
     {
-      "id": "2a42",
+      "id": "2a72",
       "name": "30mm 2A42",
       "type": "機炮",
       "caliber": "30mm"
@@ -258,7 +258,7 @@ const VEHICLE_ANNOTATION_BMP1M = {
         }
       ],
       "name": "武器 1",
-      "weaponId": "2a42",
+      "weaponId": "2a72",
       "recoilDist": 0.015
     }
   ],
@@ -274,7 +274,7 @@ const VEHICLE_ANNOTATION_BMP1M = {
       "x": 0.6924,
       "y": 0.1216,
       "name": "槍口 2",
-      "weaponId": "2a42",
+      "weaponId": "2a72",
       "layerOrder": "above"
     }
   ],

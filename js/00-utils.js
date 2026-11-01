@@ -22,4 +22,16 @@
     return (map[type] || []).indexOf(bid) !== -1;
   };
   window._collapseStates = window._collapseStates || {};
+  window.hasCrewTalent = function(role, talentId){
+    if(typeof state === 'undefined' || !state.station || !state.station.crew) return false;
+    var sid = state.station.crew[role];
+    if(!sid) return false;
+    var servants = state.servants || [];
+    for(var i = 0; i < servants.length; i++){
+      if(servants[i].id === sid){
+        return Array.isArray(servants[i].talents) && servants[i].talents.indexOf(talentId) >= 0;
+      }
+    }
+    return false;
+  };
 })();

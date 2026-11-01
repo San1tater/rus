@@ -83,7 +83,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .modal{position:relative;background:#1e1813;border:1px solid #3a2f25;border-radius:10px;width:88%;max-width:420px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.7);overflow:hidden;z-index:1}
 .modal.full{width:100%;height:100%;max-width:none;max-height:none;border-radius:0}
 .modal-hd{flex:0 0 auto;padding:10px 12px;border-bottom:1px solid #2a231c;font-size:13px;color:var(--c-accent);font-weight:bold;display:flex;justify-content:space-between;align-items:center}
-.modal-hd .x{font-size:18px;color:#7a6f60;padding:0 6px;cursor:pointer}
+.modal-hd .x{font-size:15px;color:#fff;background:#6a2a2a;padding:3px 10px;border-radius:4px;line-height:1.2;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-weight:bold}
 .modal-bd-inner{flex:1;min-height:0;overflow-y:auto;padding:10px 12px}
 .modal-ft{flex:0 0 auto;padding:8px;border-top:1px solid #2a231c;display:flex;gap:6px}
 .btn{flex:1;padding:10px;border:none;border-radius:8px;background:#2c2419;color:#ddd;font-size:12px;font-weight:bold;cursor:pointer}
