@@ -20,14 +20,7 @@ function armorBreakdownText(id, rarity){
   return total + (ac ? '（' + ac + '級）' : '');
 }
 
-function profDisplay(v){
-  v = v || 0;
-  if(v >= MAX_PROF_LEVEL) return 'Lv.' + MAX_PROF_LEVEL + ' (MAX)';
-  const capped = Math.min(MAX_PROF_LEVEL, v);
-  const lv = Math.floor(capped);
-  const pct = Math.round((capped - lv) * 100);
-  return 'Lv.' + lv + ' (' + pct + '%)';
-}
+
 
 let _inventoryScrollPos = 0;
 const inventoryCollapsed = {};
@@ -516,150 +509,20 @@ function openLogHistory(){
 }
 
 /* ============== 控制中心 / 偏好 ============== */
-var _ccFolded = new Proxy({}, {
-  get: function(_, k){ const v = window._collapseStates['cc.' + k]; return v === undefined ? true : !!v; },
-  set: function(_, k, v){ window._collapseStates['cc.' + k] = !!v; return true; }
-});
-function _ccToggle(sec){
-  _ccFolded[sec] = !_ccFolded[sec];
-  const body = document.getElementById('cc-body-' + sec);
-  const arrow = document.getElementById('cc-arrow-' + sec);
-  if(body) body.style.display = _ccFolded[sec] ? 'none' : 'block';
-  if(arrow) arrow.textContent = _ccFolded[sec] ? '▶' : '▼';
-}
 
-function _bindPrefEvents(container){
-  const getCtx = function(k){
-    if(k === 'exp') return state.preferences.ammoExplore;
-    if(k === 'cmb') return state.preferences.ammoCombat;
-    if(k === 'con') return state.preferences.consume;
-    if(k === 'texp') return state.preferences.throwableExplore;
-    if(k === 'tcmb') return state.preferences.throwableCombat;
-    return null;
-  };
-  for(const prefix of ['exp', 'texp']){
-    const ctx = getCtx(prefix);
-    if(!ctx) continue;
-    const pri = container.querySelector('#' + prefix + '-pri');
-    if(pri) pri.onchange = (function(c){ return function(){ c.priority = pri.value; save(); }; })(ctx);
-    const fb = container.querySelector('#' + prefix + '-fb');
-    if(fb) fb.onchange = (function(c){ return function(){ c.fallback = fb.value; save(); }; })(ctx);
-  }
-  container.addEventListener('change', function(e){
-    const t = e.target;
-    if(!t || !t.classList || !t.classList.contains('excl-cb')) return;
-    const ctx = getCtx(t.dataset.prefix);
-    if(!ctx) return;
-    const r = t.dataset.r;
-    if(!ctx.exclude) ctx.exclude = [];
-    const idx = ctx.exclude.indexOf(r);
-    if(t.checked){ if(idx < 0) ctx.exclude.push(r); }
-    else { if(idx >= 0) ctx.exclude.splice(idx, 1); }
-    const label = t.closest('label');
-    if(label){
-      if(t.checked){ label.style.borderColor = '#e05252'; label.style.background = '#3a1a1a'; label.style.color = '#e05252'; }
-      else { label.style.borderColor = '#3a2f25'; label.style.background = '#241d16'; label.style.color = '#a89a85'; }
-    }
-    save();
-  });
-  container.addEventListener('click', function(e){
-    const t = e.target;
-    if(!t) return;
-    if(t.tagName === 'INPUT') return;
-    const label = t.closest ? t.closest('.excl-label') : null;
-    if(!label) return;
-    e.preventDefault();
-    const cb = label.querySelector('.excl-cb');
-    if(!cb) return;
-    cb.checked = !cb.checked;
-    cb.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-}
 
-function rarityPolicyBlockHTML(prefix, title, ctx, showExclude){
-  if(showExclude === undefined) showExclude = true;
-  const pri = ctx.priority || '一般';
-  const fb = ctx.fallback || 'desc';
-  const ex = ctx.exclude || [];
-  let h = '<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:10px 0 6px">' + title + '</div>';
-  h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="flex:0 0 60px;color:#7a6f60;font-size:11px">優先使用</span><select id="' + prefix + '-pri" style="flex:1;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:4px 6px;font-size:11px">';
-  for(const r of RARITY_ORDER){ h += '<option value="' + r + '" ' + (pri === r ? 'selected' : '') + '>' + r + '</option>'; }
-  h += '</select></div>';
-  if(showExclude){
-    h += '<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0"><span style="flex:0 0 60px;color:#7a6f60;font-size:11px;padding-top:4px">不使用</span><div style="flex:1;display:flex;flex-wrap:wrap;gap:4px">';
-    for(const r of UI_RARITY_LIST){
-      const on = ex.includes(r);
-      const bc = on ? '#e05252' : '#3a2f25';
-      const bg = on ? '#3a1a1a' : '#241d16';
-      const tc = on ? '#e05252' : '#a89a85';
-      h += '<label class="excl-label" data-prefix="' + prefix + '" data-r="' + r + '" style="cursor:pointer;font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid ' + bc + ';background:' + bg + ';color:' + tc + ';user-select:none;display:flex;align-items:center;gap:4px;line-height:1.2"><input type="checkbox" class="excl-cb" data-prefix="' + prefix + '" data-r="' + r + '" ' + (on ? 'checked' : '') + ' style="accent-color:#e05252;margin:0;width:auto;flex:0 0 auto">' + r + '</label>';
-    }
-    h += '</div></div>';
-  }
-  h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="flex:0 0 60px;color:#7a6f60;font-size:11px">用罄後</span><select id="' + prefix + '-fb" style="flex:1;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:4px 6px;font-size:11px">';
-  h += '<option value="desc" ' + (fb === 'desc' ? 'selected' : '') + '>降序（傳奇→破舊）</option>';
-  h += '<option value="asc" ' + (fb === 'asc' ? 'selected' : '') + '>升序（破舊→傳奇）</option>';
-  h += '</select></div>';
-  return h;
-}
 
-function getControlCenterBody(){
-  const p = state.proficiency;
-  const pref = state.preferences;
-  const types = ['突擊步槍','機槍','衝鋒槍','狙擊槍','手槍','霰彈槍','刀','手榴彈'];
-  function secHead(id, title){
-    const collapsed = _ccFolded[id];
-    return '<div class="cc-sec-head" data-cc-sec="' + id + '" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:5px;margin:8px 0 4px;cursor:pointer;user-select:none"><span style="font-size:11px;color:#e8a33d;font-weight:bold">' + title + '</span><span id="cc-arrow-' + id + '" style="color:#7a6f60;font-size:11px">' + (collapsed ? '▶' : '▼') + '</span></div>';
-  }
-  let html = '<div class="detail-sub" style="margin-bottom:6px">基地核心 · 熟練度與偏好</div>';
-  html += secHead('weapons', '🔫 熟練度（欄位）');
-  html += '<div id="cc-body-weapons" style="display:' + (_ccFolded.weapons ? 'none' : 'block') + '">';
-  html += '<div class="prof-line"><span>主武器</span><span class="v">' + profDisplay(p.primary) + '</span></div>';
-  html += '<div class="prof-line"><span>副武器</span><span class="v">' + profDisplay(p.secondary) + '</span></div>';
-  html += '<div class="prof-line"><span>近戰武器</span><span class="v">' + profDisplay(p.melee) + '</span></div>';
-  html += '<div class="prof-line"><span>投擲物</span><span class="v">' + profDisplay(p.throwable) + '</span></div>';
-  html += '</div>';
-  html += secHead('types', '🎯 熟練度（武器）');
-  html += '<div id="cc-body-types" style="display:' + (_ccFolded.types ? 'none' : 'block') + '">';
-  for(const t of types){ html += '<div class="prof-line"><span>' + t + '</span><span class="v">' + profDisplay(p[t]) + '</span></div>'; }
-  html += '</div>';
-  html += secHead('other', '🛠️ 其他');
-  html += '<div id="cc-body-other" style="display:' + (_ccFolded.other ? 'none' : 'block') + '">';
-  html += '<div class="prof-line"><span>物品製造</span><span class="v">' + profDisplay(p.craft) + '</span></div>';
-  html += '<div class="prof-line"><span>物品拆解</span><span class="v">' + profDisplay(p.salvage) + '</span></div>';
-  html += '<div class="prof-line"><span>物品掉落</span><span class="v">' + profDisplay(p.drop) + '</span></div>';
-  html += '</div>';
-  html += secHead('pref', '⚙️ 偏好設定');
-  html += '<div id="cc-body-pref" style="display:' + (_ccFolded.pref ? 'none' : 'block') + '">';
-  html += rarityPolicyBlockHTML('exp', '🎯 探索模式彈藥', pref.ammoExplore, true);
-  html += rarityPolicyBlockHTML('texp', '💣 探索模式手雷', pref.throwableExplore, true);
-  html += '</div>';
-  return html;
-}
 
-function openControlCenter(){
-  const ft = el('div', 'modal-ft');
-  ft.innerHTML = '<button class="btn ghost" id="m-close-cc">關閉</button>';
-  const bd = openModal({ title: '控制中心', body: getControlCenterBody(), footer: ft });
-  bd.querySelectorAll('[data-cc-sec]').forEach(function(h){
-    h.onclick = function(){ _ccToggle(h.getAttribute('data-cc-sec')); };
-  });
-  _bindPrefEvents(bd);
-  ft.querySelector('#m-close-cc').onclick = closeModal;
-}
 
-function openPreference(){
-  const p = state.preferences;
-  let body = '';
-  body += rarityPolicyBlockHTML('exp', '🎯 探索模式彈藥', p.ammoExplore, true);
-  body += rarityPolicyBlockHTML('texp', '💣 探索模式手雷', p.throwableExplore, true);
-  const bd = openModal({ title: '偏好設定', body: body });
-  _bindPrefEvents(bd);
-}
 
-function openMerchant(){
-  openModal({ title: '商人', body: '<div class="empty-hint">商人系統開發中，敬請期待。</div>' });
-}
+
+
+
+
+
+
+
+
 
 
 /* ===== 補丁：renderEquipZone（舊 03-boss-render.js 遺漏，14-ui-common 未收錄） ===== */

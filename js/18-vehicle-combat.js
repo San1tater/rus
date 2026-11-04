@@ -426,8 +426,9 @@ function _onBTRKillTarget(target, wid, c, usedAmmoId){
   if(window.BTRSupport){
     window.BTRSupport.killCount = (window.BTRSupport.killCount || 0) + 1;
     if(!window.BTRSupport.kills) window.BTRSupport.kills = {};
+    if(!window.BTRSupport.weaponKills) window.BTRSupport.weaponKills = {};
     var _killKey = wid + (usedAmmoId ? ':' + usedAmmoId : '');
-    window.BTRSupport.kills[_killKey] = (window.BTRSupport.kills[_killKey] || 0) + 1;
+    window.BTRSupport.weaponKills[_killKey] = (window.BTRSupport.weaponKills[_killKey] || 0) + 1;
     window.BTRSupport.kills[target.eid] = (window.BTRSupport.kills[target.eid] || 0) + 1;
     var loot = (typeof rollEnemyLoot === 'function') ? rollEnemyLoot(target) : [];
     if(!window.BTRSupport.loot) window.BTRSupport.loot = [];
@@ -662,7 +663,11 @@ window._vHitVehicle = function(veh, dmg, penMM, ammoId, attackerName, weaponName
   }
   if(key === 'gun' && d.parts.gun <= 0){
     if(_prevPartVal > 0){
-      if(typeof pushLog === 'function') pushLog('<span class="lose">炮管</span> 損壞，載具離場', [], 'explore');
+      if(typeof pushLog === 'function'){
+        const _shouldLeaveGun = window._vehicleWeaponsDead && window._vehicleWeaponsDead();
+        if(_shouldLeaveGun) pushLog('<span class="lose">炮管</span> 損壞，載具離場', [], 'explore');
+        else pushLog('<span class="lose">炮管</span> 損壞（車頂武器仍可開火）', [], 'explore');
+      }
       d.repairUntil = Date.now() + 4 * 3600 * 1000;
     }
     if(window._vehicleWeaponsDead && window._vehicleWeaponsDead()) _forceLeave(vid, veh, 'gun');

@@ -679,6 +679,3 @@ window._measureLayerMaxY = _measureLayerMaxY;
 window._resolveEnemyDef = _resolveEnemyDef;
 window._resolveEnemyAnims = _resolveEnemyAnims;
 window._getRandomEquipForEnemy = _getRandomEquipForEnemy;
-window._raidDrawHuman = _raidDrawHuman;
-window._raidDrawEnemy = _raidDrawEnemy;
-window._drawWorkerHelmet = _raidDrawWorkerHelmet;

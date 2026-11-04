@@ -316,7 +316,13 @@ function _offlineExploreSettle(now, baseTime){
       if(!d) continue;
       var rar = state.player.equippedRarity[slot] || '一般';
       var m = RARITY_MULT[rar] || 1;
-      if(d.dmg) score += d.dmg * m * 2;
+      if(d.cal && typeof getDefaultAmmo === 'function' && typeof AMMO !== 'undefined'){
+        var _defAmmoId = getDefaultAmmo(d.cal);
+        if(_defAmmoId && AMMO[_defAmmoId] && AMMO[_defAmmoId].dmg){
+          score += AMMO[_defAmmoId].dmg * m * 2;
+        }
+      }
+      if(d.dmg != null) score += d.dmg * m * 2;
       if(d.rpm) score += d.rpm * 0.05;
       if(typeof equipArmorValue === 'function'){
         if(d.slot === 'head' || d.slot === 'top' || d.slot === 'pants' || d.slot === 'shoes'){
@@ -328,7 +334,13 @@ function _offlineExploreSettle(now, baseTime){
     return Math.max(10, score * lvMult);
   })();
   var _enemyScore = function(inst){
-    return Math.max(1, inst.maxHp * 0.8 + inst.maxArmor * 1.5 + inst.dmg * 3);
+    var _dmg = (inst.dmg != null) ? inst.dmg
+             : (inst.primaryWeapon && inst.primaryWeapon.dmg != null) ? inst.primaryWeapon.dmg
+             : (inst.secondaryWeapon && inst.secondaryWeapon.dmg != null) ? inst.secondaryWeapon.dmg
+             : 10;
+    var _hp = inst.maxHp || 0;
+    var _ar = inst.maxArmor || 0;
+    return Math.max(1, _hp * 0.8 + _ar * 1.5 + _dmg * 3);
   };
   var wins = 0, losses = 0;
   var allLoot = {};
@@ -356,7 +368,9 @@ function _offlineExploreSettle(now, baseTime){
         eventEnemies.push(inst);
       }
       if(!eventEnemies.length) continue;
+      if(!isFinite(eventScore) || eventScore <= 0) eventScore = 100;
       var winRate = _playerScore / (_playerScore + eventScore);
+      if(!isFinite(winRate)) winRate = 0.5;
       if(winRate < 0.05) winRate = 0.05;
       if(winRate > 0.95) winRate = 0.95;
       if(Math.random() < winRate){

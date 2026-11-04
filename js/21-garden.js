@@ -7,25 +7,12 @@
    ============================================================ */
 
 /* ===== 地塊類型 ===== */
-var GARDEN_PLOT_TYPES = {
-  soil:    { name: '土地',   icon: '', imgIcon: 'soil', desc: '基礎土地，無增減' },
-  tower:   { name: '哨塔',   icon: '<span style="color:#e05252;font-weight:bold">✖</span>', desc: '自動防禦', bg: 'tower_bg' },
-  shed:    { name: '工棚',   icon: '🛖', desc: '容納一個監工', bg: 'shed_bg' },
-  compost: { name: '堆肥區', icon: '♻️', desc: '轉化腐爛食物', bg: 'compost_bg' },
-  fridge:  { name: '保鮮櫃', icon: '🧊', desc: '作物保鮮 24h → 48h', bg: 'fridge_bg' },
-  distillery: { name: '蒸餾室', icon: '🍶', desc: '作物釀成私酒', bg: 'distillery_bg' },
-  black_soil: { name: '黑土', imgIcon: 'black_soil', special: true, desc: '生長 <span style="color:#4caf50">↑10%</span> ｜ 產量 <span style="color:#4caf50">↑30%</span>' },
-  red_soil:   { name: '紅土', imgIcon: 'red_soil',   special: true, desc: '生長 <span style="color:#e05252">↓25%</span> ｜ 產量 <span style="color:#4caf50">↑60%</span>' }
-};
 
-var SPECIAL_SOIL_BONUS = {
-  soil:       { grow: 0,     yield: 0 },
-  black_soil: { grow: 0.10,  yield: 0.30 },
-  red_soil:   { grow: -0.25, yield: 0.60 }
-};
 
-function _isSoilType(t){ return t === 'soil' || t === 'black_soil' || t === 'red_soil'; }
-function _getSoilBonus(t){ return SPECIAL_SOIL_BONUS[t] || SPECIAL_SOIL_BONUS.soil; }
+
+
+
+
 
 function _getPlotTypeIconHtml(type, size, flexNone, fill){
   const _flex = flexNone ? ';flex:0 0 auto' : '';
@@ -1144,7 +1131,7 @@ function openConfirm(msg, onOk, onCancel){
 let _gardenActors = [];
 let _gardenActorTimer = null;
 
-function servantExpNeed(lv){ return Math.max(10, lv * 40); }
+
 
 function servantAddExp(srv, n){
   if(!srv || srv.lv >= SERVANT_MAX_LV) return;

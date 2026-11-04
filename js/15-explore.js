@@ -356,7 +356,12 @@ function _evac(){
   ex.evacuatingPassengers = true;
   ex.evacuateStartAt = performance.now();
   for(let i = 0; i < ex.passengersFollowing.length; i++){
-    ex.passengersFollowing[i].targetX = 1.8 + i * 0.08;
+    const it = ex.passengersFollowing[i];
+    if(!it._retreating){
+      it._retreating = true;
+      it._retreatSpeed = true;
+    }
+    it.targetX = 1.8 + i * 0.05;
   }
 }
 
@@ -409,16 +414,7 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
   if(item.fadeIn < 1) item.fadeIn = Math.min(1, (item.fadeIn || 0) + 0.03);
   ctx.save();
   ctx.globalAlpha = item.fadeIn;
-  if(animN === 'dead' && typeof _drawHumanCorpse === 'function'){
-    const _ox = cw / 2 - 355 * sc;
-    const _oy = chh - 10 - 543 * sc;
-    const _fakeDef = { canvas: { w: 400, h: 500 }, layers: GAME_LAYERS, colors: null };
-    const _fakeAnim = { frameCount: 1, rootRot: [90], rootDy: [0], rootPivot: { x: 0.5, y: 0.95 }, keys: GAME_ANIMS.idle.keys };
-    const _eqForCorpse = { head: eq.head, top: eq.top, primary: wps ? eq[wps] : null };
-    try {
-      _drawHumanCorpse(ctx, null, sc, _ox, _oy, _fakeDef, _fakeAnim, 0, _eqForCorpse, true);
-    } catch(e){ console.warn('[corpse]', e); }
-  } else if(animN === 'dead'){
+  if(animN === 'dead'){
     ctx.save();
     ctx.translate(cw / 2 - 193 * sc, chh - 10 - 68 * sc);
     ctx.rotate(Math.PI / 2);
@@ -428,15 +424,40 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
     const B = { x: 30, y: 30, w: 340, h: 460 };
     const units = [];
     for(const L of GAME_LAYERS){ units.push({ z: L.z, kind:'layer', layer: L }); }
+    if(eq.head && typeof HEAD_ARMOR_LAYOUT !== 'undefined'){
+      const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
+      const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
+      if(layerDef){
+        const img = getHeroImg('icons/items/' + resolveIconId(eq.head) + '.png');
+        units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
+      }
+    }
+    if(eq.top && typeof getTopCfg === 'function'){
+      const cfg = getTopCfg(eq.top);
+      const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
+      if(layerDef){
+        const img = getHeroImg('icons/items/' + resolveIconId(eq.top) + '.png');
+        units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
+      }
+    }
+    if(wps && eq[wps] && typeof getWeaponCfg === 'function'){
+      const cfg = getWeaponCfg(wps, eq[wps]);
+      if(cfg){
+        const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
+        if(layerDef){
+          const img = getHeroImg('icons/items/' + resolveIconId(eq[wps]) + '.png');
+          units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
+        }
+      }
+    }
     units.sort(function(a,b){ return a.z - b.z; });
     for(const u of units){
       if(u.kind === 'layer') drawBodyLayer(ctx, u.layer, B, anim, 0);
+      else drawEqLayer(ctx, u, B, anim, 0);
     }
     ctx.restore();
   } else {
-    const _animDefDraw = GAME_ANIMS[animN] || GAME_ANIMS.idle;
-    const _frameCountDraw = _animDefDraw.frameCount || 8;
-    _raidDrawHuman(ctx, cw / 2, chh * 0.95, sc, eq, eqR, animN, item.animFrame % _frameCountDraw, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
+    _raidDrawHuman(ctx, cw / 2, chh * 0.95, sc, eq, eqR, animN, item.animFrame % 8, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
   }
   ctx.restore();
 }
