@@ -22,6 +22,19 @@ function armorBreakdownText(id, rarity){
 
 
 
+function _armorClassWithSub(def){
+  if(!def || def.armor == null || !def.level) return '';
+  const main = armorClass(def.level);
+  if(!def.subArmor || !def.subArmor.length) return main;
+  let maxSub = 0;
+  for(let i = 0; i < def.subArmor.length; i++){
+    const lv = def.subArmor[i].level || 0;
+    if(lv > maxSub) maxSub = lv;
+  }
+  if(maxSub <= 0) return main;
+  return main + '+' + armorClass(maxSub);
+}
+
 let _inventoryScrollPos = 0;
 const inventoryCollapsed = {};
 const ARMOR_SLOT_ORDER = { head:0, face:1, top:2, pants:3, shoes:4, backpack:5 };
@@ -99,7 +112,7 @@ function openSlotDetail(slot){
   const rar = state.player.equippedRarity[slot] || '一般';
   let body = '';
   if(def){
-    const ac = armorClass(def.level || 0);
+    const ac = _armorClassWithSub(def);
     const isArmor = slot === 'head' || slot === 'face' || slot === 'top' || slot === 'pants' || slot === 'shoes';
     const dVal = def.dmg != null ? Math.round(def.dmg * (RARITY_MULT[rar] || 1)) : null;
     body += '<div class="detail-title ' + rarityClass(rar) + '">' + itemIcon(id, 30) + ' ' + def.name + (ac ? ' <span class="armor-class">' + ac + '</span>' : '') + '</div>';
@@ -204,7 +217,9 @@ function openSlotPicker(slot, returnFn){
   if(!list.length) body = '<div class="empty-hint">倉庫中沒有可裝備於此槽位的物品</div>';
   else {
     for(const it of list){
-      body += '<div class="item-row" data-iid="' + it.id + '" data-irar="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + '</div><div class="sub">' + (it.def.type || slot) + ' · ' + it.rarity + '</div></div><div class="cnt">*' + it.count + '</div></div>';
+      const _ac = (it.def.armor != null && it.def.level) ? _armorClassWithSub(it.def) : '';
+      const _acHtml = _ac ? ' <span class="armor-class">' + _ac + '</span>' : '';
+      body += '<div class="item-row" data-iid="' + it.id + '" data-irar="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div><div class="sub">' + (it.def.type || slot) + ' · ' + it.rarity + '</div></div><div class="cnt">*' + it.count + '</div></div>';
     }
   }
   const _slotPickerOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
@@ -302,7 +317,7 @@ function openEquipmentCompare(slot, newId, newRarity, onConfirm, onCancel){
       }
     }
   } else {
-    const ac = armorClass(newDef.level || 0);
+    const ac = _armorClassWithSub(newDef);
     const dVal = (newDef.dmg != null) ? Math.round(newDef.dmg * (RARITY_MULT[newRarity] || 1)) : null;
     body += '<div class="detail-title ' + rarityClass(newRarity) + '">' + iconBox(newRarity, newId) + ' ' + newDef.name + (ac ? ' <span class="armor-class">' + ac + '</span>' : '') + '</div>';
     body += '<div class="detail-sub">稀有度：' + newRarity + '</div>';
@@ -375,7 +390,7 @@ function openInventory(){
       if(!collapsed){
         for(const it of groups[g]){
           if(!it.def) continue;
-          const ac = armorClass(it.def.level || 0);
+          const ac = _armorClassWithSub(it.def);
           const dVal = (it.def.dmg != null) ? Math.round(it.def.dmg * (RARITY_MULT[it.rarity] || 1)) : null;
           const isArmorDef = it.def.slot === 'head' || it.def.slot === 'face' || it.def.slot === 'top' || it.def.slot === 'pants' || it.def.slot === 'shoes';
           const sub = it.rarity
@@ -407,7 +422,7 @@ function openInventory(){
 function openItemDetail(id, rarity, returnFn){
   const d = itemDef(id);
   if(!d) return;
-  const ac = armorClass(d.level || 0);
+  const ac = _armorClassWithSub(d);
   const dVal = (d.dmg != null) ? Math.round(d.dmg * (RARITY_MULT[rarity] || 1)) : null;
   const isArmorDef = d.slot === 'head' || d.slot === 'face' || d.slot === 'top' || d.slot === 'pants' || d.slot === 'shoes';
   const iconBox = '<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:5px;background:' + rarityBg(rarity) + ';flex-shrink:0">' + itemIcon(id, 30) + '</span>';
@@ -617,11 +632,7 @@ if(typeof renderEquipZone === 'undefined'){
       const isFixed = def && def.fixed;
       let inner = '';
       if(def){
-        if(PANTS_SHOES_EMOJI[id]){
-          inner = '<span style="font-size:' + Math.floor(cellSize * 0.5) + 'px;line-height:1">' + PANTS_SHOES_EMOJI[id] + '</span><div class="lbl">' + labels[key] + '</div>';
-        } else {
-          inner = '<img class="slot-img" src="icons/items/' + resolveIconId(id) + '.png' + assetSuffix() + '" alt=""><div class="lbl">' + labels[key] + '</div>';
-        }
+        inner = '<img class="slot-img" src="icons/items/' + resolveIconId(id) + '.png' + assetSuffix() + '" alt=""><div class="lbl">' + labels[key] + '</div>';
       } else {
         inner = '<div class="nm">' + labels[key] + '</div>';
       }

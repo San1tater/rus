@@ -627,9 +627,12 @@ function onBuildCell(i){
   let body='<div style="font-size:11px;color:#e8a33d;margin-bottom:6px">選擇要建造的設施</div>';
   for(const bid of available){
     const b=BUILDINGS[bid];
+    const needGarage = (bid === 'station' && getBuildingLv('garage') <= 0);
     let costHtml='';
     for(const [k,v] of Object.entries(b.cost)){const have=materialEquivalent(k);const ok=have>=v;costHtml+='<span class="'+(ok?'cost-ok':'cost-no')+'">'+MATERIALS[k].name+' '+have+'/'+v+'</span>';}
-    body+='<div class="item-row" data-bid="'+bid+'"><div class="icon">'+buildingIcon(bid)+'</div><div class="info"><div class="nm">'+b.name+'</div><div class="sub">'+b.desc+'</div><div class="sub">'+costHtml+'</div><div class="sub" style="color:#4caf50">效果：'+buildingBonusText(bid,1)+'</div></div></div>';
+    let prereqHtml = '';
+    if(needGarage) prereqHtml = '<div class="sub" style="color:#e05252">⚠ 需先建造車場</div>';
+    body+='<div class="item-row' + (needGarage ? ' disabled' : '') + '" data-bid="'+bid+'"' + (needGarage ? ' style="opacity:.5;cursor:not-allowed"' : '') + '><div class="icon">'+buildingIcon(bid)+'</div><div class="info"><div class="nm">'+b.name+'</div><div class="sub">'+b.desc+'</div><div class="sub">'+costHtml+'</div><div class="sub" style="color:#4caf50">效果：'+buildingBonusText(bid,1)+'</div>' + prereqHtml + '</div></div>';
   }
   if(taken.length){
     body+='<div class="divider"></div><div style="color:#5a5040;font-size:10px;margin:4px 0 6px">已建造（不可重複）</div>';
@@ -638,7 +641,11 @@ function onBuildCell(i){
   const bd=openModal({title:'建造設施',body});
   $$('.item-row[data-bid]',bd).forEach(r=>{
     r.onclick=()=>{
+      if(r.classList.contains('disabled')) return;
       const bid=r.dataset.bid;const b=BUILDINGS[bid];
+      if(bid === 'station' && getBuildingLv('garage') <= 0){
+        return;
+      }
       for(const [k,v] of Object.entries(b.cost))if(materialEquivalent(k)<v){return;}
       for(const [k,v] of Object.entries(b.cost))consumeMaterial(k,v);
       state.base.slots[i]={id:bid,lv:1};addProf('craft',1);refreshPlayerStats();save();closeModal();renderBase();

@@ -7,10 +7,17 @@ const _ST_CREW_LABELS = { commander: '車長', gunner: '炮手', driver: '駕駛
 const _ST_BELT_WIDS = { kpvt: 1, pkt: 1, nsvt: 1, '2a42': 1, '2a72': 1 };
 const _ST_CALIBER_MAP = { pkt: 7.62, kpvt: 14.5, nsvt: 12.7, '2a42': 30, '2a72': 30, '2a28': 73, '2a70': 100, '2a46': 125, '2a46m1': 125 };
 const _ST_PRESETS = {
-  '穿燃': { name: '穿燃', desc: 'AP-I / API-T 交替', img: 'ap' },
-  '全穿甲': { name: '全穿甲', desc: 'AP-I 四連', img: 'ap' },
-  '高爆': { name: '高爆', desc: 'OFZT / BT 混合', img: 'he' },
-  '混合': { name: '混合', desc: 'BT / OFZT 交替', img: 'mix' }
+  '穿燃': { name: '穿燃', desc: '穿甲燃燒彈鏈', img: 'ap' },
+  '高爆': { name: '高爆', desc: '高爆彈鏈', img: 'he' },
+  '混合': { name: '混合', desc: '穿甲 / 高爆交替', img: 'mix' }
+};
+
+const _ST_PRESET_DESC_BY_WID = {
+  kpvt:  { '穿燃': 'B-32 / BZT 交替', '高爆': 'MD / MDZ 交替', '混合': 'B-32 / MD 交替' },
+  nsvt:  { '穿燃': 'B-32 / BZT 交替', '高爆': 'MD / MDZ 交替', '混合': 'B-32 / MD 交替' },
+  '2a42': { '穿燃': '3UBR6 穿甲曳光彈', '高爆': '3UOF8 高爆燃燒彈', '混合': '3UBR6 / 3UOF8 交替' },
+  '2a72': { '穿燃': '3UBR6 穿甲曳光彈', '高爆': '3UOF8 高爆燃燒彈', '混合': '3UBR6 / 3UOF8 交替' },
+  pkt:   { '穿燃': 'B-32 / BZT 交替' }
 };
 const _ST_SLOT_LABELS = { primaryWeapon: '主武器', helmet: '頭盔', body: '上衣', ammoPouch: '彈掛', ammoBox: '彈藥箱' };
 
@@ -56,7 +63,7 @@ function _stEnsureStyles(){
     '.st-main-row{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#241d16;border:1px solid #2a231c;border-radius:5px;margin-bottom:4px;font-size:11px;cursor:pointer}',
     '.st-main-name{flex:0 0 auto;color:#e8a33d;font-weight:bold;white-space:nowrap;padding-right:8px}',
     '.st-main-icons{flex:1;display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}',
-    '.st-main-icon{position:relative;width:32px;height:32px;border-radius:4px;background:#0e0c0a;border:1px solid #3a2f25;display:flex;align-items:center;justify-content:center;overflow:hidden}',
+    '.st-main-icon{position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center;overflow:hidden}',
     '.st-main-icon img{width:90%;height:90%;object-fit:contain}',
     '.st-main-icon-lbl{position:absolute;bottom:-1px;right:1px;font-size:9px;color:#fff;background:rgba(0,0,0,.7);padding:0 2px;border-radius:2px;line-height:1.1;font-weight:bold}',
     '.st-main-curmax{margin-left:auto;color:#e8a33d;font-family:monospace;font-size:11px;font-weight:bold;flex:0 0 auto}',
@@ -102,6 +109,7 @@ function _stEnsureStyles(){
     '.st-ammo-cell-hd .nm{flex:1;color:#e8a33d;font-weight:bold;font-size:12px}',
     '.st-ammo-cell-hd .cnt{color:#fff;font-family:monospace;font-size:14px;font-weight:bold}',
     '@media (max-width:420px){.st-passenger-card,.st-crew-card{min-height:64px;padding:6px 4px;gap:4px}.st-pass-ico,.st-crew-ico{width:32px;height:32px;flex:0 0 32px}.st-pass-name,.st-crew-name{font-size:11px}.st-pass-stat,.st-crew-stat{font-size:9px}.st-belt-preset img{width:24px;height:24px}.st-main-icon{width:26px;height:26px}.st-pd-slot,.st-pd-grenade{width:56px;height:56px}.st-pd-row,.st-pd-grenades{grid-template-columns:repeat(3,56px);gap:4px}.st-veh .btn{padding:4px 8px;font-size:10px}.st-title{font-size:12px;max-width:40%}.st-pd-sprite{flex:0 0 44px;width:44px;height:44px}.st-pd-heal-area{height:44px;padding:4px 8px}.st-belt-name,.st-main-name{font-size:10px;padding-right:4px}.st-talent-badge{width:44px;height:44px}}'
+    ,'.st-passenger-card.over-cap::after,.st-crew-card.over-cap::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top right,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px)),linear-gradient(to top left,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px))}'
   ].join('');
   document.head.appendChild(st);
 }
@@ -259,10 +267,11 @@ function _stHealAreaHtml(hp, maxHp, hpPct, talentHtml){
   return _inner;
 }
 
-function _stCard(p, srv, pi){
+function _stCard(p, srv, pi, cap){
   const w = _stPassW(p);
   const mw = calcPassengerMaxWeight(srv);
   const over = w > mw;
+  const _overCap = (typeof cap === 'number' && pi >= cap);
   const maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
   let hp = (srv.hp !== undefined && srv.hp !== null) ? srv.hp : maxHp;
   if(srv.injuredUntil && srv.injuredUntil > Date.now()) hp = 0;
@@ -270,7 +279,8 @@ function _stCard(p, srv, pi){
   const hpCol = hp <= 0 ? '#e05252' : '#fff';
   const wtCol = over ? '#e05252' : '#fff';
   const _cantGo = (hp <= 0 || over) ? ' cant-go' : '';
-  let h = '<div class="st-passenger-card' + _cantGo + '" data-passenger="' + pi + '" style="border-color:' + bgc + '">';
+  const _overCls = _overCap ? ' over-cap' : '';
+  let h = '<div class="st-passenger-card' + _cantGo + _overCls + '" data-passenger="' + pi + '" style="border-color:' + bgc + '">';
   h += '<div class="st-pass-ico" style="background:' + bgc + '"><img src="icons/servants/' + srv.type + '.png' + assetSuffix() + '"></div>';
   h += '<div class="st-pass-info">';
   h += '<div class="st-pass-name ' + rarityClass(srv.rarity) + '">' + servantLabel(srv) + '</div>';
@@ -284,7 +294,8 @@ function _stEmptyCardAt(pi, isExtra){
   const extraLbl = isExtra ? '<div style="font-size:7px;color:#e05252;line-height:1.1">超載</div>' : '';
   const bg = isExtra ? '#100a06' : '#1a1510';
   const bc = isExtra ? '#5a2a2a' : '#3a2f25';
-  return '<div class="st-passenger-card" data-add-passenger="' + pi + '" style="min-height:76px;background:' + bg + ';border:1.5px dashed ' + bc + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5a5040;font-size:9px;padding:4px;cursor:pointer;box-sizing:border-box"><div style="font-size:22px;line-height:1;color:#3a2f25;font-weight:300">＋</div>' + extraLbl + '</div>';
+  const _overCls = isExtra ? ' over-cap' : '';
+  return '<div class="st-passenger-card' + _overCls + '" data-add-passenger="' + pi + '" style="min-height:76px;background:' + bg + ';border:1.5px dashed ' + bc + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5a5040;font-size:9px;padding:4px;cursor:pointer;box-sizing:border-box"><div style="font-size:22px;line-height:1;color:#3a2f25;font-weight:300">＋</div>' + extraLbl + '</div>';
 }
 
 function _stSlotHtml(slot, label, id, rar, cnt){
@@ -376,7 +387,7 @@ function _stRender(page){
     if(pi < s.passengers.length){
       const p = s.passengers[pi];
       const psrv = state.servants.find(function(x){ return x.id === p.srvId; });
-      if(psrv) html += _stCard(p, psrv, pi);
+      if(psrv) html += _stCard(p, psrv, pi, cap);
       else html += _stEmptyCardAt(pi, pi >= cap);
     } else {
       html += _stEmptyCardAt(pi, pi >= cap);
@@ -570,12 +581,15 @@ function _stPickBelt(vid, wid){
   if(!a) return;
   const cur = a.preset || '穿燃';
   let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px">' + wid.toUpperCase() + ' · 彈鏈預設</div>';
+  const _descMap = _ST_PRESET_DESC_BY_WID[wid] || null;
   for(const k in _ST_PRESETS){
+    if(_descMap && !_descMap[k]) continue;
     const pr = _ST_PRESETS[k];
     const on = (k === cur);
+    const _rowDesc = (_descMap && _descMap[k]) || pr.desc;
     body += '<div class="item-row" data-preset="' + k + '"' + (on ? ' style="border-color:#e8a33d;background:#2a1f10"' : '') + '>';
-    body += '<div class="icon" style="background:#0e0c0a"><img src="icons/ammo/belt_' + pr.img + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>';
-    body += '<div class="info"><div class="nm">' + pr.name + '</div><div class="sub">' + pr.desc + '</div></div>';
+    body += '<div class="icon" style="background:transparent;border-color:transparent"><img src="icons/ammo/belt_' + pr.img + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>';
+    body += '<div class="info"><div class="nm">' + pr.name + '</div><div class="sub">' + _rowDesc + '</div></div>';
     if(on) body += '<div style="color:#e8a33d;font-weight:bold;padding:0 6px">✓</div>';
     body += '</div>';
   }
@@ -585,6 +599,7 @@ function _stPickBelt(vid, wid){
     (function(el){
       el.onclick = function(){
         a.preset = el.getAttribute('data-preset');
+        a._mixToggle = false;
         save();
         closeModal();
         _stRefresh();
@@ -706,7 +721,7 @@ function _stCrewDetail(role, srvId){
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '<button class="btn primary" id="st-cd-swap">更換</button><button class="btn danger" id="st-cd-remove">解除</button>';
-  const bd = openModal({ title: '車組詳情 · ' + _ST_CREW_LABELS[role], body: body, footer: ft });
+  const bd = openModal({ title: '車組詳情 · ' + _ST_CREW_LABELS[role], body: body, footer: ft, onClose: function(){ closeModal(); _stRefresh(); } });
 
   const ha = bd.querySelector('.st-pd-heal-area');
   if(ha) ha.onclick = function(){
@@ -716,8 +731,9 @@ function _stCrewDetail(role, srvId){
     srv.injuredUntil = 0;
     srv.hp = maxHp;
     save();
-    closeModal();if(typeof _stRefresh==='function')_stRefresh();
+    closeModal();
     _stRefresh();
+    _stCrewDetail(role, srvId);
   };
 
   const sb = ft.querySelector('#st-cd-swap');
@@ -750,7 +766,8 @@ function _stPickCrew(role){
   for(let j = 0; j < avail.length; j++){
     const sv = avail[j];
     const td = SERVANT_TYPES[sv.type] || { name: '?' };
-    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + '</div></div></div>';
+    const _inGarden = Array.isArray(sv.assignedPlots) && sv.assignedPlots.length > 0;
+    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + (_inGarden ? ' 🌱工作中' : '') + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + '</div></div></div>';
   }
   const bd = openModal({
     title: _ST_CREW_LABELS[role],
@@ -768,11 +785,28 @@ function _stPickCrew(role){
   for(let k = 0; k < els.length; k++){
     (function(elEl){
       elEl.onclick = function(){
-        if(elEl.getAttribute('data-clear')) s.crew[role] = null;
-        else s.crew[role] = elEl.getAttribute('data-srv');
-        save();
-        closeModal();
-        _stRefresh();
+        if(elEl.getAttribute('data-clear')){ s.crew[role] = null; save(); closeModal(); _stRefresh(); return; }
+        const sid = elEl.getAttribute('data-srv');
+        const srv = (state.servants || []).find(function(x){ return x.id === sid; });
+        if(!srv) return;
+        const _inGarden = Array.isArray(srv.assignedPlots) && srv.assignedPlots.length > 0;
+        const _doAdd = function(){
+          s.crew[role] = sid;
+          save();
+          closeModal();
+          _stRefresh();
+          setTimeout(function(){ _stCrewDetail(role, sid); }, 50);
+        };
+        if(_inGarden){
+          _openRelocateConfirm('車站', function(){
+            srv.assignedPlots = [];
+            _doAdd();
+          }, function(){
+            setTimeout(function(){ _stPickCrew(role); }, 50);
+          });
+        } else {
+          _doAdd();
+        }
       };
     })(els[k]);
   }
@@ -792,19 +826,38 @@ function _stPickPassenger(){
     const td = SERVANT_TYPES[sv.type] || { name: '?' };
     const tal = (typeof getServantTalents === 'function') ? getServantTalents(sv) : [];
     const ts = tal.length ? ' · 天賦 ' + tal.length : '';
-    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + ts + '</div></div></div>';
+    const _inGarden = Array.isArray(sv.assignedPlots) && sv.assignedPlots.length > 0;
+    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + (_inGarden ? ' 🌱工作中' : '') + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + ts + '</div></div></div>';
   }
   const bd = openModal({ title: '添加載員', body: body, onClose: function(){ closeModal(); _stRefresh(); } });
   const els = bd.querySelectorAll('.item-row');
   for(let k = 0; k < els.length; k++){
     (function(el){
       el.onclick = function(){
-        const np = _stBlank();
-        np.srvId = el.getAttribute('data-srv');
-        s.passengers.push(np);
-        save();
-        closeModal();
-        _stRefresh();
+        const sid = el.getAttribute('data-srv');
+        const srv = (state.servants || []).find(function(x){ return x.id === sid; });
+        if(!srv) return;
+        const _inGarden = Array.isArray(srv.assignedPlots) && srv.assignedPlots.length > 0;
+        const _doAdd = function(){
+          const np = _stBlank();
+          np.srvId = sid;
+          s.passengers.push(np);
+          const _newIdx = s.passengers.length - 1;
+          save();
+          closeModal();
+          _stRefresh();
+          setTimeout(function(){ _stDetail(_newIdx); }, 50);
+        };
+        if(_inGarden){
+          _openRelocateConfirm('車站', function(){
+            srv.assignedPlots = [];
+            _doAdd();
+          }, function(){
+            setTimeout(function(){ _stPickPassenger(); }, 50);
+          });
+        } else {
+          _doAdd();
+        }
       };
     })(els[k]);
   }
@@ -883,8 +936,8 @@ function _stDetail(idx){
 
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
-  ft.innerHTML = '<button class="btn danger" id="st-remove">移除載員</button>';
-  const bd = openModal({ title: '載員詳情 · ' + tw.toFixed(1) + ' / ' + mw + ' kg' + (tw > mw ? ' ⚠' : ''), body: body, footer: ft });
+  ft.innerHTML = '<button class="btn primary" id="st-swap">更換</button><button class="btn danger" id="st-remove">移除</button>';
+  const bd = openModal({ title: '載員詳情 · ' + tw.toFixed(1) + ' / ' + mw + ' kg' + (tw > mw ? ' ⚠' : ''), body: body, footer: ft, onClose: function(){ closeModal(); _stRefresh(); } });
 
   const ha = bd.querySelector('.st-pd-heal-area');
   if(ha) ha.onclick = function(){
@@ -894,15 +947,22 @@ function _stDetail(idx){
     srv.injuredUntil = 0;
     srv.hp = maxHp;
     save();
-    closeModal();if(typeof _stRefresh==='function')_stRefresh();
+    closeModal();
+    _stRefresh();
     _stDetail(idx);
   };
 
   ft.querySelector('#st-remove').onclick = function(){
+    _stReturnPassengerEquip(p);
     s.passengers.splice(idx, 1);
     save();
     closeModal();
     _stRefresh();
+  };
+
+  ft.querySelector('#st-swap').onclick = function(){
+    closeModal();
+    _stSwapPassenger(idx);
   };
 
   const se = bd.querySelectorAll('[data-slot]');
@@ -1023,8 +1083,11 @@ function _stPickEquip(idx, slot){
     const dis = (bw + iw) > mw;
     let wl = iw.toFixed(1) + ' kg' + (dis ? ' · 超重' : '');
     if(it.count && (slot === 'ammoPouch' || slot === 'ammoBox')) wl += ' ×' + it.count;
-    if((slot === 'helmet' || slot === 'body') && it.armorLv) wl += ' · ' + ROMAN[Math.min(6, it.armorLv)] + '級 甲' + it.armorVal;
-    body += '<div class="item-row' + (dis ? ' disabled' : '') + '" data-eid="' + it.id + '" data-rid="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 40) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + '</div><div class="sub">' + it.rarity + ' · ' + wl + '</div></div>' + (dis ? '<div class="cnt" style="color:#e05252;font-weight:bold">✕</div>' : '') + '</div>';
+    const _isArmorSlot = (slot === 'helmet' || slot === 'body');
+    if(_isArmorSlot && it.armorVal) wl += ' · 甲' + it.armorVal;
+    const _acStr = _isArmorSlot ? (_armorClassWithSub(it.def) || '') : '';
+    const _acHtml = _acStr ? ' <span class="armor-class">' + _acStr + '</span>' : '';
+    body += '<div class="item-row' + (dis ? ' disabled' : '') + '" data-eid="' + it.id + '" data-rid="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 40) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div><div class="sub">' + it.rarity + ' · ' + wl + '</div></div>' + (dis ? '<div class="cnt" style="color:#e05252;font-weight:bold">✕</div>' : '') + '</div>';
   }
 
   const _title = '選擇 ' + (_ST_SLOT_LABELS[slot] || slot) + ' · ' + tw.toFixed(1) + ' / ' + mw + ' kg' + (tw > mw ? ' ⚠' : '');
@@ -1183,6 +1246,8 @@ function openStationPage(){
           if(typeof _a.max !== 'number' || _a.max <= 0) _a.max = _mx;
           if(typeof _a.current !== 'number' || _a.current < 0) _a.current = _mx;
           if(!_a.preset) _a.preset = '穿燃';
+          if(_a.preset === '全穿甲') _a.preset = '穿燃';
+          if(_wf === 'pkt' && _a.preset !== '穿燃') _a.preset = '穿燃';
         }
       }
     }
@@ -1229,3 +1294,122 @@ function _stRefresh(){
 window.openStationPage = openStationPage;
 window.closeStationPage = closeStationPage;
 window._talentBadges = _stTalentBadges;
+
+function _openRelocateConfirm(targetLabel, onConfirm, onCancel){
+  const fromLabel = (targetLabel === '車站') ? '後院' : '車站';
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn primary" id="rc-ok">確認</button>';
+  const body = '<div style="font-size:12px;line-height:1.6;color:#ddd">此僕人正在' + fromLabel + '工作，是否轉至' + targetLabel + '？</div>';
+  openModal({
+    title: '轉移至' + targetLabel,
+    body: body,
+    footer: ft,
+    onClose: function(){
+      closeModal();
+      if(onCancel) setTimeout(onCancel, 50);
+    }
+  });
+  ft.querySelector('#rc-ok').onclick = function(){
+    closeModal();
+    if(onConfirm) onConfirm();
+  };
+}
+
+function _stReturnPassengerEquip(p){
+  if(!p) return;
+  if(p.primaryWeapon){
+    if(AMMO[p.primaryWeapon]){
+      invAdd(p.primaryWeapon, p.primaryWeaponRarity || '一般', p.primaryWeaponBoxCount || AMMOBOX_CAPACITY);
+    } else {
+      invAdd(p.primaryWeapon, p.primaryWeaponRarity || '一般', 1);
+    }
+    p.primaryWeapon = null;
+    p.primaryWeaponRarity = '';
+    p.primaryWeaponBoxCount = 0;
+  }
+  if(p.helmet){
+    invAdd(p.helmet, p.helmetRarity || '一般', 1);
+    p.helmet = null;
+    p.helmetRarity = '';
+  }
+  if(p.body){
+    invAdd(p.body, p.bodyRarity || '一般', 1);
+    p.body = null;
+    p.bodyRarity = '';
+  }
+  if(p.ammoPouch){
+    invAdd(p.ammoPouch.ammoId, p.ammoPouch.rarity || '一般', p.ammoPouch.count || 0);
+    p.ammoPouch = null;
+  }
+  if(p.ammoBox){
+    invAdd(p.ammoBox.ammoId, p.ammoBox.rarity || '一般', p.ammoBox.count || 0);
+    p.ammoBox = null;
+  }
+  if(Array.isArray(p.grenades)){
+    for(let i = 0; i < p.grenades.length; i++){
+      const g = p.grenades[i];
+      if(!g) continue;
+      const gid = typeof g === 'string' ? g : g.id;
+      const gr = typeof g === 'string' ? '一般' : (g.rarity || '一般');
+      if(gid) invAdd(gid, gr, 1);
+      p.grenades[i] = null;
+    }
+  }
+}
+
+function _stSwapPassenger(idx){
+  const s = _stInit();
+  const p = s.passengers[idx];
+  if(!p) return;
+  const occ = _stOcc();
+  const curSrvId = p.srvId;
+  const avail = [];
+  for(let i = 0; i < state.servants.length; i++){
+    const srv = state.servants[i];
+    if(srv.id === curSrvId) continue;
+    const o = occ[srv.id];
+    if(o === 'crew') continue;
+    if(o === 'passenger') continue;
+    avail.push(srv);
+  }
+  let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px">選擇替換載員（裝備欄保留）</div>';
+  if(!avail.length) body += '<div class="empty-hint">沒有可用僕人</div>';
+  for(let j = 0; j < avail.length; j++){
+    const sv = avail[j];
+    const td = SERVANT_TYPES[sv.type] || { name: '?' };
+    const _inGarden = Array.isArray(sv.assignedPlots) && sv.assignedPlots.length > 0;
+    const _stnMark = _inGarden ? ' 🌱工作中' : '';
+    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + _stnMark + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + '</div></div></div>';
+  }
+  const bd = openModal({ title: '更換載員', body: body, onClose: function(){ closeModal(); _stDetail(idx); } });
+  const els = bd.querySelectorAll('.item-row');
+  for(let k = 0; k < els.length; k++){
+    (function(el){
+      el.onclick = function(){
+        const sid = el.getAttribute('data-srv');
+        const srv = (state.servants || []).find(function(x){ return x.id === sid; });
+        if(!srv) return;
+        const _doSwap = function(){
+          p.srvId = sid;
+          save();
+          closeModal();
+          _stRefresh();
+          setTimeout(function(){ _stDetail(idx); }, 50);
+        };
+        const _inGarden = Array.isArray(srv.assignedPlots) && srv.assignedPlots.length > 0;
+        if(_inGarden && typeof _openRelocateConfirm === 'function'){
+          _openRelocateConfirm('車站', function(){
+            srv.assignedPlots = [];
+            _doSwap();
+          }, function(){
+            setTimeout(function(){ _stSwapPassenger(idx); }, 50);
+          });
+        } else {
+          if(_inGarden) srv.assignedPlots = [];
+          _doSwap();
+        }
+      };
+    })(els[k]);
+  }
+}

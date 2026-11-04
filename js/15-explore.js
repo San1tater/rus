@@ -334,7 +334,9 @@ function _disembark(){
       srv: srv, p: p,
       screenX: 0.35 + _newCount * 0.01,
       targetX: 0.35,
-      animFrame: 0, animNext: 0, fadeIn: 0
+      animFrame: 0, animNext: 0, fadeIn: 1,
+      clipH: 0,
+      _spawnAt: performance.now() + _newCount * 100
     });
     _newCount++;
   }
@@ -412,8 +414,20 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
   item.animFrame = _animFrame;
   const sc = chh * CHAR_HEIGHT_FACTOR / 386;
   if(item.fadeIn < 1) item.fadeIn = Math.min(1, (item.fadeIn || 0) + 0.03);
+  if(item.clipH === undefined) item.clipH = 1;
+  else if(item.clipH < 1 && typeof item._spawnAt === 'number'){
+    const _elapsed = now - item._spawnAt;
+    if(_elapsed >= 600) item.clipH = 1;
+    else if(_elapsed <= 0) item.clipH = 0;
+    else item.clipH = _elapsed / 600;
+  }
   ctx.save();
   ctx.globalAlpha = item.fadeIn;
+  if(item.clipH < 1){
+    ctx.beginPath();
+    ctx.rect(0, 0, cw, chh * item.clipH);
+    ctx.clip();
+  }
   if(animN === 'dead'){
     ctx.save();
     ctx.translate(cw / 2 - 193 * sc, chh - 10 - 68 * sc);

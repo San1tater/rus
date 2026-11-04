@@ -180,9 +180,9 @@ const VEHICLE_WEAPON_STATS = {
   pkt:       { dmg: 61,   penMM: 20 },
   pkt_t46m:  { dmg: 50,   penMM: 20 },
   nsvt:      { dmg: 110,  penMM: 32 },
-  nsvt_md:   { dmg: 80,   penMM: 32 },
+  nsvt_md:   { dmg: 150,  penMM: 6 },
   kpvt:      { dmg: 160,  penMM: 45 },
-  kpvt_mdz:  { dmg: 120,  penMM: 45 },
+  kpvt_mdz:  { dmg: 220,  penMM: 8 },
   /* 30mm */
   '30mm_ap':   { dmg: 450, penMM: 50 },
   '30mm_apds': { dmg: 450, penMM: 80 },
@@ -254,10 +254,9 @@ const VEHICLE_MAIN_AMMO_POOL = {
 
 /* 彈鏈預設 */
 const VEHICLE_BELT_PRESETS = {
-  '穿燃':{name:'穿燃',desc:'AP-I / API-T 交替',img:'ap'},
-  '全穿甲':{name:'全穿甲',desc:'AP-I 四連',img:'ap'},
-  '高爆':{name:'高爆',desc:'OFZT / BT 混合',img:'he'},
-  '混合':{name:'混合',desc:'BT / OFZT 交替',img:'mix'}
+  '穿燃':{name:'穿燃',desc:'穿甲燃燒彈鏈',img:'ap'},
+  '高爆':{name:'高爆',desc:'高爆彈鏈',img:'he'},
+  '混合':{name:'混合',desc:'穿甲 / 高爆交替',img:'mix'}
 };
 
 function _buildLoadoutFallback(vid){

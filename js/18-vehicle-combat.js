@@ -145,8 +145,20 @@ function _getVehicleAmmoStats(wid, ammoId){
     if(ammoId === '73hefrag') return VEHICLE_WEAPON_STATS['2a28_he'];
   }
   if(wid === 'pkt') return VEHICLE_WEAPON_STATS.pkt;
-  if(wid === 'kpvt') return VEHICLE_WEAPON_STATS.kpvt;
-  if(wid === 'nsvt') return VEHICLE_WEAPON_STATS.nsvt;
+  if(wid === 'kpvt'){
+    const _gK = (typeof _garageInitState === 'function') ? _garageInitState() : null;
+    const _vidK = _gK ? _gK.currentVehicle : 'btr80';
+    const _aK = state.vehicleAmmo && state.vehicleAmmo[_vidK] && state.vehicleAmmo[_vidK][wid];
+    if(_aK && _aK.preset === '高爆') return VEHICLE_WEAPON_STATS['kpvt_mdz'];
+    return VEHICLE_WEAPON_STATS.kpvt;
+  }
+  if(wid === 'nsvt'){
+    const _gN = (typeof _garageInitState === 'function') ? _garageInitState() : null;
+    const _vidN = _gN ? _gN.currentVehicle : 'btr80';
+    const _aN = state.vehicleAmmo && state.vehicleAmmo[_vidN] && state.vehicleAmmo[_vidN][wid];
+    if(_aN && _aN.preset === '高爆') return VEHICLE_WEAPON_STATS['nsvt_md'];
+    return VEHICLE_WEAPON_STATS.nsvt;
+  }
   if(wid === '2a72' || wid === '2a42'){
     const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
     const vid = g ? g.currentVehicle : 'btr80';
@@ -261,6 +273,7 @@ function _applyHESplash(wid, mainTarget, baseDmg, isCrit, penMM, ammoId){
       if(typeof pushLog === 'function'){
         (function(){var _wn={ '2a46':'125mm 主炮','2a46m1':'125mm 主炮','2a70':'100mm 主炮','2a28':'73mm 主炮','2a42':'30mm 機炮','2a72':'30mm 機炮','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid]||(wid?wid.toUpperCase():'未知武器');var _af={'3bm42':'穿甲彈','3of26':'高爆彈','3bk29':'破甲彈','100he':'高爆彈','73heat':'破甲彈','73hefrag':'高爆彈'}[ammoId];var _fm=_af?('（'+_af+'）'):(ammoId==='atgm'?'（反坦克導彈）':(ammoId?'（'+ammoId+'）':''));pushLog('<span class="run">'+_wn+_fm+'</span> 濺射擊殺 <b class="r-'+(t.enemy.rarity||'一般')+'">'+eName+'</b>', [], 'explore');})();
       }
+      if(typeof _grantBTRCrewExp === 'function') _grantBTRCrewExp(3);
       if(t.type === 'event' && t.event && t.event.content){
         t.event.content = t.event.content.filter(function(x){ return x !== t.enemy; });
         if(!t.event.content.length) t.event.cleared = true;
@@ -352,10 +365,29 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   if(hr > 75) hr = 75;
   if(hr < 0) hr = 0;
 
-  const stats = _getVehicleAmmoStats(wid, _usedAmmoId);
+  let _mixIsHE = null;
+  if(wid === '2a72' || wid === '2a42' || wid === 'kpvt' || wid === 'nsvt'){
+    const _mixAmmoObj = state.vehicleAmmo && state.vehicleAmmo[p.vehicleId] && state.vehicleAmmo[p.vehicleId][wid];
+    if(_mixAmmoObj && _mixAmmoObj.preset === '混合'){
+      if(typeof _mixAmmoObj._mixToggle !== 'boolean') _mixAmmoObj._mixToggle = false;
+      _mixIsHE = _mixAmmoObj._mixToggle;
+      _mixAmmoObj._mixToggle = !_mixAmmoObj._mixToggle;
+    }
+  }
+
+  let stats;
+  if(_mixIsHE === null){
+    stats = _getVehicleAmmoStats(wid, _usedAmmoId);
+  } else if(wid === '2a72' || wid === '2a42'){
+    stats = _mixIsHE ? VEHICLE_WEAPON_STATS['30mm_hef'] : VEHICLE_WEAPON_STATS['30mm_ap'];
+  } else if(wid === 'kpvt'){
+    stats = _mixIsHE ? VEHICLE_WEAPON_STATS['kpvt_mdz'] : VEHICLE_WEAPON_STATS['kpvt'];
+  } else if(wid === 'nsvt'){
+    stats = _mixIsHE ? VEHICLE_WEAPON_STATS['nsvt_md'] : VEHICLE_WEAPON_STATS['nsvt'];
+  }
   if(!stats) return false;
 
-  const isHE = _isHEAmmo(wid, _usedAmmoId);
+  const isHE = _isHEAmmo(wid, _usedAmmoId) && (wid === '2a46' || wid === '2a46m1' || wid === '2a70' || wid === '2a28');
   const baseDmg = Math.round(stats.dmg * _LEG_MULT);
   const penMM = stats.penMM || 0;
 
@@ -392,10 +424,9 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
     }
     _applyHESplash(wid, target, finalDmg, crit, penMM, _usedAmmoId);
   } else {
-    const targetArmorLevel = target.armorLevel || 0;
     const proxy = { hp: target.hp, armor: target.armor || 0 };
     const res = applyDamage(proxy, finalDmg, penMM, {
-      armorMMOverride: (ARMOR_LEVEL_TO_MM[targetArmorLevel] || 0)
+      armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(target, part) : 0; }
     });
     target.hp = proxy.hp;
     if(target.armor !== undefined) target.armor = proxy.armor;
@@ -423,6 +454,7 @@ function _onBTRKillTarget(target, wid, c, usedAmmoId){
     else form = '（' + usedAmmoId + '）';
   }
   if(typeof pushLog === 'function') pushLog('<span class="run">' + wn + form + '</span> 擊殺 <b class="r-' + target.rarity + '">' + eName + '</b>', [], 'explore');
+  if(typeof _grantBTRCrewExp === 'function') _grantBTRCrewExp(3);
   if(window.BTRSupport){
     window.BTRSupport.killCount = (window.BTRSupport.killCount || 0) + 1;
     if(!window.BTRSupport.kills) window.BTRSupport.kills = {};
@@ -710,9 +742,19 @@ function _detonate(vid, veh){
       if(srv){ srv.hp = 0; srv.injuredUntil = _now + 4 * 3600 * 1000; }
     }
   }
+  const _combatRef = window._combat;
   const _passengers = state.station && state.station.passengers;
-  if(_passengers){
-    for(const p of _passengers){
+  if(_combatRef && Array.isArray(_combatRef.allies) && _combatRef.allies.length){
+    for(const a of _combatRef.allies){
+      if(a.isPassenger && a.srv){
+        a.srv.hp = 0;
+        a.srv.injuredUntil = _now + 4 * 3600 * 1000;
+      }
+    }
+  } else if(_passengers){
+    const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
+    for(let _pi = 0; _pi < _passengers.length && _pi < _cap; _pi++){
+      const p = _passengers[_pi];
       if(!p || !p.srvId) continue;
       const srv = (state.servants || []).find(function(s){ return s.id === p.srvId; });
       if(srv){ srv.hp = 0; srv.injuredUntil = _now + 4 * 3600 * 1000; }
@@ -1026,3 +1068,20 @@ window._forceEndVehicleCombat = function(){
     try{ window._exploreSetVehicleMode(false); }catch(e){}
   }
 };
+
+function _grantBTRCrewExp(exp){
+  if(!state.station || !state.station.crew) return;
+  const members = [];
+  for(const r of ['commander', 'gunner', 'driver']){
+    const sid = state.station.crew[r];
+    if(!sid) continue;
+    const srv = (state.servants || []).find(function(s){ return s.id === sid; });
+    if(srv) members.push(srv);
+  }
+  if(!members.length) return;
+  const per = Math.floor(exp / members.length);
+  if(per <= 0) return;
+  for(const srv of members){
+    if(typeof servantAddExp === 'function') servantAddExp(srv, per);
+  }
+}

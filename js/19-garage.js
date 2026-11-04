@@ -248,23 +248,34 @@ function _garageGetResearchInfo(){
   return { targetId: target, target: tgt, have: Math.floor(have), need: need, prereqs: [] };
 }
 
-function _garageOpenCamo(){
+function _garageConfirmStation(){
   const g = _garageInitState();
   const cur = VEHICLES[g.currentVehicle];
   if(!cur) return;
-  let body = '<div class="detail-sub">' + cur.name + '</div>';
-  if(cur.camo && cur.camo.locked && cur.camo.locked.length){
-    body += '<div class="divider"></div>';
-    body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:4px">🔒 未解鎖塗裝</div>';
-    for(const cid of cur.camo.locked){
-      const v = cur.camo.variants && cur.camo.variants[cid];
-      if(!v) continue;
-      body += '<div class="item-row" style="opacity:0.55;cursor:not-allowed"><div class="icon">🔒</div><div class="info"><div class="nm" style="color:#7a6f60">' + v.name + '</div><div class="sub">' + v.desc + ' · 甲 ' + v.armor + ' · ' + v.speedRoad + '/' + v.speedOffroad + ' km/h</div></div></div>';
-    }
+  const stationLv = (typeof getBuildingLv === 'function') ? getBuildingLv('station') : 0;
+  if(stationLv <= 0){
+    const ft = el('div','modal-ft');
+    ft.innerHTML = '<button class="btn primary" id="m-ok">知道了</button>';
+    openModal({
+      title: '尚未建造車站',
+      body: '<div class="detail-sub">當前載具：' + cur.name + '</div>'
+        + '<div style="font-size:12px;color:#e05252;line-height:1.6;margin:8px 0">請先在基地建造車站（需車場作為前置）</div>',
+      footer: ft
+    });
+    ft.querySelector('#m-ok').onclick = closeModal;
+    return;
   }
-  body += '<div class="divider"></div>';
-  body += '<div class="empty-hint">其他塗裝系統開發中，敬請期待。</div>';
-  openModal({ title: '🎨 塗裝 · ' + cur.name, body: body });
+  const ft = el('div','modal-ft');
+  ft.innerHTML = '<button class="btn primary" id="m-go">前往</button><button class="btn ghost" id="m-cancel">取消</button>';
+  const body = '<div class="detail-sub">當前載具：' + cur.name + '</div>'
+    + '<div style="font-size:12px;color:#ddd;line-height:1.6;margin:8px 0">是否前往車站配置車組與載員？</div>';
+  openModal({ title: '前往車站', body: body, footer: ft });
+  ft.querySelector('#m-cancel').onclick = closeModal;
+  ft.querySelector('#m-go').onclick = function(){
+    closeModal();
+    if(typeof closeGaragePage === 'function') closeGaragePage();
+    if(typeof openStationPage === 'function') openStationPage();
+  };
 }
 
 function _splitVehicleWeapon(v){
@@ -548,7 +559,7 @@ function _garageBind(){
   if(!p) return;
 
   const showcase = p.querySelector('#garage-showcase-img');
-  if(showcase) showcase.onclick = function(){ _garageOpenCamo(); };
+  if(showcase) showcase.onclick = function(){ _garageConfirmStation(); };
 
   const _rt = p.querySelector('#garage-research-target');
   if(_rt) _rt.onclick = function(){ _garageShowTechDetail(_rt.dataset.vid); };

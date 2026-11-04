@@ -96,9 +96,9 @@ function applyDamage(target, rawDmg, penetration, armorOpts){
     armorMM = armorMMOverride;
   }
 
-  let al;
+  let armorMMVal = null;
   if(armorMM !== null){
-    if(armorMM <= 0){
+    if(armorMM <= 0 || pool <= 0){
       const hpDmg = Math.round(rawDmg * 1.2);
       target.hp = Math.max(0, Math.round((target.hp || 0) - hpDmg));
       result.hpLost = hpDmg;
@@ -106,9 +106,8 @@ function applyDamage(target, rawDmg, penetration, armorOpts){
       result.overkill = true;
       return result;
     }
-    al = armorMMToLevel(armorMM);
+    armorMMVal = armorMM;
   } else {
-    al = armorLevel;
     if(pool <= 0){
       const hpDmg = Math.round(rawDmg * 1.2);
       target.hp = Math.max(0, Math.round((target.hp || 0) - hpDmg));
@@ -117,10 +116,11 @@ function applyDamage(target, rawDmg, penetration, armorOpts){
       result.overkill = true;
       return result;
     }
+    armorMMVal = ARMOR_LEVEL_TO_MM[armorLevel] || 1;
   }
 
   const pen = penetration || 0;
-  const diff = pen - al;
+  const diff = pen - armorMMVal;
 
   if(diff >= 0){
     const reduction = 0.5 * Math.pow(0.01, diff / 7);
@@ -134,9 +134,7 @@ function applyDamage(target, rawDmg, penetration, armorOpts){
     result.finalDmg = hpDmg;
     if((target.armor || 0) <= 0) result.overkill = true;
   } else {
-    const d = -diff;
-    const mult = 0.1 * Math.pow(0.1, (d - 1) / 5);
-    const armorDmg = Math.round(rawDmg * mult);
+    const armorDmg = pen > 0 ? Math.round(rawDmg * (pen / armorMMVal)) : 0;
     const armorLost = Math.min(pool, armorDmg);
     target.armor = Math.max(0, pool - armorLost);
     result.armorLost = armorLost;

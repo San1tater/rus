@@ -277,7 +277,6 @@ function itemIcon(id,size){
     return `<img src="icons/garden/crops/${_img}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
   }
   if(MATERIAL_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${MATERIAL_EMOJI[id]}</span>`;
-  if(PANTS_SHOES_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${PANTS_SHOES_EMOJI[id]}</span>`;
   const ammoDef=AMMO[id];
   if(ammoDef && ammoDef.cal){
     const f=AMMO_ICON_BY_CAL[ammoDef.cal];

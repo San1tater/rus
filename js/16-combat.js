@@ -770,9 +770,9 @@ function _firePassenger(a, t, now, w){
     if(typeof pushLog === 'function'){
       pushLog('<span class="win">' + (typeof servantLabel === 'function' ? servantLabel(a.srv) : '載員') + '</span> 用 <span class="' + _wCls + '">' + _wName + '</span> 擊殺 <b class="r-' + (t.rarity || '一般') + '">' + eName + '</b>', [], 'explore');
     }
+    if(typeof servantAddExp === 'function') servantAddExp(a.srv, 3);
   }
 
-  if(typeof servantAddExp === 'function') servantAddExp(a.srv, 1);
 }
 
 function _enemyFire(e, now){
