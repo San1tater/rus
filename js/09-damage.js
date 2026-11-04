@@ -1,0 +1,146 @@
+'use strict';
+
+const HIT_PART_WEIGHTS = [
+  { part:'head',  pct:15 },
+  { part:'face',  pct:15 },
+  { part:'top',   pct:40 },
+  { part:'other', pct:30 }
+];
+
+function rollHitPart(){
+  var r = Math.random() * 100;
+  for(var i = 0; i < HIT_PART_WEIGHTS.length; i++){
+    r -= HIT_PART_WEIGHTS[i].pct;
+    if(r <= 0) return HIT_PART_WEIGHTS[i].part;
+  }
+  return 'other';
+}
+
+function getPlayerArmorMMForPart(part){
+  if(part === 'head' || part === 'face'){
+    var id = state.player.equipped.head;
+    if(!id) return 0;
+    return armorMMForSlot(id, part);
+  }
+  if(part === 'top'){
+    var id2 = state.player.equipped.top;
+    if(!id2) return 0;
+    return armorMMForSlot(id2, 'top');
+  }
+  return 0;
+}
+
+function getEnemyArmorMMForPart(enemy, part){
+  if(!enemy) return 0;
+  if(part === 'head' || part === 'face'){
+    if(!enemy.helmet) return 0;
+    return armorMMForSlot(enemy.helmet, part);
+  }
+  if(part === 'top'){
+    if(!enemy.body) return 0;
+    return armorMMForSlot(enemy.body, 'top');
+  }
+  return 0;
+}
+
+function getPassengerArmorMMForPart(passenger, part){
+  var eq = passenger && passenger.equipData;
+  if(!eq) return 0;
+  if(part === 'head' || part === 'face'){
+    if(!eq.head) return 0;
+    var hid = typeof eq.head === 'object' ? eq.head.id : eq.head;
+    return armorMMForSlot(hid, part);
+  }
+  if(part === 'top'){
+    if(!eq.top) return 0;
+    var tid = typeof eq.top === 'object' ? eq.top.id : eq.top;
+    return armorMMForSlot(tid, 'top');
+  }
+  return 0;
+}
+
+function applyDamage(target, rawDmg, penetration, armorOpts){
+  let armorLevel = 0, armorMMOverride = null, armorProvider = null, isHE = false;
+  if(armorOpts && typeof armorOpts === 'object'){
+    armorProvider = armorOpts.armorProvider || null;
+    armorMMOverride = (armorOpts.armorMMOverride != null) ? armorOpts.armorMMOverride : null;
+    isHE = !!armorOpts.isHE;
+    armorLevel = armorOpts.armorLevel || 0;
+  } else {
+    armorLevel = armorOpts || 0;
+  }
+
+  if(rawDmg == null || isNaN(rawDmg) || !isFinite(rawDmg)) rawDmg = 0;
+  if(penetration == null || isNaN(penetration) || !isFinite(penetration)) penetration = 0;
+  if(isNaN(armorLevel) || !isFinite(armorLevel)) armorLevel = 0;
+
+  const result = {armorLost:0, hpLost:0, finalDmg:0, overkill:false, part:null};
+  const pool = Math.max(0, Math.round(target.armor || 0));
+
+  if(isHE){
+    const hpDmg = Math.round(rawDmg * 1.2);
+    target.hp = Math.max(0, Math.round((target.hp || 0) - hpDmg));
+    result.hpLost = hpDmg;
+    result.finalDmg = hpDmg;
+    result.overkill = true;
+    return result;
+  }
+
+  let armorMM = null;
+  if(armorProvider){
+    const part = rollHitPart();
+    result.part = part;
+    const mm = armorProvider(part);
+    if(mm != null && isFinite(mm)) armorMM = mm;
+  } else if(armorMMOverride !== null){
+    armorMM = armorMMOverride;
+  }
+
+  let al;
+  if(armorMM !== null){
+    if(armorMM <= 0){
+      const hpDmg = Math.round(rawDmg * 1.2);
+      target.hp = Math.max(0, Math.round((target.hp || 0) - hpDmg));
+      result.hpLost = hpDmg;
+      result.finalDmg = hpDmg;
+      result.overkill = true;
+      return result;
+    }
+    al = armorMMToLevel(armorMM);
+  } else {
+    al = armorLevel;
+    if(pool <= 0){
+      const hpDmg = Math.round(rawDmg * 1.2);
+      target.hp = Math.max(0, Math.round((target.hp || 0) - hpDmg));
+      result.hpLost = hpDmg;
+      result.finalDmg = hpDmg;
+      result.overkill = true;
+      return result;
+    }
+  }
+
+  const pen = penetration || 0;
+  const diff = pen - al;
+
+  if(diff >= 0){
+    const reduction = 0.5 * Math.pow(0.01, diff / 7);
+    const armorDmg = Math.round(rawDmg);
+    const hpDmg = Math.round(rawDmg * (1 - reduction));
+    const armorLost = Math.min(pool, armorDmg);
+    target.armor = Math.max(0, pool - armorLost);
+    target.hp = Math.max(0, Math.round((target.hp || 0) - hpDmg));
+    result.armorLost = armorLost;
+    result.hpLost = hpDmg;
+    result.finalDmg = hpDmg;
+    if((target.armor || 0) <= 0) result.overkill = true;
+  } else {
+    const d = -diff;
+    const mult = 0.1 * Math.pow(0.1, (d - 1) / 5);
+    const armorDmg = Math.round(rawDmg * mult);
+    const armorLost = Math.min(pool, armorDmg);
+    target.armor = Math.max(0, pool - armorLost);
+    result.armorLost = armorLost;
+    result.finalDmg = armorLost;
+  }
+  return result;
+}
