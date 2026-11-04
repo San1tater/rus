@@ -25,19 +25,19 @@
 <div id="modal-layer"><div class="modal-bd"></div><div class="modal"></div></div>
 
   <script src="js/00-utils.js"></script>
-  <script src="js/01-data-core.js"></script>
-  <script src="js/02-data-boss.js"></script>
-  <script src="js/03-boss-render.js"></script>
-  <script src="js/04-boss-combat.js"></script>
-  <script src="js/05-boss-ai.js"></script>
-  <script src="js/06-human-render.js"></script>
-  <script src="js/07-enemy-data.js"></script>
-  <script src="js/08-garden-core.js"></script>
-  <script src="js/08a-garden-servants.js"></script>
-  <script src="js/08b-garden-raid.js"></script>
-  <script src="js/09-base.js"></script>
-  <script src="js/10-station.js"></script>
-
+  <script src="js/01-constants.js"></script>
+  <script src="js/02-data-items.js"></script>
+  <script src="js/03-data-enemies.js"></script>
+  <script src="js/04-data-regions.js"></script>
+  <script src="js/05-data-vehicles.js"></script>
+  <script src="js/06-data-boss.js"></script>
+  <script src="js/06b-boss-anims.js"></script>
+  <script src="js/07-data-garden.js"></script>
+  <script src="js/08-state.js"></script>
+  <script src="js/09-damage.js"></script>
+  <script src="js/10-render-hero.js"></script>
+  <script src="js/11-render-enemy.js"></script>
+  <script src="js/12-render-boss.js"></script>
   <script src="js/btr80_annotation.js"></script>
   <script src="js/btr80a_annotation.js"></script>
   <script src="js/btr82_annotation.js"></script>
@@ -49,23 +49,47 @@
   <script src="js/t80u_annotation.js"></script>
   <script src="js/t80uk_annotation.js"></script>
   <script src="js/t80um_annotation.js"></script>
-
   <script src="js/bmp1_annotation.js"></script>
   <script src="js/bmp1m_annotation.js"></script>
   <script src="js/bmp2_annotation.js"></script>
   <script src="js/bmp3_annotation.js"></script>
   <script src="js/bmd4_annotation.js"></script>
-
-  <script src="js/11-vehicle.js"></script>
-
-  <script src="js/12-explore.js"></script>
-  <script src="js/13-livebattle.js"></script>
-  <script src="js/14-vehicle-combat.js"></script>
-  <script src="js/15-vehicle-damage.js"></script>
-  <script src="js/16-boot.js"></script>
-
- 
-
+  <script>
+  /* 建立 VEHICLE_ANNOTATIONS 索引 */
+  (function(){
+    var A = window.VEHICLE_ANNOTATIONS = window.VEHICLE_ANNOTATIONS || {};
+    if(typeof VEHICLE_ANNOTATION_BTR80 !== 'undefined') A.btr80 = VEHICLE_ANNOTATION_BTR80;
+    if(typeof VEHICLE_ANNOTATION_BTR80A !== 'undefined') A.btr80a = VEHICLE_ANNOTATION_BTR80A;
+    if(typeof VEHICLE_ANNOTATION_BTR82 !== 'undefined') A.btr82 = VEHICLE_ANNOTATION_BTR82;
+    if(typeof VEHICLE_ANNOTATION_BTR82A !== 'undefined') A.btr82a = VEHICLE_ANNOTATION_BTR82A;
+    if(typeof VEHICLE_ANNOTATION_BTR90 !== 'undefined') A.btr90 = VEHICLE_ANNOTATION_BTR90;
+    if(typeof VEHICLE_ANNOTATION_T80 !== 'undefined') A.t80 = VEHICLE_ANNOTATION_T80;
+    if(typeof VEHICLE_ANNOTATION_T80B !== 'undefined') A.t80b = VEHICLE_ANNOTATION_T80B;
+    if(typeof VEHICLE_ANNOTATION_T80BV !== 'undefined') A.t80bv = VEHICLE_ANNOTATION_T80BV;
+    if(typeof VEHICLE_ANNOTATION_T80U !== 'undefined') A.t80u = VEHICLE_ANNOTATION_T80U;
+    if(typeof VEHICLE_ANNOTATION_T80UK !== 'undefined') A.t80uk = VEHICLE_ANNOTATION_T80UK;
+    if(typeof VEHICLE_ANNOTATION_T80UM !== 'undefined') A.t80um = VEHICLE_ANNOTATION_T80UM;
+    if(typeof VEHICLE_ANNOTATION_BMP1 !== 'undefined') A.bmp1 = VEHICLE_ANNOTATION_BMP1;
+    if(typeof VEHICLE_ANNOTATION_BMP1M !== 'undefined') A.bmp1m = VEHICLE_ANNOTATION_BMP1M;
+    if(typeof VEHICLE_ANNOTATION_BMP2 !== 'undefined') A.bmp2 = VEHICLE_ANNOTATION_BMP2;
+    if(typeof VEHICLE_ANNOTATION_BMP3 !== 'undefined') A.bmp3 = VEHICLE_ANNOTATION_BMP3;
+    if(typeof VEHICLE_ANNOTATION_BMD4 !== 'undefined') A.bmd4 = VEHICLE_ANNOTATION_BMD4;
+  })();
+  </script>
+  <script src="js/13-render-vehicle.js"></script>
+  <script src="js/14-ui-common.js"></script>
+  <script src="js/15-explore.js"></script>
+  <script src="js/16-combat.js"></script>
+  <script src="js/17a-boss-ui.js"></script>
+  <script src="js/17b-boss-combat.js"></script>
+  <script src="js/18-vehicle-combat.js"></script>
+  <script src="js/19-garage.js"></script>
+  <script src="js/20-station.js"></script>
+  <script src="js/21-garden.js"></script>
+  <script src="js/22-garden-merchant.js"></script>
+  <script src="js/23-garden-raid.js"></script>
+  <script src="js/24-base.js"></script>
+  <script src="js/25-boot.js"></script>
 
 </body>
 </html>
