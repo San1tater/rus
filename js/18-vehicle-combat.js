@@ -45,6 +45,7 @@ const _VEHICLE_CRIT_MULT = 37.5;
  * blastPen 為距離 0 的近距等效穿深（遊戲代理值）。
  * HE 類 blastPen = 直擊穿深；HEAT/ATGM 類 blastPen 遠低於直擊（定向聚流不擴散）。
  */
+/* rev-fix-splash-v2 */
 const VEHICLE_SPLASH = {
   '3of26':    { blastPen: 45, maxR: 60, splashRatio: 0.50 },
   '100he':    { blastPen: 35, maxR: 50, splashRatio: 0.50 },
@@ -97,10 +98,12 @@ function _applyVehicleSplash(sp, mainTarget, baseDmg, ratioMult, wid, usedAmmoId
     let dist;
     if(t.type === 'current') dist = Math.abs(t.enemy.worldX - impactRelWorldX);
     else dist = Math.abs(t.enemy.worldX - impactAbsWorldX);
-    if(dist > sp.maxR) continue;
+    if(dist >= sp.maxR) continue;
     const tt = dist / sp.maxR;
     const falloff = 1 - tt * tt;
-    const dmgVal = Math.max(1, Math.round(maxDmg * falloff));
+    if(falloff <= 0) continue;
+    const dmgVal = Math.round(maxDmg * falloff);
+    if(dmgVal <= 0) continue;
     const penVal = sp.blastPen * falloff;
     const proxy = { hp: t.enemy.hp, armor: t.enemy.armor || 0 };
     const res = applyDamage(proxy, dmgVal, penVal, {
@@ -499,7 +502,7 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   if(!hit){
     const _spMiss = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
     if(_spMiss && target){
-      _applyVehicleSplash(_spMiss, target, finalDmg, 0.6, wid, _usedAmmoId);
+      _applyVehicleSplash(_spMiss, target, baseDmg, 0.6, wid, _usedAmmoId);
     }
     return true;
   }
@@ -520,7 +523,7 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   /* rev-fix-splash: 濺射走單次 applyDamage，穿甲值隨 (1-t²) 衰減 */
   const _spMain = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
   if(_spMain){
-    _applyVehicleSplash(_spMain, target, finalDmg, 1.0, wid, _usedAmmoId);
+    _applyVehicleSplash(_spMain, target, baseDmg, 1.0, wid, _usedAmmoId);
   }
   return true;
 };
