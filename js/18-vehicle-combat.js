@@ -40,6 +40,87 @@ const _LEG_MULT = 5;
 const _VEHICLE_CRIT_RATE = 0.85;
 const _VEHICLE_CRIT_MULT = 37.5;
 
+/* rev-fix-splash: 載具濺射參數表
+ * maxR 為「傷害歸零」的距離，比現實「保證殺傷半徑」長，代表破片飛散極限。
+ * blastPen 為距離 0 的近距等效穿深（遊戲代理值）。
+ * HE 類 blastPen = 直擊穿深；HEAT/ATGM 類 blastPen 遠低於直擊（定向聚流不擴散）。
+ */
+const VEHICLE_SPLASH = {
+  '3of26':    { blastPen: 45, maxR: 60, splashRatio: 0.50 },
+  '100he':    { blastPen: 35, maxR: 50, splashRatio: 0.50 },
+  '73hefrag': { blastPen: 25, maxR: 30, splashRatio: 0.40 },
+  '3bk29':    { blastPen: 18, maxR: 25, splashRatio: 0.35 },
+  '73heat':   { blastPen: 12, maxR: 20, splashRatio: 0.35 },
+  'atgm':     { blastPen: 22, maxR: 22, splashRatio: 0.35 },
+  '30mm_hef': { blastPen: 10, maxR: 10, splashRatio: 0.20 }
+};
+
+function _getVehicleSplashParams(wid, usedAmmoId, mixIsHE, preset){
+  if(usedAmmoId && VEHICLE_SPLASH[usedAmmoId]) return VEHICLE_SPLASH[usedAmmoId];
+  if(wid === 'atgm') return VEHICLE_SPLASH['atgm'];
+  if((wid === '2a42' || wid === '2a72') && (mixIsHE === true || preset === '高爆')) return VEHICLE_SPLASH['30mm_hef'];
+  return null;
+}
+
+function _applyVehicleSplash(sp, mainTarget, baseDmg, ratioMult, wid, usedAmmoId){
+  const c = window._combat;
+  const ex = window._explore;
+  if(!c || !ex || !sp || !mainTarget) return;
+  const impactRelWorldX = mainTarget.worldX;
+  const impactAbsWorldX = ex.worldX + impactRelWorldX;
+  const maxDmg = baseDmg * sp.splashRatio * (ratioMult || 1.0);
+  const targets = [];
+  for(let i = 0; i < c.enemies.length; i++){
+    if(c.enemies[i] === mainTarget) continue;
+    if(c.enemies[i].hp <= 0) continue;
+    targets.push({ enemy: c.enemies[i], type: 'current' });
+  }
+  for(let ni = 0; ni < ex.nodes.length; ni++){
+    const node = ex.nodes[ni];
+    for(let ei = 0; ei < node.events.length; ei++){
+      const ev = node.events[ei];
+      if(ev.cleared) continue;
+      if(ev.type !== 'combat') continue;
+      if(!ev.content) continue;
+      for(let j = 0; j < ev.content.length; j++){
+        const en = ev.content[j];
+        if(en.hp <= 0) continue;
+        let dup = false;
+        for(let k = 0; k < c.enemies.length; k++){ if(c.enemies[k] === en){ dup = true; break; } }
+        if(dup) continue;
+        targets.push({ enemy: en, type: 'event', event: ev });
+      }
+    }
+  }
+  for(let ti = 0; ti < targets.length; ti++){
+    const t = targets[ti];
+    let dist;
+    if(t.type === 'current') dist = Math.abs(t.enemy.worldX - impactRelWorldX);
+    else dist = Math.abs(t.enemy.worldX - impactAbsWorldX);
+    if(dist > sp.maxR) continue;
+    const tt = dist / sp.maxR;
+    const falloff = 1 - tt * tt;
+    const dmgVal = Math.max(1, Math.round(maxDmg * falloff));
+    const penVal = sp.blastPen * falloff;
+    const proxy = { hp: t.enemy.hp, armor: t.enemy.armor || 0 };
+    const res = applyDamage(proxy, dmgVal, penVal, {
+      armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(t.enemy, part) : 0; }
+    });
+    t.enemy.hp = proxy.hp;
+    if(t.enemy.armor !== undefined) t.enemy.armor = proxy.armor;
+    const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
+    const rel = (t.type === 'current') ? t.enemy.worldX : (t.enemy.worldX - ex.worldX);
+    _vehicleCombatFloat(rel, '-' + shown, res.hpLost > 0 ? 'enemy' : 'armor');
+    if(t.enemy.hp <= 0){
+      _onBTRKillTarget(t.enemy, wid, c, usedAmmoId);
+      if(t.type === 'event' && t.event && t.event.content){
+        t.event.content = t.event.content.filter(function(x){ return x !== t.enemy; });
+        if(!t.event.content.length) t.event.cleared = true;
+      }
+    }
+  }
+}
+
 window._vehicleWeaponsDead = function(){
   const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
   const vid = g ? g.currentVehicle : 'btr80';
@@ -370,12 +451,16 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   if(hr < 0) hr = 0;
 
   let _mixIsHE = null;
+  let _preset30 = null;
   if(wid === '2a72' || wid === '2a42' || wid === 'kpvt' || wid === 'nsvt'){
     const _mixAmmoObj = state.vehicleAmmo && state.vehicleAmmo[p.vehicleId] && state.vehicleAmmo[p.vehicleId][wid];
-    if(_mixAmmoObj && _mixAmmoObj.preset === '混合'){
-      if(typeof _mixAmmoObj._mixToggle !== 'boolean') _mixAmmoObj._mixToggle = false;
-      _mixIsHE = _mixAmmoObj._mixToggle;
-      _mixAmmoObj._mixToggle = !_mixAmmoObj._mixToggle;
+    if(_mixAmmoObj){
+      _preset30 = _mixAmmoObj.preset || null;
+      if(_mixAmmoObj.preset === '混合'){
+        if(typeof _mixAmmoObj._mixToggle !== 'boolean') _mixAmmoObj._mixToggle = false;
+        _mixIsHE = _mixAmmoObj._mixToggle;
+        _mixAmmoObj._mixToggle = !_mixAmmoObj._mixToggle;
+      }
     }
   }
 
@@ -410,35 +495,32 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   }
   /* 載具不繪製子彈；視覺特效由 BTRSupport 處理 */
 
+  /* rev-fix-splash: 未命中時仍觸發濺射（落點爆炸），ratioMult 0.6 */
   if(!hit){
-    if(isHE && target){
-      _applyHESplash(wid, target, Math.round(baseDmg * 0.15), false, penMM, _usedAmmoId);
+    const _spMiss = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
+    if(_spMiss && target){
+      _applyVehicleSplash(_spMiss, target, finalDmg, 0.6, wid, _usedAmmoId);
     }
     return true;
   }
 
-  if(isHE){
-    const mainProxy = { hp: target.hp, armor: target.armor || 0 };
-    const mainRes = applyDamage(mainProxy, finalDmg, penMM, { isHE: true });
-    target.hp = mainProxy.hp;
-    if(target.armor !== undefined) target.armor = mainProxy.armor;
-    _vehicleCombatFloat(target.worldX, '-' + mainRes.hpLost + (crit ? '!' : ''), crit ? 'crit' : 'enemy');
-    if(target.hp <= 0){
-      _onBTRKillTarget(target, wid, c, _usedAmmoId);
-    }
-    _applyHESplash(wid, target, finalDmg, crit, penMM, _usedAmmoId);
-  } else {
-    const proxy = { hp: target.hp, armor: target.armor || 0 };
-    const res = applyDamage(proxy, finalDmg, penMM, {
-      armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(target, part) : 0; }
-    });
-    target.hp = proxy.hp;
-    if(target.armor !== undefined) target.armor = proxy.armor;
-    const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
-    _vehicleCombatFloat(target.worldX, '-' + shown + (crit ? '!' : ''), crit ? 'crit' : 'enemy');
-    if(target.hp <= 0){
-      _onBTRKillTarget(target, wid, c, _usedAmmoId);
-    }
+  /* rev-fix-splash: 主目標走普通穿甲（不再 isHE: true 繞過護甲） */
+  const mainProxy = { hp: target.hp, armor: target.armor || 0 };
+  const mainRes = applyDamage(mainProxy, finalDmg, penMM, {
+    armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(target, part) : 0; }
+  });
+  target.hp = mainProxy.hp;
+  if(target.armor !== undefined) target.armor = mainProxy.armor;
+  const _shownMain = mainRes.hpLost > 0 ? mainRes.hpLost : mainRes.armorLost;
+  _vehicleCombatFloat(target.worldX, '-' + _shownMain + (crit ? '!' : ''), crit ? 'crit' : (mainRes.hpLost > 0 ? 'enemy' : 'armor'));
+  if(target.hp <= 0){
+    _onBTRKillTarget(target, wid, c, _usedAmmoId);
+  }
+
+  /* rev-fix-splash: 濺射走單次 applyDamage，穿甲值隨 (1-t²) 衰減 */
+  const _spMain = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
+  if(_spMain){
+    _applyVehicleSplash(_spMain, target, finalDmg, 1.0, wid, _usedAmmoId);
   }
   return true;
 };
