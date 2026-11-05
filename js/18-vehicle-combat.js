@@ -282,6 +282,9 @@ function _applyHESplash(wid, mainTarget, baseDmg, isCrit, penMM, ammoId){
         window.BTRSupport.killCount = (window.BTRSupport.killCount || 0) + 1;
         if(!window.BTRSupport.kills) window.BTRSupport.kills = {};
         window.BTRSupport.kills[t.enemy.eid] = (window.BTRSupport.kills[t.enemy.eid] || 0) + 1;
+        if(!window.BTRSupport.weaponKills) window.BTRSupport.weaponKills = {};
+        var _killKey = wid + (ammoId ? ':' + ammoId : '');
+        window.BTRSupport.weaponKills[_killKey] = (window.BTRSupport.weaponKills[_killKey] || 0) + 1;
         if(typeof rollEnemyLoot === 'function'){
           const loot = rollEnemyLoot(t.enemy);
           if(!window.BTRSupport.loot) window.BTRSupport.loot = [];
