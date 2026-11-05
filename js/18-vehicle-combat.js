@@ -789,6 +789,7 @@ function _detonate(vid, veh){
   if(_c){ _c.active = false; _c.onResolve = null; }
   const _b = window.BTRSupport;
   if(_b && _b.active){
+    if(typeof _b._finishSupportAndLog === 'function'){ try { _b._finishSupportAndLog(); } catch(e){} }
     try { _b._cleanup(); } catch(e){}
     _b.active = false;
   }
@@ -834,6 +835,7 @@ function _resolveVehicleLeave(reason){
 
   if(b && b.active){
     if(reason === 'detonated'){
+      if(typeof b._finishSupportAndLog === 'function'){ try { b._finishSupportAndLog(); } catch(e){} }
       try { b._cleanup(); } catch(e){}
       b.active = false;
     } else if(reason === 'engine' || reason === 'driver_dead' || reason === 'tracks' || reason === 'hull_destroyed' || reason === 'player_dead'){
