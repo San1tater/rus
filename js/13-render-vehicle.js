@@ -1780,12 +1780,7 @@ const BTRSupport = {
       }
     } catch(e){}
     if(window._explore){
-      if(window._explore.corpses && window._explore.corpses.length){
-        for(let i = window._explore.corpses.length - 1; i >= 0; i--){
-          try { window._explore.corpses[i].wrap.remove(); } catch(e){}
-        }
-        window._explore.corpses = [];
-      }
+      /* rev-fix-keep-corpses: 不清空 ex.corpses，讓屍體繼續隨世界向左移出 */
       window._explore._lootingUntil = 0;
       window._explore._corpseLootTriggered = false;
       window._explore._pendingLootEvent = null;

@@ -574,7 +574,7 @@ function _firePlayer(p, t, now, w){
   const duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: _tx, ty: 0.55, t: 0,
+    sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: false, hit: hit, rarity: _pBulletRar,
     big: (w.def.slot === 'throwable'), arc: (w.def.slot === 'throwable'),
@@ -729,7 +729,7 @@ function _firePassenger(a, t, now, w){
   const duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: _tx, ty: 0.55, t: 0,
+    sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: false, hit: hit, rarity: (am && am.rarity) ? am.rarity : '一般',
     _target: t,
@@ -832,7 +832,7 @@ function _enemyFire(e, now){
   const duration = Math.max(50, (distPx / (1200 + _approachPx)) * 1000);
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: tx, ty: 0.55, t: 0,
+    sx: mz.x, sy: mz.y, tx: tx, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: true, hit: hit,
     rarity: (w && w.ammoId && typeof AMMO !== 'undefined' && AMMO[w.ammoId]) ? (AMMO[w.ammoId].rarity || '一般') : '一般',
@@ -911,7 +911,7 @@ function _enemyFireRPG(e, p, now){
   const duration = Math.max(50, (distPx / (800 + _approachPx)) * 1000);
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: tx, ty: 0.55, t: 0,
+    sx: mz.x, sy: mz.y, tx: tx, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: true, big: true, missile: true, hit: hit,
     rarity: rar, _target: p,
@@ -1004,7 +1004,7 @@ function _enemyThrowGrenade(e, p, now){
   const duration = Math.max(100, (distPx / 600) * 1000);
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: px, ty: 0.55, t: 0,
+    sx: mz.x, sy: mz.y, tx: px, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: true, big: true, arc: true, isGrenade: true, hit: true,
     rarity: gRar, _target: p,
@@ -1341,4 +1341,5 @@ window._combatPlayerAdvance = function(delta){
   }
 };;
 
+/* rev-fix-ty-level */
 window._combatStart = _start;
