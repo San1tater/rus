@@ -1227,7 +1227,7 @@ const BTRSupport = {
     for(const m of _ready){
       if(m._syncGroup === 'main'){
         m._preselectedTarget = (typeof window._pickBTRTarget === 'function') ? window._pickBTRTarget(m.weaponId, 'main') : null;
-        if(m._preselectedTarget && !_mainTarget) _mainTarget = m._preselectedTarget;
+        if(m._preselectedTarget && !_mainTarget && m.weaponId !== 'pkt') _mainTarget = m._preselectedTarget;  /* rev-fix-pkt-follow */
       }
     }
     for(const m of _ready){

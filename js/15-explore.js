@@ -1077,11 +1077,17 @@ function _startMap(region, ri){
   if(!rs) return;
   if(ri === undefined || ri === null) ri = Math.floor(Math.random() * rs.length);
   const persisted = _ensureES(region, ri);
+  /* rev-fix-world-norewind: 同一 region 且已 active 時不倒退 worldX */
+  const _sameRegion = (ex.region === region && ex.active === true);
   ex.region = region;
   ex.routeIdx = ri;
   ex.nodes = persisted.nodes;
   ex.totalLen = persisted.totalLen;
-  ex.worldX = persisted.worldX || 0;
+  if(_sameRegion){
+    ex.worldX = Math.max(ex.worldX || 0, persisted.worldX || 0);
+  } else {
+    ex.worldX = persisted.worldX || 0;
+  }
   ex.mode = 'walk';
   ex.active = true;
   ex.deadUntil = 0;
