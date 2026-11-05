@@ -892,7 +892,7 @@ const BTRSupport = {
     this.phase = 'enter';
     this.phaseT = 0;
     this.yOffset = 0; this.doorOpen = 0; this.shakeX = 0; this.shakeY = 0; this.sinkOffset = 0;
-    this.kills = {}; this.loot = []; this.killCount = 0; this.lastTickSec = -1;
+    this.kills = {}; this.loot = []; this.killCount = 0; this.weaponKills = {}; this.lastTickSec = -1;
     this.fireFx = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = [];
     this.recoilStates = {}; this.missiles = []; this.erasedMissilePolys = []; this.erasedBaseImg = null;
     this.playerClipH = 1.0; this.playerXOffset = 0; this._finished = false;
@@ -1162,7 +1162,7 @@ const BTRSupport = {
       const _dxPx = _spd * _dt * _ppm;
       this.x -= _dxPx / this.width;
     }
-    if(this.x < -1.5){
+    if(this.x * this.width + this.targetW < 0){
       this._finishWreck();
     }
   },
@@ -1266,11 +1266,8 @@ const BTRSupport = {
       : true;
     m._preselectedTarget = null;
     if(!_fired && !_inBurst){
-      if(_isAtgm && (m.lastFireAt || 0) === 0){
-        m.nextFireAt = now + 500;
-      } else {
-        m.nextFireAt = now + m.profile.pauseMs;
-      }
+      /* rev-fix-nofire: 無目標時短重試，避免長 pauseMs 懲罰（2A70 從 4s → 500ms） */
+      m.nextFireAt = now + 500;
       return;
     }
     if(!_fired && _inBurst){

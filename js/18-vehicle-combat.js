@@ -57,7 +57,8 @@ window._vehicleWeaponsDead = function(){
   for(const wid in ld){
     if(wid === 'pkt') continue;
     if(wid === 'nsvt' || wid === 'kpvt' || wid === 'atgm'){
-      const a = ammoState && ammoState[wid];
+      let a = ammoState && ammoState[wid];
+      if(!a) { a = { current: 100, max: 100 }; }
       if(a && a.current > 0) return false;
     }
   }
@@ -611,8 +612,9 @@ const key = _vPickInternalKey(vid);
     if(d.members.commander > 0) pool.push({ t: 'crew', r: 'commander' });
     if(d.members.player > 0) pool.push({ t: 'player' });
     const _st = state.station;
-    if(_st && _st.passengers){
-      for(let i = 0; i < _st.passengers.length; i++){
+    const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
+    if(_cap > 0 && _st && _st.passengers){
+      for(let i = 0; i < _st.passengers.length && i < _cap; i++){
         const pp = _st.passengers[i];
         const ss = (state.servants || []).find(function(x){ return x.id === pp.srvId; });
         if(ss && (!ss.hp || ss.hp > 0)) pool.push({ t: 'passenger', srv: ss, p: pp });
@@ -670,9 +672,15 @@ const key = _vPickInternalKey(vid);
       const _maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(tgt.srv) : 100;
       const _curHp = (typeof tgt.srv.hp === 'number') ? tgt.srv.hp : _maxHp;
       const _t2 = { hp: _curHp, armor: _arm };
-      applyDamage(_t2, dmg * 1.5, penMM, { armorMMOverride: 0 });
+      const _res2 = applyDamage(_t2, dmg * 1.5, penMM, {
+        armorProvider: function(part){
+          if (part === 'head' || part === 'face') return tgt.p.helmet ? armorMMForSlot(tgt.p.helmet, part) : 0;
+          if (part === 'top') return tgt.p.body ? armorMMForSlot(tgt.p.body, 'top') : 0;
+          return 0;
+        }
+      });
       tgt.srv.hp = _t2.hp;
-      _vehicleCombatFloat(0, '載員 -' + Math.round(_t2.hpLost || dmg * 1.5), 'crit');
+      _vehicleCombatFloat(0, '載員 -' + Math.round(_res2.hpLost), 'crit');
       if(tgt.srv.hp <= 0){
         tgt.srv.hp = 0;
         tgt.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;

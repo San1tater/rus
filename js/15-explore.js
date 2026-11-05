@@ -318,7 +318,7 @@ function _disembark(){
   const _newList = _retreatingList.slice();
   let _newCount = 0;
   for(let i = 0; i < st.passengers.length; i++){
-    if(i >= cap) break;
+    if(_newCount >= cap) break;
     const p = st.passengers[i];
     const srv = state.servants.find(function(s){ return s.id === p.srvId; });
     if(!srv) continue;
@@ -532,7 +532,11 @@ function _renderPass(now){
     if(_checkDown(s)){ s.screenX -= _worldStep; continue; }
     if(s._retreating){
       const diff = s.targetX - s.screenX;
-      if(diff > 0) s.screenX += _walkStep * 3;
+      if(diff > 0) {
+        const _dtS = Math.min(0.1, dtS);
+        const _evacStep = (0.3 * _dtS) + _worldStep;
+        s.screenX += _evacStep;
+      }
       continue;
     }
     if(s.srv && s.srv._standUntil && _nowWall < s.srv._standUntil) continue;
@@ -565,16 +569,8 @@ function _renderPass(now){
         _animO = 'fire_primary';
         _animStartOverride = a._fireAnimStart || _perfNow;
       }
-      if((_animO === 'fire_primary' || _animO === 'reload') && it.srv && it.srv._standUntil && _nowRp < it.srv._standUntil && it.srv._standStart != null){
-        const _t = Math.max(0, Math.min(1, (_nowRp - it.srv._standStart) / Math.max(1, it.srv._standUntil - it.srv._standStart)));
-        const _walkAnim = GAME_ANIMS.walk;
-        const _wl = _walkAnim.keys;
-        const _wf = (it.animFrame || 0) % _walkAnim.frameCount;
-        _legO = {
-          right_leg: { rot: (_wl.right_leg[_wf] ? _wl.right_leg[_wf].rot : 0) * (1 - _t) },
-          left_leg: { rot: (_wl.left_leg[_wf] ? _wl.left_leg[_wf].rot : 0) * (1 - _t) }
-        };
-      }
+      /* rev-fix-leg: 與玩家一致，fire/reload 期間不使用 legOverride，腿恆為 0 */
+      /* _standStart/_standUntil 仍保留給下方 idle 過渡邏輯使用 */
     }
     if(!_animO && it.srv && it.srv._standUntil && _nowRp < it.srv._standUntil && it.srv._standStart != null){
       _animO = 'idle';

@@ -448,14 +448,12 @@ function _garageRenderHtml(){
     if(tgt && tgt.researchCost){
       const ammo = _garageAmmoEquiv();
       const liq = (typeof _gardenLiquorValue === 'function') ? _gardenLiquorValue() : 0;
-      const cal = tgt.researchCost.ammoCal;
-      const ammoIcon = (typeof AMMO_ICON_BY_CAL !== 'undefined' && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : '545.png';
       const _fAmmo = fmtNum(ammo);
       const _fAmmoMax = fmtNum(tgt.researchCost.ammoCount);
       const _fLiq = fmtNum(liq);
       const _fLiqMax = fmtNum(tgt.researchCost.liquor);
       h += '<div class="garage-req-row">';
-      h += '<span class="' + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + '"><img src="icons/items/' + ammoIcon + assetSuffix() + '" class="req-icon" alt=""> ' + _fAmmo + '/' + _fAmmoMax + '</span>';
+      h += '<span class="' + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + '"><img src="icons/items/545.png' + assetSuffix() + '" class="req-icon" alt=""> ' + _fAmmo + '/' + _fAmmoMax + '</span>';
       h += '<span class="' + (liq >= tgt.researchCost.liquor ? 'ok' : 'bad') + '"><img src="icons/garden/liquor.png' + assetSuffix() + '" class="req-icon" alt=""> ' + _fLiq + '/' + _fLiqMax + '</span>';
       h += '</div>';
     }
@@ -836,11 +834,9 @@ function _garageShowTechDetail(vid){
     const need = v.researchCost.exp;
     const expDone = prog >= need;
     const canBuy = expDone && ammo >= v.researchCost.ammoCount && liq >= v.researchCost.liquor;
-    const cal = v.researchCost.ammoCal;
-    const ammoIcon = (typeof AMMO_ICON_BY_CAL !== 'undefined' && AMMO_ICON_BY_CAL[cal]) ? AMMO_ICON_BY_CAL[cal] : '545.png';
     const isTarget = (g.researchTarget === vid);
     body += '<div class="garage-tech-detail-col-title">研發需求</div>';
-    body += '<div class="tech-detail-row"><span class="k"><img src="icons/items/' + ammoIcon + assetSuffix() + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
+    body += '<div class="tech-detail-row"><span class="k"><img src="icons/items/545.png' + assetSuffix() + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
     body += '<div class="tech-detail-row"><span class="k"><img src="icons/garden/liquor.png' + assetSuffix() + '" class="req-icon" alt=""> 私酒</span><span class="v ' + (liq >= v.researchCost.liquor ? 'ok' : 'bad') + '">' + Math.floor(liq) + '/' + v.researchCost.liquor + '</span></div>';
     body += '<div class="tech-detail-row"><span class="k">經驗</span><span class="v ' + (expDone ? 'ok' : 'bad') + '">' + prog + '/' + need + '</span></div>';
     body += '<div class="tech-detail-btn-col">';

@@ -158,7 +158,24 @@ function _stNormG(p){
 }
 
 function _stPrune(s){
-  if(!s || !Array.isArray(s.passengers)) return;
+  if(!s) return;
+  
+  // 清理車組
+  if(s.crew){
+    for(const r of _ST_CREW_ROLES){
+      const sid = s.crew[r];
+      if(sid){
+        let found = false;
+        for(let j = 0; j < state.servants.length; j++){
+          if(state.servants[j].id === sid){ found = true; break; }
+        }
+        if(!found) s.crew[r] = null;
+      }
+    }
+  }
+
+  // 清理載員
+  if(!Array.isArray(s.passengers)) return;
   const v = [];
   for(let i = 0; i < s.passengers.length; i++){
     const p = s.passengers[i];
@@ -684,7 +701,15 @@ function _stOpenMainAmmoPicker(vid, wid, onClose){
 
 function _stCrewDetail(role, srvId){
   const srv = state.servants.find(function(x){ return x.id === srvId; });
-  if(!srv) return;
+  if(!srv){
+    const s = _stInit();
+    s.crew[role] = null;
+    if(typeof save === 'function') save();
+    if(typeof closeModal === 'function') closeModal();
+    if(typeof _stRefresh === 'function') _stRefresh();
+    if(typeof notify === 'function') notify('該僕人已不存在');
+    return;
+  }
   const td = SERVANT_TYPES[srv.type] || { name: '?' };
   const tal = (typeof getServantTalents === 'function') ? getServantTalents(srv) : [];
   const maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
