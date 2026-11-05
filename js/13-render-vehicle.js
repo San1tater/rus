@@ -770,11 +770,11 @@ const MUZZLE_PROFILES = {
   '2a72':  { burst: 8, intervalMs: 300,   pauseMs: 600,   flashSize: 32, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
   '2a42':  { burst: 8, intervalMs: 150,   pauseMs: 600,   flashSize: 34, flashColor: '255,180,60',  bulletSize: 4.5, bulletSpeed: 400, projectileType: 'bullet' },
   '2a72_fast': { burst: 8, intervalMs: 150, pauseMs: 600, flashSize: 32, flashColor: '255,180,60', bulletSize: 4.5, bulletSpeed: 380, projectileType: 'bullet' },
-  '2a46':  { burst: 1,  intervalMs: 2500,  pauseMs: 1500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
-  '2a46m1':{ burst: 1,  intervalMs: 2500,  pauseMs: 1500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
+  '2a46':  { burst: 1,  intervalMs: 2500,  pauseMs: 6500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
+  '2a46m1':{ burst: 1,  intervalMs: 2500,  pauseMs: 6500,  flashSize: 40, flashColor: '255,140,60',  bulletSize: 6,   bulletSpeed: 300, projectileType: 'bullet' },
   atgm:    { burst: 1,  intervalMs: 20000, pauseMs: 20000, flashSize: 30, flashColor: '255,200,100', bulletSize: 5,   bulletSpeed: 280, projectileType: 'missile' },
   '2a28':  { burst: 1,  intervalMs: 2500,  pauseMs: 1500,  flashSize: 36, flashColor: '255,150,60',  bulletSize: 5.5, bulletSpeed: 320, projectileType: 'bullet' },
-  '2a70':  { burst: 1,  intervalMs: 2500,  pauseMs: 1500,  flashSize: 38, flashColor: '255,145,60',  bulletSize: 5.5, bulletSpeed: 310, projectileType: 'bullet' },
+  '2a70':  { burst: 1,  intervalMs: 2500,  pauseMs: 4000,  flashSize: 38, flashColor: '255,145,60',  bulletSize: 5.5, bulletSpeed: 310, projectileType: 'bullet' },
   default: { burst: 3,  intervalMs: 100,   pauseMs: 300,   flashSize: 22, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' }
 };
 
