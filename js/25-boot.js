@@ -343,6 +343,7 @@ function _offlineExploreSettle(now, baseTime){
     return Math.max(1, _hp * 0.8 + _ar * 1.5 + _dmg * 3);
   };
   var wins = 0, losses = 0;
+  var offlineServantGained = null;
   var allLoot = {};
   var searchCount = 0;
   var emptyCount = 0;
@@ -375,6 +376,11 @@ function _offlineExploreSettle(now, baseTime){
       if(winRate > 0.95) winRate = 0.95;
       if(Math.random() < winRate){
         wins++;
+        // 離線 1% 機率掉落僕人
+        if(Math.random() < 0.01 && typeof grantRandomServant === 'function'){
+          var _srv = grantRandomServant();
+          if(_srv && !offlineServantGained) offlineServantGained = _srv;
+        }
         for(var ei2 = 0; ei2 < eventEnemies.length; ei2++){
           var loot = (typeof rollEnemyLoot === 'function') ? rollEnemyLoot(eventEnemies[ei2]) : [];
           _lootAdd(loot);
@@ -413,7 +419,8 @@ function _offlineExploreSettle(now, baseTime){
     searchCount: searchCount,
     emptyCount: emptyCount,
     items: items,
-    exp: exp
+    exp: exp,
+    servant: offlineServantGained
   };
 }
 
@@ -455,6 +462,10 @@ function offlineSettle(){
       _ep.push('獲 ' + _cnt + ' 件');
     }
     if(exploreResult.exp > 0) _ep.push('經驗 +' + exploreResult.exp);
+    if(exploreResult.servant){
+      var _sdef = (typeof SERVANT_TYPES !== 'undefined' && SERVANT_TYPES[exploreResult.servant.type]) ? SERVANT_TYPES[exploreResult.servant.type] : null;
+      _ep.push('招募了 <b class="r-' + exploreResult.servant.rarity + '">' + (_sdef ? _sdef.name : '僕人') + '</b>');
+    }
     if(_ep.length) summary += ' ' + exploreResult.region + '：' + _ep.join(' · ') + '。';
   }
   if(overtime) summary += '（超過 8 小時，已進入休息模式）';
