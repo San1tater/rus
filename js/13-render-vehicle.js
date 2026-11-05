@@ -763,6 +763,14 @@ const BTR_TIMELINE = {
 };
 const PHASE_ORDER = ['enter', 'arrive', 'sink', 'center', 'support', 'lift', 'exit', 'leave'];
 
+/* rev-fix-magazine: 僅機槍的彈箱容量與換彈延遲 */
+/* 容量對齊 VEHICLE_LOADOUT perBelt：pkt 250 / nsvt 100 / kpvt 50 */
+const VEHICLE_MACHINE_GUN_MAGAZINE = {
+  'pkt':  { capacity: 250, reloadTime: 30 },
+  'nsvt': { capacity: 100, reloadTime: 20 },
+  'kpvt': { capacity: 50,  reloadTime: 10 }
+};
+
 const MUZZLE_PROFILES = {
   kpvt:    { burst: 5,  intervalMs: 100,   pauseMs: 300,   flashSize: 26, flashColor: '255,200,80',  bulletSize: 3.5, bulletSpeed: 450, projectileType: 'bullet' },
   pkt:     { burst: 5,  intervalMs: 80,    pauseMs: 300,   flashSize: 22, flashColor: '255,220,120', bulletSize: 3,   bulletSpeed: 480, projectileType: 'bullet' },
@@ -916,8 +924,10 @@ const BTRSupport = {
       const _sg = (m.weaponId === 'atgm' || m.weaponId === 'nsvt') ? null : 'main';
       const _profileKey = (m.weaponId === '2a72' && !pid) ? '2a72_fast' : m.weaponId;
       const _prof = MUZZLE_PROFILES[_profileKey] || MUZZLE_PROFILES.default;
+      const _mgDef = VEHICLE_MACHINE_GUN_MAGAZINE[m.weaponId] || null;
       this.muzzles.push({
         weaponId: m.weaponId,
+        magazine: _mgDef ? { current: _mgDef.capacity, capacity: _mgDef.capacity, reloadTime: _mgDef.reloadTime } : null,
         mx: m.x, my: m.y,
         angle: m.angle,
         layerOrder: m.layerOrder || 'above',
@@ -1245,6 +1255,11 @@ const BTRSupport = {
   },
 
   _fireMuzzle(m, now){
+    /* rev-fix-magazine: 換彈結束後補滿下一箱 */
+    if(m.magazine && m.magazine.current <= 0){
+      m.magazine.current = m.magazine.capacity;
+      m._reloading = false;
+    }
     if(typeof window._vehicleWeaponsDead === 'function' && window._vehicleWeaponsDead()){
       m.nextFireAt = now + 500;
       m._preselectedTarget = null;
@@ -1341,6 +1356,17 @@ const BTRSupport = {
     m.shotsLeft--;
     if(m.shotsLeft <= 0){ m.shotsLeft = m.profile.burst; m.nextFireAt = now + m.profile.pauseMs; }
     else { m.nextFireAt = now + m.profile.intervalMs; }
+
+    /* rev-fix-magazine: 機槍扣彈箱；打空則進入換彈延遲，覆蓋 nextFireAt */
+    if(m.magazine){
+      m.magazine.current -= 1;
+      if(m.magazine.current <= 0){
+        m.magazine.current = 0;
+        m.nextFireAt = now + m.magazine.reloadTime * 1000;
+        m.shotsLeft = m.profile.burst;
+        m._reloading = true;
+      }
+    }
 
     if(!this.recoilStates) this.recoilStates = {};
     let rcDist = 0, rcDur = 500;

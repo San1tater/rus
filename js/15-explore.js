@@ -832,7 +832,10 @@ function _startCombat(ev, first){
     allies: allies,
     enemies: enemies,
       onVictoryStart: function(){
-      if(!isV){
+      /* rev-fix-corpses: 下車後 sceneType 已變 foot，即使 isV 仍為 true 也要轉移屍體 */
+      const _cNow = window._combat;
+      const _isFootNow = !!(_cNow && _cNow.sceneType === 'foot');
+      if(!isV || _isFootNow){
         const _curOffs = enemies.map(function(e){ return e.worldX; });
         _startCorpses(enemies, _curOffs);
       }
