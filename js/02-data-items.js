@@ -190,7 +190,7 @@ const WEAPON_MOD_RULES={
   ak74n:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},ak74m:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},
   akm:{mags:[45,75],scopes:[]},akms:{mags:[45,75],scopes:[]},akmn:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},
   ak103:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},ak104:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},
-  ak105:{mags:[45,60],scopes:['1P87','PSO-1']},ak12:{mags:[45,60,95],scopes:['1P87','PSO-1']},
+  ak105:{mags:[60,95],scopes:['1P87','PSO-1']},ak12:{mags:[45,60,95],scopes:['1P87','PSO-1']},
   asval:{mags:[30],scopes:['PSO-1','1P87']},'9a91':{mags:[],scopes:['PSO-1']},sr3m:{mags:[],scopes:['1P87']},
   vss:{mags:[20,30],scopes:['PSO-1']},svd:{mags:[15,20],scopes:['PSO-1']},sv98:{mags:[],scopes:['1P59']},
   rpk16:{mags:[95],scopes:['1P87','PSO-1']},rpd:{mags:[],scopes:[]},

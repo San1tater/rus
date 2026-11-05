@@ -476,48 +476,48 @@ if(typeof window.fmtItemSpan === "undefined"){
 }
 
 /* 兜底：buildingTick（缺失補丁，完整版） */
-if(typeof window.buildingTick === "undefined"){
-  window.buildingTick = function(){
-    var now = Date.now();
-    var genLv = getBuildingLv("generator");
-    var genMult = 1 + genLv * 0.2;
-    var radioLv = getBuildingLv("radio");
-    if(radioLv > 0){
-      var rLast = state.radioLastTick || 0;
-      var rInt = 5 * 60 * 1000 / genMult;
-      if(now - rLast > rInt){
-        state.radioLastTick = now;
-        var mats = ["wood","metal","screws","cloth","gears","electronics"];
+window.buildingTick = function(){
+  var now = Date.now();
+  var genLv = getBuildingLv("generator");
+  var genMult = 1 + genLv * 0.2;
+  var radioLv = getBuildingLv("radio");
+  if(radioLv > 0){
+    var rLast = state.radioLastTick || 0;
+    var rInt = 5 * 60 * 1000 / genMult;
+    if(now - rLast >= rInt){
+      var times = Math.floor((now - rLast) / rInt);
+      var mats = ["wood","metal","screws","cloth","gears","electronics"];
+      for(var i=0; i<times; i++){
         var m = pick(mats);
         var cnt = rndInt(3, 8) * radioLv;
         invAdd(m, "一般", cnt);
       }
+      state.radioLastTick = rLast + times * rInt;
     }
-    var armoryLv = getBuildingLv("armory");
-    if(armoryLv > 0){
-      var aLast = state.armoryLastTick || 0;
-      var aInt = 3 * 60 * 1000 / genMult;
-      if(now - aLast > aInt){
-        state.armoryLastTick = now;
-        var tRar = "一般";
-        if(armoryLv <= 10) tRar = "破舊";
-        else if(armoryLv <= 20) tRar = "一般";
-        else if(armoryLv <= 35) tRar = "庫存";
-        else tRar = "精品";
-        var _ti = RARITY_ORDER.indexOf(tRar);
-        var pw = equippedWeapon("primary");
-        var sw = equippedWeapon("secondary");
-        var cals = [];
-        if(pw && pw.def.cal) cals.push(pw.def.cal);
-        if(sw && sw.def.cal && (!pw || sw.def.cal !== pw.def.cal)) cals.push(sw.def.cal);
-        if(!cals.length) cals.push("9x19");
-        for(var ci = 0; ci < cals.length; ci++){
+  }
+  var armoryLv = getBuildingLv("armory");
+  if(armoryLv > 0){
+    var aLast = state.armoryLastTick || 0;
+    var aInt = 3 * 60 * 1000 / genMult;
+    if(now - aLast >= aInt){
+      var times = Math.floor((now - aLast) / aInt);
+      var tRar = "一般";
+      if(armoryLv <= 10) tRar = "破舊"; else if(armoryLv <= 20) tRar = "一般"; else if(armoryLv <= 35) tRar = "庫存"; else tRar = "精品";
+      var _ti = RARITY_ORDER.indexOf(tRar);
+      var pw = equippedWeapon("primary");
+      var sw = equippedWeapon("secondary");
+      var cals = [];
+      if(pw && pw.def.cal) cals.push(pw.def.cal);
+      if(sw && sw.def.cal && (!pw || sw.def.cal !== pw.def.cal)) cals.push(sw.def.cal);
+      if(!cals.length) cals.push("9x19");
+      for(var t=0; t<times; t++){
+        for(var ci=0; ci<cals.length; ci++){
           var cal = cals[ci];
           var ammos = Object.keys(AMMO).filter(function(k){ return AMMO[k].cal === cal; });
           if(!ammos.length) continue;
           var cands = [];
           var minD = 999;
-          for(var ai = 0; ai < ammos.length; ai++){
+          for(var ai=0; ai<ammos.length; ai++){
             var aIdx = RARITY_ORDER.indexOf(AMMO[ammos[ai]].rarity);
             if(aIdx < 0) continue;
             var dd = Math.abs(aIdx - _ti);
@@ -531,13 +531,14 @@ if(typeof window.buildingTick === "undefined"){
           }
         }
       }
+      state.armoryLastTick = aLast + times * aInt;
     }
-    if(typeof processCrafting === "function"){ try{ processCrafting(); }catch(e){} }
-    if(typeof _gardenMealTick === "function"){ try{ _gardenMealTick(now); }catch(e){} }
-    if(typeof _gardenFarmBackgroundTick === "function"){ try{ _gardenFarmBackgroundTick(now); }catch(e){} }
-    if(typeof _gardenStorageRotCheck === "function"){ try{ _gardenStorageRotCheck(); }catch(e){} }
-  };
-}
+  }
+  if(typeof processCrafting === "function") processCrafting();
+  if(typeof _gardenMealTick === "function"){ try{ _gardenMealTick(now); }catch(e){} }
+  if(typeof _gardenFarmBackgroundTick === "function"){ try{ _gardenFarmBackgroundTick(now); }catch(e){} }
+  if(typeof _gardenStorageRotCheck === "function"){ try{ _gardenStorageRotCheck(); }catch(e){} }
+};
 
 
 /* 補丁 v5：_calcSpeedDisplay 覆蓋（arrive/sink/center/support/lift/exit 都顯示載具速度） */
@@ -560,3 +561,104 @@ window._calcSpeedDisplay = function(){
   var _extra = Math.max(0, w - _free);
   return 1.4 / (1 + _extra * _pen);
 };
+
+/* [Patch] 補全工作台改造結算 */
+function processCrafting(){
+  if(!state.crafting || !state.crafting.length) return;
+  const now = Date.now();
+  const genLv = (typeof getBuildingLv === 'function') ? getBuildingLv('generator') : 0;
+  const sm = 1 + genLv * 0.2;
+  for(let i = state.crafting.length - 1; i >= 0; i--){
+    const c = state.crafting[i];
+    if(c.type === 'mod'){
+      const t = c.time * 1000 / sm;
+      if(now - c.startTime >= t){
+        const info = c.modInfo;
+        const namedId = getOrCreateNamedItem(info.baseId, info.mag, info.scope);
+        if(info.fromEquippedSlot){
+          if(!state.player.equipped[info.fromEquippedSlot]){
+            state.player.equipped[info.fromEquippedSlot] = namedId;
+            state.player.equippedRarity[info.fromEquippedSlot] = '具名';
+          } else {
+            invAddRaw(namedId, '具名', 1);
+            pushLog('<span class="pl">系統</span> 改造完成：<b class="r-具名">' + itemDef(namedId).name + '</b> 已放入背包（原槽位已被佔用）。', [], 'explore');
+          }
+        } else {
+          if(info.originalId) invRemove(info.originalId, info.originalRarity, 1);
+          invAddRaw(namedId, '具名', 1);
+        }
+        pushLog('<span class="pl">玩家</span> 完成改造：<b class="r-具名">' + itemDef(namedId).name + '</b>。', [], 'explore');
+        state.crafting.splice(i, 1);
+        if (typeof addProf === 'function') addProf('craft', 1);
+        if (typeof refreshPlayerStats === 'function') refreshPlayerStats();
+        if (typeof save === 'function') save();
+      }
+    }
+  }
+}
+
+/* [Patch] 補全離線建築產出 */
+function _offlineBuildingSettle(now, baseTime){
+  const genLv = getBuildingLv('generator');
+  const genMult = 1 + genLv * 0.2;
+  let radioCount = 0;
+  let armoryCount = 0;
+
+  const radioLv = getBuildingLv('radio');
+  if(radioLv > 0){
+    const interval = 5 * 60 * 1000 / genMult;
+    const last = Math.max(state.radioLastTick || 0, baseTime);
+    if(now - last >= interval){
+      const times = Math.floor((now - last) / interval);
+      const mats = ['wood','metal','screws','cloth','gears','electronics'];
+      for(let i = 0; i < times; i++){
+        const m = pick(mats);
+        const cnt = rndInt(3, 8) * radioLv;
+        invAdd(m, '一般', cnt);
+      }
+      radioCount = times;
+      state.radioLastTick = last + times * interval;
+    }
+  }
+
+  const armoryLv = getBuildingLv('armory');
+  if(armoryLv > 0){
+    const interval = 3 * 60 * 1000 / genMult;
+    const last = Math.max(state.armoryLastTick || 0, baseTime);
+    if(now - last >= interval){
+      const times = Math.floor((now - last) / interval);
+      let targetRarity = '一般';
+      if(armoryLv<=10)targetRarity='破舊'; else if(armoryLv<=20)targetRarity='一般'; else if(armoryLv<=35)targetRarity='庫存'; else targetRarity='精品';
+      const _targetIdx = RARITY_ORDER.indexOf(targetRarity);
+      const pw = equippedWeapon('primary'), sw = equippedWeapon('secondary');
+      const cals = [];
+      if(pw && pw.def.cal) cals.push(pw.def.cal);
+      if(sw && sw.def.cal && (!pw || sw.def.cal !== pw.def.cal)) cals.push(sw.def.cal);
+      if(!cals.length) cals.push('9x19');
+      for(let i = 0; i < times; i++){
+        for(const cal of cals){
+          const ammos = Object.keys(AMMO).filter(k => AMMO[k].cal === cal);
+          if(!ammos.length) continue;
+          const _cands = [];
+          let _minDiff = 999;
+          for(const a of ammos){
+            const aIdx = RARITY_ORDER.indexOf(AMMO[a].rarity);
+            if(aIdx < 0) continue;
+            const d = Math.abs(aIdx - _targetIdx);
+            if(d < _minDiff){ _minDiff = d; _cands.length = 0; _cands.push(a); }
+            else if(d === _minDiff){ _cands.push(a); }
+          }
+          if(_cands.length){
+            const chosen = _cands[0];
+            const cnt = rndInt(5, 10) * Math.max(1, Math.ceil(armoryLv / 5));
+            invAdd(chosen, AMMO[chosen].rarity, cnt);
+          }
+        }
+      }
+      armoryCount = times;
+      state.armoryLastTick = last + times * interval;
+    }
+  }
+  processCrafting();
+  return { radioCount, armoryCount };
+}

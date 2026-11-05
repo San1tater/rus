@@ -4367,3 +4367,78 @@ function _removeFromStation(srvId){
 /* === _refreshServantListNow（指派/撤回/改名後實時刷新僕人列表） === */
 /* === _gardenFoodTtlMs（冰箱加成：24h → 48h） === */
 /* === _gardenStorageRotCheck（作物腐爛 → 堆肥/種子；種子 48h 過期） === */
+
+/* [Patch] 補全缺失的僕人與天賦系統 */
+window.grantRandomServant = function(){
+  const allTypes = Object.keys(SERVANT_TYPES);
+  const types = allTypes.filter(function(t){
+    if(t === 'foreman') return _gardenHasPlotType('shed');
+    return true;
+  });
+  if(!types.length) return null;
+  const type = pick(types);
+  const rarity = rollRarity();
+  const id = 's_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+  if(!state.garden) state.garden = {};
+  if(typeof state.garden.nextServantTag !== 'number') state.garden.nextServantTag = 1;
+  const _tag = state.garden.nextServantTag++;
+  const srv = {
+    id: id, type: type, rarity: rarity, lv: 1, exp: 0,
+    assignedPlots: [], autoPlant: 'off',
+    foodPolicy: 'normal', resting: false,
+    obtainedAt: Date.now(), tag: _tag, customName: '', talents: []
+  };
+  srv.stamina = (typeof servantEffectiveMaxStamina === 'function') ? servantEffectiveMaxStamina(srv) : 100;
+  state.servants = state.servants || [];
+  state.servants.push(srv);
+  return srv;
+};
+function grantRandomServant(){ return window.grantRandomServant(); }
+
+function _gardenServantLeaveCheck(silent){
+  const now = Date.now();
+  const leaving = [];
+  state.servants = (state.servants || []).filter(function(s){
+    if(s.lv > 1 || (s.exp || 0) > 0 || (s.assignedPlots && s.assignedPlots.length > 0)) return true;
+    const grace = SERVANT_LEAVE_GRACE[s.rarity] || 24 * 3600 * 1000;
+    if(now - (s.obtainedAt || now) < grace) return true;
+    leaving.push(s);
+    return false;
+  });
+  const seedReward = {}, matReward = {};
+  if(!leaving.length) return { count: 0, seeds: seedReward, mats: matReward };
+  const seedNames = Object.keys(SEEDS);
+  const matNames = ['wood','metal','screws','cloth','gears','electronics'];
+  for(const s of leaving){
+    const r = SERVANT_LEAVE_REWARD[s.rarity] || SERVANT_LEAVE_REWARD['一般'];
+    const sc = rndInt(r.seedMin, r.seedMax);
+    for(let i = 0; i < sc; i++){
+      const sid = pick(seedNames);
+      gardenStorageAdd(sid, s.rarity, 1);
+      seedReward[sid+'@'+s.rarity] = (seedReward[sid+'@'+s.rarity] || 0) + 1;
+    }
+    const mc = rndInt(r.matMin, r.matMax);
+    for(let i = 0; i < mc; i++){
+      const mid = pick(matNames);
+      invAdd(mid, '一般', 1);
+      matReward[mid] = (matReward[mid] || 0) + 1;
+    }
+  }
+  if(!silent) _gardenLog(leaving.length + ' 僕人離開', 'leave');
+  return { count: leaving.length, seeds: seedReward, mats: matReward };
+}
+
+window.getServantTalents = function(srv){ return srv && Array.isArray(srv.talents) ? srv.talents : []; };
+function getServantTalents(srv){ return window.getServantTalents(srv); }
+function awakenTalent(srv){
+  if(!srv || !Array.isArray(srv.talents) || typeof TALENT_DEFS === 'undefined') return null;
+  if(Math.random() >= TALENT_AWAKEN_RATE) return null;
+  // 加入排重機制，過濾掉已擁有的天賦
+  var pool = Object.keys(TALENT_DEFS).filter(function(t){ return srv.talents.indexOf(t) === -1; });
+  if(pool.length > 0) {
+    var k = pick(pool);
+    srv.talents.push(k);
+    return k;
+  }
+  return null;
+}

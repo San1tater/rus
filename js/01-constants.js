@@ -68,7 +68,7 @@ const TALENT_DEFS = {
   commander_sense: {kind:'crew',role:'commander',name:'車長直覺',desc:'索敵 +15%'},
   driver_instinct: {kind:'crew',role:'driver',name:'駕駛本能',desc:'速度 +10%，履帶損傷 -20%'},
   strongman: {kind:'passenger',name:'大力士',desc:'負重 +6kg'},
-  bombardier: {kind:'passenger',name:'投彈手',desc:'手榴彈欄位 3→5'},
+  bombardier: {kind:'passenger',name:'投彈手',desc:'手榴彈欄位 1→3'},
   ammo_handler: {kind:'passenger',name:'彈藥手',desc:'主武器欄可放彈藥箱'}
 };
 
