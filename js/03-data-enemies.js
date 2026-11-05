@@ -98,7 +98,7 @@ function generateEnemyInstance(e,t){
     var w = pickEnemyWeapon(e, rarity, t);
     var wd = WEAPONS[w];
     if(wd){
-      var ai = getDefaultAmmo(wd.cal);
+      var ai = getAmmoByRarity(wd.cal, rarity) || getDefaultAmmo(wd.cal);
       primaryWeapon = {
         id: w, rarity: rarity, ammoId: ai, ammoCount: rndInt(30,60),
         dmg: _getAmmoDmg(ai), penMM: _getAmmoPenMM(ai)
@@ -108,7 +108,7 @@ function generateEnemyInstance(e,t){
     var w2 = pickEnemyWeapon(e, rarity, t);
     var wd2 = WEAPONS[w2];
     if(wd2){
-      var ai2 = getDefaultAmmo(wd2.cal);
+      var ai2 = getAmmoByRarity(wd2.cal, rarity) || getDefaultAmmo(wd2.cal);
       if(wd2.slot === 'secondary'){
         secondaryWeapon = {
           id: w2, rarity: rarity, ammoId: ai2, ammoCount: rndInt(30,60),
@@ -123,7 +123,7 @@ function generateEnemyInstance(e,t){
           var pi = pick(PISTOL_POOL);
           var pd = WEAPONS[pi];
           if(pd){
-            var pai = getDefaultAmmo(pd.cal);
+            var pai = getAmmoByRarity(pd.cal, rarity) || getDefaultAmmo(pd.cal);
             secondaryWeapon = {
               id: pi, rarity: rarity, ammoId: pai, ammoCount: rndInt(30,60),
               dmg: _getAmmoDmg(pai), penMM: _getAmmoPenMM(pai)

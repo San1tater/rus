@@ -341,6 +341,29 @@ function hasVariableRarity(id){const d=ALL_ITEMS[id];if(d&&d.named)return false;
 function rollRarity(){const r=Math.random();if(r<0.35)return '破舊';if(r<0.65)return '一般';if(r<0.85)return '庫存';if(r<0.97)return '精品';return '傳奇';}
 function isFixedItem(id){const d=ARMOR[id];return d&&d.fixed===true;}
 function getDefaultAmmo(cal){for(const k in AMMO){if(AMMO[k].cal===cal&&AMMO[k].rarity==='一般')return k;}for(const k in AMMO){if(AMMO[k].cal===cal)return k;}return null;}
+function getAmmoByRarity(cal, targetRarity){
+  if(!cal) return null;
+  var tIdx = RARITY_ORDER.indexOf(targetRarity);
+  if(tIdx < 0) return getDefaultAmmo(cal);
+  var best = null, bestDiff = 999;
+  for(const k in AMMO){
+    if(AMMO[k].cal !== cal) continue;
+    var dIdx = RARITY_ORDER.indexOf(AMMO[k].rarity);
+    if(dIdx < 0 || dIdx < tIdx) continue;
+    var diff = dIdx - tIdx;
+    if(diff === 0) return k;
+    if(diff < bestDiff){ best = k; bestDiff = diff; }
+  }
+  if(best) return best;
+  var bestIdx2 = -1;
+  for(const k in AMMO){
+    if(AMMO[k].cal !== cal) continue;
+    var dIdx2 = RARITY_ORDER.indexOf(AMMO[k].rarity);
+    if(dIdx2 < 0) continue;
+    if(dIdx2 > bestIdx2){ best = k; bestIdx2 = dIdx2; }
+  }
+  return best;
+}
 function getMeleeHits(rpm){return Math.max(1,Math.round((rpm||60)*MELEE_DURATION/60));}
 
 function namedWeaponName(baseId,mag,scope){

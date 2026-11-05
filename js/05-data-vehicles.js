@@ -130,7 +130,7 @@ const VEHICLES = {
     weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
     armorGrid:['40/30/20','23/20/15','—'],
     speedFwd:70, speedRev:20, speedRoad:70, speedOffroad:'45-50',
-    supportDuration:42, next:[],
+    supportDuration:48, next:[],
     researchCost:{ ammoCal:'7.62x54', ammoCount:3000, liquor:3000, exp:15000 }
   }
 };

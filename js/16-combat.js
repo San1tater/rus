@@ -844,9 +844,15 @@ function _enemyFire(e, now){
 
   if(!hit) return;
 
-  const _baseDmg = w.dmg != null ? w.dmg : (e.dmg != null ? e.dmg : 10);
-  const dmg = (typeof rndInt === 'function') ? rndInt(_baseDmg - 5, _baseDmg + 5) : _baseDmg;
-  const penMM = (AMMO[w.ammoId] && AMMO[w.ammoId].penMM) || e.penMM || 0;
+  const _ammoDef = (typeof AMMO !== 'undefined' && w.ammoId) ? AMMO[w.ammoId] : null;
+  const _wRar = w.rarity || e.rarity || '一般';
+  const _aRar = _ammoDef ? (_ammoDef.rarity || '一般') : _wRar;
+  const _rawAmmoDmg = _ammoDef ? _ammoDef.dmg : (w.dmg != null ? w.dmg : (e.dmg != null ? e.dmg : 10));
+  const penMM = _ammoDef ? (_ammoDef.penMM || 0) : (e.penMM || 0);
+  const _eCritRate = (typeof calcCritRate === 'function') ? calcCritRate(_wRar, _aRar) : 0.1;
+  const _eCritMult = (typeof calcCritMult === 'function') ? calcCritMult(_wRar, _aRar) : 1.5;
+  const _isECrit = Math.random() < _eCritRate;
+  const dmg = Math.round(_rawAmmoDmg * (_isECrit ? _eCritMult : 1));
 
   if(p.isVehicle){
     if(typeof window._vHitVehicle === 'function'){
@@ -867,7 +873,7 @@ function _enemyFire(e, now){
     state.player.hp = p.hp;
     state.player.armor = p.armor;
     _playHurt(now);
-    _float(p, '-' + (res.hpLost + res.armorLost), '');
+    _float(p, '-' + (res.hpLost + res.armorLost) + (_isECrit ? '!' : ''), _isECrit ? 'crit' : '');
     return;
   }
 
@@ -889,7 +895,7 @@ function _enemyFire(e, now){
         pushLog('<span class="lose">' + _eNameD + '</span> 用 <span class="' + _wClsD + '">' + _wNameD + '</span> 擊倒 <b class="' + ((p.srv && typeof rarityClass === 'function') ? rarityClass(p.srv.rarity) : '') + '">' + (typeof servantLabel === 'function' ? servantLabel(p.srv) : '載員') + '</b>', [], 'explore');
       }
     }
-    _float(p, '-' + res.hpLost, '');
+    _float(p, '-' + res.hpLost + (_isECrit ? '!' : ''), _isECrit ? 'crit' : '');
   }
 }
 

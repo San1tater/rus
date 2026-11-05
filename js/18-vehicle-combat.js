@@ -578,18 +578,17 @@ window._vHitVehicle = function(veh, dmg, penMM, ammoId, attackerName, weaponName
   const isHeat = _vIsHeatAmmo(ammoId);
   armorMM += _vGetEraBonus(vid, isHeat);
 
+  /* 載具無護甲池：diff <= 0 直接 0，diff > 0 按剩餘穿深/原穿深 */
   const _diff = penMM - armorMM;
-  if(_diff < 0){
+  if(_diff <= 0){
     if(typeof _vehicleCombatFloat === 'function'){
-      _vehicleCombatFloat(0, '跳彈', 'armor');
+      _vehicleCombatFloat(0, _diff === 0 ? '磨穿' : '跳彈', 'armor');
     }
     return { penetrated: false, damage: 0 };
   }
-  /* 剩餘穿深衰減：與 applyDamage 一致 */
-  const _reduction = 0.5 * Math.pow(0.01, _diff / 7);
-  dmg = Math.max(1, Math.round(dmg * (1 - _reduction)));
+  dmg = Math.max(1, Math.round(dmg * (_diff / penMM)));
 
-  const key = _vPickInternalKey(vid);
+const key = _vPickInternalKey(vid);
   d.lastHit = { part: part.key, internal: key, dmg: dmg };
 
   if(key === 'ammoRack'){

@@ -106,13 +106,14 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
       dmg = fromU.dmg || 10;
     }
     const tgt = { hp: toU.hp, armor: toU.armor };
-    const pen = fromU.isGuard ? (fromU.ammoId && AMMO[fromU.ammoId] ? (AMMO[fromU.ammoId].pen || 0) : (fromU.weaponDef.pen || 0)) : (fromU.pen || 0);
+    const pen = fromU.isGuard ? (fromU.ammoId && AMMO[fromU.ammoId] ? (AMMO[fromU.ammoId].penMM || 0) : (fromU.weaponDef.penMM || 0)) : (fromU.pen || 0);
     const res = applyDamage(tgt, dmg, pen, toU.armorLevel || 0);
     toU.hp = tgt.hp; toU.armor = tgt.armor;
     const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
     fromU.dmgDone = (fromU.dmgDone || 0) + shown;
     if(fromU.isGuard && fromU.srv) servantAddExp(fromU.srv, 2);
-    if(toU.hp <= 0) toU.alive = false;
+      if(fromU.isGuard && fromU.ammoId && shown === 0) fromU._stopFire = true;
+      if(toU.hp <= 0) toU.alive = false;
   }
   let round = 0;
   const maxRounds = 30;
@@ -1085,7 +1086,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
         x: wrapW + 120, targetX: _colX, targetY: _y, slideIn: true,
         y: _y,
         hp: e.maxHp, maxHp: e.maxHp,
-        armor: 0, maxArmor: 0,
+        armor: e.armor || 0, maxArmor: e.maxArmor || 0,
         alive: true, isGuard: false,
         state: 'combat',
         weaponId: 'ak74',
@@ -1266,7 +1267,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
         return;
       }
       const tgt = { hp: toU.hp, armor: toU.armor };
-      const pen = b.fromU.isGuard ? (b.fromU.ammoId && AMMO[b.fromU.ammoId] ? (AMMO[b.fromU.ammoId].pen || 0) : (b.fromU.weaponDef.pen || 0)) : (b.fromU.pen || 0);
+      const pen = b.fromU.isGuard ? (b.fromU.ammoId && AMMO[b.fromU.ammoId] ? (AMMO[b.fromU.ammoId].penMM || 0) : (b.fromU.weaponDef.penMM || 0)) : (b.fromU.pen || 0);
       const res = applyDamage(tgt, b.damage, pen, toU.armorLevel || 0);
       toU.hp = tgt.hp; toU.armor = tgt.armor;
       const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;

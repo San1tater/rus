@@ -123,9 +123,8 @@ function applyDamage(target, rawDmg, penetration, armorOpts){
   const diff = pen - armorMMVal;
 
   if(diff >= 0){
-    const reduction = 0.5 * Math.pow(0.01, diff / 7);
     const armorDmg = Math.round(rawDmg);
-    const hpDmg = Math.round(rawDmg * (1 - reduction));
+    const hpDmg = pen > 0 ? Math.round(rawDmg * (diff / pen)) : 0;
     const armorLost = Math.min(pool, armorDmg);
     target.armor = Math.max(0, pool - armorLost);
     target.hp = Math.max(0, Math.round((target.hp || 0) - hpDmg));
