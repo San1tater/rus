@@ -321,11 +321,18 @@ function computeAnimFrame(animName, startAt, now){
 function updateHeroAnim(now){
   const a = GAME_ANIMS[heroAnim.name];
   if(!a) return;
+  const isFire = heroAnim.name === 'fire_primary' || heroAnim.name === 'fire_secondary' || heroAnim.name === 'attack_melee';
+  /* rev-fix-anim-start: fire 動畫基於 animStart 計算幀，確保每發都從 0 開始且正常更新 */
+  if(isFire && typeof heroAnim.animStart === 'number'){
+    const interval = 1000 / a.fps;
+    const elapsed = Math.max(0, now - heroAnim.animStart);
+    heroAnim.frame = Math.min(a.frameCount - 1, Math.floor(elapsed / interval));
+    return;
+  }
   const interval = 1000 / a.fps;
   if(now - heroAnim.lastUpdate >= interval){
     heroAnim.lastUpdate = now;
-    const isFire = heroAnim.name === 'fire_primary' || heroAnim.name === 'fire_secondary' || heroAnim.name === 'attack_melee';
-    if(a.loop || (isFire && now <= (heroAnim.forcedEnd || 0))){
+    if(a.loop){
       heroAnim.frame = (heroAnim.frame + 1) % a.frameCount;
     } else {
       if(heroAnim.frame < a.frameCount - 1){

@@ -248,9 +248,10 @@ function _playFire(now, isPrimary){
   const dur = a ? Math.round((a.frameCount / a.fps) * 1000) : 250;
   c._fireAnim = anim;
   c._playerAnimUntil = now + dur;
+  /* rev-fix-anim-start: 用 animStart 記錄動畫起點，不重置 lastUpdate */
   heroAnim.name = anim;
   heroAnim.frame = 0;
-  heroAnim.lastUpdate = now;
+  heroAnim.animStart = now;
   heroAnim.forcedEnd = now + dur;
 }
 
@@ -262,9 +263,10 @@ function _playMeleeFire(now){
   const dur = a ? Math.round((a.frameCount / a.fps) * 1000) : 600;
   c._fireAnim = anim;
   c._playerAnimUntil = now + dur;
+  /* rev-fix-anim-start: 用 animStart 記錄動畫起點 */
   heroAnim.name = anim;
   heroAnim.frame = 0;
-  heroAnim.lastUpdate = now;
+  heroAnim.animStart = now;
   heroAnim.forcedEnd = now + dur;
 }
 
@@ -555,12 +557,7 @@ function _firePlayer(p, t, now, w){
   const mz = _getPlayerMuzzlePosFoot();
   const sm = c.sm;
   const rel = t.worldX - p.worldX;
-  let tx;
-  if(rel <= sm.screenRightWorld){
-    tx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-  } else {
-    tx = 1.05;
-  }
+  const tx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
 
   const hit = Math.random() * 100 < hr;
   const _tx = hit ? tx : (tx + 0.15);
@@ -714,12 +711,7 @@ function _firePassenger(a, t, now, w){
   if(!mz) return;
 
   const rel = t.worldX - a.worldX;
-  let tx;
-  if(rel <= sm.screenRightWorld){
-    tx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-  } else {
-    tx = 1.05;
-  }
+  const tx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
 
   const hit = Math.random() * 100 < hr;
   const _tx = hit ? tx : (tx + 0.15);
@@ -1198,6 +1190,7 @@ function _render(){
       by += dy * ext;
     }
     
+    if(bx < -10 || bx > W + 10 || by < -10 || by > H + 10) continue;
     const _bulletColor = window._rarityBulletColor(bb.rarity);
     if(bb.missile){
       ctx.save();
