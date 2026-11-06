@@ -2853,6 +2853,17 @@ function _gardenOfflineSettle(now, baseTime){
     }
   }
   g.lastMealAt = Math.floor(now / GARDEN_MEAL_INTERVAL_MS) * GARDEN_MEAL_INTERVAL_MS;
+  /* rev-fix-offline-align-v2: 只在 lastX 落後 > 500 週期（times 會被截斷）時才對齊，避免正常情況額外生產 */
+  const _mAl = g.merchant;
+  if(_mAl){
+    const _baseAl = now - (now % MERCHANT_INTERVAL_MS);
+    const _maxSafe = 500 * MERCHANT_INTERVAL_MS;
+    if(_mAl.foodLv > 0  && (now - _mAl.lastFood)  > _maxSafe) _mAl.lastFood  = _baseAl;
+    if(_mAl.seedLv > 0  && (now - _mAl.lastSeed)  > _maxSafe) _mAl.lastSeed  = _baseAl;
+    if(_mAl.throwLv > 0 && (now - _mAl.lastThrow) > _maxSafe) _mAl.lastThrow = _baseAl;
+    if(_mAl.ammoLv > 0  && (now - _mAl.lastAmmo)  > _maxSafe) _mAl.lastAmmo  = _baseAl;
+  }
+  if(typeof _gardenCompostDecayTick === 'function'){ try { _gardenCompostDecayTick(now); } catch(e){} }
   const _mSeed = Object.keys(merchantAccum.seed).reduce(function(s,k){ return s + merchantAccum.seed[k].count; }, 0);
   const _mThrow = Object.keys(merchantAccum.throw).reduce(function(s,k){ return s + merchantAccum.throw[k].count; }, 0);
   const _mAmmo = Object.keys(merchantAccum.ammo).reduce(function(s,k){ return s + merchantAccum.ammo[k].count; }, 0);
@@ -4303,7 +4314,7 @@ function _gardenTowerPickAmmo(idx, wDef){
   let body = '<div class="item-row" data-amid=""><div class="icon">✕</div><div class="info"><div class="nm">未指定</div><div class="sub">不射擊</div></div></div>';
   for(const a of ammos){
     const d = AMMO[a];
-    body += '<div class="item-row" data-amid="' + a + '"><div class="icon" style="background:' + rarityBg(d.rarity) + '">' + itemIcon(a, 30) + '</div><div class="info"><div class="nm ' + rarityClass(d.rarity) + '">' + d.name + '</div><div class="sub">' + d.rarity + ' · 穿甲 ' + (d.pen||0) + ' · 傷害 ' + (d.dmg||0) + '</div></div></div>';
+    body += '<div class="item-row" data-amid="' + a + '"><div class="icon" style="background:' + rarityBg(d.rarity) + '">' + itemIcon(a, 30) + '</div><div class="info"><div class="nm ' + rarityClass(d.rarity) + '">' + d.name + '</div><div class="sub">' + d.rarity + ' · 穿甲 ' + (d.penMM||0) + ' · 傷害 ' + (d.dmg||0) + '</div></div></div>';
   }
   const bd = openModal({ title: '選擇彈藥', body: body, onClose: function(){ _gardenTowerOpen(idx); } });
   const rows = bd.querySelectorAll('.item-row[data-amid]');

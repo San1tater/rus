@@ -741,17 +741,6 @@ function _trigger(ev){
   }
 }
 
-function _getPW(){
-  let s = null;
-  if(state.player.equipped.primary) s = 'primary';
-  else if(state.player.equipped.secondary) s = 'secondary';
-  else if(state.player.equipped.melee) s = 'melee';
-  if(!s) return null;
-  const id = state.player.equipped[s];
-  const d = itemDef(id);
-  if(!d) return null;
-  return { id: id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d };
-}
 
 function _startCombat(ev, first){
   const ex = window._explore;

@@ -140,6 +140,24 @@ function updatePlayerStatPanel(){
 }
 
 /* ===== 主循環 ===== */
+/* rev-fix-tickHeroWalkSwitch: 探索模式下根據移動速度切換 walk/idle */
+window._tickHeroWalkSwitch = function(now){
+  const ex = window._explore;
+  if(!ex || !ex.active) return;
+  if(typeof heroAnim === 'undefined') return;
+  if(ex.mode === 'combat' || ex.mode === 'vehicle' || ex.mode === 'dead' || ex.mode === 'healing') return;
+  if(window._combatActive) return;
+  /* rev-fix-tickHeroWalkSwitch-v2: 補全 fire_* / switch_* 守衛 */
+  const _blocked = ['attack_melee','heal_melee','hurt','reload','fire_primary','fire_secondary','switch_secondary','switch_melee'];
+  if(_blocked.indexOf(heroAnim.name) >= 0) return;
+  const want = (ex._currentSpeed > 0.5) ? 'walk' : 'idle';
+  if(heroAnim.name !== want){
+    heroAnim.name = want;
+    heroAnim.frame = 0;
+    heroAnim.lastUpdate = now;
+  }
+};
+
 function heroLoop(now){
   if(typeof window._tickHeroWalkSwitch === 'function') window._tickHeroWalkSwitch(now);
   updateHeroAnim(now);

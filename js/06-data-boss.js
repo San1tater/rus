@@ -136,6 +136,11 @@ const BOSS_SKILLS = {
   ]
 };
 
+/* rev-fix-getBossSkillList: 補全缺失定義（17a/17b 用 typeof 守衛回退到 BOSS_SKILLS[bossId]） */
+function getBossSkillList(bossId){
+  return BOSS_SKILLS[bossId] || [];
+}
+
 const BOSS_LAYERS = {
   factory_king: {
     canvas: { w:400, h:500 },

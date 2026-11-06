@@ -439,11 +439,16 @@ function _getPW(){
       if(c) c._activeSlot = s;
       return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d };
     }
-    if(d.cal && c){
-      const hasMag = c._playerMag && c._playerMag.weaponId === id && c._playerMag.inMag > 0;
-      if(hasMag){ c._activeSlot = s; return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d }; }
-      const ammo = (typeof pickAmmoByPreferenceOrOrder === 'function') ? pickAmmoByPreferenceOrOrder(d.cal, 'combat') : null;
-      if(ammo){ c._activeSlot = s; return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d }; }
+    if(d.cal){
+      /* rev-fix-getPW-null: c 為 null 時（戰鬥尚未啟動）也應返回主武器 */
+      if(c){
+        const hasMag = c._playerMag && c._playerMag.weaponId === id && c._playerMag.inMag > 0;
+        if(hasMag){ c._activeSlot = s; return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d }; }
+        const ammo = (typeof pickAmmoByPreferenceOrOrder === 'function') ? pickAmmoByPreferenceOrOrder(d.cal, 'combat') : null;
+        if(ammo){ c._activeSlot = s; return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d }; }
+      } else {
+        return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d };
+      }
     }
   }
   return null;
