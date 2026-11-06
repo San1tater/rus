@@ -66,13 +66,13 @@ const WEAPONS={
   pp19:{name:'PP-19-01 Vityaz',slot:'primary',type:'衝鋒槍',cal:'9x19',mag:TK_MAG.pp19,modes:['掃射','長點射','短點射','點射'],rpm:700,range:0.45},
   pm:{name:'PM 手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pm,modes:['點射'],rpm:120,range:0.35},
   pb:{name:'PB 微聲手槍',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.pb,modes:['點射'],rpm:120,range:0.35},
-  mp443:{name:'MP-443 Grach',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.mp443,modes:['點射'],rpm:120,range:0.4},
+  mp443:{name:'MP-443 Grach',slot:'secondary',type:'手槍',cal:'9x19',mag:TK_MAG.mp443,modes:['點射'],rpm:120,range:0.4},
   aps:{name:'APS 斯捷奇金',slot:'secondary',type:'手槍',cal:'9x18',mag:TK_MAG.aps,modes:['掃射','長點射','短點射','點射'],rpm:750,range:0.35},
   mp133:{name:'MP-133 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp133,modes:['點射'],rpm:30,range:0.4},
   mp153:{name:'MP-153 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp153,modes:['點射'],rpm:70,range:0.42},
   mp155:{name:'MP-155 霰彈槍',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:TK_MAG.mp155,modes:['點射'],rpm:70,range:0.4},
   saiga12:{name:'Saiga-12',slot:'secondary',type:'霰彈槍',cal:'12ga',mag:5,modes:['掃射','點射'],rpm:450,range:0.45},
-  toz106:{name:'TOZ-106',slot:'secondary',type:'霰彈槍',cal:'20/70',mag:TK_MAG.toz106,modes:['點射'],rpm:30,range:0.35},
+  toz106:{name:'TOZ-106',slot:'secondary',type:'霰彈槍',cal:'20/70',mag:TK_MAG.toz106,modes:['點射'],rpm:30,range:0.35,fireMode:'栓動'},
   ks23:{name:'KS-23',slot:'secondary',type:'霰彈槍',cal:'23x75',mag:TK_MAG.ks23,modes:['點射'],rpm:30,range:0.45},
   '6kh2':{name:'6Kh2 刺刀',slot:'melee',type:'刺刀',dmg:25,penMM:3,modes:['近戰'],rpm:120,range:0.15},
   '6kh5':{name:'6Kh5 刺刀',slot:'melee',type:'刺刀',dmg:26,penMM:3,modes:['近戰'],rpm:120,range:0.15},
@@ -316,8 +316,7 @@ function buildingIcon(id){return `<img src="icons/buildings/${id}.png${assetSuff
 async function probeAssetVersion(){
   if(location.protocol==='file:') return false;
   try{
-    const url = ASSET_PROBE_URL + '?probe=' + Date.now();
-    const res = await fetch(url, { method:'HEAD', cache:'no-store' });
+    const res = await fetch(ASSET_PROBE_URL, { method:'HEAD', cache:'no-cache' });
     if(!res.ok) return false;
     const lm = res.headers.get('Last-Modified') || '';
     const etag = res.headers.get('ETag') || '';

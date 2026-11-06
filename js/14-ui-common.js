@@ -130,7 +130,7 @@ function openSlotDetail(slot){
     } else {
       if(!isArmor && def.rpm) body += '<div class="stat-line"><span class="k">射速</span><span class="v">' + def.rpm + ' RPM</span></div>';
       if(dVal != null) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + dVal + '</span></div>';
-      if(def.modes) body += '<div class="stat-line"><span class="k">射擊模式</span><span class="v">' + def.modes.join('/') + '</span></div>';
+      if(def.modes) body += '<div class="stat-line"><span class="k">射擊模式</span><span class="v">' + _fireModeLabel(def) + '</span></div>';
       if(def.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸（群傷）</span></div>';
     }
     if(slot === 'melee') body += '<div class="stat-line"><span class="k">每輪攻擊次數</span><span class="v">' + getMeleeHits(def.rpm) + '</span></div>';
@@ -233,6 +233,26 @@ function openSlotPicker(slot, returnFn){
   });
 }
 
+/* rev-fix-firemode-label: 武器射擊模式顯示為全自動/半自動/栓動/泵動 */
+function _fireModeLabel(def){
+  if(!def) return '—';
+  if(def.slot === 'melee') return '近戰';
+  if(def.slot === 'throwable') return '投擲';
+  if(def.fireMode) return def.fireMode;
+  const rpm = def.rpm || 600;
+  if(def.type === '霰彈槍'){
+    if(rpm < 50) return '泵動';
+    return '半自動';
+  }
+  const modes = def.modes || [];
+  if(modes.indexOf('掃射') >= 0) return '全自動';
+  if(rpm < 50){
+    if(def.type === '狙擊槍') return '栓動';
+    return '手動';
+  }
+  return '半自動';
+}
+
 function getDisplayStat(id, rarity, key){
   const d = itemDef(id);
   if(!d) return null;
@@ -240,6 +260,11 @@ function getDisplayStat(id, rarity, key){
   if(key === 'dmg' && d.dmg != null) return Math.round(d.dmg * mult);
   if(key === 'armor' && d.armor != null && d.armor > 0) return equipArmorValue(id, rarity);
   if(key === 'heal' && d.heal != null) return Math.round(d.heal * mult);
+  if(key === 'range'){
+    if(d.slot === 'melee') return 2;
+    if(d._shortRange) return (typeof FOOT_RANGE_SHORT === 'number') ? FOOT_RANGE_SHORT : 20;
+    return (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[d.type]) || null;
+  }
   return d[key] != null ? d[key] : null;
 }
 
@@ -326,10 +351,10 @@ function openEquipmentCompare(slot, newId, newRarity, onConfirm, onCancel){
     if(newDef.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
     if(dVal != null) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + dVal + '</span></div>';
     if(newDef.cal){
-      const aid = getDefaultAmmo(newDef.cal);
-      if(aid) body += '<div class="stat-line"><span class="k">默認彈藥</span><span class="v">' + AMMO[aid].name + '（' + AMMO[aid].dmg + '，穿甲 ' + AMMO[aid].penMM + 'mm）</span></div>';
+      body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + newDef.cal + '</span></div>';
     }
     if(newDef.mag) body += '<div class="stat-line"><span class="k">彈匣</span><span class="v">' + newDef.mag + '</span></div>';
+    if(newDef.modes) body += '<div class="stat-line"><span class="k">射擊模式</span><span class="v">' + _fireModeLabel(newDef) + '</span></div>';
     if(newDef.rpm && !isArmorSlot) body += '<div class="stat-line"><span class="k">射速</span><span class="v">' + newDef.rpm + ' RPM</span></div>';
     if(newDef.slot === 'melee') body += '<div class="stat-line"><span class="k">每輪攻擊</span><span class="v">' + getMeleeHits(newDef.rpm) + ' 次</span></div>';
     if(newDef.scopeBonus) body += '<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+' + newDef.scopeBonus + '% 命中</span></div>';
@@ -444,7 +469,7 @@ function openItemDetail(id, rarity, returnFn){
     if(d.pellets) body += '<div class="stat-line"><span class="k">彈丸數</span><span class="v">' + d.pellets + '</span></div>';
     if(d.mag) body += '<div class="stat-line"><span class="k">彈匣</span><span class="v">' + d.mag + '</span></div>';
     if(!isArmorDef && d.rpm) body += '<div class="stat-line"><span class="k">射速</span><span class="v">' + d.rpm + ' RPM</span></div>';
-    if(d.modes) body += '<div class="stat-line"><span class="k">模式</span><span class="v">' + d.modes.join('/') + '</span></div>';
+    if(d.modes) body += '<div class="stat-line"><span class="k">射擊模式</span><span class="v">' + _fireModeLabel(d) + '</span></div>';
     if(d.heal) body += '<div class="stat-line"><span class="k">治療</span><span class="v">' + Math.round(d.heal * (RARITY_MULT[rarity] || 1)) + '</span></div>';
     if(d.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>';
   }
@@ -473,6 +498,16 @@ function openOfflineDetail(log){
       const cat = itemCat(it.id);
       if(groups[cat]) groups[cat].push(it);
       else groups.misc.push(it);
+    }
+    /* rev-fix-offline-sort: 稀有度 desc → 名稱 */
+    for(const g in groups){
+      groups[g].sort(function(a, b){
+        const rd = sortByRarityDesc(a, b);
+        if(rd !== 0) return rd;
+        const ad = itemDef(a.id) || { name: a.id };
+        const bd = itemDef(b.id) || { name: b.id };
+        return (ad.name || '').localeCompare(bd.name || '', 'zh-Hant');
+      });
     }
     const names = { weapon:'⚔️ 武器', armor:'🛡️ 裝備', ammo:'🔫 彈藥', consume:'💊 消耗品', material:'🔧 材料', misc:'📦 其他' };
     if(!window._offlineCollapsed) window._offlineCollapsed = {};

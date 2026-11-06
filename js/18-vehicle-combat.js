@@ -133,8 +133,8 @@ window._vehicleWeaponsDead = function(){
   if(dmg.members && dmg.members.gunner <= 0 && dmg.members.commander <= 0) return true;
   const gunDead = dmg.parts && dmg.parts.gun <= 0;
   const turretDead = dmg.parts && dmg.parts.turret <= 0;
-  if(turretDead) return true;
-  if(!gunDead) return false;
+  /* rev-fix-turret-ammo: 炮塔壞了不直接離場，改檢查剩餘武器彈藥 */
+  if(!gunDead && !turretDead) return false;
   const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
   if(!ld) return true;
   const ammoState = state.vehicleAmmo && state.vehicleAmmo[vid];
@@ -356,7 +356,7 @@ function _applyHESplash(wid, mainTarget, baseDmg, isCrit, penMM, ammoId){
     if(t.enemy.hp <= 0){
       const eName = (typeof ENEMIES !== 'undefined' && ENEMIES[t.enemy.eid]) ? ENEMIES[t.enemy.eid].name : t.enemy.eid;
       if(typeof pushLog === 'function'){
-        (function(){var _wn={ '2a46':'125mm 主炮','2a46m1':'125mm 主炮','2a70':'100mm 主炮','2a28':'73mm 主炮','2a42':'30mm 機炮','2a72':'30mm 機炮','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid]||(wid?wid.toUpperCase():'未知武器');var _af={'3bm42':'穿甲彈','3of26':'高爆彈','3bk29':'破甲彈','100he':'高爆彈','73heat':'破甲彈','73hefrag':'高爆彈'}[ammoId];var _fm=_af?('（'+_af+'）'):(ammoId==='atgm'?'（反坦克導彈）':(ammoId?'（'+ammoId+'）':''));pushLog('<span class="run">'+_wn+_fm+'</span> 濺射擊殺 <b class="r-'+(t.enemy.rarity||'一般')+'">'+eName+'</b>', [], 'explore');})();
+        (function(){var _wn={ '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid]||(wid?wid.toUpperCase():'未知武器');var _af={'3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','100he':'3UOF17 高爆','73heat':'PG-15V 破甲','73hefrag':'OG-15V 高爆'}[ammoId];var _fm=_af?('（'+_af+'）'):(ammoId==='atgm'?'（反坦克導彈）':(ammoId?'（'+ammoId+'）':''));pushLog('<span class="run">'+_wn+_fm+'</span> 濺射擊殺 <b class="r-'+(t.enemy.rarity||'一般')+'">'+eName+'</b>', [], 'explore');})();
       }
       if(typeof _grantBTRCrewExp === 'function') _grantBTRCrewExp(3);
       if(t.type === 'event' && t.event && t.event.content){
@@ -531,12 +531,12 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
 function _onBTRKillTarget(target, wid, c, usedAmmoId){
   if(!c && window._combat) c = window._combat;
   var eName = (typeof ENEMIES !== 'undefined' && ENEMIES[target.eid]) ? ENEMIES[target.eid].name : target.eid;
-  var wn = { '2a46':'125mm 主炮','2a46m1':'125mm 主炮','2a70':'100mm 主炮','2a28':'73mm 主炮','2a42':'30mm 機炮','2a72':'30mm 機炮','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid] || (wid ? wid.toUpperCase() : '未知武器');
+  var wn = { '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid] || (wid ? wid.toUpperCase() : '未知武器');
   var form = '';
   if(usedAmmoId){
     var ammoForm = {
-      '3bm42':'穿甲彈', '3of26':'高爆彈', '3bk29':'破甲彈',
-      '100he':'高爆彈', '73heat':'破甲彈', '73hefrag':'高爆彈'
+      '3bm42':'3BM42 穿甲', '3of26':'3OF26 高爆', '3bk29':'3BK29 破甲',
+      '100he':'3UOF17 高爆', '73heat':'PG-15V 破甲', '73hefrag':'OG-15V 高爆'
     }[usedAmmoId];
     if(ammoForm) form = '（' + ammoForm + '）';
     else if(usedAmmoId === 'atgm') form = '（反坦克導彈）';

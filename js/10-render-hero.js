@@ -153,6 +153,10 @@ const GAME_ANIMS = {
   },
 };
 
+/* rev-fix-heal-melee: 治療動畫 = attack_melee 循環版 */
+GAME_ANIMS.heal_melee = JSON.parse(JSON.stringify(GAME_ANIMS.attack_melee));
+GAME_ANIMS.heal_melee.loop = true;
+
 const WEAPON_LAYOUT = {
   '6kh2':     { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:5,y:19,w:117,h:28} },
   '6kh5':     { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:5,y:19,w:117,h:28} },
@@ -324,9 +328,10 @@ function updateHeroAnim(now){
   const isFire = heroAnim.name === 'fire_primary' || heroAnim.name === 'fire_secondary' || heroAnim.name === 'attack_melee';
   /* rev-fix-anim-start: fire 動畫基於 animStart 計算幀，確保每發都從 0 開始且正常更新 */
   if(isFire && typeof heroAnim.animStart === 'number'){
+    /* rev-fix-anim-loop: 射擊期間持續循環 01230123，不鎖死在最後一幀 */
     const interval = 1000 / a.fps;
     const elapsed = Math.max(0, now - heroAnim.animStart);
-    heroAnim.frame = Math.min(a.frameCount - 1, Math.floor(elapsed / interval));
+    heroAnim.frame = Math.floor(elapsed / interval) % a.frameCount;
     return;
   }
   const interval = 1000 / a.fps;
@@ -547,7 +552,7 @@ function drawEqLayer(ctx, u, B, anim, fi){
   ctx.restore();
 }
 
-function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio, legOverride){
+function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio, legOverride, healItemId){
   const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
   const factor = charHFactor || CHAR_HEIGHT_FACTOR;
@@ -595,7 +600,9 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
   }
 
   let wpSlot = null, wpId = null;
-  if(weaponSlotOverride && eq[weaponSlotOverride]){
+  if(weaponSlotOverride === '__hidden__'){
+    /* rev-fix-heal-anim: 治療動畫隱藏武器 */
+  } else if(weaponSlotOverride && eq[weaponSlotOverride]){
     wpSlot = weaponSlotOverride;
     wpId = eq[weaponSlotOverride];
   } else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
@@ -610,6 +617,15 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
         const img = getHeroImg(`icons/items/${resolveIconId(wpId)}.png`);
         units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
       }
+    }
+  }
+
+  /* rev-fix-heal-item-render: 治療時前側手下方顯示消耗品圖標 */
+  if(healItemId){
+    const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
+    if(_fa){
+      const _hImg = getHeroImg(`icons/items/${resolveIconId(healItemId)}.png`);
+      units.push({ z: _fa.z - 0.4, kind:'eq', layerId: 'front_arm', ox: 0.88, oy: 0.15, scale: 0.35, rotation: 45, img: _hImg });
     }
   }
 
@@ -648,7 +664,7 @@ function renderExploreHeroCanvas(){
       ctx.rect(0, 0, w, h * clipH);
       ctx.clip();
     }
-    drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, heroAnim.eqSlot || null, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO + offsetX);
+    drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, heroAnim.eqSlot || null, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO + offsetX, null, heroAnim.healItem || null);
     if(clipH < 1.0) ctx.restore();
   }
 }
@@ -662,8 +678,9 @@ function renderBattleHeroCanvas(){
   if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
-  const overrideSlot = (battle.weaponSlot === 'throwable') ? null : battle.weaponSlot;
-  drawBlockHero(ctx, w, h, battleHeroAnim.name, battleHeroAnim.frame, overrideSlot, CHAR_HEIGHT_FACTOR_BATTLE, 0.5, battleHeroAnim.legOverride || null);
+  /* rev-fix-boss-heal-anim: 治療中隱藏武器 */
+  const overrideSlot = battle.consuming ? '__hidden__' : ((battle.weaponSlot === 'throwable') ? null : battle.weaponSlot);
+  drawBlockHero(ctx, w, h, battleHeroAnim.name, battleHeroAnim.frame, overrideSlot, CHAR_HEIGHT_FACTOR_BATTLE, 0.5, battleHeroAnim.legOverride || null, battleHeroAnim.healItem || null);
 }
 
 function renderZone2Silhouette(){

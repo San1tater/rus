@@ -584,6 +584,13 @@ function _garageBind(){
 
 /* ============== 科技樹 ============== */
 function _garageOpenTechTree(){
+  /* rev-fix-tech-scrollbar: 隱藏滾動條但保持拖動 */
+  if(!document.getElementById('wt-tech-scroll-style')){
+    const _st = document.createElement('style');
+    _st.id = 'wt-tech-scroll-style';
+    _st.textContent = '.wt-tech-custom-scroll{scrollbar-width:none !important;-ms-overflow-style:none !important;}.wt-tech-custom-scroll::-webkit-scrollbar{display:none !important;width:0 !important;height:0 !important;}';
+    document.head.appendChild(_st);
+  }
   const NW = 100, NH = 64;
   const nodes = [
     { vid: 'btr80',  x: 140, y: 10 },
@@ -654,7 +661,7 @@ function _garageOpenTechTree(){
       + '</div>';
   }
 
-  const body = '<div class="wt-tech-custom-scroll"><div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + svg + nodesHtml + '</div></div>';
+  const body = '<div class="wt-tech-custom-scroll" style="overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;max-height:60vh;"><div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + svg + nodesHtml + '</div></div>';
 
   const bd = openModal({ title: '科技樹', body: body });
 

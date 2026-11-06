@@ -1812,12 +1812,12 @@ window._openBTRSupportDetail = function(log){
   const totalKills = log.btrTotalKills || 0;
   const totalLoot = loot.reduce(function(s, it){ return s + (it.count || 0); }, 0);
 
-  const summary = vehName + ' 橫衝直撞 · 擊殺 ' + totalKills + ' 隻 · 獲得 ' + totalLoot + ' 件物資' + (exp > 0 ? ' · 經驗 +' + exp : '');
+  const summary = vehName + ' 火力支援 · 擊殺 ' + totalKills + ' 名 · 繳獲 ' + totalLoot + ' 件物資' + (exp > 0 ? ' · 經驗 +' + exp : '');
   let body = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">' + summary + '</div>';
 
   if(Object.keys(kills).length){
     const kc = !!window._collapseStates['btr.__enemy_kills__'];
-    body += '<div class="cat-header" data-btr-cat="__enemy_kills__" style="cursor:pointer"><span>💀 敵人擊殺 (' + Object.keys(kills).length + ')</span><span>' + (kc ? '▶' : '▼') + '</span></div>';
+    body += '<div class="cat-header" data-btr-cat="__enemy_kills__" style="cursor:pointer"><span>💀 敵人擊殺 (' + totalKills + ')</span><span>' + (kc ? '▶' : '▼') + '</span></div>';
     if(!kc){
       for(const eid in kills){
         const eDef = (typeof ENEMIES !== 'undefined' && ENEMIES[eid]) || { name: eid };
@@ -1828,10 +1828,10 @@ window._openBTRSupportDetail = function(log){
   const weaponKills = log.btrWeaponKills || {};
   if(Object.keys(weaponKills).length){
     const wkc = !!window._collapseStates['btr.__weapon_kills__'];
-    body += '<div class="cat-header" data-btr-cat="__weapon_kills__" style="cursor:pointer"><span>🎯 武器擊殺 (' + Object.keys(weaponKills).length + ')</span><span>' + (wkc ? '▶' : '▼') + '</span></div>';
+    body += '<div class="cat-header" data-btr-cat="__weapon_kills__" style="cursor:pointer"><span>🎯 武器表現 (' + Object.keys(weaponKills).length + ')</span><span>' + (wkc ? '▶' : '▼') + '</span></div>';
     if(!wkc){
-      const _weaponNameMap = { '2a46':'125mm 主炮','2a46m1':'125mm 主炮','2a70':'100mm 主炮','2a28':'73mm 主炮','2a42':'30mm 機炮','2a72':'30mm 機炮','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' };
-      const _ammoNameMap = { '3bm42':'穿甲彈','3of26':'高爆彈','3bk29':'破甲彈','100he':'高爆彈','73heat':'破甲彈','73hefrag':'高爆彈' };
+      const _weaponNameMap = { '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' };
+      const _ammoNameMap = { '3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','100he':'3UOF17 高爆','73heat':'PG-15V 破甲','73hefrag':'OG-15V 高爆' };
       for(const wk in weaponKills){
         const parts = wk.split(':');
         const wName = _weaponNameMap[parts[0]] || parts[0];

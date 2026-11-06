@@ -871,7 +871,7 @@ function _bindBattleTap(el, handler){
 }
 
 function renderBattleJoystick(z2){
-  z2.innerHTML = '<div class="joystick" id="joystick"><div class="stick" id="stick"></div></div><div class="z2-hint">拖動搖桿左右移動</div>';
+  z2.innerHTML = '<div class="joystick" id="joystick"><div class="stick" id="stick"></div></div>';
   const joy = document.getElementById('joystick'), stick = document.getElementById('stick');
   let touchId = null, cx, cy, radius;
 
@@ -983,7 +983,7 @@ function renderBattleControls(z3){
   if(modes.indexOf(battle.fireMode) === -1) battle.fireMode = modes[0] || '點射';
   const canFire = !battle.reloading && !battle.consuming;
 
-  z3.innerHTML = '<div class="ctrl-wrap"><div class="ammo-info" id="battle-ammo-info">' + buildBattleWeaponInfo() + '</div><div class="fire-modes">' + modes.map(function(m){ return '<div class="fm-btn ' + (m === battle.fireMode ? 'on' : '') + '" data-mode="' + m + '">' + m + '</div>'; }).join('') + '</div><div style="display:flex;gap:4px"><div class="weapon-slot-btn ' + (battle.weaponSlot === 'primary' ? 'on' : '') + '" data-slot="primary" style="flex:1">主武器</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'secondary' ? 'on' : '') + '" data-slot="secondary" style="flex:1">副武器</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'melee' ? 'on' : '') + '" data-slot="melee" style="flex:1">近戰</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'throwable' ? 'on' : '') + '" data-slot="throwable" style="flex:1">投擲</div></div><div style="flex:1;display:flex;align-items:center;justify-content:center;gap:40px;"><div class="heal-btn" id="heal-btn">✚</div><div class="fire-btn ' + (canFire ? '' : 'disabled') + '" id="fire-btn">' + (battle.reloading ? '裝填' : (battle.consuming ? '使用中' : '攻擊')) + '</div></div><div class="ammo-info" id="battle-dmg-status" style="color:#7a6f60">對 Boss 傷害：' + Math.round(battle.damageDealt) + ' ｜ ' + (battle.engaged ? '⚔️ 已交戰' : '⏸️ 準備中') + '</div></div>';
+  z3.innerHTML = '<div class="ctrl-wrap"><div class="ammo-info" id="battle-ammo-info">' + buildBattleWeaponInfo() + '</div><div class="fire-modes">' + modes.map(function(m){ return '<div class="fm-btn ' + (m === battle.fireMode ? 'on' : '') + '" data-mode="' + m + '">' + m + '</div>'; }).join('') + '</div><div style="display:flex;gap:4px"><div class="weapon-slot-btn ' + (battle.weaponSlot === 'primary' ? 'on' : '') + '" data-slot="primary" style="flex:1">主武器</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'secondary' ? 'on' : '') + '" data-slot="secondary" style="flex:1">副武器</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'melee' ? 'on' : '') + '" data-slot="melee" style="flex:1">近戰</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'throwable' ? 'on' : '') + '" data-slot="throwable" style="flex:1">投擲</div></div><div style="flex:1;display:flex;align-items:center;justify-content:center;gap:40px;"><div class="heal-btn" id="heal-btn">✚</div><div class="fire-btn ' + (canFire ? '' : 'disabled') + '" id="fire-btn">' + (battle.reloading ? '裝填' : (battle.consuming ? '使用中' : '攻擊')) + '</div></div><!--rev-fix-remove-dmg-status--></div>';
 
   z3.querySelectorAll('.fm-btn').forEach(function(b){
     _bindBattleTap(b, function(){
@@ -1411,6 +1411,18 @@ function manualHeal(){
   battle.firing = false;
   battle._healToken = (battle._healToken || 0) + 1;
   const _myHealToken = battle._healToken;
+  /* rev-fix-heal-anim: 播放攻擊動作 */
+  if(typeof battleHeroAnim !== 'undefined'){
+    battleHeroAnim.name = 'heal_melee';
+    battleHeroAnim.frame = 0;
+    battleHeroAnim.lastUpdate = performance.now();
+    battleHeroAnim.forcedEnd = performance.now() + 2100;
+    battleHeroAnim.healItem = item.id;
+    /* rev-fix-preload-heal-item-boss */
+    if(typeof getHeroImg === 'function'){
+      try { getHeroImg('icons/items/' + resolveIconId(item.id) + '.png'); } catch(e){}
+    }
+  }
   if(battle.healTimer) clearTimeout(battle.healTimer);
   battle.healTimer = setTimeout(function(){
     if(!battle || !battle.active){ battle.consuming = false; battle.healTimer = null; return; }
@@ -1421,10 +1433,11 @@ function manualHeal(){
     invRemove(item.id, item.rarity, 1);
     battle.consuming = false;
     battle.healTimer = null;
+    if(typeof battleHeroAnim !== 'undefined') battleHeroAnim.healItem = null;
     if(typeof spawnHitFx === 'function'){ spawnHitFx(battle.px, battle.py, '+' + actualHeal, 'heal'); }
     pushLog('<span class="pl">玩家</span> 使用 ' + itemDef(item.id).name + '，恢復 ' + actualHeal + ' 生命。', [], 'combat');
     if(typeof refreshBattleControlsLive === 'function') refreshBattleControlsLive();
-  }, 1200);
+  }, 2000);
   if(typeof refreshBattleControlsLive === 'function') refreshBattleControlsLive();
 }
 
@@ -1533,7 +1546,9 @@ function battleLoop(now){
 
   {
     let _wantAnim;
-    if(battle.reloading){
+    if(battle.consuming){
+      _wantAnim = 'heal_melee';
+    } else if(battle.reloading){
       _wantAnim = 'reload';
     } else if(battle.firing){
       if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';

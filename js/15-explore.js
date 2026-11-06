@@ -795,10 +795,20 @@ function _startCombat(ev, first){
       /* v25: 错误的"武器是弹药"判断已删除 */
       const pw = p.primaryWeapon ? itemDef(p.primaryWeapon) : null;
       const wO = pw ? { id: p.primaryWeapon, rarity: p.primaryWeaponRarity || '一般', def: pw, slot: 'primary' } : null;
+      /* rev-fix-passenger-armor: 依裝備初始化護甲，避免 armor=0 時 1.2 倍傷害 */
+      let _armor = 0, _armorLevel = 0;
+      for(const _slot of ['head','top']){
+        const _id = (_slot === 'head') ? p.helmet : p.body;
+        const _rar = (_slot === 'head') ? (p.helmetRarity || '一般') : (p.bodyRarity || '一般');
+        if(!_id) continue;
+        _armor += (typeof equipArmorValue === 'function') ? (equipArmorValue(_id, _rar) || 0) : 0;
+        const _d = ARMOR[_id];
+        if(_d && _d.level) _armorLevel = Math.max(_armorLevel, _d.level);
+      }
       allies.push({
         isPassenger: true, srv: srv,
         hp: servantMaxHp(srv), maxHp: servantMaxHp(srv),
-        armor: 0, maxArmor: 0, armorLevel: 0,
+        armor: _armor, maxArmor: _armor, armorLevel: _armorLevel,
         worldX: 0,
         weapon: wO,
         equipData: {
@@ -849,56 +859,67 @@ function _startCombat(ev, first){
     var _isVNow = !!(window.BTRSupport && window.BTRSupport.active && window.BTRSupport.phase !== 'wreck');
     if(win){
       ex.mode = _isVNow ? 'vehicle' : 'walk';
-      if(typeof save === 'function') save();
-      return;
-    }
-    // 步战失败：消耗品恢复机制
-    var _hp = state.player.hp;
-    var _maxHp = state.player.maxHp;
-    var _used = [];
-    var _medbayLv = (typeof getBuildingLv === 'function') ? getBuildingLv('medbay') : 0;
-    while(_hp <= 0){
-      var _c = (typeof findNextConsumable === 'function') ? findNextConsumable() : null;
-      if(!_c) break;
-      var _heal = (typeof calcConsumableHeal === 'function') ? calcConsumableHeal(_c, _medbayLv) : 0;
-      if(_heal <= 0) break;
-      invRemove(_c.id, _c.rarity, 1);
-      _hp = Math.min(_maxHp, _hp + _heal);
-      _used.push(_c);
-    }
-    if(_hp > 0){
-      state.player.hp = _hp;
-      if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
-      ex.mode = 'walk';
-      ex._lootingUntil = performance.now() + 2000;
-      ex.deadUntil = 0;
-      if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'idle'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now(); }
-      for(var ci = ex.corpses.length - 1; ci >= 0; ci--){ try{ ex.corpses[ci].wrap.remove(); }catch(e){} }
-      ex.corpses = [];
-      ex._pendingLootEvent = null;
-      if(typeof pushLog === 'function'){
-        pushLog('<span class="pl">玩家</span> 重傷倒地，使用 ' + _used.map(function(u){ return fmtItemSpan(u.id, u.rarity, 1); }).join('、') + ' 恢復 ' + Math.round(_hp) + ' 生命', [], 'explore');
+      /* rev-fix-heal-after-win: 勝利後若受傷，自動使用醫療包補血，等待治療過程 1200ms（參考 Boss 戰 manualHeal） */
+      if(!_isVNow && state.player.hp < state.player.maxHp){
+        var _healUsed = [];
+        var _medbayLvW = (typeof getBuildingLv === 'function') ? getBuildingLv('medbay') : 0;
+        while(state.player.hp < state.player.maxHp){
+          var _hc = (typeof findNextConsumable === 'function') ? findNextConsumable() : null;
+          if(!_hc) break;
+          var _hHeal = (typeof calcConsumableHeal === 'function') ? calcConsumableHeal(_hc, _medbayLvW) : 0;
+          if(_hHeal <= 0) break;
+          invRemove(_hc.id, _hc.rarity, 1);
+          state.player.hp = Math.min(state.player.maxHp, state.player.hp + _hHeal);
+          _healUsed.push(_hc);
+        }
+        if(_healUsed.length > 0){
+          if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
+          ex.mode = 'healing';
+          ex._healCdUntil = performance.now() + 2000;
+          if(typeof heroAnim !== 'undefined'){
+            /* rev-fix-heal-melee-loop: 治療動畫循環 2s */
+            heroAnim.name = 'heal_melee';
+            heroAnim.frame = 0;
+            heroAnim.lastUpdate = performance.now();
+            heroAnim.animStart = null;
+            heroAnim.forcedEnd = performance.now() + 2100;
+            heroAnim.eqSlot = '__hidden__';
+            heroAnim.healItem = (_healUsed.length > 0) ? _healUsed[0].id : null;
+            /* rev-fix-preload-heal-item: 預先載入圖標，避免首幀空白 */
+            if(heroAnim.healItem && typeof getHeroImg === 'function'){
+              try { getHeroImg('icons/items/' + resolveIconId(heroAnim.healItem) + '.png'); } catch(e){}
+            }
+          }
+          if(typeof pushLog === 'function'){
+            pushLog('<span class="pl">玩家</span> 使用 ' + _healUsed.map(function(u){ return fmtItemSpan(u.id, u.rarity, 1); }).join('、') + ' 恢復至 ' + Math.round(state.player.hp) + ' 生命', [], 'explore');
+          }
+        } else if(state.player.hp < state.player.maxHp){
+          if(typeof pushLog === 'function'){
+            pushLog('<span class="pl">玩家</span> <span class="lose">受傷</span>（無醫療包），HP ' + Math.round(state.player.hp) + '/' + state.player.maxHp, [], 'explore');
+          }
+        }
       }
       if(typeof save === 'function') save();
-      if(typeof renderZone3Log === 'function') renderZone3Log();
       return;
     }
-    // 消耗品耗尽：60 秒 CD
+    // rev-fix-no-heal-on-fail: 失敗 = 倒地，不使用醫療包，直接進入 60s CD
+    if(state.player.hp > 0) state.player.hp = 0;
     state.player.deadUntil = Date.now() + 60000;
     ex.mode = 'dead';
     ex.deadUntil = performance.now() + 60000;
     for(var ci2 = ex.corpses.length - 1; ci2 >= 0; ci2--){ try{ ex.corpses[ci2].wrap.remove(); }catch(e){} }
     ex.corpses = [];
     ex._pendingLootEvent = null;
-    if(ex.passengersFollowing && ex.passengersFollowing.length){
-      if(typeof _evac === 'function') _evac();
+    ex._corpseLootTriggered = false;
+    if(ex.passengersFollowing && ex.passengersFollowing.length && typeof _evac === 'function' && !ex.evacuatingPassengers){
+      try { _evac(); } catch(e){}
     }
     if(!isV){
       state.player.armor = state.player.maxArmor;
     }
     if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'dead'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now(); }
     if(typeof pushLog === 'function'){
-      pushLog('<span class="lose">玩家</span> 重傷倒地（無消耗品），60 秒後恢復', [], 'explore');
+      pushLog('<span class="pl">玩家</span> <span class="lose">重傷倒地</span>，60 秒後恢復', [], 'explore');
     }
     if(typeof save === 'function') save();
     if(typeof renderZone3Log === 'function') renderZone3Log();
@@ -928,6 +949,37 @@ function _tick(now){
   }
 
   if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
+
+  if(ex.mode === 'healing'){
+    /* rev-fix-heal-tick-anim: 治療期間保持攻擊動畫，結束切 walk */
+    if(now >= ex._healCdUntil){
+      ex.mode = 'walk';
+      ex._healCdUntil = 0;
+      if(typeof heroAnim !== 'undefined'){
+        heroAnim.name = 'walk';
+        heroAnim.frame = 0;
+        heroAnim.lastUpdate = now;
+        heroAnim.eqSlot = null;
+        heroAnim.forcedEnd = 0;
+        heroAnim.animStart = null;
+        /* rev-fix-heal-item-explore-clear */
+        heroAnim.healItem = null;
+      }
+    } else {
+      if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'heal_melee'){
+        heroAnim.name = 'heal_melee';
+        heroAnim.frame = 0;
+        heroAnim.lastUpdate = now;
+        heroAnim.forcedEnd = now + 2100;
+        heroAnim.eqSlot = '__hidden__';
+        heroAnim.animStart = null;
+      }
+    }
+    ex._currentSpeed = 0;
+    _updateBgTransform();
+    _updateCorpsesLayout();
+    return;
+  }
 
   if(ex.mode === 'dead'){
     if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'dead'){
@@ -1094,10 +1146,22 @@ function _startMap(region, ri){
   ex.combatEvent = null;
   ex._curNodeIdx = 0;
   ex._bgDirty = true;
-  ex.corpses = [];
-  ex._lootingUntil = 0;
-  ex._pendingLootEvent = null;
-  ex._corpseLootTriggered = false;
+  if(!_sameRegion){
+    ex.corpses = [];
+    ex._lootingUntil = 0;
+    ex._pendingLootEvent = null;
+    ex._corpseLootTriggered = false;
+  } else {
+    /* rev-fix-explore-resume: 同區域返回，若有待拾取戰利品立即結算 */
+    if(ex._pendingLootEvent){
+      if(!ex._pendingLootEvent.cleared) ex._pendingLootEvent.cleared = true;
+      if(typeof _lootVictory === 'function') _lootVictory(ex._pendingLootEvent);
+      ex._pendingLootEvent = null;
+      ex.corpses = [];
+      ex._lootingUntil = 0;
+      ex._corpseLootTriggered = false;
+    }
+  }
   if(!ex.passengersFollowing) ex.passengersFollowing = [];
   const _n = ex.passengersFollowing.length;
   if(_n > 0){ if(ex._slot0 >= _n) ex._slot0 = 0; if(ex._slot1 >= _n) ex._slot1 = (_n > 1 ? 1 : 0); }
@@ -1343,7 +1407,15 @@ window.renderExplore = function(){
     const region = state.activeRegion || rgs[0] || '廢棄工廠';
     state.activeRegion = region;
     z1.innerHTML = '<div class="scene"><div class="bg-scroll" style="--spd:10s"><div class="bg-track"><div class="bg-layer"></div><div class="bg-layer"></div></div></div><div class="bg-fade" id="explore-bg-fade" style="opacity:0"></div><div class="groundline"></div><div class="explore-fx" id="explore-fx"></div><canvas id="hero-canvas" class="hero-canvas"></canvas><div class="zone-title">🧭 ' + region.replace(/II$/,' II') + '</div><div class="zone-badge">' + (state.preferences.actionMode === 'attack' ? '⚔ 攻擊前進' : '🥷 潛行蒐集') + '</div></div>';
-    try { _startMap(region); } catch(e){ console.warn('[explore startMap]', e); }
+    const ex = window._explore;
+    const _needStart = (!ex.active) || (ex.region !== region);
+    if(_needStart){
+      try { _startMap(region); } catch(e){ console.warn('[explore startMap]', e); }
+    } else {
+      /* rev-fix-explore-resume: 切頁返回保留 worldX / corpses / pendingLootEvent */
+      ex._bgDirty = true;
+      if(!ex.passengersFollowing) ex.passengersFollowing = [];
+    }
     try { _renderBg(); } catch(e){}
     requestAnimationFrame(function(){
       if(typeof renderExploreHeroCanvas === 'function') renderExploreHeroCanvas();

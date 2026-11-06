@@ -329,6 +329,8 @@ function tryHitPlayer(dmg, pen){
   if(_hh)_hh.style.width=Math.max(0,battle.playerHp/battle.playerMaxHp*100)+'%';
   if(_ha)_ha.style.width=Math.max(0,battle.playerArmor/battle.playerMaxArmor*100)+'%';
   spawnHitFx(battle.px, battle.py, isCrit ? '-'+Math.round(finalDmg)+'!' : '-'+Math.round(finalDmg), isCrit ? 'crit' : (res.hpLost > 0 ? 'enemy' : 'armor'));
+  /* rev-fix-heal-btn-refresh: 受傷後刷新按鈕狀態 */
+  if(typeof refreshBattleControlsLive === 'function') refreshBattleControlsLive();
   if(battle.playerHp <= 0){
     endBattle(false);
   }

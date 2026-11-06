@@ -475,7 +475,7 @@ function _stRender(page){
         const srcT = a2.presetBreakdown || a2.breakdown;
         const cnt = (srcT && srcT[d.id]) || 0;
         if(cnt <= 0) continue;
-        icons += '<div class="st-main-icon"><img src="icons/ammo/' + d.id + '.png' + assetSuffix() + '" alt=""><div class="st-main-icon-lbl">×' + _stFmtNum(cnt) + '</div></div>';
+        icons += '<div class="st-main-icon"><img src="icons/ammo/' + (d.img || d.id) + '.png' + assetSuffix() + '" alt=""><div class="st-main-icon-lbl">×' + _stFmtNum(cnt) + '</div></div>';
       }
       if(!icons) icons = '<div style="color:#5a5040;font-size:11px;padding:8px">未配置</div>';
       const _calPrefix2 = (_ST_CALIBER_MAP[wid2] ? _ST_CALIBER_MAP[wid2] + 'mm ' : '');
