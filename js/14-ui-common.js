@@ -117,23 +117,25 @@ function openSlotDetail(slot){
     const dVal = def.dmg != null ? Math.round(def.dmg * (RARITY_MULT[rar] || 1)) : null;
     body += '<div class="detail-title ' + rarityClass(rar) + '">' + itemIcon(id, 30) + ' ' + def.name + (ac ? ' <span class="armor-class">' + ac + '</span>' : '') + '</div>';
     body += '<div class="detail-sub">' + labels[slot] + ' · 稀有度：' + rar + '</div>';
+    /* rev-fix-unify-order-slot: 統一順序（類型→口徑→攻擊屬性→裝甲→重量→特性→瞄具→固定→庫存） */
     body += '<div class="stat-line"><span class="k">類型</span><span class="v">' + (def.type || (def.slot ? '裝備' : '—')) + '</span></div>';
-    if(def.armor != null) body += '<div class="stat-line"><span class="k">裝甲值</span><span class="v">' + armorBreakdownText(id, rar) + '</span></div>';
-    body += '<div class="stat-line"><span class="k">重量</span><span class="v">' + getItemWeight(id, rar).toFixed(2) + ' kg</span></div>';
-    if(def.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
     if(def.cal) body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + def.cal + '</span></div>';
-    if(def.mag) body += '<div class="stat-line"><span class="k">彈匣</span><span class="v">' + def.mag + '</span></div>';
     if(def.slot === 'throwable'){
       body += '<div class="stat-line"><span class="k">破片數</span><span class="v">' + (def.fragments || 1) + '</span></div>';
       body += '<div class="stat-line"><span class="k">每片傷害</span><span class="v">' + Math.round((def.fragmentDamage || def.dmg || 0) * (RARITY_MULT[rar] || 1)) + '</span></div>';
-      body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>';
     } else {
-      if(!isArmor && def.rpm) body += '<div class="stat-line"><span class="k">射速</span><span class="v">' + def.rpm + ' RPM</span></div>';
       if(dVal != null) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + dVal + '</span></div>';
+      if(def.mag) body += '<div class="stat-line"><span class="k">彈匣</span><span class="v">' + def.mag + '</span></div>';
+      if(!isArmor && def.rpm) body += '<div class="stat-line"><span class="k">射速</span><span class="v">' + def.rpm + ' RPM</span></div>';
+      var _rangeMS = getDisplayStat(id, rar, 'range');
+      if(_rangeMS != null) body += '<div class="stat-line"><span class="k">射程</span><span class="v">' + _rangeMS + ' m</span></div>';
       if(def.modes) body += '<div class="stat-line"><span class="k">射擊模式</span><span class="v">' + _fireModeLabel(def) + '</span></div>';
-      if(def.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸（群傷）</span></div>';
     }
     if(slot === 'melee') body += '<div class="stat-line"><span class="k">每輪攻擊次數</span><span class="v">' + getMeleeHits(def.rpm) + '</span></div>';
+    if(def.armor != null) body += '<div class="stat-line"><span class="k">裝甲值</span><span class="v">' + armorBreakdownText(id, rar) + '</span></div>';
+    body += '<div class="stat-line"><span class="k">重量</span><span class="v">' + getItemWeight(id, rar).toFixed(2) + ' kg</span></div>';
+    if(def.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
+    if(def.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">' + (slot === 'throwable' ? '爆炸群傷' : '爆炸（群傷）') + '</span></div>';
     if(def.scopeBonus) body += '<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+' + def.scopeBonus + '% 命中</span></div>';
     if(def.fixed) body += '<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>';
     if(slot === 'throwable') body += '<div class="stat-line"><span class="k">庫存</span><span class="v">' + getThrowableCount() + '</span></div>';
@@ -346,19 +348,27 @@ function openEquipmentCompare(slot, newId, newRarity, onConfirm, onCancel){
     const dVal = (newDef.dmg != null) ? Math.round(newDef.dmg * (RARITY_MULT[newRarity] || 1)) : null;
     body += '<div class="detail-title ' + rarityClass(newRarity) + '">' + iconBox(newRarity, newId) + ' ' + newDef.name + (ac ? ' <span class="armor-class">' + ac + '</span>' : '') + '</div>';
     body += '<div class="detail-sub">稀有度：' + newRarity + '</div>';
+    /* rev-fix-unify-order-equiv: 統一順序 */
     body += '<div class="stat-line"><span class="k">裝備槽</span><span class="v">' + labels[slot] + '</span></div>';
-    if(newDef.armor != null) body += '<div class="stat-line"><span class="k">裝甲值</span><span class="v">' + armorBreakdownText(newId, newRarity) + '</span></div>';
-    if(newDef.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
-    if(dVal != null) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + dVal + '</span></div>';
-    if(newDef.cal){
-      body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + newDef.cal + '</span></div>';
+    if(newDef.type) body += '<div class="stat-line"><span class="k">類型</span><span class="v">' + newDef.type + '</span></div>';
+    if(newDef.cal) body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + newDef.cal + '</span></div>';
+    if(newDef.slot === 'throwable'){
+      body += '<div class="stat-line"><span class="k">破片數</span><span class="v">' + (newDef.fragments || 1) + '</span></div>';
+      body += '<div class="stat-line"><span class="k">每片傷害</span><span class="v">' + Math.round((newDef.fragmentDamage || newDef.dmg || 0) * (RARITY_MULT[newRarity] || 1)) + '</span></div>';
+    } else {
+      if(dVal != null) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + dVal + '</span></div>';
+      if(newDef.mag) body += '<div class="stat-line"><span class="k">彈匣</span><span class="v">' + newDef.mag + '</span></div>';
+      if(newDef.rpm && !isArmorSlot) body += '<div class="stat-line"><span class="k">射速</span><span class="v">' + newDef.rpm + ' RPM</span></div>';
+      var _rangeEQ = getDisplayStat(newId, newRarity, 'range');
+      if(_rangeEQ != null) body += '<div class="stat-line"><span class="k">射程</span><span class="v">' + _rangeEQ + ' m</span></div>';
+      if(newDef.modes) body += '<div class="stat-line"><span class="k">射擊模式</span><span class="v">' + _fireModeLabel(newDef) + '</span></div>';
     }
-    if(newDef.mag) body += '<div class="stat-line"><span class="k">彈匣</span><span class="v">' + newDef.mag + '</span></div>';
-    if(newDef.modes) body += '<div class="stat-line"><span class="k">射擊模式</span><span class="v">' + _fireModeLabel(newDef) + '</span></div>';
-    if(newDef.rpm && !isArmorSlot) body += '<div class="stat-line"><span class="k">射速</span><span class="v">' + newDef.rpm + ' RPM</span></div>';
     if(newDef.slot === 'melee') body += '<div class="stat-line"><span class="k">每輪攻擊</span><span class="v">' + getMeleeHits(newDef.rpm) + ' 次</span></div>';
+    if(newDef.armor != null) body += '<div class="stat-line"><span class="k">裝甲值</span><span class="v">' + armorBreakdownText(newId, newRarity) + '</span></div>';
+    body += '<div class="stat-line"><span class="k">重量</span><span class="v">' + getItemWeight(newId, newRarity).toFixed(2) + ' kg</span></div>';
+    if(newDef.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
+    if(newDef.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">' + (newDef.slot === 'throwable' ? '爆炸群傷' : '爆炸（群傷）') + '</span></div>';
     if(newDef.scopeBonus) body += '<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+' + newDef.scopeBonus + '% 命中</span></div>';
-    if(newDef.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸（群傷）</span></div>';
   }
 
   const ft = el('div', 'modal-ft');
@@ -453,29 +463,35 @@ function openItemDetail(id, rarity, returnFn){
   const iconBox = '<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:5px;background:' + rarityBg(rarity) + ';flex-shrink:0">' + itemIcon(id, 30) + '</span>';
   let body = '<div class="detail-title ' + rarityClass(rarity) + '">' + iconBox + ' ' + d.name + (ac ? ' <span class="armor-class">' + ac + '</span>' : '') + '</div>';
   body += '<div class="detail-sub">稀有度：' + rarity + '</div>';
-  body += '<div class="stat-line"><span class="k">持有</span><span class="v">' + invCount(id, rarity) + '</span></div>';
-  if(!AMMO[id]) body += '<div class="stat-line"><span class="k">重量</span><span class="v">' + getItemWeight(id, rarity).toFixed(2) + ' kg</span></div>';
+  /* rev-fix-unify-order-item: 統一順序 */
   if(d.type) body += '<div class="stat-line"><span class="k">類型</span><span class="v">' + d.type + '</span></div>';
-  if(d.armor != null) body += '<div class="stat-line"><span class="k">裝甲值</span><span class="v">' + armorBreakdownText(id, rarity) + '</span></div>';
-  if(d.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
   if(d.cal) body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + d.cal + '</span></div>';
   if(d.slot === 'throwable'){
     body += '<div class="stat-line"><span class="k">破片數</span><span class="v">' + (d.fragments || 1) + '</span></div>';
     body += '<div class="stat-line"><span class="k">每片傷害</span><span class="v">' + Math.round((d.fragmentDamage || d.dmg || 0) * (RARITY_MULT[rarity] || 1)) + '</span></div>';
-    body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>';
   } else {
     if(dVal != null) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + dVal + '</span></div>';
     if(!isArmorDef && d.penMM) body += '<div class="stat-line"><span class="k">穿甲</span><span class="v">' + d.penMM + ' mm</span></div>';
     if(d.pellets) body += '<div class="stat-line"><span class="k">彈丸數</span><span class="v">' + d.pellets + '</span></div>';
     if(d.mag) body += '<div class="stat-line"><span class="k">彈匣</span><span class="v">' + d.mag + '</span></div>';
     if(!isArmorDef && d.rpm) body += '<div class="stat-line"><span class="k">射速</span><span class="v">' + d.rpm + ' RPM</span></div>';
+    var _rangeMI = getDisplayStat(id, rarity, 'range');
+    if(_rangeMI != null) body += '<div class="stat-line"><span class="k">射程</span><span class="v">' + _rangeMI + ' m</span></div>';
     if(d.modes) body += '<div class="stat-line"><span class="k">射擊模式</span><span class="v">' + _fireModeLabel(d) + '</span></div>';
     if(d.heal) body += '<div class="stat-line"><span class="k">治療</span><span class="v">' + Math.round(d.heal * (RARITY_MULT[rarity] || 1)) + '</span></div>';
-    if(d.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">爆炸群傷</span></div>';
   }
   if(d.slot === 'melee') body += '<div class="stat-line"><span class="k">每輪攻擊次數</span><span class="v">' + getMeleeHits(d.rpm) + '</span></div>';
+  if(d.armor != null) body += '<div class="stat-line"><span class="k">裝甲值</span><span class="v">' + armorBreakdownText(id, rarity) + '</span></div>';
+  if(!AMMO[id]) body += '<div class="stat-line"><span class="k">重量</span><span class="v">' + getItemWeight(id, rarity).toFixed(2) + ' kg</span></div>';
+  if(d.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
+  if(d.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">' + (d.slot === 'throwable' ? '爆炸群傷' : '爆炸群傷') + '</span></div>';
   if(d.scopeBonus) body += '<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+' + d.scopeBonus + '% 命中</span></div>';
   if(d.fixed) body += '<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>';
+  /* rev-fix-stackable-owned: 「持有」只對可堆疊物品有意義（無 slot，或投擲物）；其餘為唯一實例 */
+  var _stackable = !d.slot || d.slot === 'throwable';
+  if(_stackable){
+    body += '<div class="stat-line"><span class="k">持有</span><span class="v">' + invCount(id, rarity) + '</span></div>';
+  }
   const ft = el('div', 'modal-ft');
   if(d.slot && !d.fixed) ft.innerHTML = '<button class="btn primary" id="m-equip">裝備</button>';
   openModal({ title: '物品詳情', body: body, footer: ft, onClose: function(){ if(typeof returnFn === 'function'){ returnFn(); } else { closeModal(); } } });
