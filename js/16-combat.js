@@ -63,8 +63,30 @@ function _start(cfg){
     _switchAnim: null,
     _fireAnim: null,
     _hurtUntil: 0,
-    _playerMag: window._playerMagPersistent || (window._playerMagPersistent = { inMag: 0, ammoRef: null, weaponId: null })
+    _playerMag: { inMag: 0, ammoRef: null, weaponId: null },
+    _activeSlot: null,
+    _pendingReload: null
   };
+
+  /* rev-fix-preswap: 战斗开始时预装填（主优先，主无弹则副） */
+  (function(){
+    const _slots = ['primary', 'secondary'];
+    for(const _s of _slots){
+      const _id = state.player.equipped[_s];
+      const _d = _id ? itemDef(_id) : null;
+      if(!_d || !_d.cal) continue;
+      const _ammo = (typeof pickAmmoByPreferenceOrOrder === 'function') ? pickAmmoByPreferenceOrOrder(_d.cal, 'combat') : null;
+      if(!_ammo) continue;
+      const _take = Math.min(_d.mag || 30, _ammo.count);
+      if(_take <= 0) continue;
+      invRemove(_ammo.id, _ammo.rarity, _take);
+      window._combat._playerMag.weaponId = _id;
+      window._combat._playerMag.inMag = _take;
+      window._combat._playerMag.ammoRef = { id: _ammo.id, rarity: _ammo.rarity, def: AMMO[_ammo.id] };
+      window._combat._activeSlot = _s;
+      break;
+    }
+  })();
 
   for(let i = 0; i < window._combat.allies.length; i++){
     window._combat.allies[i]._nextFireAt = window._combat.playerFireReadyAt;
@@ -270,7 +292,7 @@ function _playMeleeFire(now){
   heroAnim.forcedEnd = now + dur;
 }
 
-function _playReload(now){
+function _playReload(now, w, ammo){
   const c = window._combat;
   if(!c || typeof heroAnim === 'undefined') return;
   const ra = GAME_ANIMS.reload;
@@ -281,6 +303,13 @@ function _playReload(now){
   heroAnim.name = 'reload';
   heroAnim.frame = 0;
   heroAnim.lastUpdate = now;
+  /* rev-fix-reload-pending: 記錄待填充彈匣，CD 結束後處理 */
+  if(w && w.def && ammo){
+    const take = Math.min(w.def.mag || 30, ammo.count);
+    if(take > 0){
+      c._pendingReload = { weaponId: w.id, ammoId: ammo.id, ammoRarity: ammo.rarity, count: take };
+    }
+  }
 }
 
 function _playSwitch(now, toSecondary){
@@ -297,6 +326,15 @@ function _playSwitch(now, toSecondary){
 function _tickAI(dt, now){
   const c = window._combat;
   if(!c) return;
+  /* rev-fix-pending-reload: 换弹 CD 结束后填充弹匣 */
+  if(c._pendingReload && now >= (c._playerReloadEnd || 0)){
+    const _pr = c._pendingReload;
+    c._pendingReload = null;
+    invRemove(_pr.ammoId, _pr.ammoRarity, _pr.count);
+    c._playerMag.weaponId = _pr.weaponId;
+    c._playerMag.inMag = _pr.count;
+    c._playerMag.ammoRef = { id: _pr.ammoId, rarity: _pr.ammoRarity, def: AMMO[_pr.ammoId] };
+  }
   const p = c.allies[0];
   if(!p) return;
   const _isVeh = (c.sceneType === 'vehicle');
@@ -361,16 +399,54 @@ function _autoFireFoot(now){
   }
 }
 
+/* rev-fix-findNextSlot: 從 fromSlot 之後找下一個可用武器 */
+function _findNextAvailableSlot(fromSlot){
+  const c = window._combat;
+  const order = ['primary', 'secondary', 'melee'];
+  const fromIdx = order.indexOf(fromSlot);
+  if(fromIdx < 0) return null;
+  for(let i = fromIdx + 1; i < order.length; i++){
+    const s = order[i];
+    const id = state.player.equipped[s];
+    const d = id ? itemDef(id) : null;
+    if(!d) continue;
+    if(d.slot === 'melee') return { slot: s, id, def: d };
+    if(d.cal){
+      const ammo = (typeof pickAmmoByPreferenceOrOrder === 'function') ? pickAmmoByPreferenceOrOrder(d.cal, 'combat') : null;
+      const hasMag = c && c._playerMag && c._playerMag.weaponId === id && c._playerMag.inMag > 0;
+      if(ammo || hasMag) return { slot: s, id, def: d };
+    }
+  }
+  return null;
+}
+
 function _getPW(){
-  let s = null;
-  if(state.player.equipped.primary) s = 'primary';
-  else if(state.player.equipped.secondary) s = 'secondary';
-  else if(state.player.equipped.melee) s = 'melee';
-  if(!s) return null;
-  const id = state.player.equipped[s];
-  const d = itemDef(id);
-  if(!d) return null;
-  return { id: id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d };
+  const c = window._combat;
+  /* rev-fix-getPW-active: 已有 activeSlot 則繼續用 */
+  if(c && c._activeSlot){
+    const s = c._activeSlot;
+    const id = state.player.equipped[s];
+    const d = id ? itemDef(id) : null;
+    if(d) return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d };
+  }
+  /* 否則按主→副→近戰找可用武器 */
+  const order = ['primary', 'secondary', 'melee'];
+  for(const s of order){
+    const id = state.player.equipped[s];
+    const d = id ? itemDef(id) : null;
+    if(!d) continue;
+    if(d.slot === 'melee'){
+      if(c) c._activeSlot = s;
+      return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d };
+    }
+    if(d.cal && c){
+      const hasMag = c._playerMag && c._playerMag.weaponId === id && c._playerMag.inMag > 0;
+      if(hasMag){ c._activeSlot = s; return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d }; }
+      const ammo = (typeof pickAmmoByPreferenceOrOrder === 'function') ? pickAmmoByPreferenceOrOrder(d.cal, 'combat') : null;
+      if(ammo){ c._activeSlot = s; return { id, rarity: state.player.equippedRarity[s] || '一般', slot: s, def: d }; }
+    }
+  }
+  return null;
 }
 
 function _ensureMag(w){
@@ -542,11 +618,22 @@ function _firePlayer(p, t, now, w){
   }
 
   if(w.def.cal){
-    if(!_ensureMag(w)){
-      if(w.slot === 'primary' && state.player.equipped.secondary) _playSwitch(now, true);
+    if(c._playerMag && c._playerMag.weaponId === w.id && c._playerMag.inMag > 0){
+      c._playerMag.inMag--;
+    } else {
+      /* 彈匣空：先嘗試換彈，備彈空則切換 */
+      const _ammo = (typeof pickAmmoByPreferenceOrOrder === 'function') ? pickAmmoByPreferenceOrOrder(w.def.cal, 'combat') : null;
+      if(_ammo){
+        _playReload(now, w, _ammo);
+        return false;
+      }
+      const _next = _findNextAvailableSlot(w.slot);
+      if(_next){
+        c._activeSlot = _next.slot;
+        _playSwitch(now, _next.slot === 'secondary');
+      }
       return false;
     }
-    c._playerMag.inMag--;
   }
 
   /* rev-fix-chain-accuracy: 探索模式連續射擊命中率動態遞減（1→短→長→掃） */
@@ -622,10 +709,7 @@ function _firePlayer(p, t, now, w){
     }
   });
 
-  if(w.def.cal && c._playerMag.inMag <= 0){
-    _playReload(now);
-  }
-
+  /* rev-fix-fire-no-trailing: 换弹延后到下次开火时处理 */
   return true;
 }
 
@@ -886,7 +970,7 @@ function _enemyFire(e, now){
           const _eNameV = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
           const _wNameV = (w && w.id && typeof WEAPONS !== 'undefined' && WEAPONS[w.id]) ? WEAPONS[w.id].name : (w && w.id ? w.id : '武器');
           const _wRarV = (w && w.rarity) || '一般';
-          window._vHitVehicle(p, dmg, penMM, w.ammoId || 'unknown', _eNameV, _wNameV, _wRarV);
+          window._vHitVehicle(p, dmg, penMM, w.ammoId || 'unknown', _eNameV, _wNameV, _wRarV, e.rarity || '一般');
         }
         return;
       }
@@ -924,7 +1008,10 @@ function _enemyFire(e, now){
             const _wRarD = (w && w.rarity) || '一般';
             const _wClsD = (typeof rarityClass === 'function') ? rarityClass(_wRarD) : '';
             const _eClsD = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
-            pushLog('<span class="' + _eClsD + '">' + _eNameD + '</span> 用 <span class="' + _wClsD + '">' + _wNameD + '</span> 擊倒 <b class="' + ((p.srv && typeof rarityClass === 'function') ? rarityClass(p.srv.rarity) : '') + '">' + (typeof servantLabel === 'function' ? servantLabel(p.srv) : '載員') + '</b>', [], 'explore');
+            const _sRarD = (p.srv && p.srv.rarity) ? p.srv.rarity : '一般';
+            const _sClsD = (typeof rarityClass === 'function') ? rarityClass(_sRarD) : '';
+            const _sNameD = (typeof servantLabel === 'function' ? servantLabel(p.srv) : '載員');
+            pushLog('<span class="' + _sClsD + '">' + _sNameD + '</span> 被 <span class="' + _eClsD + '">' + _eNameD + '</span> 用 <span class="' + _wClsD + '">' + _wNameD + '</span> <span class="lose">擊倒</span>', [], 'explore');
           }
         }
         _float(p, '-' + res.hpLost, '');
@@ -968,9 +1055,9 @@ function _enemyFireRPG(e, p, now){
       if(p.isVehicle){
         if(typeof window._vHitVehicle === 'function'){
           const _eNameR = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
-          window._vHitVehicle(p, baseDmg, penMM, 'atgm', _eNameR, 'RPG', rar);
+          window._vHitVehicle(p, baseDmg, penMM, 'atgm', _eNameR, 'RPG', rar, e.rarity || '一般');
         }
-        return;
+        /* rev-fix-rpg-splash-vehicle: 不 return 繼續走濺射 */
       }
 
       if(p.isPlayer){
@@ -1001,29 +1088,66 @@ function _enemyFireRPG(e, p, now){
             const _eNameR2 = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
             const _wClsR2 = (typeof rarityClass === 'function') ? rarityClass(rar || '一般') : '';
             const _eClsR2 = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
-            pushLog('<span class="' + _eClsR2 + '">' + _eNameR2 + '</span> 用 <span class="' + _wClsR2 + '">RPG</span> 擊倒 <b class="' + ((p.srv && typeof rarityClass === 'function') ? rarityClass(p.srv.rarity) : '') + '">' + (typeof servantLabel === 'function' ? servantLabel(p.srv) : '載員') + '</b>', [], 'explore');
+            const _sRarR2 = (p.srv && p.srv.rarity) ? p.srv.rarity : '一般';
+            const _sClsR2 = (typeof rarityClass === 'function') ? rarityClass(_sRarR2) : '';
+            const _sNameR2 = (typeof servantLabel === 'function' ? servantLabel(p.srv) : '載員');
+            pushLog('<span class="' + _sClsR2 + '">' + _sNameR2 + '</span> 被 <span class="' + _eClsR2 + '">' + _eNameR2 + '</span> 用 <span class="' + _wClsR2 + '">RPG</span> <span class="lose">擊倒</span>', [], 'explore');
           }
         }
         _float(p, '-' + res.hpLost, crit ? 'crit' : '');
       }
 
+      /* rev-fix-rpg-splash-heat: RPG 視為 HEAT，走距離衰減 + 穿甲衰減 + 部位護甲 */
+      const _RPG_SPLASH = { blastPen: 18, maxR: 8, splashRatio: 0.35 };
       const mainWX = p.worldX;
       for(let i = 0; i < c.allies.length; i++){
         const a = c.allies[i];
         if(a === p) continue;
         if(a.hp <= 0) continue;
+        if(a.isVehicle) continue;
         const _dist = Math.abs(a.worldX - mainWX);
-        if(_dist <= 3){
-          const splash = Math.round(baseDmg * 0.2);
-          a.hp = Math.max(0, a.hp - splash);
-          if(a.isPlayer){ state.player.hp = a.hp; _playHurt(performance.now()); }
-          if(a.isPassenger && a.hp <= 0 && a.srv){
-            a.srv.hp = 0;
-            a.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
-            a._retreating = true;
-          }
-          _float(a, '-' + splash, '');
+        if(_dist >= _RPG_SPLASH.maxR) continue;
+        const _t = _dist / _RPG_SPLASH.maxR;
+        const _falloff = 1 - _t * _t;
+        if(_falloff <= 0) continue;
+        const _splashDmg = Math.max(1, Math.round(baseDmg * _RPG_SPLASH.splashRatio * _falloff));
+        const _splashPen = _RPG_SPLASH.blastPen * _falloff;
+        let _armorProvider = null;
+        if(a.isPlayer){
+          _armorProvider = function(part){ return (typeof getPlayerArmorMMForPart === 'function') ? getPlayerArmorMMForPart(part) : 0; };
+        } else if(a.isPassenger && a.srv){
+          _armorProvider = (function(_a){ return function(part){ return (typeof getPassengerArmorMMForPart === 'function') ? getPassengerArmorMMForPart(_a, part) : 0; }; })(a);
         }
+        const _proxy = { hp: a.hp, armor: a.armor || 0 };
+        const _res = applyDamage(_proxy, _splashDmg, _splashPen, { armorProvider: _armorProvider });
+        a.hp = _proxy.hp;
+        a.armor = _proxy.armor;
+        const _shownSplash = _res.hpLost > 0 ? _res.hpLost : _res.armorLost;
+        if(a.isPlayer){
+          state.player.hp = a.hp;
+          state.player.armor = a.armor;
+          _playHurt(performance.now());
+          if(a.hp <= 0 && typeof _evac === 'function' && !(window._explore && window._explore.evacuatingPassengers)){
+            try { _evac(); } catch(e){}
+          }
+        }
+        if(a.isPassenger && a.hp <= 0 && a.srv){
+          a.srv.hp = 0;
+          a.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
+          a._retreating = true;
+          a._injuredDown = true;
+          if(typeof pushLog === 'function'){
+            const _eNameSP = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
+            const _eClsSP = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
+            const _sRarSP = (a.srv && a.srv.rarity) ? a.srv.rarity : '一般';
+            const _sClsSP = (typeof rarityClass === 'function') ? rarityClass(_sRarSP) : '';
+            const _sNameSP = (typeof servantLabel === 'function' ? servantLabel(a.srv) : '載員');
+            const _wClsSP = (typeof rarityClass === 'function') ? rarityClass(rar || '一般') : '';
+            pushLog('<span class="' + _sClsSP + '">' + _sNameSP + '</span> 被 <span class="' + _eClsSP + '">' + _eNameSP + '</span> 用 <span class="' + _wClsSP + '">RPG</span> <span class="lose">擊倒</span>', [], 'explore');
+          }
+        }
+        _float(a, '-' + _shownSplash, _res.hpLost > 0 ? '' : 'armor');
+        if(a.isPlayer && a.hp <= 0){ endBattle(false); return; }
       }
     }
   });
@@ -1346,6 +1470,17 @@ function _resolve(win){
   if(!c || c.resolved) return;
   c.resolved = true;
   c.victory = win;
+
+  /* rev-fix-online-servant: 2% 掉僕人（與離線一致） */
+  if(win && Math.random() < 0.02 && typeof grantRandomServant === 'function'){
+    var _svr = grantRandomServant();
+    if(_svr && typeof SERVANT_TYPES !== 'undefined' && SERVANT_TYPES[_svr.type]){
+      var _sdef = SERVANT_TYPES[_svr.type];
+      if(typeof pushLog === 'function'){
+        pushLog('<span class="pl">玩家</span> 擊敗敵人，獲得僕人：<b class="r-' + _svr.rarity + '">' + _sdef.name + '</b>（' + _svr.rarity + '）', [], 'explore');
+      }
+    }
+  }
 
   if(typeof pushLog === 'function'){
     if(win) pushLog('<span class="pl">玩家</span> <span class="win">戰鬥勝利</span>（' + c.enemies.length + ' 名敵人）', [], 'explore');

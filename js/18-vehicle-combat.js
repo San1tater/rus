@@ -133,17 +133,46 @@ window._vehicleWeaponsDead = function(){
   if(dmg.members && dmg.members.gunner <= 0 && dmg.members.commander <= 0) return true;
   const gunDead = dmg.parts && dmg.parts.gun <= 0;
   const turretDead = dmg.parts && dmg.parts.turret <= 0;
-  /* rev-fix-turret-ammo: 炮塔壞了不直接離場，改檢查剩餘武器彈藥 */
   if(!gunDead && !turretDead) return false;
   const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
   if(!ld) return true;
   const ammoState = state.vehicleAmmo && state.vehicleAmmo[vid];
+  /* rev-fix-turret-vehicles: 炮塔內武器按車型定義；車頂/外置武器炮塔卡死時仍可用 */
+  const TURRET_WEAPONS_BY_VID = {
+    btr80:  { kpvt:1, pkt:1 },
+    btr80a: { '2a72':1, pkt:1 },
+    btr82:  { kpvt:1, pkt:1 },
+    btr82a: { '2a72':1, pkt:1 },
+    btr90:  { '2a42':1, pkt:1 },
+    bmp1:   { '2a28':1, pkt:1 },
+    bmp1m:  { '2a72':1, pkt:1 },
+    bmp2:   { '2a42':1, pkt:1 },
+    bmp3:   { '2a70':1, '2a72':1, pkt:1 },
+    bmd4:   { '2a70':1, '2a72':1, pkt:1 },
+    t80:    { '2a46':1, pkt:1 },
+    t80b:   { '2a46':1, pkt:1 },
+    t80bv:  { '2a46':1, pkt:1 },
+    t80u:   { '2a46m1':1, pkt:1 },
+    t80uk:  { '2a46m1':1, pkt:1 },
+    t80um:  { '2a46m1':1, pkt:1 }
+  };
+  const turretWeapons = TURRET_WEAPONS_BY_VID[vid] || {};
+  const MAIN_GUNS = { '2a46':1, '2a46m1':1, '2a70':1, '2a28':1, '2a72':1, '2a42':1 };
   for(const wid in ld){
-    if(wid === 'pkt') continue;
-    if(wid === 'nsvt' || wid === 'kpvt' || wid === 'atgm'){
-      let a = ammoState && ammoState[wid];
-      if(!a) { a = { current: 100, max: 100 }; }
-      if(a && a.current > 0) return false;
+    if(MAIN_GUNS[wid] && gunDead) continue;
+    if(turretWeapons[wid] && turretDead) continue;
+    const a = ammoState && ammoState[wid];
+    if(!a){
+      const mx = ld[wid].belts ? ld[wid].belts * ld[wid].perBelt : (ld[wid].rounds || 0);
+      if(mx > 0) return false;
+      continue;
+    }
+    if(a.breakdown){
+      let sum = 0;
+      for(const k in a.breakdown) sum += (a.breakdown[k] || 0);
+      if(sum > 0) return false;
+    } else if((a.current || 0) > 0){
+      return false;
     }
   }
   return true;
@@ -656,11 +685,14 @@ function _vCalcPassengerArmor(p){
   return a;
 }
 
-window._vHitVehicle = function(veh, dmg, penMM, ammoId, attackerName, weaponName, weaponRarity){
+window._vHitVehicle = function(veh, dmg, penMM, ammoId, attackerName, weaponName, weaponRarity, attackerRarity){
   const vid = veh.vehicleId;
   const d = _vEnsureDamage(vid);
   if(attackerName || weaponName){
-    d.lastAttacker = { name: attackerName || '???', weapon: weaponName || '???', rarity: weaponRarity || '一般' };
+    var _atkRar = attackerRarity || '一般';
+    var _atkNameRaw = attackerName || '???';
+    var _atkNameHtml = (typeof rarityClass === 'function') ? ('<span class="' + rarityClass(_atkRar) + '">' + _atkNameRaw + '</span>') : _atkNameRaw;
+    d.lastAttacker = { name: _atkNameRaw, nameHtml: _atkNameHtml, weapon: weaponName || '???', rarity: weaponRarity || '一般' };
   }
   const part = _vPickWeighted(_VEHICLE_PART_PROB);
   let armorMM = _vGetArmor(vid, part.key);
@@ -712,30 +744,54 @@ const key = _vPickInternalKey(vid);
       d.members[tgt.r] = Math.max(0, d.members[tgt.r] - dmg * 1.5);
       _vehicleCombatFloat(0, '乘員 -' + Math.round(dmg * 1.5), 'crit');
       if(tgt.r === 'driver' && d.members.driver <= 0){
-        if(typeof pushLog === 'function') pushLog('<span class="lose">駕駛</span> 陣亡', [], 'explore');
         const _drvId = state.station && state.station.crew ? state.station.crew.driver : null;
-        if(_drvId){
-          const _drvSrv = (state.servants || []).find(function(s){ return s.id === _drvId; });
-          if(_drvSrv){ _drvSrv.hp = 0; _drvSrv.injuredUntil = Date.now() + 4 * 3600 * 1000; _drvSrv._injuredDown = true; }
+        const _drvSrv = _drvId ? (state.servants || []).find(function(s){ return s.id === _drvId; }) : null;
+        const _drvRar = _drvSrv ? (_drvSrv.rarity || '一般') : '一般';
+        const _drvCls = (typeof rarityClass === 'function') ? rarityClass(_drvRar) : '';
+        if(typeof pushLog === 'function'){
+          var _laDrv = d.lastAttacker;
+          if(_laDrv && _laDrv.weapon){
+            var _wClsDrv = (typeof rarityClass === 'function') ? rarityClass(_laDrv.rarity || '一般') : '';
+            pushLog('<span class="' + _drvCls + '">駕駛</span> 被 ' + (_laDrv.nameHtml || _laDrv.name) + ' 用 <span class="' + _wClsDrv + '">' + _laDrv.weapon + '</span> <span class="lose">擊殺</span>', [], 'explore');
+          } else {
+            pushLog('<span class="' + _drvCls + '">駕駛</span> <span class="lose">陣亡</span>', [], 'explore');
+          }
         }
+        if(_drvSrv){ _drvSrv.hp = 0; _drvSrv.injuredUntil = Date.now() + 4 * 3600 * 1000; _drvSrv._injuredDown = true; }
         d.repairUntil = Date.now() + 4 * 3600 * 1000;
         _forceLeave(vid, veh, 'driver_dead');
       }
       if(tgt.r === 'gunner' && d.members.gunner <= 0){
-        if(typeof pushLog === 'function') pushLog('<span class="lose">炮手</span> 陣亡', [], 'explore');
         const _gnrId = state.station && state.station.crew ? state.station.crew.gunner : null;
-        if(_gnrId){
-          const _gnrSrv = (state.servants || []).find(function(s){ return s.id === _gnrId; });
-          if(_gnrSrv){ _gnrSrv.hp = 0; _gnrSrv.injuredUntil = Date.now() + 4 * 3600 * 1000; _gnrSrv._injuredDown = true; }
+        const _gnrSrv = _gnrId ? (state.servants || []).find(function(s){ return s.id === _gnrId; }) : null;
+        const _gnrRar = _gnrSrv ? (_gnrSrv.rarity || '一般') : '一般';
+        const _gnrCls = (typeof rarityClass === 'function') ? rarityClass(_gnrRar) : '';
+        if(typeof pushLog === 'function'){
+          var _laGnr = d.lastAttacker;
+          if(_laGnr && _laGnr.weapon){
+            var _wClsGnr = (typeof rarityClass === 'function') ? rarityClass(_laGnr.rarity || '一般') : '';
+            pushLog('<span class="' + _gnrCls + '">炮手</span> 被 ' + (_laGnr.nameHtml || _laGnr.name) + ' 用 <span class="' + _wClsGnr + '">' + _laGnr.weapon + '</span> <span class="lose">擊殺</span>', [], 'explore');
+          } else {
+            pushLog('<span class="' + _gnrCls + '">炮手</span> <span class="lose">陣亡</span>', [], 'explore');
+          }
         }
+        if(_gnrSrv){ _gnrSrv.hp = 0; _gnrSrv.injuredUntil = Date.now() + 4 * 3600 * 1000; _gnrSrv._injuredDown = true; }
       }
       if(tgt.r === 'commander' && d.members.commander <= 0){
-        if(typeof pushLog === 'function') pushLog('<span class="lose">車長</span> 陣亡', [], 'explore');
         const _cmdId = state.station && state.station.crew ? state.station.crew.commander : null;
-        if(_cmdId){
-          const _cmdSrv = (state.servants || []).find(function(s){ return s.id === _cmdId; });
-          if(_cmdSrv){ _cmdSrv.hp = 0; _cmdSrv.injuredUntil = Date.now() + 4 * 3600 * 1000; _cmdSrv._injuredDown = true; }
+        const _cmdSrv = _cmdId ? (state.servants || []).find(function(s){ return s.id === _cmdId; }) : null;
+        const _cmdRar = _cmdSrv ? (_cmdSrv.rarity || '一般') : '一般';
+        const _cmdCls = (typeof rarityClass === 'function') ? rarityClass(_cmdRar) : '';
+        if(typeof pushLog === 'function'){
+          var _laCmd = d.lastAttacker;
+          if(_laCmd && _laCmd.weapon){
+            var _wClsCmd = (typeof rarityClass === 'function') ? rarityClass(_laCmd.rarity || '一般') : '';
+            pushLog('<span class="' + _cmdCls + '">車長</span> 被 ' + (_laCmd.nameHtml || _laCmd.name) + ' 用 <span class="' + _wClsCmd + '">' + _laCmd.weapon + '</span> <span class="lose">擊殺</span>', [], 'explore');
+          } else {
+            pushLog('<span class="' + _cmdCls + '">車長</span> <span class="lose">陣亡</span>', [], 'explore');
+          }
         }
+        if(_cmdSrv){ _cmdSrv.hp = 0; _cmdSrv.injuredUntil = Date.now() + 4 * 3600 * 1000; _cmdSrv._injuredDown = true; }
       }
     } else if(tgt.t === 'player'){
       const _tgt = { hp: state.player.hp, armor: state.player.armor };
@@ -769,7 +825,18 @@ const key = _vPickInternalKey(vid);
       if(tgt.srv.hp <= 0){
         tgt.srv.hp = 0;
         tgt.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
-        if(typeof pushLog === 'function') pushLog('<span class="lose">' + (typeof servantLabel === 'function' ? servantLabel(tgt.srv) : '載員') + '</span> 重傷', [], 'explore');
+        if(typeof pushLog === 'function'){
+          var _laP = d.lastAttacker;
+          var _sRarC = (tgt.srv && tgt.srv.rarity) ? tgt.srv.rarity : '一般';
+          var _sClsC = (typeof rarityClass === 'function') ? rarityClass(_sRarC) : '';
+          var _sNameC = (typeof servantLabel === 'function' ? servantLabel(tgt.srv) : '載員');
+          if(_laP && _laP.weapon){
+            var _wClsP = (typeof rarityClass === 'function') ? rarityClass(_laP.rarity || '一般') : '';
+            pushLog('<span class="' + _sClsC + '">' + _sNameC + '</span> 被 ' + (_laP.nameHtml || _laP.name) + ' 用 <span class="' + _wClsP + '">' + _laP.weapon + '</span> <span class="lose">擊倒</span>', [], 'explore');
+          } else {
+            pushLog('<span class="' + _sClsC + '">' + _sNameC + '</span> <span class="lose">重傷</span>', [], 'explore');
+          }
+        }
       }
     }
     return { penetrated: true, part: part.key, internal: '乘員', damage: dmg };
@@ -780,14 +847,30 @@ const key = _vPickInternalKey(vid);
   _vehicleCombatFloat(0, '-' + Math.round(dmg), '');
   if(key === 'engine' && d.parts.engine <= 0){
     if(_prevPartVal > 0){
-      if(typeof pushLog === 'function') pushLog('<span class="lose">引擎</span> 癱瘓', [], 'explore');
+      if(typeof pushLog === 'function'){
+      var _laEng = d.lastAttacker;
+      if(_laEng && _laEng.weapon){
+        var _wClsEng = (typeof rarityClass === 'function') ? rarityClass(_laEng.rarity || '一般') : '';
+        pushLog('<span class="run">引擎</span> 被 ' + (_laEng.nameHtml || _laEng.name) + ' 用 <span class="' + _wClsEng + '">' + _laEng.weapon + '</span> <span class="lose">癱瘓</span>', [], 'explore');
+      } else {
+        pushLog('<span class="run">引擎</span> <span class="lose">癱瘓</span>', [], 'explore');
+      }
+    }
       d.repairUntil = Date.now() + 4 * 3600 * 1000;
     }
     _forceLeave(vid, veh, 'engine');
   }
   if(key === 'tracks' && d.parts.tracks <= 0){
     if(_prevPartVal > 0){
-      if(typeof pushLog === 'function') pushLog('<span class="lose">履帶/輪組</span> 癱瘓', [], 'explore');
+      if(typeof pushLog === 'function'){
+      var _laTrk = d.lastAttacker;
+      if(_laTrk && _laTrk.weapon){
+        var _wClsTrk = (typeof rarityClass === 'function') ? rarityClass(_laTrk.rarity || '一般') : '';
+        pushLog('<span class="run">履帶/輪組</span> 被 ' + (_laTrk.nameHtml || _laTrk.name) + ' 用 <span class="' + _wClsTrk + '">' + _laTrk.weapon + '</span> <span class="lose">癱瘓</span>', [], 'explore');
+      } else {
+        pushLog('<span class="run">履帶/輪組</span> <span class="lose">癱瘓</span>', [], 'explore');
+      }
+    }
       d.repairUntil = Date.now() + 4 * 3600 * 1000;
     }
     _forceLeave(vid, veh, 'tracks');
@@ -795,9 +878,15 @@ const key = _vPickInternalKey(vid);
   if(key === 'gun' && d.parts.gun <= 0){
     if(_prevPartVal > 0){
       if(typeof pushLog === 'function'){
+        var _laGun = d.lastAttacker;
         const _shouldLeaveGun = window._vehicleWeaponsDead && window._vehicleWeaponsDead();
-        if(_shouldLeaveGun) pushLog('<span class="lose">炮管</span> 損壞，載具離場', [], 'explore');
-        else pushLog('<span class="lose">炮管</span> 損壞（車頂武器仍可開火）', [], 'explore');
+        var _gunSuffix = _shouldLeaveGun ? '，載具離場' : '（車頂武器仍可開火）';
+        if(_laGun && _laGun.weapon){
+          var _wClsGun = (typeof rarityClass === 'function') ? rarityClass(_laGun.rarity || '一般') : '';
+          pushLog('<span class="run">炮管</span> 被 ' + (_laGun.nameHtml || _laGun.name) + ' 用 <span class="' + _wClsGun + '">' + _laGun.weapon + '</span> <span class="lose">損壞</span>' + _gunSuffix, [], 'explore');
+        } else {
+          pushLog('<span class="run">炮管</span> <span class="lose">損壞</span>' + _gunSuffix, [], 'explore');
+        }
       }
       d.repairUntil = Date.now() + 4 * 3600 * 1000;
     }
@@ -805,7 +894,18 @@ const key = _vPickInternalKey(vid);
   }
   if(key === 'turret' && d.parts.turret <= 0){
     if(_prevPartVal > 0){
-      if(typeof pushLog === 'function') pushLog('<span class="lose">炮塔</span> 卡死，載具離場', [], 'explore');
+      /* rev-fix-turret-log-match: 日誌依實際是否全滅分開寫 */
+      var _allDeadT = window._vehicleWeaponsDead && window._vehicleWeaponsDead();
+      if(typeof pushLog === 'function'){
+        var _laTurr = d.lastAttacker;
+        var _turrSuffix = _allDeadT ? '，載具離場' : '（車頂武器仍可開火）';
+        if(_laTurr && _laTurr.weapon){
+          var _wClsTurr = (typeof rarityClass === 'function') ? rarityClass(_laTurr.rarity || '一般') : '';
+          pushLog('<span class="run">炮塔</span> 被 ' + (_laTurr.nameHtml || _laTurr.name) + ' 用 <span class="' + _wClsTurr + '">' + _laTurr.weapon + '</span> <span class="lose">卡死</span>' + _turrSuffix, [], 'explore');
+        } else {
+          pushLog('<span class="run">炮塔</span> <span class="lose">卡死</span>' + _turrSuffix, [], 'explore');
+        }
+      }
       d.repairUntil = Date.now() + 4 * 3600 * 1000;
     }
     if(window._vehicleWeaponsDead && window._vehicleWeaponsDead()) _forceLeave(vid, veh, 'turret');
@@ -875,9 +975,9 @@ function _detonate(vid, veh){
     const _la = d.lastAttacker;
     if(_la && _la.weapon){
       const _wClsDet = (typeof rarityClass === 'function') ? rarityClass(_la.rarity || '一般') : '';
-      pushLog('<span class="lose">殉爆</span> ' + _la.name + ' 用 <span class="' + _wClsDet + '">' + _la.weapon + '</span> 引發彈藥架殉爆，全員重傷', [], 'explore');
+      pushLog((_la.nameHtml || _la.name) + ' 用 <span class="' + _wClsDet + '">' + _la.weapon + '</span> 引發<span class="run">彈藥架</span><span class="lose">殉爆</span>，<span class="lose">全員重傷</span>', [], 'explore');
     } else {
-      pushLog('<span class="lose">殉爆</span> 載具彈藥架殉爆，全員重傷', [], 'explore');
+      pushLog('載具<span class="run">彈藥架</span><span class="lose">殉爆</span>，<span class="lose">全員重傷</span>', [], 'explore');
     }
   }
 
@@ -945,7 +1045,7 @@ function _resolveVehicleLeave(reason){
   if(reason === 'detonated' || reason === 'hull_destroyed'){
     _writeVehicleDestroyedLog(reason, _vid);
   } else if(reason === 'crew_dead'){
-    if(typeof pushLog === 'function') pushLog('<span class="lose">載具</span> 炮手車長陣亡', [], 'explore');
+    if(typeof pushLog === 'function') pushLog('載具 炮手、車長 <span class="lose">陣亡</span>', [], 'explore');
   }
 
   if(reason === 'detonated' || reason === 'player_dead'){

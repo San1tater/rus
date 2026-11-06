@@ -166,16 +166,33 @@ function generateEnemyInstance(e,t){
 
 function rollEnemyLoot(en){
   if(!en) return [];
-  var L=[];
-  if(en.primaryWeapon) L.push({id: en.primaryWeapon.id, rarity: en.primaryWeapon.rarity, count: 1});
-  if(en.secondaryWeapon) L.push({id: en.secondaryWeapon.id, rarity: en.secondaryWeapon.rarity, count: 1});
-  if(en.primaryWeapon && en.primaryWeapon.ammoId)
-    L.push({id: en.primaryWeapon.ammoId, rarity: _getAmmoRarity(en.primaryWeapon.ammoId), count: rndInt(30,60)});
-  if(en.secondaryWeapon && en.secondaryWeapon.ammoId)
-    L.push({id: en.secondaryWeapon.ammoId, rarity: _getAmmoRarity(en.secondaryWeapon.ammoId), count: rndInt(30,60)});
-  if(en.helmet) L.push({id: en.helmet, rarity: en.helmetRarity || '一般', count: 1});
-  if(en.body) L.push({id: en.body, rarity: en.bodyRarity || '一般', count: 1});
-  if(en.grenade) L.push({id: en.grenade.id, rarity: en.grenade.rarity || '一般', count: 1});
+  var L = [];
+  /* rev-fix-loot-random: 掉落加入隨機性，稀有度越高裝備越容易被打壞 */
+  var rar = en.rarity || '一般';
+  var rarIdx = RARITY_ORDER.indexOf(rar);
+  var baseChance = rarIdx >= 0 ? Math.max(0.55, 0.85 - rarIdx * 0.08) : 0.85;
+
+  if(en.primaryWeapon && Math.random() < baseChance * 0.90){
+    L.push({id: en.primaryWeapon.id, rarity: en.primaryWeapon.rarity, count: 1});
+    if(en.primaryWeapon.ammoId && Math.random() < 0.60){
+      L.push({id: en.primaryWeapon.ammoId, rarity: _getAmmoRarity(en.primaryWeapon.ammoId), count: rndInt(15, 35)});
+    }
+  }
+  if(en.secondaryWeapon && Math.random() < baseChance * 0.60){
+    L.push({id: en.secondaryWeapon.id, rarity: en.secondaryWeapon.rarity, count: 1});
+    if(en.secondaryWeapon.ammoId && Math.random() < 0.60){
+      L.push({id: en.secondaryWeapon.ammoId, rarity: _getAmmoRarity(en.secondaryWeapon.ammoId), count: rndInt(10, 25)});
+    }
+  }
+  if(en.helmet && Math.random() < baseChance * 0.40){
+    L.push({id: en.helmet, rarity: en.helmetRarity || '一般', count: 1});
+  }
+  if(en.body && Math.random() < baseChance * 0.35){
+    L.push({id: en.body, rarity: en.bodyRarity || '一般', count: 1});
+  }
+  if(en.grenade && en.grenade.count > 0 && Math.random() < 0.70){
+    L.push({id: en.grenade.id, rarity: en.grenade.rarity || '一般', count: 1});
+  }
   return L;
 }
 

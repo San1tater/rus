@@ -355,6 +355,33 @@ function _offlineExploreSettle(now, baseTime){
       allLoot[k].count += loot[li].count;
     }
   };
+  /* rev-fix-offline-ammo: 靜態裝備分數（不含彈藥）+ 主武器口徑 */
+  var _staticScore = (function(){
+    var _s = 0;
+    var _eq = state.player.equipped;
+    for(var _slot in _eq){
+      if(!_eq[_slot]) continue;
+      var _d = itemDef(_eq[_slot]);
+      if(!_d) continue;
+      var _r = state.player.equippedRarity[_slot] || '一般';
+      var _m = RARITY_MULT[_r] || 1;
+      if(_d.dmg != null) _s += _d.dmg * _m * 2;
+      if(_d.rpm) _s += _d.rpm * 0.05;
+      if(typeof equipArmorValue === 'function'){
+        if(_d.slot === 'head' || _d.slot === 'top' || _d.slot === 'pants' || _d.slot === 'shoes'){
+          _s += equipArmorValue(_eq[_slot], _r) * 1.2;
+        }
+      }
+    }
+    var _lvM = 1 + (state.player.level - 1) * 0.1;
+    return Math.max(10, _s * _lvM);
+  })();
+  var _mainCal = null;
+  var _pw = state.player.equipped.primary;
+  var _sw = state.player.equipped.secondary;
+  if(_pw){ var _pd = itemDef(_pw); if(_pd && _pd.cal) _mainCal = _pd.cal; }
+  if(!_mainCal && _sw){ var _sd = itemDef(_sw); if(_sd && _sd.cal) _mainCal = _sd.cal; }
+
   for(var i = 0; i < totalEvents; i++){
     var r = Math.random();
     if(r < 0.60){
@@ -370,14 +397,33 @@ function _offlineExploreSettle(now, baseTime){
       }
       if(!eventEnemies.length) continue;
       if(!isFinite(eventScore) || eventScore <= 0) eventScore = 100;
-      var winRate = _playerScore / (_playerScore + eventScore);
+      /* rev-fix-offline-ammo: 用偏好彈藥計算戰力 */
+      var _ammoRef = null;
+      if(_mainCal && typeof pickAmmoByPreferenceOrOrder === 'function'){
+        _ammoRef = pickAmmoByPreferenceOrOrder(_mainCal, 'explore');
+      }
+      var _eventPlayerScore = _staticScore;
+      if(_ammoRef && _ammoRef.def){
+        var _aM = RARITY_MULT[_ammoRef.rarity] || 1;
+        _eventPlayerScore += _ammoRef.def.dmg * _aM * 2 + (_ammoRef.def.penMM || 0) * 5;
+      } else if(state.player.equipped.melee){
+        var _mDef = itemDef(state.player.equipped.melee);
+        if(_mDef) _eventPlayerScore += (_mDef.dmg || 25) * 2;
+      }
+      var winRate = _eventPlayerScore / (_eventPlayerScore + eventScore);
       if(!isFinite(winRate)) winRate = 0.5;
       if(winRate < 0.05) winRate = 0.05;
       if(winRate > 0.95) winRate = 0.95;
       if(Math.random() < winRate){
         wins++;
-        // 離線 1% 機率掉落僕人
-        if(Math.random() < 0.01 && typeof grantRandomServant === 'function'){
+        /* rev-fix-offline-ammo: 扣除彈藥 */
+        if(_ammoRef){
+          var _need = Math.ceil(n * 5);
+          var _take = Math.min(_need, _ammoRef.count);
+          if(_take > 0) invRemove(_ammoRef.id, _ammoRef.rarity, _take);
+        }
+        /* rev-fix-offline-servant: 2% 掉僕人（與在線一致） */
+        if(Math.random() < 0.02 && typeof grantRandomServant === 'function'){
           var _srv = grantRandomServant();
           if(_srv && !offlineServantGained) offlineServantGained = _srv;
         }
@@ -389,11 +435,15 @@ function _offlineExploreSettle(now, baseTime){
         losses++;
       }
     } else if(r < 0.85){
+      /* rev-fix-offline-search: 與在線一致，1~3 種 */
       searchCount++;
-      var drop = (typeof rollRegionDrop === 'function') ? rollRegionDrop(region) : null;
-      if(drop){
-        var cnt = 1 + Math.floor(Math.random() * 3);
-        _lootAdd([{ id: drop.id, rarity: drop.rarity, count: cnt }]);
+      var _nSearch = 1 + Math.floor(Math.random() * 3);
+      for(var _si = 0; _si < _nSearch; _si++){
+        var drop = (typeof rollRegionDrop === 'function') ? rollRegionDrop(region) : null;
+        if(drop){
+          var cnt = 1 + Math.floor(Math.random() * 3);
+          _lootAdd([{ id: drop.id, rarity: drop.rarity, count: cnt }]);
+        }
       }
     } else {
       emptyCount++;
