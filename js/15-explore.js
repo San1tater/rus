@@ -908,7 +908,16 @@ function _startCombat(ev, first){
     }
     if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'dead'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now(); }
     if(typeof pushLog === 'function'){
-      pushLog('<span class="pl">玩家</span> <span class="lose">重傷倒地</span>，60 秒後恢復', [], 'explore');
+      /* rev-fix-player-killer-onResolve: 顯示被誰擊倒 */
+      var _pk = ex._pendingPlayerKiller;
+      ex._pendingPlayerKiller = null;
+      if(_pk && _pk.weapon){
+        var _wClsPK = (typeof rarityClass === 'function') ? rarityClass(_pk.wRarity || '一般') : '';
+        var _eClsPK = (typeof rarityClass === 'function') ? rarityClass(_pk.aRarity || '一般') : '';
+        pushLog('<span class="pl">玩家</span> 被 <span class="' + _eClsPK + '">' + _pk.name + '</span> 用 <span class="' + _wClsPK + '">' + _pk.weapon + '</span> <span class="lose">擊倒</span>，60 秒後恢復', [], 'explore');
+      } else {
+        pushLog('<span class="pl">玩家</span> <span class="lose">重傷倒地</span>，60 秒後恢復', [], 'explore');
+      }
     }
     if(typeof save === 'function') save();
     if(typeof renderZone3Log === 'function') renderZone3Log();

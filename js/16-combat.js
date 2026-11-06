@@ -961,10 +961,15 @@ function _enemyFire(e, now){
     _target: p,
     _onHit: function() {
       if(!hit || p.hp <= 0) return;
-      const _baseDmg = w.dmg != null ? w.dmg : (e.dmg != null ? e.dmg : 10);
-      let dmg = (typeof rndInt === 'function') ? rndInt(_baseDmg - 5, _baseDmg + 5) : _baseDmg;
+      /* rev-fix-enemy-dmg-unify: 與玩家一致 — 基礎傷害 = AMMO.dmg × 彈藥稀有度倍率，無隨機波動 */
+      let dmg;
+      if(w.ammoId && AMMO[w.ammoId]){
+        const _ammoDefE = AMMO[w.ammoId];
+        dmg = Math.round(_ammoDefE.dmg * (RARITY_MULT[_ammoDefE.rarity] || 1));
+      } else {
+        dmg = (w.dmg != null ? w.dmg : (e.dmg != null ? e.dmg : 10));
+      }
       const penMM = (AMMO[w.ammoId] && AMMO[w.ammoId].penMM) || e.penMM || 0;
-      /* rev-fix-enemy-crit: 敵人暴擊，與玩家邏輯一致 */
       const _wRarE = e.rarity || '一般';
       const _aRarE = (w.ammoId && AMMO[w.ammoId]) ? AMMO[w.ammoId].rarity : '一般';
       const _isCritE = Math.random() < calcCritRate(_wRarE, _aRarE);
@@ -989,6 +994,12 @@ function _enemyFire(e, now){
         state.player.hp = p.hp;
         state.player.armor = p.armor;
         _playHurt(performance.now());
+        /* rev-fix-player-killer-rifle */
+        if(p.hp <= 0 && !c._playerKiller){
+          var _eNameK = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
+          var _wNameK = (w && w.id && typeof WEAPONS !== 'undefined' && WEAPONS[w.id]) ? WEAPONS[w.id].name : (w && w.id ? w.id : '武器');
+          c._playerKiller = { name: _eNameK, weapon: _wNameK, wRarity: (w && w.rarity) || '一般', aRarity: e.rarity || '一般' };
+        }
         _float(p, '-' + (res.hpLost + res.armorLost), _isCritE ? 'crit' : '');
         /* rev-fix-evac-on-player-death */
         if(p.hp <= 0 && typeof _evac === 'function' && !(window._explore && window._explore.evacuatingPassengers)){
@@ -1074,6 +1085,11 @@ function _enemyFireRPG(e, p, now){
         state.player.hp = p.hp;
         state.player.armor = p.armor;
         _playHurt(performance.now());
+        /* rev-fix-player-killer-rpg */
+        if(p.hp <= 0 && !c._playerKiller){
+          var _eNameK2 = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
+          c._playerKiller = { name: _eNameK2, weapon: 'RPG', wRarity: rar || '一般', aRarity: e.rarity || '一般' };
+        }
         _float(p, '-' + (res.hpLost + res.armorLost), crit ? 'crit' : '');
         /* rev-fix-evac-rpg: 玩家被 RPG 打到倒地也撤載員 */
         if(p.hp <= 0 && typeof _evac === 'function' && !(window._explore && window._explore.evacuatingPassengers)){
@@ -1198,9 +1214,22 @@ function _enemyThrowGrenade(e, p, now){
           if(Math.random() < hitRate) hitCount++;
         }
         if(hitCount === 0){ _float(a, 'MISS', 'miss'); continue; }
-        const totalDmg = Math.round(gDmg * hitCount);
+        /* rev-fix-enemy-grenade-crit: 手榴彈暴擊，與玩家邏輯一致 */
+        const _gCritRate = calcCritRate(gRar, gRar);
+        const _gCritMult = calcCritMult(gRar, gRar);
+        const _gIsCrit = Math.random() < _gCritRate;
+        let totalDmg = Math.round(gDmg * hitCount);
+        if(_gIsCrit) totalDmg = Math.round(totalDmg * _gCritMult);
         a.hp = Math.max(0, a.hp - totalDmg);
-        if(a.isPlayer){ state.player.hp = a.hp; _playHurt(performance.now()); }
+        if(a.isPlayer){
+          state.player.hp = a.hp;
+          _playHurt(performance.now());
+          /* rev-fix-player-killer-grenade */
+          if(a.hp <= 0 && !c._playerKiller){
+            var _eNameK3 = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
+            c._playerKiller = { name: _eNameK3, weapon: (gDef && gDef.name) || '手榴彈', wRarity: gRar || '一般', aRarity: e.rarity || '一般' };
+          }
+        }
         if(a.isPassenger && a.hp <= 0 && a.srv){
           a.srv.hp = 0;
           a.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
@@ -1489,7 +1518,7 @@ function _resolve(win){
 
   if(typeof pushLog === 'function'){
     if(win) pushLog('<span class="pl">玩家</span> <span class="win">戰鬥勝利</span>（' + c.enemies.length + ' 名敵人）', [], 'explore');
-    else if(c.sceneType !== 'vehicle') pushLog('<span class="pl">玩家</span> <span class="lose">戰鬥失敗</span>', [], 'explore');
+    /* rev-fix-player-killer-resolve: 失敗日誌改由 onResolve 統一輸出「被 X 用 Y 擊倒」 */
   }
 
   if(win){
@@ -1497,6 +1526,8 @@ function _resolve(win){
     c.lootUntil = performance.now() + 0;
   } else {
     c.active = false;
+    /* rev-fix-player-killer-resolve: 保存 killer 到 ex，供 onResolve 使用 */
+    if(c._playerKiller && window._explore) window._explore._pendingPlayerKiller = c._playerKiller;
     const cb = c.onResolve;
     c.onResolve = null;
     _cleanup();

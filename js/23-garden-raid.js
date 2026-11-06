@@ -66,6 +66,9 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
       towerIdx: g.towerIdx, towerCfg: g.towerCfg,
       ammoId: ammoId, ammoRarity: ammoRarity, ammoStock: stock,
       ammoBudget: budget, ammoUsed: 0, magCap: magCap,
+      /* rev-fix-raid-offline-guard-armor: 與步戰一致 — 記錄裝備以計算部位護甲 */
+      equipped: { head: (eqCfg && eqCfg.head) || null, top: (eqCfg && eqCfg.top) || null },
+      equippedRarity: { head: (eqRar && eqRar.head) || '一般', top: (eqRar && eqRar.top) || '一般' },
       hitRate: hitRate, critRate: critRate, critMult: critMult,
       dmgDone: 0
     });
@@ -78,6 +81,13 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
     return {
       id: _eid, name: _ename,
       dmg: _dmg, pen: _pen, armorLevel: e.armorLevel || 1,
+      /* rev-fix-raid-offline-enemy-armor: 與步戰一致 — 記錄裝備以計算部位護甲 */
+      helmet: e.helmet || null,
+      body: e.body || null,
+      helmetRarity: e.helmetRarity || '一般',
+      bodyRarity: e.bodyRarity || '一般',
+      rarity: e.rarity || '一般',
+      ammoId: (e.primaryWeapon && e.primaryWeapon.ammoId) || null,
       rpm: 300, hp: e.maxHp, maxHp: e.maxHp,
       armor: e.armor || 0, maxArmor: e.maxArmor || 0, alive: true, isGuard: false
     };
@@ -103,11 +113,34 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
       dmg = ammo ? Math.round(ammo.dmg * (RARITY_MULT[fromU.ammoRarity] || 1)) : Math.round((fromU.weaponDef.dmg || 20) * (RARITY_MULT[fromU.weaponRarity] || 1));
       if(Math.random() < fromU.critRate) dmg = Math.round(dmg * fromU.critMult);
     } else {
-      dmg = fromU.dmg || 10;
+      /* rev-fix-raid-offline-enemy-dmg: 與步戰一致 — 彈藥傷害 × 稀有度倍率 + 暴擊 */
+      if(fromU.ammoId && AMMO[fromU.ammoId]){
+        const _aDef = AMMO[fromU.ammoId];
+        dmg = Math.round(_aDef.dmg * (RARITY_MULT[_aDef.rarity] || 1));
+      } else {
+        dmg = fromU.dmg || 10;
+      }
+      const _aRarE2 = fromU.ammoId && AMMO[fromU.ammoId] ? AMMO[fromU.ammoId].rarity : '一般';
+      const _isCritE2 = Math.random() < calcCritRate(fromU.rarity || '一般', _aRarE2);
+      if(_isCritE2) dmg = Math.round(dmg * calcCritMult(fromU.rarity || '一般', _aRarE2));
     }
     const tgt = { hp: toU.hp, armor: toU.armor };
     const pen = fromU.isGuard ? (fromU.ammoId && AMMO[fromU.ammoId] ? (AMMO[fromU.ammoId].penMM || 0) : (fromU.weaponDef.penMM || 0)) : (fromU.pen || 0);
-    const res = applyDamage(tgt, dmg, pen, toU.armorLevel || 0);
+    /* rev-fix-raid-offline-armor-provider: 與步戰一致 — roll 部位 + 部位護甲 */
+    const _armorProvider = toU.isGuard ? function(part){
+        if(part === 'head' || part === 'face'){
+          const h = toU.equipped && toU.equipped.head;
+          return h ? armorMMForSlot(h, part) : 0;
+        }
+        if(part === 'top'){
+          const t = toU.equipped && toU.equipped.top;
+          return t ? armorMMForSlot(t, 'top') : 0;
+        }
+        return 0;
+      } : function(part){
+        return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(toU, part) : 0;
+      };
+    const res = applyDamage(tgt, dmg, pen, { armorProvider: _armorProvider });
     toU.hp = tgt.hp; toU.armor = tgt.armor;
     const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
     fromU.dmgDone = (fromU.dmgDone || 0) + shown;
@@ -1081,6 +1114,13 @@ function _gardenRaidShowBattle(guards, enemies, region){
       enemyUnits.push({
         id: _eid, name: _ename,
         dmg: _dmg, pen: _pen, armorLevel: e.armorLevel || 1,
+        /* rev-fix-raid-online-enemy-armor: 與步戰一致 — 記錄裝備以計算部位護甲 */
+        helmet: e.helmet || null,
+        body: e.body || null,
+        helmetRarity: e.helmetRarity || '一般',
+        bodyRarity: e.bodyRarity || '一般',
+        rarity: e.rarity || '一般',
+        ammoId: (e.primaryWeapon && e.primaryWeapon.ammoId) || null,
         rpm: 300,
         homeX: _colX, homeY: _y,
         x: wrapW + 120, targetX: _colX, targetY: _y, slideIn: true,
@@ -1223,7 +1263,17 @@ function _gardenRaidShowBattle(guards, enemies, region){
       let dmg = 0, crit = false;
       if(hit){
         if(isEnemy){
-          dmg = fromU.dmg || 10;
+          /* rev-fix-raid-online-enemy-dmg: 與步戰一致 — 彈藥傷害 × 稀有度倍率 + 暴擊 */
+          if(fromU.ammoId && AMMO[fromU.ammoId]){
+            const _aDef = AMMO[fromU.ammoId];
+            dmg = Math.round(_aDef.dmg * (RARITY_MULT[_aDef.rarity] || 1));
+          } else {
+            dmg = fromU.dmg || 10;
+          }
+          const _aRarE = fromU.ammoId && AMMO[fromU.ammoId] ? AMMO[fromU.ammoId].rarity : '一般';
+          const _isCritE = Math.random() < calcCritRate(fromU.rarity || '一般', _aRarE);
+          if(_isCritE) dmg = Math.round(dmg * calcCritMult(fromU.rarity || '一般', _aRarE));
+          crit = _isCritE;
         } else {
           const ammo = fromU.ammoId ? AMMO[fromU.ammoId] : null;
           const baseDmg = ammo ? Math.round(ammo.dmg * (RARITY_MULT[fromU.ammoRarity] || 1)) : Math.round((fromU.weaponDef.dmg || 20) * (RARITY_MULT[fromU.weaponRarity] || 1));
@@ -1268,7 +1318,21 @@ function _gardenRaidShowBattle(guards, enemies, region){
       }
       const tgt = { hp: toU.hp, armor: toU.armor };
       const pen = b.fromU.isGuard ? (b.fromU.ammoId && AMMO[b.fromU.ammoId] ? (AMMO[b.fromU.ammoId].penMM || 0) : (b.fromU.weaponDef.penMM || 0)) : (b.fromU.pen || 0);
-      const res = applyDamage(tgt, b.damage, pen, toU.armorLevel || 0);
+      /* rev-fix-raid-online-armor-provider: 與步戰一致 — roll 部位 + 部位護甲 */
+      const _armorProvider = toU.isGuard ? function(part){
+        if(part === 'head' || part === 'face'){
+          const h = toU.equipped && toU.equipped.head;
+          return h ? armorMMForSlot(h, part) : 0;
+        }
+        if(part === 'top'){
+          const t = toU.equipped && toU.equipped.top;
+          return t ? armorMMForSlot(t, 'top') : 0;
+        }
+        return 0;
+      } : function(part){
+        return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(toU, part) : 0;
+      };
+      const res = applyDamage(tgt, b.damage, pen, { armorProvider: _armorProvider });
       toU.hp = tgt.hp; toU.armor = tgt.armor;
       const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
       b.fromU.dmgDone = (b.fromU.dmgDone || 0) + shown;

@@ -806,6 +806,16 @@ const key = _vPickInternalKey(vid);
         const _ex = window._explore;
         if(_ex){ _ex.mode = 'dead'; _ex.deadUntil = performance.now() + 60000; _ex._currentSpeed = 0; }
         if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'dead'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now(); }
+        /* rev-fix-player-killer-vehicle: 載具戰玩家倒下時顯示被誰擊倒 */
+        if(typeof pushLog === 'function'){
+          var _laPK = d.lastAttacker;
+          if(_laPK && _laPK.weapon){
+            var _wClsPKV = (typeof rarityClass === 'function') ? rarityClass(_laPK.rarity || '一般') : '';
+            pushLog('<span class="pl">玩家</span> 被 ' + (_laPK.nameHtml || _laPK.name) + ' 用 <span class="' + _wClsPKV + '">' + _laPK.weapon + '</span> <span class="lose">擊倒</span>', [], 'explore');
+          } else {
+            pushLog('<span class="pl">玩家</span> <span class="lose">重傷倒地</span>', [], 'explore');
+          }
+        }
         _forceLeave(vid, veh, 'player_dead');
       }
     } else if(tgt.t === 'passenger'){
