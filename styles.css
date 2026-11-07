@@ -1803,3 +1803,13 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 
 /* [v74-stat-pair] emoji 與當前值綁成一個不可拆的 flex item */
 .player-stat-panel .stat-pair{display:inline-flex;align-items:center;gap:2px;white-space:nowrap;flex:0 0 auto}
+
+
+/* v147: 隱藏戰鬥列表滾動條 */
+.boss-list::-webkit-scrollbar {
+  display: none !important;
+}
+.boss-list {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
