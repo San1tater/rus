@@ -339,7 +339,7 @@ function _stSlotHtml(slot, label, id, rar, cnt){
 function _stVehicleHealth(vid){
   const d = state.vehicleDamage && state.vehicleDamage[vid];
   if(!d) return { hp: 2600, max: 2600, pct: 100, repairing: false, destroyed: false };
-  const maxParts = 800 + 1000 + 400 + 400;
+  const maxParts = 800 + 1000 + 400;
   if(d.destroyed) return { hp: 0, max: maxParts, pct: 0, repairing: false, destroyed: true };
   if(d.repairUntil && d.repairUntil > Date.now()){
     return { hp: 0, max: maxParts, pct: 0, repairing: true, repairUntil: d.repairUntil, destroyed: false };
@@ -366,7 +366,7 @@ function _stRender(page){
   html += '<span style="color:' + _hpCol + ';font-size:12px;font-weight:bold;font-family:monospace">' + _stFmtNum(_vh.hp) + '/' + _stFmtNum(_vh.max) + '</span>';
   if(_repairTxt) html += '<span style="color:#e05252;font-size:11px">' + _repairTxt + '</span>';
   html += '<button class="btn" id="st-repair-btn" style="background:#e8a33d;color:#0e0c0a;border-color:#e8a33d;font-weight:bold">維修</button>';
-  html += '<button class="btn" id="st-garage-btn" style="background:#4caf50;color:#fff;border-color:#4caf50;font-weight:bold">車場</button>';
+  html += '<button class="btn" id="st-heal-btn" style="background:#4caf50;color:#fff;border-color:#4caf50;font-weight:bold">治療</button>';
   html += '</div>';
   html += '<div class="st-x" id="st-close">✕</div></div>';
   html += '<div class="st-body" id="st-body-scroll">';
@@ -414,7 +414,7 @@ function _stRender(page){
 
   const _cost = (typeof vcEstimateCallCost === 'function') ? vcEstimateCallCost(vid) : { diff: 0 };
   const _avail = (typeof vcAmmoEquivTotal === 'function') ? Math.round(vcAmmoEquivTotal()) : 0;
-  html += '<div class="st-section"><div class="st-sec-title" style="display:flex;justify-content:space-between;align-items:center"><span>彈藥配置</span><span style="font-size:11px;color:#e8a33d;font-weight:bold;padding-left:40px;margin-left:auto;font-family:monospace">預估 ' + _stFmtNum(_cost ? _cost.diff : 0) + ' / 可用 ' + _stFmtNum(_avail) + '</span></div>';
+  html += '<div class="st-section"><div class="st-sec-title" style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:6px;align-items:center"><span>彈藥配置</span><button class="btn" id="st-garage-btn" style="padding:2px 10px;font-size:10px;background:#4caf50;color:#fff;border-color:#4caf50;font-weight:bold;border-radius:4px;flex:0 0 auto;white-space:nowrap;display:inline-flex;align-items:center;gap:4px">車場 <span style="font-size:11px;line-height:1;color:#fff;-webkit-text-fill-color:#fff">▶︎</span></button></div><span style="font-size:11px;color:#e8a33d;font-weight:bold;font-family:monospace">預估 ' + _stFmtNum(_cost ? _cost.diff : 0) + ' / 可用 ' + _stFmtNum(_avail) + '</span></div>';
 
   const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
   let beltRows = '';
@@ -488,7 +488,8 @@ function _stRender(page){
   }
   if(mainRows) html += mainRows;
   if(ld && ld.atgm){
-    html += '<div class="st-main-row" style="cursor:default;opacity:.85"><div class="st-main-name">ATGM</div><div class="st-main-icons" style="color:#e8a33d;font-weight:bold">車型固定 ' + (ld.atgm.rounds || 0) + ' 發</div></div>';
+    const _atgmName140 = (typeof window._vehicleWeaponDisplayName === 'function') ? window._vehicleWeaponDisplayName('atgm', vid) : 'ATGM';
+    html += '<div class="st-main-row" style="cursor:default;opacity:.85"><div class="st-main-name">' + _atgmName140 + '</div><div class="st-main-icons" style="color:#e8a33d;font-weight:bold">車型固定 ' + (ld.atgm.rounds || 0) + ' 發</div></div>';
   }
 
   html += '</div>';
@@ -544,11 +545,79 @@ function _stRender(page){
     })(mr[mi]);
   }
 
+  const hb = page.querySelector('#st-heal-btn');
+  if(hb) hb.onclick = function(){ _stHealAllCrew(vid); };
+
   const rb = page.querySelector('#st-repair-btn');
   if(rb) rb.onclick = function(){ _stOpenRepairDialog(vid); };
 
   const gb = page.querySelector('#st-garage-btn');
   if(gb) gb.onclick = function(){ closeStationPage(); if(typeof openGaragePage === 'function') openGaragePage(); };
+}
+
+function _stHealAllCrew(vid){
+  const st = _stInit();
+  const _now = Date.now();
+  const _allInjured = [];
+  const _injuredNames = [];
+  for(const role of _ST_CREW_ROLES){
+    const sid = st.crew[role];
+    if(!sid) continue;
+    const srv = state.servants.find(function(s){ return s.id === sid; });
+    if(!srv) continue;
+    if((srv.injuredUntil && srv.injuredUntil > _now) || srv.hp <= 0){
+      _allInjured.push(srv);
+      _injuredNames.push('車組·' + _ST_CREW_LABELS[role] + ' ' + servantLabel(srv));
+    }
+  }
+  for(const p of st.passengers){
+    if(!p || !p.srvId) continue;
+    const srv = state.servants.find(function(s){ return s.id === p.srvId; });
+    if(!srv) continue;
+    if((srv.injuredUntil && srv.injuredUntil > _now) || srv.hp <= 0){
+      _allInjured.push(srv);
+      _injuredNames.push('載員 ' + servantLabel(srv));
+    }
+  }
+  if(!_allInjured.length){
+    if(typeof notify === 'function') notify('沒有需要治療的成員', 'warn');
+    return;
+  }
+  let _totalMed = 0;
+  for(const k in state.inventory){
+    const p = k.split('@');
+    const c = CONSUMABLES[p[0]];
+    if(!c || !c.heal) continue;
+    if(state.inventory[k] > 0) _totalMed += state.inventory[k];
+  }
+  let body = '<div class="detail-sub">需要治療 ' + _allInjured.length + ' 名成員</div>';
+  body += '<div class="stat-line"><span class="k">醫療品需求</span><span class="v">' + _allInjured.length + ' 個</span></div>';
+  body += '<div class="stat-line"><span class="k">當前庫存</span><span class="v" style="color:' + (_totalMed >= _allInjured.length ? '#4caf50' : '#e05252') + '">' + _totalMed + ' 個</span></div>';
+  body += '<div class="divider"></div>';
+  body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:6px">名單</div>';
+  for(const name of _injuredNames){
+    body += '<div style="font-size:11px;color:#a89a85;padding:3px 0">· ' + name + '</div>';
+  }
+  const ft = document.createElement('div');
+  ft.className = 'modal-ft';
+  ft.innerHTML = '<button class="btn primary" id="st-heal-all-ok" ' + (_totalMed >= _allInjured.length ? '' : 'disabled') + '>確認治療</button>';
+  const bd = openModal({ title: '一鍵治療', body: body, footer: ft });
+  const ok = ft.querySelector('#st-heal-all-ok');
+  if(ok) ok.onclick = function(){
+    let _healed = 0;
+    for(const srv of _allInjured){
+      const _med = _stConsumeLowestMed();
+      if(!_med) break;
+      srv.injuredUntil = 0;
+      srv._injuredDown = false;
+      srv.hp = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
+      _healed++;
+    }
+    save();
+    closeModal();
+    if(typeof notify === 'function') notify('治療 ' + _healed + ' 名成員');
+    _stRefresh();
+  };
 }
 
 function _stOpenRepairDialog(vid){
@@ -963,9 +1032,11 @@ function _stDetail(idx){
     const gr = gi ? (typeof gi === 'string' ? '一般' : (gi.rarity || '一般')) : null;
     const gw = gid ? (ITEM_WEIGHT[gid] || 0.5) : 0;
     const bg = gid ? rarityBg(gr) : '';
+    const _stockQ141 = gid ? ((typeof invCount === 'function') ? invCount(gid, gr) : 0) : 0;
+    const _stockCol141 = _stockQ141 > 0 ? '#fff' : '#e05252';
     body += '<div class="st-pd-grenade' + (gid ? ' filled' : '') + '" data-grenade="' + g + '"' + (gid ? ' style="border-color:' + bg + '"' : '') + '>';
     body += '<div class="st-pd-grenade-lbl">#' + (g + 1) + '</div>';
-    if(gid) body += '<div class="st-pd-grenade-icon" style="background:' + bg + '">' + itemIcon(gid, 60) + '</div><div class="st-pd-grenade-wt">' + gw.toFixed(1) + 'kg</div>';
+    if(gid) body += '<div class="st-pd-grenade-icon" style="background:' + bg + '">' + itemIcon(gid, 60) + '</div><div class="st-pd-grenade-wt" style="color:' + _stockCol141 + '">×' + _stockQ141 + (_stockQ141 > 0 ? ' · ' + gw.toFixed(1) + 'kg' : ' 缺') + '</div>';
     else body += '<div class="st-pd-grenade-icon empty">＋</div>';
     body += '</div>';
   }
@@ -1211,44 +1282,61 @@ function _stPickGrenade(idx, gi){
   const cw = cid ? (ITEM_WEIGHT[cid] || 0.5) : 0;
   const bw = tw - cw;
 
+  /* rev141: 手榴彈 = 配置；裝/卸不扣庫存，投擲時才扣。列表含「當前已配置」即使庫存 0 */
   const list = [];
+  const seen = {};
+  if(cid){
+    const _curDef = WEAPONS[cid];
+    if(_curDef && _curDef.slot === 'throwable'){
+      const _curCnt = invCount(cid, cr || '一般');
+      list.push({ id: cid, rarity: cr || '一般', def: _curDef, count: _curCnt, isCurrent: true });
+      seen[cid + '@' + (cr || '一般')] = true;
+    }
+  }
   for(const k in state.inventory){
     const pp = k.split('@');
     const d = WEAPONS[pp[0]];
     if(!d || d.slot !== 'throwable') continue;
     if(state.inventory[k] <= 0) continue;
+    const _key = pp[0] + '@' + pp[1];
+    if(seen[_key]) continue;
+    seen[_key] = true;
     list.push({ id: pp[0], rarity: pp[1], def: d, count: state.inventory[k] });
   }
   list.sort(function(a, b){
+    if(a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
     const rd = sortByRarityDesc(a, b);
     return rd !== 0 ? rd : (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
   });
 
   let body = '';
-  if(cid) body += '<div class="item-row" data-clear="1"><div class="icon">✕</div><div class="info"><div class="nm">卸下</div><div class="sub">清空此欄</div></div></div>';
+  body += '<div style="font-size:10px;color:#7a6f60;margin-bottom:8px;line-height:1.4">配置只決定「傾向使用什麼」，投擲時才從庫存扣除。庫存為 0 則不投擲。</div>';
+  if(cid) body += '<div class="item-row" data-clear="1"><div class="icon">✕</div><div class="info"><div class="nm">卸下</div><div class="sub">清空此欄（不影響庫存）</div></div></div>';
   if(!list.length) body += '<div class="empty-hint">庫存沒有手榴彈</div>';
   for(let li = 0; li < list.length; li++){
     const it = list[li];
     const gw = ITEM_WEIGHT[it.id] || 0.5;
     const dis = (bw + gw) > mw;
+    const _stockCol = it.count > 0 ? '#4caf50' : '#e05252';
+    const _stockTxt = it.count > 0 ? ('×' + it.count) : '缺貨';
+    const _curBadge = it.isCurrent ? ' <span style="color:#e8a33d;font-size:9px">（當前配置）</span>' : '';
     const wl = gw.toFixed(1) + ' kg' + (dis ? ' · 超重' : '');
-    body += '<div class="item-row' + (dis ? ' disabled' : '') + '" data-gid="' + it.id + '" data-grid="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 40) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + '</div><div class="sub">' + it.rarity + ' · ' + wl + ' ×' + it.count + '</div></div>' + (dis ? '<div class="cnt" style="color:#e05252;font-weight:bold">✕</div>' : '') + '</div>';
+    body += '<div class="item-row' + (dis ? ' disabled' : '') + '" data-gid="' + it.id + '" data-grid="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 40) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _curBadge + '</div><div class="sub">' + it.rarity + ' · ' + wl + ' · <span style="color:' + _stockCol + '">' + _stockTxt + '</span></div></div>' + (dis ? '<div class="cnt" style="color:#e05252;font-weight:bold">✕</div>' : '') + '</div>';
   }
 
-  const _title = '選擇手榴彈 · ' + tw.toFixed(1) + ' / ' + mw + ' kg' + (tw > mw ? ' ⚠' : '');
+  const _title = '配置手榴彈 · ' + tw.toFixed(1) + ' / ' + mw + ' kg' + (tw > mw ? ' ⚠' : '');
   const bd = openModal({ title: _title, body: body, onClose: function(){ closeModal(); _stDetail(idx); } });
   const rows = bd.querySelectorAll('.item-row:not(.disabled)');
   for(let ri = 0; ri < rows.length; ri++){
     (function(el){
       el.onclick = function(){
         if(el.getAttribute('data-clear')){
-          if(cid) invAdd(cid, cr || '一般', 1);
+          /* rev141: 卸下不退庫存（本來就沒扣） */
           p.grenades[gi] = null;
         } else {
           const gid = el.getAttribute('data-gid');
           const grid = el.getAttribute('data-grid');
-          if(!invRemove(gid, grid, 1)) return;
-          if(cid) invAdd(cid, cr || '一般', 1);
+          /* rev141: 裝上不扣庫存，只記錄配置 */
           p.grenades[gi] = { id: gid, rarity: grid };
         }
         save();
@@ -1384,14 +1472,8 @@ function _stReturnPassengerEquip(p){
     p.ammoBox = null;
   }
   if(Array.isArray(p.grenades)){
-    for(let i = 0; i < p.grenades.length; i++){
-      const g = p.grenades[i];
-      if(!g) continue;
-      const gid = typeof g === 'string' ? g : g.id;
-      const gr = typeof g === 'string' ? '一般' : (g.rarity || '一般');
-      if(gid) invAdd(gid, gr, 1);
-      p.grenades[i] = null;
-    }
+    /* rev141: 手榴彈 = 配置，卸載員時不退庫存 */
+    for(let i = 0; i < p.grenades.length; i++) p.grenades[i] = null;
   }
 }
 

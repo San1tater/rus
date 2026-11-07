@@ -880,14 +880,20 @@ function _firePassenger(a, t, now, w){
 
   /* rev-fix-passenger-grenade-branch: 10% 概率優先投雷 */
   if(a.grenades && a.grenades.length > 0 && now >= (a._nextGrenadeAt || 0) && Math.random() < 0.10){
-    const gEntry = a.grenades[0];
-    const gDef = (typeof WEAPONS !== 'undefined') ? WEAPONS[gEntry.id] : null;
-    if(gDef && gDef.slot === 'throwable'){
-      const _gr = _rangeOfWeaponDef(gDef);
-      if(Math.abs(t.worldX - a.worldX) <= _gr){
-        a.grenades.shift();
+    /* rev141: 手榴彈 = 配置；找第一個庫存有貨的配置，扣 1 庫存才投；無貨則不投 */
+    let _chosenG141 = null, _chosenDef141 = null;
+    for(const _cfg141 of a.grenades){
+      const _cnt141 = (typeof invCount === 'function') ? invCount(_cfg141.id, _cfg141.rarity) : 0;
+      if(_cnt141 <= 0) continue;
+      const _def141 = (typeof WEAPONS !== 'undefined') ? WEAPONS[_cfg141.id] : null;
+      if(_def141 && _def141.slot === 'throwable'){ _chosenG141 = _cfg141; _chosenDef141 = _def141; break; }
+    }
+    if(_chosenG141 && _chosenDef141){
+      const _gr141 = _rangeOfWeaponDef(_chosenDef141);
+      if(Math.abs(t.worldX - a.worldX) <= _gr141){
+        invRemove(_chosenG141.id, _chosenG141.rarity, 1);
         a._nextGrenadeAt = now + 1500;
-        _passengerThrowGrenade(a, t, gDef, gEntry.rarity || '一般', now);
+        _passengerThrowGrenade(a, t, _chosenDef141, _chosenG141.rarity, now);
         return;
       }
     }

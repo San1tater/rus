@@ -607,7 +607,10 @@ function onBuildCell(i){
     for(const [k,v] of Object.entries(upCost)){const have=materialEquivalent(k);const ok=have>=v;body+='<div class="stat-line"><span class="k">'+MATERIALS[k].name+'</span><span class="v" style="color:'+(ok?'#4caf50':'#e05252')+'">'+have+'/'+v+'</span></div>';}
     const ft=el('div','modal-ft');
     const isWorkbench=slot.id==='workbench';
-    ft.innerHTML='<button class="btn primary" id="m-up" '+(_isMax ? 'disabled' : '')+'>'+(_isMax ? '已滿級' : '升級')+'</button>'+(isWorkbench?'<button class="btn" id="m-craft">改造</button>':'');
+    ft.innerHTML = (_isMax
+      ? '<button class="btn" id="m-up" disabled style="white-space:nowrap">已滿級</button>'
+      : '<button class="btn primary" id="m-up">升級</button>')
+      + (isWorkbench ? '<button class="btn" id="m-craft">改造</button>' : '');
     openModal({title:b.name,body,footer:ft});
     ft.querySelector('#m-up').onclick=()=>{
       if(b.maxLv && slot.lv >= b.maxLv){return;}

@@ -458,7 +458,7 @@ function _garageRenderHtml(){
       h += '</div>';
     }
   } else {
-    h += '<div class="garage-research-empty" id="garage-research-empty">未選定研發目標<br><span style="font-size:10px;color:#7a6f60">點擊打開科技樹</span></div>';
+    h += '<div class="garage-research-empty" id="garage-research-empty" style="color:#7a6f60">研發目標<br>未選定<br>點擊打開<br>科技樹</div>';
   }
   h += '</div>';
   h += '</div>';
@@ -466,10 +466,16 @@ function _garageRenderHtml(){
 
   h += '<div class="garage-dock" id="garage-dock">';
   h += '<div class="garage-dock-tabs">';
-  const tabs = [{ k: 'all', n: '全部' }, { k: 'btr', n: '輪戰' }, { k: 't80', n: '坦克' }, { k: 'bmp', n: '步戰' }];
+  const tabs = [{ k: 'all', n: '全部' }, { k: 'btr', n: '輪戰' }, { k: 't80', n: '坦克' }, { k: 'bmp', n: '步戰' }, { k: 'station', n: '車站 ▶︎' }];
   const curTab = window._garageFilter || 'all';
   for(const t of tabs){
-    h += '<div class="garage-tab ' + (curTab === t.k ? 'on' : '') + '" data-tab="' + t.k + '">' + t.n + '</div>';
+    /* rev148: 「車站」為跳頁按鈕，綠底白字；永不套 .on（避免 .garage-tab.on 的 !important 覆蓋） */
+    const _isStation148 = (t.k === 'station');
+    const _onCls148 = _isStation148 ? 'station-tab-noactive' : (curTab === t.k ? 'on' : '');
+    const _style148 = _isStation148
+      ? ' style="display:flex;align-items:center;justify-content:center;background:#4caf50 !important;color:#fff !important;font-weight:bold;border-radius:4px;margin:2px 4px;line-height:1;border-bottom:0 !important"'
+      : '';
+    h += '<div class="garage-tab ' + _onCls148 + '" data-tab="' + t.k + '"' + _style148 + '>' + t.n + '</div>';
   }
   h += '</div>';
   h += '<div class="garage-dock-list" id="garage-dock-list"></div>';
@@ -569,6 +575,10 @@ function _garageBind(){
   for(let i = 0; i < tabs.length; i++){
     (function(t){
       t.onclick = function(){
+        if(t.dataset.tab === 'station'){
+          if(typeof openStationPage === 'function') openStationPage();
+          return;
+        }
         window._garageFilter = t.dataset.tab;
         const allTabs = p.querySelectorAll('.garage-tab');
         for(let j = 0; j < allTabs.length; j++) allTabs[j].classList.remove('on');

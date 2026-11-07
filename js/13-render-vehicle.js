@@ -1834,7 +1834,9 @@ window._openBTRSupportDetail = function(log){
       const _ammoNameMap = { '3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','3uof17':'3UOF17 高爆','pg15v':'PG-15V 破甲','og15v':'OG-15V 高爆' };
       for(const wk in weaponKills){
         const parts = wk.split(':');
-        const wName = _weaponNameMap[parts[0]] || parts[0];
+        const wName = (parts[0] === 'atgm' && typeof window._vehicleWeaponDisplayName === 'function')
+          ? window._vehicleWeaponDisplayName('atgm', vehId)
+          : (_weaponNameMap[parts[0]] || parts[0]);
         const aName = parts[1] ? (_ammoNameMap[parts[1]] || parts[1]) : '';
         const disp = wName + (aName ? ' · ' + aName : '');
         body += '<div class="stat-line"><span class="k">' + disp + '</span><span class="v">×' + weaponKills[wk] + '</span></div>';
