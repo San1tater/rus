@@ -253,10 +253,8 @@ function _loop(now){
   if(!c) return;
   if(!c.active){ _cleanup(); return; }
 
-  const _btrActive = !!(window.BTRSupport && window.BTRSupport.active);
-  if(typeof currentTab !== 'undefined' && currentTab !== 'explore' && currentTab !== 'combat'){
-    if(!_btrActive){ _cleanup(); return; }
-  }
+  /* rev145: 允許在背景繼續戰鬥，僅跳過渲染 */
+
 
   const dt = Math.min(0.05, (now - c.lastTick) / 1000);
   c.lastTick = now;
@@ -304,7 +302,7 @@ function _loop(now){
     }
   }
 
-  if(typeof currentTab === 'undefined' || currentTab === 'explore' || currentTab === 'combat'){
+  if(typeof currentTab === 'undefined' || currentTab === 'explore'){
     _render();
     _renderFrames();
   }
@@ -453,6 +451,7 @@ function _tickAI(dt, now){
 function _autoFireFoot(now){
   const c = window._combat, p = c.allies[0];
   if(!p) return;
+  if(c._playerReloadEnd && now < c._playerReloadEnd) return;
   const alive = [];
   for(let i = 0; i < c.enemies.length; i++) if(c.enemies[i].hp > 0) alive.push(c.enemies[i]);
   if(!alive.length) return;

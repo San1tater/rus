@@ -585,7 +585,7 @@ function _stOpenRepairDialog(vid){
       d.disabled = false;
       d.parts = { engine: 800, tracks: 1000, turret: 400 };
       if(d.weapons){ for(const _wid in d.weapons){ d.weapons[_wid].hp = d.weapons[_wid].max; } }
-      d.members = { driver: 300, gunner: 300, commander: 300, player: 100 };
+      d.members = { driver: 1, gunner: 1, commander: 1, player: 1 };
       d.ammoRackDamage = 0;
     }
     save();

@@ -30,11 +30,6 @@ function _applySceneFadeIn(){
 }
 
 function renderCurrentTab(){
-  /* 切頁先清理舊戰鬥殘留；BTR 支援進行中時保留 _combat */
-  var _btrActive = !!(window.BTRSupport && window.BTRSupport.active);
-  if(!_btrActive && typeof window._combatCleanup === 'function'){
-    try { window._combatCleanup(); } catch(e){ console.warn('[combatCleanup]', e); }
-  }
   if(currentTab === 'explore') renderExplore();
   else if(currentTab === 'combat') renderCombat();
   else if(currentTab === 'base') renderBase();
@@ -57,12 +52,6 @@ $$('.tab').forEach(t=>{
     if(typeof closeGaragePage === 'function'){ closeGaragePage(); }
     if(typeof closeStationPage === 'function'){ closeStationPage(); }
     currentTab = _nextTab;
-    if(_nextTab !== 'explore' && _nextTab !== 'combat'){
-      var _btrActive = !!(window.BTRSupport && window.BTRSupport.active);
-      if(!_btrActive && typeof window._combatCleanup === 'function'){
-        try { window._combatCleanup(); } catch(_){}
-      }
-    }
     if(currentTab === 'base') _regionScrollPos = 0;
     $$('.tab').forEach(x => x.classList.toggle('active', x === t));
     if(currentTab === 'garden'){

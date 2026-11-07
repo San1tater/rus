@@ -940,6 +940,7 @@ function _startCombat(ev, first){
 function _tick(now){
   const ex = window._explore;
   if(!ex.active) return;
+
   const b = window.BTRSupport;
   const ph = (b && b.active) ? b.phase : null;
 
@@ -1353,7 +1354,7 @@ function _radioShowConfirm(){
       dmg._loggedParts = {};
       if(dmg.parts){ dmg.parts.engine = 800; dmg.parts.tracks = 1000; dmg.parts.turret = 400; }
       if(dmg.weapons){ for(const _wid in dmg.weapons){ dmg.weapons[_wid].hp = dmg.weapons[_wid].max; } }
-      if(dmg.members){ dmg.members.driver = 300; dmg.members.gunner = 300; dmg.members.commander = 300; dmg.members.player = 100; }
+      if(dmg.members){ dmg.members.driver = 1; dmg.members.gunner = 1; dmg.members.commander = 1; dmg.members.player = 1; }
     }
     save();
     closeModal();

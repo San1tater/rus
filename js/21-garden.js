@@ -1001,13 +1001,6 @@ function _gsBlockEx(title, colKey, items, minCells, fallbackIcon, cellSize, font
 function renderGardenStorage(box){
   if(!box) return;
   const storage = _gardenStorageInit();
-  try {
-    const _lk = Object.keys(storage).filter(function(k){ return k.indexOf('liquor@') === 0; });
-    console.log('[garden-storage] 全部 key:', Object.keys(storage), '私酒 key:', _lk);
-    if(_lk.length){
-      _lk.forEach(function(k){ console.log('  ' + k + ' = ' + storage[k]); });
-    }
-  } catch(e){}
   const seeds = [], crops = [];
   for(const k in storage){
     const p = k.split('@');

@@ -629,7 +629,7 @@ function _vEnsureDamage(vid){
     d = {
       ammoRackDamage: 0,
       parts: { engine: 800, tracks: 1000, turret: 400 },
-      members: { driver: 300, gunner: 300, commander: 300, player: 100 },
+      members: { driver: 1, gunner: 1, commander: 1, player: 1 },
       weapons: {},
       disabled: false,
       destroyed: false,
@@ -649,7 +649,19 @@ function _vEnsureDamage(vid){
       if(!_ld[_wid]) delete d.weapons[_wid];
     }
   }
-  if(typeof d.members.player !== 'number') d.members.player = 100;
+  /* v140: members 只存存活標記（1/0），從實時 servant.hp / state.player.hp 同步 */
+  if(!d.members || typeof d.members !== 'object') d.members = { driver: 1, gunner: 1, commander: 1, player: 1 };
+  const _crewS = state.station && state.station.crew;
+  if(_crewS){
+    for(const _roleS of ['driver', 'gunner', 'commander']){
+      const _sidS = _crewS[_roleS];
+      if(!_sidS){ d.members[_roleS] = 0; continue; }
+      const _srvS = (state.servants || []).find(function(s){ return s.id === _sidS; });
+      if(!_srvS || (_srvS.injuredUntil && _srvS.injuredUntil > Date.now())){ d.members[_roleS] = 0; continue; }
+      d.members[_roleS] = (_srvS.hp > 0) ? 1 : 0;
+    }
+  }
+  d.members.player = (state.player.hp > 0) ? 1 : 0;
   return d;
 }
 
@@ -770,7 +782,15 @@ const key = _vPickInternalKey(vid);
     const tgt = pool[Math.floor(Math.random() * pool.length)];
 
     if(tgt.t === 'crew'){
-      d.members[tgt.r] = Math.max(0, d.members[tgt.r] - dmg * 1.5);
+      /* v140: 扣實際 servant.hp，members 只存 1/0 */
+      const _crewSidX = state.station && state.station.crew ? state.station.crew[tgt.r] : null;
+      const _crewSrvX = _crewSidX ? (state.servants || []).find(function(s){ return s.id === _crewSidX; }) : null;
+      if(_crewSrvX){
+        _crewSrvX.hp = Math.max(0, (_crewSrvX.hp || 0) - dmg * 1.5);
+        d.members[tgt.r] = _crewSrvX.hp > 0 ? 1 : 0;
+      } else {
+        d.members[tgt.r] = 0;
+      }
       _vehicleCombatFloat(0, '乘員 -' + Math.round(dmg * 1.5), 'crit');
       if(tgt.r === 'driver' && d.members.driver <= 0){
         const _drvId = state.station && state.station.crew ? state.station.crew.driver : null;
@@ -828,6 +848,7 @@ const key = _vPickInternalKey(vid);
       applyDamage(_tgt, dmg * 1.5, penMM, { armorMMOverride: ARMOR_LEVEL_TO_MM[_lv] || 0 });
       state.player.hp = _tgt.hp;
       state.player.armor = _tgt.armor;
+      d.members.player = _tgt.hp > 0 ? 1 : 0;
       _vehicleCombatFloat(0, '玩家 -' + Math.round(dmg * 1.5), 'crit');
       if(state.player.hp <= 0){
         state.player.hp = 0;
@@ -1277,7 +1298,7 @@ window._radioBTRTrigger = function(){
 
   if(state.vehicleDamage && state.vehicleDamage[vid]){
     const d = state.vehicleDamage[vid];
-    d.members = { driver: 300, gunner: 300, commander: 300, player: 100 };
+    d.members = { driver: 1, gunner: 1, commander: 1, player: 1 };
     d.parts = { engine: 800, tracks: 1000, turret: 400 };
     if(d.weapons){ for(const _wid in d.weapons){ d.weapons[_wid].hp = d.weapons[_wid].max; } }
     d.ammoRackDamage = 0;
