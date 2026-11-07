@@ -196,6 +196,9 @@ function load(){
 
     _initUnlockedFrom();
 
+    /* rev-fix-sanitize-state: 通用存檔自檢 */
+    _sanitizeState();
+
     return true;
   } catch(e){
     console.warn('[load] err:', e);
@@ -251,6 +254,178 @@ function invList(){
   }
   return l;
 }
+function _sanitizeState(){
+  /* rev-fix-sanitize-state: 通用存檔自檢，移除不符合當前定義的條目 */
+  const removed = [];
+  const fixed = [];
+
+  /* 1. vehicleAmmo */
+  if(state.vehicleAmmo && typeof state.vehicleAmmo === 'object'){
+    for(const vid in state.vehicleAmmo){
+      if(typeof VEHICLES !== 'undefined' && !VEHICLES[vid]){
+        removed.push('vehicleAmmo:' + vid);
+        delete state.vehicleAmmo[vid];
+        continue;
+      }
+      const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
+      if(!ld) continue;
+      const validWeapons = Object.keys(ld);
+      const ammoState = state.vehicleAmmo[vid];
+      for(const wid in ammoState){
+        if(validWeapons.indexOf(wid) < 0){
+          removed.push('vehicleAmmo:' + vid + '.' + wid);
+          delete ammoState[wid];
+          continue;
+        }
+        const a = ammoState[wid];
+        if(!a || typeof a !== 'object') continue;
+        const defs = (typeof VEHICLE_MAIN_AMMO_POOL !== 'undefined' && VEHICLE_MAIN_AMMO_POOL[wid]) || [];
+        const validIds = defs.map(function(x){ return x.id; });
+        if(validIds.length === 0) continue;
+        let changed = false;
+        if(a.breakdown){
+          for(const bid in a.breakdown){
+            if(validIds.indexOf(bid) < 0){
+              removed.push('vehicleAmmo:' + vid + '.' + wid + '.breakdown.' + bid);
+              delete a.breakdown[bid];
+              changed = true;
+            }
+          }
+        }
+        if(a.presetBreakdown){
+          for(const bid in a.presetBreakdown){
+            if(validIds.indexOf(bid) < 0){
+              removed.push('vehicleAmmo:' + vid + '.' + wid + '.presetBreakdown.' + bid);
+              delete a.presetBreakdown[bid];
+              changed = true;
+            }
+          }
+        }
+        if(changed && a.breakdown){
+          let sum = 0;
+          for(const k in a.breakdown) sum += (a.breakdown[k] || 0);
+          if((a.current || 0) > sum){
+            fixed.push('vehicleAmmo:' + vid + '.' + wid + '.current');
+            a.current = sum;
+          }
+        }
+      }
+    }
+  }
+
+  /* 2. station */
+  if(state.station){
+    const srvIds = new Set((state.servants || []).map(function(s){ return s.id; }));
+    if(state.station.crew){
+      for(const r of ['commander','gunner','driver']){
+        if(state.station.crew[r] && !srvIds.has(state.station.crew[r])){
+          removed.push('station.crew.' + r);
+          state.station.crew[r] = null;
+        }
+      }
+    }
+    if(Array.isArray(state.station.passengers)){
+      const before = state.station.passengers.length;
+      state.station.passengers = state.station.passengers.filter(function(p){
+        return p && p.srvId && srvIds.has(p.srvId);
+      });
+      if(state.station.passengers.length < before){
+        removed.push('station.passengers:' + (before - state.station.passengers.length));
+      }
+    }
+  }
+
+  /* 3. explore region */
+  if(state.explore && typeof state.explore === 'object'){
+    for(const k in state.explore){
+      const r = k.split('#')[0];
+      if(typeof REGIONS !== 'undefined' && !REGIONS[r]){
+        removed.push('explore.' + k);
+        delete state.explore[k];
+      }
+    }
+  }
+
+  /* 4. ammoOrder */
+  if(state.preferences && state.preferences.ammoOrder){
+    for(const k in state.preferences.ammoOrder){
+      const order = state.preferences.ammoOrder[k];
+      if(!Array.isArray(order)){ delete state.preferences.ammoOrder[k]; continue; }
+      const filtered = order.filter(function(aid){
+        if(!aid) return false;
+        if(typeof AMMO !== 'undefined' && AMMO[aid]) return true;
+        if(typeof WEAPONS !== 'undefined' && WEAPONS[aid] && WEAPONS[aid].slot === 'throwable') return true;
+        return false;
+      });
+      if(filtered.length !== order.length){
+        removed.push('ammoOrder.' + k + ':' + (order.length - filtered.length));
+        state.preferences.ammoOrder[k] = filtered;
+      }
+    }
+  }
+
+  /* 5. crafting */
+  if(Array.isArray(state.crafting)){
+    const before = state.crafting.length;
+    state.crafting = state.crafting.filter(function(c){
+      if(!c || c.type !== 'mod') return false;
+      if(!c.modInfo || typeof WEAPONS === 'undefined' || !WEAPONS[c.modInfo.baseId]) return false;
+      return true;
+    });
+    if(state.crafting.length < before){
+      removed.push('crafting:' + (before - state.crafting.length));
+    }
+  }
+
+  /* 6. garden.storageBatches */
+  if(state.garden && state.garden.storageBatches && typeof state.garden.storageBatches === 'object'){
+    for(const k in state.garden.storageBatches){
+      const idx = k.lastIndexOf('@');
+      if(idx < 0){ delete state.garden.storageBatches[k]; continue; }
+      const id = k.slice(0, idx);
+      const kind = (typeof _gardenStorageKind === 'function') ? _gardenStorageKind(id) : null;
+      if(!kind){
+        removed.push('garden.storageBatches.' + k);
+        delete state.garden.storageBatches[k];
+      }
+    }
+  }
+
+  /* 7. servants.assignedPlots */
+  if(Array.isArray(state.servants) && state.garden && Array.isArray(state.garden.plots)){
+    const plots = state.garden.plots;
+    for(const srv of state.servants){
+      if(!Array.isArray(srv.assignedPlots)) continue;
+      const before = srv.assignedPlots.length;
+      srv.assignedPlots = srv.assignedPlots.filter(function(idx){
+        return typeof idx === 'number' && idx >= 0 && idx < plots.length && !!plots[idx];
+      });
+      if(srv.assignedPlots.length < before){
+        removed.push('servant.' + srv.id + '.assignedPlots:' + (before - srv.assignedPlots.length));
+      }
+    }
+  }
+
+  /* 8. garden.plots crop */
+  if(state.garden && Array.isArray(state.garden.plots)){
+    for(let i = 0; i < state.garden.plots.length; i++){
+      const p = state.garden.plots[i];
+      if(!p || !p.crop) continue;
+      if(typeof SEEDS !== 'undefined' && !SEEDS[p.crop.seedId]){
+        removed.push('plot[' + i + '].crop');
+        p.crop = null;
+      }
+    }
+  }
+
+  if(removed.length > 0 || fixed.length > 0){
+    console.warn('[sanitize] removed=' + removed.length + ' fixed=' + fixed.length);
+    if(removed.length > 0) console.warn('[sanitize] removed:', removed.slice(0, 30));
+    if(fixed.length > 0) console.warn('[sanitize] fixed:', fixed.slice(0, 30));
+  }
+  return { removed: removed, fixed: fixed };
+}
+
 function _initUnlockedFrom(){
   if(!state.unlockedEquip || typeof state.unlockedEquip !== 'object') state.unlockedEquip = {};
   for(var k in state.inventory){
@@ -564,8 +739,16 @@ function getHitRate(weaponType, mode, scopeBonus){
   p += Math.floor(state.proficiency[weaponType] || 0);
   return clamp(Math.round((base + p) * (MODE_ACCURACY[mode] || 1) + (scopeBonus || 0)), 5, 75);
 }
-function calcCritRate(wr, ar){ return clamp(Math.round(10 * (RARITY_MULT[wr] || 1) * (RARITY_MULT[ar] || 1)) / 100, 0, 0.85); }
-function calcCritMult(wr, ar){ return 1.5 * (RARITY_MULT[wr] || 1) * (RARITY_MULT[ar] || 1); }
+function calcCritRate(wr, ar){
+  /* rev-fix-crit-separate: 暴率只讀武器稀有度（精度）；ar 參數保留以兼容調用點 */
+  const wm = RARITY_MULT[wr] || 1;
+  return clamp(0.10 + 0.15 * (wm - 1), 0.05, 0.60);
+}
+function calcCritMult(wr, ar){
+  /* rev-fix-crit-separate: 暴傷只讀彈藥稀有度（殺傷力）；wr 參數保留以兼容調用點 */
+  const am = RARITY_MULT[ar] || 1;
+  return 1.5 + 1.5 * (am - 1);
+}
 
 // ===== 装备 / 建築 =====
 function equippedWeapon(slot){

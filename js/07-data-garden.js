@@ -27,14 +27,16 @@ function servantHitRate(srv, mode, scopeBonus){
   return Math.max(5, Math.min(75, Math.round((base + p) * acc + (scopeBonus || 0))));
 }
 function servantCritRate(wRarity, aRarity){
-  const wr = (RARITY_MULT && RARITY_MULT[wRarity]) || 1;
-  const ar = (RARITY_MULT && RARITY_MULT[aRarity]) || 1;
-  return Math.max(0, Math.min(0.85, Math.round(10 * wr * ar) / 100));
+  /* rev-fix-servant-crit-delegate: 調用統一函數，與玩家一致 */
+  if(typeof calcCritRate === 'function') return calcCritRate(wRarity, aRarity);
+  const wm = (RARITY_MULT && RARITY_MULT[wRarity]) || 1;
+  return Math.max(0.05, Math.min(0.60, 0.10 + 0.15 * (wm - 1)));
 }
 function servantCritMult(wRarity, aRarity){
-  const wr = (RARITY_MULT && RARITY_MULT[wRarity]) || 1;
-  const ar = (RARITY_MULT && RARITY_MULT[aRarity]) || 1;
-  return 1.5 * wr * ar;
+  /* rev-fix-servant-crit-delegate: 調用統一函數，與玩家一致 */
+  if(typeof calcCritMult === 'function') return calcCritMult(wRarity, aRarity);
+  const am = (RARITY_MULT && RARITY_MULT[aRarity]) || 1;
+  return 1.5 + 1.5 * (am - 1);
 }
 function servantEffectiveMaxStamina(srv){
   if(!srv) return 100;

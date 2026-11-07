@@ -101,7 +101,8 @@ function _genMap(region, pi){
       }
       evs.push(e);
     }
-    nodes.push({ idx: i, name: name, startX: sx, endX: ex, events: evs });
+    /* rev-fix-map-region: 節點記錄自己的 region / routeIdx */
+    nodes.push({ idx: i, name: name, region: region, routeIdx: pi, startX: sx, endX: ex, events: evs });
     cur = ex;
   }
   return { nodes: nodes, totalLen: cur };
@@ -175,15 +176,20 @@ function _renderBg(){
   const idx = _curNodeIdx();
   const node = ex.nodes[idx];
   if(!node) return;
-  const _pathNodes = (ROUTES[ex.region] && ROUTES[ex.region][ex.routeIdx]) ? ROUTES[ex.region][ex.routeIdx].nodes : null;
+  /* rev-fix-map-region: 用節點自己的 region / routeIdx，處理拼接節點 */
+  const _region = node.region || ex.region;
+  const _ri = (node.routeIdx !== undefined) ? node.routeIdx : (ex.routeIdx || 0);
+  const _pathNodes = (ROUTES[_region] && ROUTES[_region][_ri]) ? ROUTES[_region][_ri].nodes : null;
   const _maxIdx = _pathNodes ? (_pathNodes.length - 1) : node.idx;
   const _safeIdx = Math.min(Math.max(0, node.idx), _maxIdx);
-  const key = REGION_KEYS[ex.region.replace(/II$/,'')] + '_r' + (ex.routeIdx || 0) + '_n' + _safeIdx;
+  const key = REGION_KEYS[_region.replace(/II$/,'')] + '_r' + _ri + '_n' + _safeIdx;
   const url = "url('images/bg/" + key + '.png' + (typeof assetSuffix === 'function' ? assetSuffix() : '') + "')";
   const ls = document.querySelectorAll('#zone1 .bg-layer');
   for(let i = 0; i < ls.length; i++) ls[i].style.backgroundImage = url;
   const t = document.querySelector('#zone1 .zone-title');
-  if(t) t.textContent = '🧭 ' + ex.region.replace(/II$/,' II') + ' · ' + node.name;
+  if(t) t.textContent = '🧭 ' + _region.replace(/II$/,' II') + ' · ' + node.name;
+  /* rev-fix-map-region: 同步 activeRegion，讓玩家位置和背景一致 */
+  if(state.activeRegion !== _region) state.activeRegion = _region;
   ex._bgDirty = false;
 }
 
@@ -807,7 +813,12 @@ function _startCombat(ev, first){
         },
         ammoPouch: p.ammoPouch ? { ammoId: p.ammoPouch.ammoId, rarity: p.ammoPouch.rarity, count: p.ammoPouch.count } : null,
         ammoBox: p.ammoBox ? { ammoId: p.ammoBox.ammoId, rarity: p.ammoBox.rarity, count: p.ammoBox.count } : null,
-        _publicPool: _publicPool
+        _publicPool: _publicPool,
+        grenades: Array.isArray(p.grenades) ? p.grenades.map(function(g){
+          if(typeof g === 'string') return { id: g, rarity: '一般' };
+          if(g && g.id) return { id: g.id, rarity: g.rarity || '一般' };
+          return null;
+        }).filter(function(g){ return g !== null; }) : []
       });
     }
   }
@@ -1340,7 +1351,8 @@ function _radioShowConfirm(){
       dmg.disabled = false;
       dmg.ammoRackDamage = 0;
       dmg._loggedParts = {};
-      if(dmg.parts){ dmg.parts.engine = 800; dmg.parts.tracks = 1000; dmg.parts.gun = 400; dmg.parts.turret = 400; }
+      if(dmg.parts){ dmg.parts.engine = 800; dmg.parts.tracks = 1000; dmg.parts.turret = 400; }
+      if(dmg.weapons){ for(const _wid in dmg.weapons){ dmg.weapons[_wid].hp = dmg.weapons[_wid].max; } }
       if(dmg.members){ dmg.members.driver = 300; dmg.members.gunner = 300; dmg.members.commander = 300; dmg.members.player = 100; }
     }
     save();
@@ -1402,8 +1414,11 @@ window.renderExplore = function(){
   const b = window.BTRSupport;
   if(!b || !b.active){
     const rgs = (typeof getActiveRegions === 'function') ? getActiveRegions() : ['廢棄工廠'];
-    const region = state.activeRegion || rgs[0] || '廢棄工廠';
-    state.activeRegion = region;
+    /* rev-fix-map-region: activeRegion 不在激活列表中時切換到首個有效區域 */
+    if(!state.activeRegion || rgs.indexOf(state.activeRegion) === -1){
+      state.activeRegion = rgs[0] || '廢棄工廠';
+    }
+    const region = state.activeRegion;
     z1.innerHTML = '<div class="scene"><div class="bg-scroll" style="--spd:10s"><div class="bg-track"><div class="bg-layer"></div><div class="bg-layer"></div></div></div><div class="bg-fade" id="explore-bg-fade" style="opacity:0"></div><div class="groundline"></div><div class="explore-fx" id="explore-fx"></div><canvas id="hero-canvas" class="hero-canvas"></canvas><div class="zone-title">🧭 ' + region.replace(/II$/,' II') + '</div><div class="zone-badge">' + (state.preferences.actionMode === 'attack' ? '⚔ 攻擊前進' : '🥷 潛行蒐集') + '</div></div>';
     const ex = window._explore;
     const _needStart = (!ex.active) || (ex.region !== region);

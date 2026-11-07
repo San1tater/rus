@@ -6,6 +6,11 @@ const ROMAN_NUM = ['','I','II','III','IV','V','VI'];
 function armorBreakdownText(id, rarity){
   const def = ARMOR[id];
   if(!def || def.armor == null) return '';
+  /* rev-fix-armor-class-whitelist: 只有 head/top 顯示護甲等級；面罩/褲子/鞋子只顯示裝甲值 */
+  if(def.slot !== 'head' && def.slot !== 'top'){
+    const total = equipArmorValue(id, rarity);
+    return total > 0 ? String(total) : '';
+  }
   const mult = RARITY_MULT[rarity] || 1;
   if(def.slot === 'head' && def.subArmor && def.subArmor.length){
     return def.subArmor.map(function(s){
@@ -23,7 +28,9 @@ function armorBreakdownText(id, rarity){
 
 
 function _armorClassWithSub(def){
+  /* rev-fix-armor-class-whitelist: 只有 head/top 顯示護甲等級；面罩/褲子/鞋子的 armor 是物理強度，非防彈等級 */
   if(!def || def.armor == null || !def.level) return '';
+  if(def.slot !== 'head' && def.slot !== 'top') return '';
   const main = armorClass(def.level);
   if(!def.subArmor || !def.subArmor.length) return main;
   let maxSub = 0;

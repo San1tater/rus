@@ -3132,8 +3132,7 @@ function renderGardenLog(box){
   if(!box) return;
   const log = (state.garden && state.garden.log) || [];
   const battleLog = (state.garden && state.garden.battleLog) || [];
-  const liveActive = !!window._raidLiveActive;
-  const live = window._raidLiveLog || [];
+  /* rev-fix-raid-log-unify: 不再使用 liveActive / live */
   function tsStr(t){
     const d = new Date(t);
     return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
@@ -3154,27 +3153,17 @@ function renderGardenLog(box){
   }
   left += '</div>';
   let right = '<div class="gs-wrap" data-col="battle">';
-  if(liveActive){
-    if(!live.length){
-      right += '<div class="gs-empty" style="position:static;padding:20px 0">戰鬥開始…</div>';
-    } else {
-      for(let i = 0; i < live.length; i++){
-        const e = live[i];
-        right += '<div class="raid-live-log-line ' + (e.cls||'') + '">' + _esc(e.text) + '</div>';
-      }
-    }
+  /* rev-fix-raid-log-unify: 移除實時日誌，右欄只顯示歷史戰鬥記錄 */
+  if(!battleLog.length){
+    right += '<div class="gs-empty" style="position:static;padding:20px 0">暫無戰鬥</div>';
   } else {
-    if(!battleLog.length){
-      right += '<div class="gs-empty" style="position:static;padding:20px 0">暫無戰鬥</div>';
-    } else {
-      for(let i = 0; i < battleLog.length; i++){
-        const e = battleLog[i];
-        const win = e.win;
-        right += '<div class="battle-log-item ' + (win?'win':'lose') + '" data-battle-idx="' + i + '" style="cursor:pointer">';
-        right += '<div class="bl-head"><span class="bl-title">' + (win?'⚔️勝':'💀敗') + ' ' + _esc(e.region||'') + '</span><span class="bl-time">' + tsFull(e.t) + '</span></div>';
-        right += '<div class="bl-row">' + e.rounds + '回 · 守' + e.guardAlive + '/' + e.guardTotal + ' · 敵' + e.enemyCount + ' · 彈' + e.ammoUsed + ' · 傷' + e.totalDmg + '</div>';
-        right += '</div>';
-      }
+    for(let i = 0; i < battleLog.length; i++){
+      const e = battleLog[i];
+      const win = e.win;
+      right += '<div class="battle-log-item ' + (win?'win':'lose') + '" data-battle-idx="' + i + '" style="cursor:pointer">';
+      right += '<div class="bl-head"><span class="bl-title">' + (win?'⚔️勝':'💀敗') + ' ' + _esc(e.region||'') + '</span><span class="bl-time">' + tsFull(e.t) + '</span></div>';
+      right += '<div class="bl-row">' + e.rounds + '回 · 守' + e.guardAlive + '/' + e.guardTotal + ' · 敵' + e.enemyCount + ' · 彈' + e.ammoUsed + ' · 傷' + e.totalDmg + '</div>';
+      right += '</div>';
     }
   }
   right += '</div>';

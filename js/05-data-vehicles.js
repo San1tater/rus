@@ -240,16 +240,16 @@ const VEHICLE_BASE_HR = {
 const VEHICLE_AMMO_DEFAULT_BREAKDOWN = {
   '2a46':   {'3bm42':20,'3of26':15,'3bk29':5},
   '2a46m1': {'3bm42':20,'3of26':15,'3bk29':5},
-  '2a70':   {'100he':40},
-  '2a28':   {'73heat':25,'73hefrag':15}
+  '2a70':   {'3uof17':40},
+  '2a28':   {'pg15v':25,'og15v':15}
 };
 
 /* 主炮彈種池 */
 const VEHICLE_MAIN_AMMO_POOL = {
   '2a46':   [{id:'3bm42',name:'3BM42 穿甲',type:'ap'},{id:'3of26',name:'3OF26 高爆',type:'he'},{id:'3bk29',name:'3BK29 破甲',type:'heat'}],
   '2a46m1': [{id:'3bm42',name:'3BM42 穿甲',type:'ap'},{id:'3of26',name:'3OF26 高爆',type:'he'},{id:'3bk29',name:'3BK29 破甲',type:'heat'}],
-  '2a70':   [{id:'100he',name:'3UOF17 高爆',type:'he',img:'3uof17'}],
-  '2a28':   [{id:'73heat',name:'PG-15V 破甲',type:'heat',img:'pg15v'},{id:'73hefrag',name:'OG-15V 高爆',type:'he',img:'og15v'}]
+  '2a70':   [{id:'3uof17',name:'3UOF17 高爆',type:'he'}],
+  '2a28':   [{id:'pg15v',name:'PG-15V 破甲',type:'heat'},{id:'og15v',name:'OG-15V 高爆',type:'he'}]
 };
 
 /* 彈鏈預設 */

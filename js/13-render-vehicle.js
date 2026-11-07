@@ -1831,7 +1831,7 @@ window._openBTRSupportDetail = function(log){
     body += '<div class="cat-header" data-btr-cat="__weapon_kills__" style="cursor:pointer"><span>🎯 武器表現 (' + Object.keys(weaponKills).length + ')</span><span>' + (wkc ? '▶' : '▼') + '</span></div>';
     if(!wkc){
       const _weaponNameMap = { '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' };
-      const _ammoNameMap = { '3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','100he':'3UOF17 高爆','73heat':'PG-15V 破甲','73hefrag':'OG-15V 高爆' };
+      const _ammoNameMap = { '3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','3uof17':'3UOF17 高爆','pg15v':'PG-15V 破甲','og15v':'OG-15V 高爆' };
       for(const wk in weaponKills){
         const parts = wk.split(':');
         const wName = _weaponNameMap[parts[0]] || parts[0];

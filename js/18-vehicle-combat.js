@@ -32,13 +32,14 @@ const _VEHICLE_INTERNAL_WEIGHTS = {
 const _VEHICLE_MAIN_AMMO = {
   '2a46':   [{ id: '3bm42', type: 'ap' }, { id: '3of26', type: 'he' }, { id: '3bk29', type: 'heat' }],
   '2a46m1': [{ id: '3bm42', type: 'ap' }, { id: '3of26', type: 'he' }, { id: '3bk29', type: 'heat' }],
-  '2a70':   [{ id: '100he', type: 'he' }],
-  '2a28':   [{ id: '73heat', type: 'heat' }, { id: '73hefrag', type: 'he' }]
+  '2a70':   [{ id: '3uof17', type: 'he' }],
+  '2a28':   [{ id: 'pg15v', type: 'heat' }, { id: 'og15v', type: 'he' }]
 };
 
 const _LEG_MULT = 5;
-const _VEHICLE_CRIT_RATE = 0.85;
-const _VEHICLE_CRIT_MULT = 37.5;
+/* rev-fix-vehicle-crit-delegate: 載具武器彈藥定義為傳奇，統一走公式 */
+const _VEHICLE_CRIT_RATE = (typeof calcCritRate === 'function') ? calcCritRate('傳奇', '傳奇') : 0.60;
+const _VEHICLE_CRIT_MULT = (typeof calcCritMult === 'function') ? calcCritMult('傳奇', '傳奇') : 7.5;
 
 /* rev-fix-splash: 載具濺射參數表
  * maxR 為「傷害歸零」的距離，比現實「保證殺傷半徑」長，代表破片飛散極限。
@@ -48,10 +49,10 @@ const _VEHICLE_CRIT_MULT = 37.5;
 /* rev-fix-splash-v2 */
 const VEHICLE_SPLASH = {
   '3of26':    { blastPen: 45, maxR: 60, splashRatio: 0.50 },
-  '100he':    { blastPen: 35, maxR: 50, splashRatio: 0.50 },
-  '73hefrag': { blastPen: 25, maxR: 30, splashRatio: 0.40 },
+  '3uof17':    { blastPen: 35, maxR: 50, splashRatio: 0.50 },
+  'og15v': { blastPen: 25, maxR: 30, splashRatio: 0.40 },
   '3bk29':    { blastPen: 18, maxR: 25, splashRatio: 0.35 },
-  '73heat':   { blastPen: 12, maxR: 20, splashRatio: 0.35 },
+  'pg15v':   { blastPen: 12, maxR: 20, splashRatio: 0.35 },
   'atgm':     { blastPen: 22, maxR: 22, splashRatio: 0.35 },
   '30mm_hef': { blastPen: 10, maxR: 10, splashRatio: 0.20 }
 };
@@ -125,19 +126,17 @@ function _applyVehicleSplash(sp, mainTarget, baseDmg, ratioMult, wid, usedAmmoId
 }
 
 window._vehicleWeaponsDead = function(){
+  /* rev-fix-weapon-hp-dead-v2: 每把武器 HP + 炮塔卡死 + 彈藥判定 */
   const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
   const vid = g ? g.currentVehicle : 'btr80';
   const dmg = state.vehicleDamage && state.vehicleDamage[vid];
   if(!dmg) return false;
   if(dmg.destroyed) return true;
   if(dmg.members && dmg.members.gunner <= 0 && dmg.members.commander <= 0) return true;
-  const gunDead = dmg.parts && dmg.parts.gun <= 0;
-  const turretDead = dmg.parts && dmg.parts.turret <= 0;
-  if(!gunDead && !turretDead) return false;
+
   const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
-  if(!ld) return true;
-  const ammoState = state.vehicleAmmo && state.vehicleAmmo[vid];
-  /* rev-fix-turret-vehicles: 炮塔內武器按車型定義；車頂/外置武器炮塔卡死時仍可用 */
+  if(!ld || !Object.keys(ld).length) return true;
+
   const TURRET_WEAPONS_BY_VID = {
     btr80:  { kpvt:1, pkt:1 },
     btr80a: { '2a72':1, pkt:1 },
@@ -157,10 +156,15 @@ window._vehicleWeaponsDead = function(){
     t80um:  { '2a46m1':1, pkt:1 }
   };
   const turretWeapons = TURRET_WEAPONS_BY_VID[vid] || {};
-  const MAIN_GUNS = { '2a46':1, '2a46m1':1, '2a70':1, '2a28':1, '2a72':1, '2a42':1 };
+  const turretDead = dmg.parts && dmg.parts.turret <= 0;
+  const ammoState = state.vehicleAmmo && state.vehicleAmmo[vid];
+
   for(const wid in ld){
-    if(MAIN_GUNS[wid] && gunDead) continue;
+    /* 武器 HP 歸零 → 不可用 */
+    if(dmg.weapons && dmg.weapons[wid] && dmg.weapons[wid].hp <= 0) continue;
+    /* 炮塔卡死 → 炮塔內武器不可用 */
     if(turretWeapons[wid] && turretDead) continue;
+    /* 彈藥判定 */
     const a = ammoState && ammoState[wid];
     if(!a){
       const mx = ld[wid].belts ? ld[wid].belts * ld[wid].perBelt : (ld[wid].rounds || 0);
@@ -168,8 +172,15 @@ window._vehicleWeaponsDead = function(){
       continue;
     }
     if(a.breakdown){
+      /* rev-fix-weapon-hp-dead-v3: 只算 VEHICLE_MAIN_AMMO_POOL 中的有效 ID，忽略舊 ID */
+      const _validIdsD = (typeof VEHICLE_MAIN_AMMO_POOL !== 'undefined' && VEHICLE_MAIN_AMMO_POOL[wid])
+        ? VEHICLE_MAIN_AMMO_POOL[wid].map(function(x){ return x.id; })
+        : null;
       let sum = 0;
-      for(const k in a.breakdown) sum += (a.breakdown[k] || 0);
+      for(const k in a.breakdown){
+        if(_validIdsD && _validIdsD.indexOf(k) < 0) continue;
+        sum += (a.breakdown[k] || 0);
+      }
       if(sum > 0) return false;
     } else if((a.current || 0) > 0){
       return false;
@@ -254,9 +265,9 @@ function _getVehicleAmmoStats(wid, ammoId){
     if(ammoId === '3bm42') return VEHICLE_WEAPON_STATS['2a46_apfsds'];
     if(ammoId === '3of26') return VEHICLE_WEAPON_STATS['2a46_he'];
     if(ammoId === '3bk29') return VEHICLE_WEAPON_STATS['2a46_heat'];
-    if(ammoId === '100he') return VEHICLE_WEAPON_STATS['2a70_he'];
-    if(ammoId === '73heat') return VEHICLE_WEAPON_STATS['2a28_heat'];
-    if(ammoId === '73hefrag') return VEHICLE_WEAPON_STATS['2a28_he'];
+    if(ammoId === '3uof17') return VEHICLE_WEAPON_STATS['2a70_he'];
+    if(ammoId === 'pg15v') return VEHICLE_WEAPON_STATS['2a28_heat'];
+    if(ammoId === 'og15v') return VEHICLE_WEAPON_STATS['2a28_he'];
   }
   if(wid === 'pkt') return VEHICLE_WEAPON_STATS.pkt;
   if(wid === 'kpvt'){
@@ -288,7 +299,7 @@ function _getVehicleAmmoStats(wid, ammoId){
 }
 
 function _isHEAmmo(wid, ammoId){
-  if(ammoId === '3of26' || ammoId === '100he' || ammoId === '73hefrag') return true;
+  if(ammoId === '3of26' || ammoId === '3uof17' || ammoId === 'og15v') return true;
   if(wid === '2a72' || wid === '2a42'){
     const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
     const vid = g ? g.currentVehicle : 'btr80';
@@ -385,7 +396,7 @@ function _applyHESplash(wid, mainTarget, baseDmg, isCrit, penMM, ammoId){
     if(t.enemy.hp <= 0){
       const eName = (typeof ENEMIES !== 'undefined' && ENEMIES[t.enemy.eid]) ? ENEMIES[t.enemy.eid].name : t.enemy.eid;
       if(typeof pushLog === 'function'){
-        (function(){var _wn={ '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid]||(wid?wid.toUpperCase():'未知武器');var _af={'3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','100he':'3UOF17 高爆','73heat':'PG-15V 破甲','73hefrag':'OG-15V 高爆'}[ammoId];var _fm=_af?('（'+_af+'）'):(ammoId==='atgm'?'（反坦克導彈）':(ammoId?'（'+ammoId+'）':''));pushLog('<span class="run">'+_wn+_fm+'</span> 濺射擊殺 <b class="r-'+(t.enemy.rarity||'一般')+'">'+eName+'</b>', [], 'explore');})();
+        (function(){var _wn={ '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid]||(wid?wid.toUpperCase():'未知武器');var _af={'3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','3uof17':'3UOF17 高爆','pg15v':'PG-15V 破甲','og15v':'OG-15V 高爆'}[ammoId];var _fm=_af?('（'+_af+'）'):(ammoId==='atgm'?'（反坦克導彈）':(ammoId?'（'+ammoId+'）':''));pushLog('<span class="run">'+_wn+_fm+'</span> 濺射擊殺 <b class="r-'+(t.enemy.rarity||'一般')+'">'+eName+'</b>', [], 'explore');})();
       }
       if(typeof _grantBTRCrewExp === 'function') _grantBTRCrewExp(3);
       if(t.type === 'event' && t.event && t.event.content){
@@ -417,6 +428,9 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   if(!c || !c.active || c.resolved || c.sceneType !== 'vehicle') return false;
   const p = c.allies[0];
   if(!p || !p.isVehicle) return false;
+  /* rev-fix-weapon-hp-fire: 該武器 HP 歸零 → 不可開火 */
+  const _vd = state.vehicleDamage && state.vehicleDamage[p.vehicleId];
+  if(_vd && _vd.weapons && _vd.weapons[wid] && _vd.weapons[wid].hp <= 0) return false;
 
   const alive = [];
   for(let i = 0; i < c.enemies.length; i++){
@@ -565,7 +579,7 @@ function _onBTRKillTarget(target, wid, c, usedAmmoId){
   if(usedAmmoId){
     var ammoForm = {
       '3bm42':'3BM42 穿甲', '3of26':'3OF26 高爆', '3bk29':'3BK29 破甲',
-      '100he':'3UOF17 高爆', '73heat':'PG-15V 破甲', '73hefrag':'OG-15V 高爆'
+      '3uof17':'3UOF17 高爆', 'pg15v':'PG-15V 破甲', 'og15v':'OG-15V 高爆'
     }[usedAmmoId];
     if(ammoForm) form = '（' + ammoForm + '）';
     else if(usedAmmoId === 'atgm') form = '（反坦克導彈）';
@@ -606,19 +620,34 @@ function _onBTRKillTarget(target, wid, c, usedAmmoId){
   } catch(e){}
 }
 
+const VEHICLE_WEAPON_NAMES = { '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' };
+
 function _vEnsureDamage(vid){
   if(!state.vehicleDamage) state.vehicleDamage = {};
   let d = state.vehicleDamage[vid];
   if(!d){
     d = {
       ammoRackDamage: 0,
-      parts: { engine: 800, tracks: 1000, gun: 400, turret: 400 },
+      parts: { engine: 800, tracks: 1000, turret: 400 },
       members: { driver: 300, gunner: 300, commander: 300, player: 100 },
+      weapons: {},
       disabled: false,
       destroyed: false,
       repairUntil: 0
     };
     state.vehicleDamage[vid] = d;
+  }
+  /* rev-fix-weapon-hp-init: 清理舊存檔 parts.gun，初始化武器 HP */
+  if(d.parts && typeof d.parts.gun !== 'undefined') delete d.parts.gun;
+  if(!d.weapons || typeof d.weapons !== 'object') d.weapons = {};
+  const _ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
+  if(_ld){
+    for(const _wid in _ld){
+      if(!d.weapons[_wid]) d.weapons[_wid] = { hp: 400, max: 400 };
+    }
+    for(const _wid in d.weapons){
+      if(!_ld[_wid]) delete d.weapons[_wid];
+    }
   }
   if(typeof d.members.player !== 'number') d.members.player = 100;
   return d;
@@ -885,22 +914,39 @@ const key = _vPickInternalKey(vid);
     }
     _forceLeave(vid, veh, 'tracks');
   }
-  if(key === 'gun' && d.parts.gun <= 0){
-    if(_prevPartVal > 0){
+  /* rev-fix-weapon-hp-hit: 每把武器獨立 HP */
+  if(key === 'gun'){
+    const _weaponIds = [];
+    for(const _wid in d.weapons){
+      if(d.weapons[_wid] && d.weapons[_wid].hp > 0) _weaponIds.push(_wid);
+    }
+    if(_weaponIds.length === 0){
+      return { penetrated: true, part: part.key, internal: '武器', damage: 0 };
+    }
+    const _widHit = _weaponIds[Math.floor(Math.random() * _weaponIds.length)];
+    const _wPrev = d.weapons[_widHit].hp;
+    d.weapons[_widHit].hp = Math.max(0, _wPrev - dmg);
+    _vehicleCombatFloat(0, '-' + Math.round(dmg), '');
+    if(d.weapons[_widHit].hp <= 0 && _wPrev > 0){
+      d.repairUntil = Date.now() + 4 * 3600 * 1000;
       if(typeof pushLog === 'function'){
-        var _laGun = d.lastAttacker;
+        const _wn = VEHICLE_WEAPON_NAMES[_widHit] || _widHit;
         const _shouldLeaveGun = window._vehicleWeaponsDead && window._vehicleWeaponsDead();
-        var _gunSuffix = _shouldLeaveGun ? '，載具離場' : '（車頂武器仍可開火）';
-        if(_laGun && _laGun.weapon){
-          var _wClsGun = (typeof rarityClass === 'function') ? rarityClass(_laGun.rarity || '一般') : '';
-          pushLog('<span class="run">炮管</span> 被 ' + (_laGun.nameHtml || _laGun.name) + ' 用 <span class="' + _wClsGun + '">' + _laGun.weapon + '</span> <span class="lose">損壞</span>' + _gunSuffix, [], 'explore');
+        if(_shouldLeaveGun){
+          /* rev-fix-weapon-log-final */
+          pushLog('所有武器 <span class="lose">損壞</span>，載具離場', [], 'explore');
         } else {
-          pushLog('<span class="run">炮管</span> <span class="lose">損壞</span>' + _gunSuffix, [], 'explore');
+          const _remain = [];
+          for(const _rwid in d.weapons){
+            if(d.weapons[_rwid].hp > 0) _remain.push(VEHICLE_WEAPON_NAMES[_rwid] || _rwid);
+          }
+          const _remainTxt = _remain.length > 0 ? ('（' + _remain.join('、') + ' 仍可開火）') : '';
+          pushLog('<span class="run">' + _wn + '</span> <span class="lose">損壞</span>' + _remainTxt, [], 'explore');
         }
       }
-      d.repairUntil = Date.now() + 4 * 3600 * 1000;
+      if(window._vehicleWeaponsDead && window._vehicleWeaponsDead()) _forceLeave(vid, veh, 'gun');
     }
-    if(window._vehicleWeaponsDead && window._vehicleWeaponsDead()) _forceLeave(vid, veh, 'gun');
+    return { penetrated: true, part: part.key, internal: '武器', damage: dmg };
   }
   if(key === 'turret' && d.parts.turret <= 0){
     if(_prevPartVal > 0){
@@ -960,7 +1006,9 @@ function _detonate(vid, veh){
         a.srv.injuredUntil = _now + 4 * 3600 * 1000;
       }
     }
-  } else if(_passengers){
+  }
+  /* rev-fix-detonate-passengers: 載具戰中 allies 只有載具，需獨立遍歷車上載員 */
+  if(_passengers){
     const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
     for(let _pi = 0; _pi < _passengers.length && _pi < _cap; _pi++){
       const p = _passengers[_pi];
@@ -1230,7 +1278,8 @@ window._radioBTRTrigger = function(){
   if(state.vehicleDamage && state.vehicleDamage[vid]){
     const d = state.vehicleDamage[vid];
     d.members = { driver: 300, gunner: 300, commander: 300, player: 100 };
-    d.parts = { engine: 800, tracks: 1000, gun: 400, turret: 400 };
+    d.parts = { engine: 800, tracks: 1000, turret: 400 };
+    if(d.weapons){ for(const _wid in d.weapons){ d.weapons[_wid].hp = d.weapons[_wid].max; } }
     d.ammoRackDamage = 0;
     d.destroyed = false;
     d.disabled = false;

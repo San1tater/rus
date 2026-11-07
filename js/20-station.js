@@ -583,7 +583,8 @@ function _stOpenRepairDialog(vid){
       d.repairUntil = 0;
       d.destroyed = false;
       d.disabled = false;
-      d.parts = { engine: 800, tracks: 1000, gun: 400, turret: 400 };
+      d.parts = { engine: 800, tracks: 1000, turret: 400 };
+      if(d.weapons){ for(const _wid in d.weapons){ d.weapons[_wid].hp = d.weapons[_wid].max; } }
       d.members = { driver: 300, gunner: 300, commander: 300, player: 100 };
       d.ammoRackDamage = 0;
     }
@@ -649,8 +650,10 @@ function _stOpenMainAmmoPicker(vid, wid, onClose){
 
   function _rb(){
     const srcR = a.presetBreakdown || a.breakdown;
+    /* rev-fix-ammo-pool-valid-ids: 只算 defs 中的有效 ID */
+    const _validIdsR = defs.map(function(x){ return x.id; });
     let total = 0;
-    for(const k in srcR) total += (srcR[k] || 0);
+    for(const k in srcR){ if(_validIdsR.indexOf(k) >= 0) total += (srcR[k] || 0); }
     let h = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px">上限 ' + mr + ' 發 · 已配置 <span id="st-ammo-total" style="color:#e8a33d;font-weight:bold">' + total + '</span> 發</div>';
     for(let i = 0; i < defs.length; i++){
       const d = defs[i];
@@ -669,9 +672,11 @@ function _stOpenMainAmmoPicker(vid, wid, onClose){
       const id = sl.getAttribute('data-ammo-id');
       sl.oninput = function(){
         if(!a.presetBreakdown) a.presetBreakdown = JSON.parse(JSON.stringify(a.breakdown));
+        /* rev-fix-ammo-pool-valid-ids: other 只算 defs 中的有效 ID，忽略舊 ID */
+        const _validIdsIn = defs.map(function(x){ return x.id; });
         let v = parseInt(sl.value, 10) || 0;
         let other = 0;
-        for(const k in a.presetBreakdown){ if(k !== id) other += (a.presetBreakdown[k] || 0); }
+        for(const k in a.presetBreakdown){ if(k !== id && _validIdsIn.indexOf(k) >= 0) other += (a.presetBreakdown[k] || 0); }
         const c = mr - other;
         if(v > c){ v = c; sl.value = c; }
         a.presetBreakdown[id] = v;
@@ -679,7 +684,7 @@ function _stOpenMainAmmoPicker(vid, wid, onClose){
         if(ce) ce.textContent = v;
         const te = bd.querySelector('#st-ammo-total');
         let nt = 0;
-        for(const k2 in a.presetBreakdown) nt += (a.presetBreakdown[k2] || 0);
+        for(const k2 in a.presetBreakdown){ if(_validIdsIn.indexOf(k2) >= 0) nt += (a.presetBreakdown[k2] || 0); }
         if(te) te.textContent = nt;
       };
       sl.onchange = function(){ save(); };
@@ -688,9 +693,16 @@ function _stOpenMainAmmoPicker(vid, wid, onClose){
   const cb = bd.querySelector('#st-ammo-confirm');
   if(cb) cb.onclick = function(){
     if(a.presetBreakdown){
-      a.breakdown = JSON.parse(JSON.stringify(a.presetBreakdown));
+      /* rev-fix-ammo-pool-valid-ids: 確認時只保留 defs 中的有效 ID */
+      const _validIdsOk = defs.map(function(x){ return x.id; });
+      const _cleaned = {};
+      for(const _k4 in a.presetBreakdown){
+        if(_validIdsOk.indexOf(_k4) >= 0) _cleaned[_k4] = a.presetBreakdown[_k4];
+      }
+      a.breakdown = _cleaned;
+      a.presetBreakdown = JSON.parse(JSON.stringify(_cleaned));
       let nt = 0;
-      for(const _k4 in a.breakdown) nt += (a.breakdown[_k4] || 0);
+      for(const _k5 in a.breakdown) nt += (a.breakdown[_k5] || 0);
       a.current = nt;
     }
     save();

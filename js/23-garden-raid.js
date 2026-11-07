@@ -903,22 +903,8 @@ function _gardenRaidLogBattle(sim, region){
   if(g.battleLog.length > 30) g.battleLog.splice(0, g.battleLog.length - 30);
 }
 
-/* ===== 即時戰鬥日誌（底部頁簽） ===== */
-window._raidLiveLog = [];
+/* ===== 戰鬥中狀態（僅標記，不再收集實時日誌） ===== */
 window._raidLiveActive = false;
-function _raidLiveLogPush(text, cls){
-  if(typeof text !== 'string'){
-    if(text && text.nodeType === 1) text = text.textContent || '';
-    else if(text == null) text = '';
-    else text = String(text);
-  }
-  if(/^\[object /.test(text)) return;
-  if(!window._raidLiveLog) window._raidLiveLog = [];
-  window._raidLiveLog.push({ text: text, cls: cls || '' });
-  if(window._raidLiveLog.length > 300) window._raidLiveLog.shift();
-  if(!window._raidLiveActive) return;
-  if(typeof _gardenUpdateBattleCol === 'function') _gardenUpdateBattleCol();
-}
 function _esc(s){ return String(s).replace(/[&<>]/g, function(c){ return c === '&' ? '&amp;' : (c === '<' ? '&lt;' : '&gt;'); }); }
 const _RARITY_COLOR = { '破舊':'#b87333', '一般':'#e0e0e0', '庫存':'#4caf50', '精品':'#2196f3', '傳奇':'#ffb300', '具名':'#a45ede' };
 
@@ -944,25 +930,7 @@ function _lootHtml(items, color){
   }).join(' ');
 }
 
-/* ===== 即時戰鬥日誌欄更新（由 _raidLiveLogPush 觸發） ===== */
-function _gardenUpdateBattleCol(){
-  const p = document.getElementById('garden-page');
-  if(!p) return;
-  if(typeof _gardenActiveTab === 'undefined' || _gardenActiveTab !== 'log') return;
-  const box = p.querySelector('#gp-content');
-  if(!box) return;
-  const _rw = box.querySelector('.gs-wrap[data-col="battle"]');
-  if(!_rw) return;
-  const live = window._raidLiveLog || [];
-  let html = '';
-  for(let i = 0; i < live.length; i++){
-    const e = live[i];
-    html += '<div class="raid-live-log-line ' + (e.cls || '') + '">' + _esc(e.text) + '</div>';
-  }
-  if(!html) html = '<div class="gs-empty" style="position:static;padding:20px 0">戰鬥開始…</div>';
-  _rw.innerHTML = html;
-  _rw.scrollTop = _rw.scrollHeight;
-}
+/* rev-fix-raid-log-unify: _gardenUpdateBattleCol 移除 */
 
 /* ===== 防禦戰主演出 ===== */
 function _gardenRaidShowBattle(guards, enemies, region){
@@ -974,7 +942,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
   if(!wrap || !grid) return;
   _raidCleanupAll();
   wrap.style.position = 'relative';
-  window._raidLiveLog = [];
+  /* rev-fix-raid-log-unify: 不再初始化 _raidLiveLog */
   window._raidLiveActive = true;
   window._raidSurrenderWorkers = false;
   if(typeof _gardenUpdateBattleCol === 'function') setTimeout(_gardenUpdateBattleCol, 50);
@@ -1009,6 +977,15 @@ function _gardenRaidShowBattle(guards, enemies, region){
     overlay.innerHTML = '<canvas class="raid-canvas" id="raid-canvas"></canvas>';
     wrap.appendChild(overlay);
 
+    /* rev-fix-garden-realscale: 螢幕外敵人氣泡容器（探索模式同款） */
+    let _enemyBubbles = page.querySelector('#raid-enemy-bubbles');
+    if(!_enemyBubbles){
+      _enemyBubbles = document.createElement('div');
+      _enemyBubbles.id = 'raid-enemy-bubbles';
+      _enemyBubbles.style.cssText = 'position:absolute;top:36px;right:8px;width:48px;pointer-events:none;z-index:23;display:flex;flex-direction:column;gap:5px;';
+      wrap.appendChild(_enemyBubbles);
+    }
+
     const canvas = overlay.querySelector('#raid-canvas');
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.max(1, Math.floor(wrapW * dpr));
@@ -1019,8 +996,11 @@ function _gardenRaidShowBattle(guards, enemies, region){
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
 
-    const logEntries = window._raidLiveLog = [];
-    function addLog(text, cls){ _raidLiveLogPush(text, cls); }
+    /* rev-fix-raid-log-unify: 改用 pushLog 寫入 state.logs */
+    const logEntries = [];
+    function addLog(text, cls){
+      if(typeof pushLog === 'function') pushLog(text, [], 'garden_raid');
+    }
 
     const CHAR_PX = Math.min(74, Math.max(40, Math.floor(wrapH * 0.18)));
     const SCALE = CHAR_PX / 386;
@@ -1123,12 +1103,15 @@ function _gardenRaidShowBattle(guards, enemies, region){
         ammoId: (e.primaryWeapon && e.primaryWeapon.ammoId) || null,
         rpm: 300,
         homeX: _colX, homeY: _y,
-        x: wrapW + 120, targetX: _colX, targetY: _y, slideIn: true,
+        x: wrapW, targetX: _colX, targetY: _y,
+        worldX: 50,
         y: _y,
         hp: e.maxHp, maxHp: e.maxHp,
         armor: e.armor || 0, maxArmor: e.maxArmor || 0,
         alive: true, isGuard: false,
-        state: 'combat',
+        state: 'walking_in',
+        walkSpeed: 1.4,
+        weaponId: (e.primaryWeapon && e.primaryWeapon.id) || 'ak74',
         weaponId: 'ak74',
         animName: 'idle', animFrame: 0, animNext: 0, hurtUntil: 0,
         nextFireAt: 0,
@@ -1141,6 +1124,8 @@ function _gardenRaidShowBattle(guards, enemies, region){
 
     const bullets = [];
     const damageTexts = [];
+    /* rev-fix-corpse-timing: 獨立屍體數組 */
+    const corpses = [];
     const MAX_DMG_AGE = 900;
     let battleState = 'combat';
     let lastTickTime = performance.now();
@@ -1249,7 +1234,8 @@ function _gardenRaidShowBattle(guards, enemies, region){
     }
 
     function guardsAlive(){ return guardUnits.some(function(u){ return u.alive; }); }
-    function enemiesAlive(){ return enemyUnits.some(function(u){ return u.alive && u.state === 'combat'; }); }
+    /* rev-fix-garden-walk: walking_in 也算在場，避免開局誤判勝利 */
+    function enemiesAlive(){ return enemyUnits.some(function(u){ return u.alive; }); }
 
     function spawnBullet(fromU, toU, hit, isEnemy){
       const sx = fromU.x + (isEnemy ? -MUZZLE_X_LEFT : MUZZLE_X_RIGHT);
@@ -1313,7 +1299,6 @@ function _gardenRaidShowBattle(guards, enemies, region){
       }
       if(!b.hit){
         damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 18, text: 'MISS', crit: false, isEnemy: b.isEnemy, startTime: Date.now() });
-        addLog(b.fromU.name + ' → ' + toU.name + '：MISS', 'miss');
         return;
       }
       const tgt = { hp: toU.hp, armor: toU.armor };
@@ -1344,12 +1329,17 @@ function _gardenRaidShowBattle(guards, enemies, region){
         if(_tu.alive && _tu.animName === 'hurt' && _tu.state === 'combat'){ _tu.animName = 'idle'; _tu.animFrame = 0; _tu.animNext = 0; }
       }, 180);
       damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 18, text: '-' + shown + (b.crit ? '!' : ''), crit: b.crit, isEnemy: b.isEnemy, startTime: Date.now() });
-      addLog(b.fromU.name + ' → ' + toU.name + '：-' + shown + (b.crit ? '!暴擊' : ''), b.isEnemy ? 'enemy' : 'ally');
       if(toU.hp <= 0){
         toU.alive = false;
         toU.animName = 'idle'; toU.animFrame = 0;
         damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 30, text: b.isEnemy ? '☠' : '✖', crit: false, isEnemy: b.isEnemy, startTime: Date.now() });
         addLog((b.isEnemy ? '☠ ' : '✖ ') + toU.name + ' 倒下', b.isEnemy ? 'kill' : 'down');
+        /* rev-fix-corpse-timing: 敵人屍體移入獨立數組，不計時 */
+        if(!toU.isGuard){
+          corpses.push({ x: toU.x, y: toU.y, id: toU.id, animStart: Date.now(), fadeStartAt: 0, fadeDuration: 1000 });
+          const _idx = enemyUnits.indexOf(toU);
+          if(_idx >= 0) enemyUnits.splice(_idx, 1);
+        }
       }
     }
 
@@ -1475,8 +1465,10 @@ function _gardenRaidShowBattle(guards, enemies, region){
         for(const g of guardUnits){
           if(!g.alive) continue;
           if(now < g.nextFireAt) continue;
-          const alive = enemyUnits.filter(function(e){ return e.alive && e.state === 'combat'; });
-          if(!alive.length) break;
+          /* rev-fix-garden-range: 守衛只打射程內（用 worldX 米） */
+          const _guardRangeM = (typeof _rangeOfWeaponDef === 'function' ? _rangeOfWeaponDef(g.weaponDef) : 15);
+          const alive = enemyUnits.filter(function(e){ return e.alive && e.state === 'combat' && (typeof e.worldX === 'number' ? e.worldX : 0) <= _guardRangeM; });
+          if(!alive.length) continue;
           if(g.ammoId){
             if(g.ammoUsed >= g.ammoBudget) continue;
             g.ammoUsed++;
@@ -1489,17 +1481,35 @@ function _gardenRaidShowBattle(guards, enemies, region){
         for(const e of enemyUnits){
           if(!e.alive || e.state !== 'combat') continue;
           if(now < e.nextFireAt) continue;
-          const alive = guardUnits.filter(function(g){ return g.alive; });
-          if(!alive.length) break;
+          /* rev-fix-garden-range: 敵人只打射程內的守衛（用 worldX 米） */
+          const _eWeaponDef = (typeof WEAPONS !== 'undefined' && e.weaponId) ? WEAPONS[e.weaponId] : null;
+          const _enemyRangeM = (typeof _rangeOfWeaponDef === 'function' && _eWeaponDef) ? _rangeOfWeaponDef(_eWeaponDef) : 15;
+          const alive = guardUnits.filter(function(g){ return g.alive && (typeof e.worldX === 'number' ? e.worldX : 0) <= _enemyRangeM; });
+          if(!alive.length) continue;
           const target = alive[Math.floor(Math.random() * alive.length)];
-          const hit = Math.random() * 100 < 75;
+          /* rev-fix-garden-chain: 連射鏈命中率（與探索模式一致） */
+          const _nowMs = Date.now();
+          if(_nowMs - (e._chainLast || 0) > (e._chainResetMs || 600)) e._chainShots = 0;
+          e._chainShots = (e._chainShots || 0) + 1;
+          e._chainLast = _nowMs;
+          const _chainN = e._chainShots;
+          let _effMode;
+          if(_chainN === 1) _effMode = '點射';
+          else if(_chainN <= 3) _effMode = '短點射';
+          else if(_chainN <= 7) _effMode = '長點射';
+          else _effMode = '掃射';
+          const _hb = 0.55;
+          const _modeMult = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[_effMode]) || 1.0;
+          const hc = _hb * _modeMult;
+          const hit = Math.random() < hc;
           spawnBullet(e, target, hit, true);
           e.nextFireAt = now + 60000 / e.rpm;
         }
         if(!enemiesAlive()){
           battleState = 'ending';
           addLog('⚔️ 防禦成功', 'win');
-          setTimeout(function(){ endBattle(true); }, 1200);
+          /* rev-fix-corpse-timing: 延時 4000ms，讓 3 秒停留 + 1 秒淡出完整播放 */
+          setTimeout(function(){ endBattle(true); }, 4000);
           return;
         }
         if(!guardsAlive()){
@@ -1560,11 +1570,26 @@ function _gardenRaidShowBattle(guards, enemies, region){
       const nowD = Date.now();
       ctx.clearRect(0, 0, wrapW, wrapH);
 
+      /* rev-fix-garden-walk: 敵人 worldX 推進，PX_PER_METER 換算 */
+      const _PX_PER_METER = CHAR_PX / 1.7;
       for(const u of enemyUnits){
-        if(u.slideIn){
-          const diff = u.x - u.targetX;
-          if(diff > 1) u.x -= diff * 0.12;
-          else { u.x = u.targetX; u.slideIn = false; }
+        if(u.state === 'walking_in' && u.alive){
+          if(typeof u.worldX !== 'number') u.worldX = 50;
+          u.worldX -= (u.walkSpeed || 1.4) * dt;
+          if(u.worldX <= 0) u.worldX = 0;
+          u.x = wrapW * 0.5 + u.worldX * _PX_PER_METER;
+          u.animName = 'walk';
+          let _inRange = false;
+          for(const g of guardUnits){
+            if(!g.alive) continue;
+            const _guardRangeM = (typeof _rangeOfWeaponDef === 'function' ? _rangeOfWeaponDef(g.weaponDef) : 15);
+            if(u.worldX <= _guardRangeM){ _inRange = true; break; }
+          }
+          if(_inRange || u.worldX <= 0){
+            u.state = 'combat';
+            u.nextFireAt = nowP + 500;
+            u.animName = 'idle';
+          }
         }
       }
 
@@ -1585,6 +1610,34 @@ function _gardenRaidShowBattle(guards, enemies, region){
         ctx.fillRect(bx, by, barW * Math.max(0, u.hp / u.maxHp), barH);
       }
 
+      /* rev-fix-corpse-timing: 所有敵人已進入 corpses → 統一觸發計時 */
+      if(corpses.length > 0 && enemyUnits.length === 0){
+        for(let ci = 0; ci < corpses.length; ci++){
+          if(corpses[ci].fadeStartAt === 0){
+            corpses[ci].fadeStartAt = nowD + 3000;
+          }
+        }
+      }
+      for(let ci = corpses.length - 1; ci >= 0; ci--){
+        const cc = corpses[ci];
+        let _alpha = 1;
+        if(cc.fadeStartAt > 0){
+          const _age = nowD - cc.fadeStartAt;
+          if(_age > 0) _alpha = Math.max(0, 1 - _age / cc.fadeDuration);
+          if(_alpha <= 0){ corpses.splice(ci, 1); continue; }
+        }
+        const _animKey = (typeof HUMAN_ENEMY_DATA !== 'undefined' && !HUMAN_ENEMY_DATA[cc.id] && HUMAN_ENEMY_DATA['human_' + cc.id]) ? 'human_' + cc.id : cc.id;
+        const _anims = (typeof _resolveEnemyAnims === 'function') ? _resolveEnemyAnims(_animKey) : null;
+        const _deathAnim = _anims && _anims.death;
+        const _fps = _deathAnim ? _deathAnim.fps : 8;
+        const _frameCount = _deathAnim ? _deathAnim.frameCount : 6;
+        const _elapsed = (nowD - cc.animStart) / 1000;
+        const _fi = Math.min(_frameCount - 1, Math.floor(_elapsed * _fps));
+        ctx.save();
+        ctx.globalAlpha = _alpha;
+        _raidDrawEnemy(ctx, cc.x, cc.y, SCALE, 'death', _fi, cc.id);
+        ctx.restore();
+      }
       for(const u of enemyUnits) drawUnit(u, nowD);
       for(const b of bullets) drawBullet(b);
       for(const d of damageTexts) drawDamage(d, nowD);
