@@ -686,3 +686,434 @@ function renderBattleHeroCanvas(){
 function renderZone2Silhouette(){
   /* no-op：drawSilhouette 從未實作，zone2-silhouette canvas 不存在 */
 }
+
+
+/* rev-fix-render-move: 從 23-garden-raid.js 搬移的繪製函數 */
+function _raidDrawWorkerHelmet(ctx, B, anim, fi, color){
+  const L = GAME_LAYERS.find(function(l){ return l.id === 'head'; });
+  if(!L) return;
+  const keys = anim.keys[L.id] || [];
+  const key = keys[fi] || {rot:0, dx:0, dy:0};
+  const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
+  const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
+  const w = B.w * L.w;
+  const h = B.h * L.h;
+  const px = w * L.pivot.x;
+  const py = h * L.pivot.y;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate((key.rot || 0) * Math.PI / 180);
+  ctx.translate(-px, -py);
+  const cxL = w * 0.5;
+  const cyL = h * 0.45;
+  const r = w * 0.72;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cxL, cyL, r, Math.PI, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+
+function drawBucketUnit(ctx, u){
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(u.bx - u.topHalf, u.topY);
+  ctx.lineTo(u.bx + u.topHalf, u.topY);
+  ctx.lineTo(u.bx + u.botHalf, u.botY);
+  ctx.lineTo(u.bx - u.botHalf, u.botY);
+  ctx.closePath();
+  ctx.fillStyle = '#9aa2aa';
+  ctx.fill();
+  ctx.strokeStyle = '#464d55';
+  ctx.lineWidth = 5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.restore();
+}
+
+
+function drawHandItemUnit(ctx, u){
+  if(u.handItemType === 'sack'){
+    const cx = u.bagX;
+    const cy = u.bagY;
+    ctx.save();
+    ctx.fillStyle = '#ede4d3';
+    ctx.strokeStyle = '#464d55';
+    ctx.lineWidth = 5;
+    ctx.lineJoin = 'round';
+    const topW = 42, topH = 31;
+    ctx.beginPath();
+    ctx.moveTo(cx - topW/2, cy - topH);
+    ctx.lineTo(cx + topW/2, cy - topH);
+    ctx.lineTo(cx, cy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const botW = 87, botH = 87;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + botW/2, cy + botH);
+    ctx.lineTo(cx - botW/2, cy + botH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  } else if(u.handItemType === 'shovel'){
+    const ax = u.anchorX;
+    const ay = u.anchorY;
+    const D_W = 30, D_H = 36;
+    const HANDLE_LEN = 148, HANDLE_W = 6;
+    const HEAD_W = 45, HEAD_H = 57;
+    const forkY = ay + D_H;
+    const handleBot = forkY + HANDLE_LEN;
+    const headBot = handleBot + HEAD_H;
+    ctx.save();
+    ctx.strokeStyle = '#9a9a9a';
+    ctx.lineWidth = HANDLE_W;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(ax, forkY);
+    ctx.lineTo(ax - D_W/2, ay);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ax, forkY);
+    ctx.lineTo(ax + D_W/2, ay);
+    ctx.stroke();
+    ctx.lineWidth = HANDLE_W + 2;
+    ctx.beginPath();
+    ctx.moveTo(ax - D_W/2, ay);
+    ctx.lineTo(ax + D_W/2, ay);
+    ctx.stroke();
+    ctx.lineWidth = HANDLE_W;
+    ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.moveTo(ax, forkY);
+    ctx.lineTo(ax, handleBot);
+    ctx.stroke();
+    ctx.fillStyle = '#8a8f95';
+    ctx.strokeStyle = '#464d55';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(ax - HEAD_W/2, handleBot);
+    ctx.lineTo(ax + HEAD_W/2, handleBot);
+    ctx.lineTo(ax + HEAD_W/2 + 2, headBot);
+    ctx.lineTo(ax - HEAD_W/2 - 2, headBot);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = '#5a6068';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ax, handleBot + 5);
+    ctx.lineTo(ax, headBot - 8);
+    ctx.stroke();
+    ctx.restore();
+  } else if(u.handItemType === 'clipboard'){
+    const w = 90, h = 110;
+    const cx = u.armMidX;
+    const cy = u.armMidY + 7;
+    ctx.save();
+    ctx.fillStyle = '#3a78c8';
+    ctx.fillRect(cx - w/2, cy - h/2, w, h);
+    ctx.restore();
+  } else if(u.handItemType === 'flask'){
+    const positions = u.flaskPositions || [];
+    const R = 37;
+    const NECK_W = 26;
+    const NECK_H = 52;
+    const halfNeck = NECK_W / 2;
+    const BODY_OFFSET = R + NECK_H/2 - 3;
+    for(const pos of positions){
+      const cx = pos.x;
+      const cy = pos.y + BODY_OFFSET;
+      const neckTopY = cy - R - NECK_H;
+      const neckBottomY = cy - R + 5;
+      const _dy = neckBottomY - cy;
+      const _angleRight = Math.atan2(_dy, halfNeck);
+      const _angleLeft = Math.atan2(_dy, -halfNeck);
+      ctx.save();
+      ctx.fillStyle = 'rgba(80,138,100,0.92)';
+      ctx.strokeStyle = '#1f3a2a';
+      ctx.lineWidth = 8;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx - halfNeck, neckTopY);
+      ctx.lineTo(cx - halfNeck, neckBottomY);
+      ctx.arc(cx, cy, R, _angleLeft, _angleRight, true);
+      ctx.lineTo(cx + halfNeck, neckTopY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - halfNeck - 8, neckTopY);
+      ctx.lineTo(cx + halfNeck + 8, neckTopY);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(180,230,200,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(cx - R*0.32, cy - R*0.25, R*0.32, R*0.14, -0.4, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+
+function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType, flipX, hasBucket, handItem, noWorkerHelmet, legOverride){
+  var anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
+  var fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  var B = { x:30, y:30, w:340, h:460 };
+  var ORIG_FOOT_X = 200, ORIG_FOOT_Y = 515;
+  var TYPE_COLORS = {
+    farmer:  { body:'#5a9a48', legs:'#3a6a2e' },
+    guard:   { body:'#5088bb', legs:'#2e4a6a' },
+    foreman: { body:'#e0a830', legs:'#d8d0c0' },
+    enemy:   { body:'#8b2a2a', legs:'#3a1010' }
+  };
+  var _colors = servantType ? TYPE_COLORS[servantType] : null;
+  if(_colors){
+    for(var li = 0; li < GAME_LAYERS.length; li++){
+      var L = GAME_LAYERS[li];
+      L._oldColor = L.color;
+      if(L.id === 'right_leg' || L.id === 'left_leg') L.color = _colors.legs;
+      else if(L.id === 'torso' || L.id === 'back_arm' || L.id === 'front_arm') L.color = _colors.body;
+    }
+  }
+  ctx.save();
+  ctx.translate(px, py);
+  if(animName === 'dead'){ ctx.rotate(-Math.PI / 2); ctx.translate(-ORIG_FOOT_X * scale, 0); }
+  ctx.scale(flipX ? -scale : scale, scale);
+  ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
+
+  var units = [];
+  for(var gi = 0; gi < GAME_LAYERS.length; gi++) units.push({z:GAME_LAYERS[gi].z, kind:'layer', layer:GAME_LAYERS[gi]});
+
+  if(equipped.head){
+    var cH = (typeof HEAD_ARMOR_LAYOUT !== 'undefined' && HEAD_ARMOR_LAYOUT[equipped.head]) ? HEAD_ARMOR_LAYOUT[equipped.head] : HERO_VISIBLE_EQ.head;
+    var lH = GAME_LAYERS.find(function(l){ return l.id === cH.layer; });
+    if(lH){
+      var imgH = getHeroImg('icons/items/' + resolveIconId(equipped.head) + '.png');
+      units.push({z:lH.z+0.5, kind:'eq', layerId:cH.layer, ox:cH.ox, oy:cH.oy, scale:cH.scale, rotation:cH.rotation, img:imgH});
+    }
+  }
+  if(equipped.top){
+    var cT = getTopCfg(equipped.top);
+    var lT = GAME_LAYERS.find(function(l){ return l.id === cT.layer; });
+    if(lT){
+      var imgT = getHeroImg('icons/items/' + resolveIconId(equipped.top) + '.png');
+      units.push({z:lT.z+0.5, kind:'eq', layerId:cT.layer, ox:cT.ox, oy:cT.oy, scale:cT.scale, rotation:cT.rotation, img:imgT});
+    }
+  }
+  var wpS = null, wpI = null;
+  if(weaponSlotOverride && equipped[weaponSlotOverride]){ wpS = weaponSlotOverride; wpI = equipped[weaponSlotOverride]; }
+  else if(equipped.primary){ wpS = 'primary'; wpI = equipped.primary; }
+  else if(equipped.secondary){ wpS = 'secondary'; wpI = equipped.secondary; }
+  else if(equipped.melee){ wpS = 'melee'; wpI = equipped.melee; }
+  if(wpS && wpI && !_isMeleeWeapon(wpI)){
+    var cW = getWeaponCfg(wpS, wpI);
+    if(cW){
+      var lW = GAME_LAYERS.find(function(l){ return l.id === cW.layer; });
+      if(lW){
+        var imgW = getHeroImg('icons/items/' + resolveIconId(wpI) + '.png');
+        units.push({z:lW.z-0.5, kind:'eq', layerId:cW.layer, ox:cW.ox, oy:cW.oy, scale:cW.scale, rotation:cW.rotation, img:imgW, trim:cW.trim});
+      }
+    }
+  }
+
+  if(hasBucket){
+    var _fa = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
+    var _ba = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
+    if(_fa && _ba){
+      var _fk = (anim.keys && anim.keys[_fa.id] && anim.keys[_fa.id][fi]) || {rot:0,dx:0,dy:0};
+      var _bk = (anim.keys && anim.keys[_ba.id] && anim.keys[_ba.id][fi]) || {rot:0,dx:0,dy:0};
+      var _fCx = B.x + B.w * (_fa.x + (_fk.dx||0) * 0.01);
+      var _fCy = B.y + B.h * (_fa.y + (_fk.dy||0) * 0.01);
+      var _fW = B.w * _fa.w, _fH = B.h * _fa.h;
+      var _fMidX = _fCx + _fW * (0.5 - _fa.pivot.x);
+      var _fMidY = _fCy + _fH * (0.5 - _fa.pivot.y);
+      var _bCx = B.x + B.w * (_ba.x + (_bk.dx||0) * 0.01);
+      var _bCy = B.y + B.h * (_ba.y + (_bk.dy||0) * 0.01);
+      var _bW = B.w * _ba.w, _bH = B.h * _ba.h;
+      var _bMidX = _bCx + _bW * (0.5 - _ba.pivot.x);
+      var _bMidY = _bCy + _bH * (0.5 - _ba.pivot.y);
+      var _bkx = (_fMidX + _bMidX) / 2;
+      var _bky = (_fMidY + _bMidY) / 2;
+      units.push({z:58, kind:'bucket', bx:_bkx, topY:_bky-38, botY:_bky+97, topHalf:54, botHalf:39});
+    }
+  }
+
+  if(handItem === 'stick' || handItem === 'clipboard' || handItem === 'flask'){
+    var _fa2 = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
+    var _ba2 = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
+    if(_fa2 && _ba2){
+      var _fk2 = (anim.keys && anim.keys[_fa2.id] && anim.keys[_fa2.id][fi]) || {rot:0,dx:0,dy:0};
+      var _bk2 = (anim.keys && anim.keys[_ba2.id] && anim.keys[_ba2.id][fi]) || {rot:0,dx:0,dy:0};
+      var _fCx2 = B.x + B.w * (_fa2.x + (_fk2.dx||0) * 0.01);
+      var _fCy2 = B.y + B.h * (_fa2.y + (_fk2.dy||0) * 0.01);
+      var _fW2 = B.w * _fa2.w, _fH2 = B.h * _fa2.h;
+      var _fMidX2 = _fCx2 + _fW2 * (0.5 - _fa2.pivot.x);
+      var _fMidY2 = _fCy2 + _fH2 * (0.5 - _fa2.pivot.y);
+      var _bCx2 = B.x + B.w * (_ba2.x + (_bk2.dx||0) * 0.01);
+      var _bCy2 = B.y + B.h * (_ba2.y + (_bk2.dy||0) * 0.01);
+      var _bW2 = B.w * _ba2.w, _bH2 = B.h * _ba2.h;
+      var _bMidX2 = _bCx2 + _bW2 * (0.5 - _ba2.pivot.x);
+      var _bMidY2 = _bCy2 + _bH2 * (0.5 - _ba2.pivot.y);
+      if(handItem === 'stick'){
+        units.push({z:60, kind:'handitem', handItemType:'sack', bagX:_bMidX2, bagY:_bMidY2});
+        var _shovelX = _fCx2 + _fW2 * (1 - _fa2.pivot.x) - _fW2 * 0.10;
+        var _shovelY = _fCy2 + _fH2 * (0 - _fa2.pivot.y) - 7;
+        units.push({z:59, kind:'handitem', handItemType:'shovel', anchorX:_shovelX, anchorY:_shovelY});
+      } else if(handItem === 'clipboard'){
+        units.push({z:58, kind:'handitem', handItemType:'clipboard', armMidX:(_fMidX2+_bMidX2)/2, armMidY:(_fMidY2+_bMidY2)/2});
+      } else if(handItem === 'flask'){
+        var _flaskRX = _fCx2 + _fW2 * (0.85 - _fa2.pivot.x);
+        var _flaskRY = _fCy2 + _fH2 * (0.5 - _fa2.pivot.y);
+        var _flaskLX = _bCx2 + _bW2 * (0.2 - _ba2.pivot.x);
+        var _flaskLY = _bCy2 + _bH2 * (0.5 - _ba2.pivot.y);
+        units.push({z:61, kind:'handitem', handItemType:'flask', flaskPositions:[{x:_flaskLX, y:_flaskLY}, {x:_flaskRX, y:_flaskRY}]});
+      }
+    }
+  }
+
+  units.sort(function(a,b){ return a.z - b.z; });
+
+  for(var ui = 0; ui < units.length; ui++){
+    var u = units[ui];
+    if(u.kind === 'layer'){
+      if(legOverride && legOverride[u.layer.id] && typeof legOverride[u.layer.id].rot === 'number'){
+        drawBodyLayerWithRot(ctx, u.layer, B, anim, fi, legOverride[u.layer.id].rot);
+      } else {
+        drawBodyLayer(ctx, u.layer, B, anim, fi);
+      }
+    }
+    else if(u.kind === 'bucket') drawBucketUnit(ctx, u);
+    else if(u.kind === 'handitem') drawHandItemUnit(ctx, u);
+    else drawEqLayer(ctx, u, B, anim, fi);
+  }
+
+  if(!noWorkerHelmet && servantType === 'foreman') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ffffff');
+  else if(!noWorkerHelmet && servantType === 'farmer') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ff8800');
+
+  ctx.restore();
+
+  if(_colors){
+    for(var ri = 0; ri < GAME_LAYERS.length; ri++){
+      var L2 = GAME_LAYERS[ri];
+      if(typeof L2._oldColor !== 'undefined'){ L2.color = L2._oldColor; delete L2._oldColor; }
+    }
+  }
+}
+
+
+function drawBodyLayerWithRot(ctx, L, B, anim, fi, rotOverride){
+  var keys = anim.keys[L.id] || [];
+  var key = keys[fi] || {rot:0, dx:0, dy:0};
+  var cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
+  var cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
+  var w = B.w * L.w;
+  var h = B.h * L.h;
+  var px = w * L.pivot.x;
+  var py = h * L.pivot.y;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rotOverride * Math.PI / 180);
+  ctx.translate(-px, -py);
+  ctx.fillStyle = L.color;
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, w - 2, h - 2);
+  ctx.restore();
+}
+
+
+function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
+  var _realId = enemyId;
+  if(typeof HUMAN_ENEMY_DATA !== "undefined"){
+    if(!HUMAN_ENEMY_DATA[enemyId] && HUMAN_ENEMY_DATA["human_" + enemyId]){
+      _realId = "human_" + enemyId;
+    }
+  }
+  if(typeof HUMAN_ENEMY_DATA !== "undefined" && HUMAN_ENEMY_DATA[_realId]){
+    const def = HUMAN_ENEMY_DATA[_realId];
+    const anims = def.anims;
+    if(!anims) return;
+    let anim = anims[animName];
+    if(!anim && animName === 'walk') anim = GAME_ANIMS.walk;
+    if(!anim) anim = anims.idle;
+    if(!anim) return;
+    const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
+    if(!window._rev510_raidEquipCache) window._rev510_raidEquipCache = {};
+    if(!window._rev510_raidEquipCache[_realId]){
+      window._rev510_raidEquipCache[_realId] = (typeof _rev506_getRandomEquip === "function")
+        ? _rev506_getRandomEquip(_realId) : null;
+    }
+    const equip = window._rev510_raidEquipCache[_realId];
+    const ox = px - def.canvas.w * scale / 2;
+    const oy = py - def.canvas.h * scale;
+    const _isDeath = (animName === "death");
+    if(typeof _rev506_drawHumanCorpse === "function"){
+      _rev506_drawHumanCorpse(ctx, _realId, scale, ox, oy, def, anim, fi, equip, _isDeath);
+      return;
+    }
+  }
+  if(typeof _drawEnemyAt === "function"){
+    var _bdef = (typeof BEAST_LAYERS !== "undefined" && BEAST_LAYERS[_realId]);
+    if(_bdef){
+      var _bx = px - _bdef.canvas.w * scale / 2;
+      var _by = py - _bdef.canvas.h * scale;
+      if(_drawEnemyAt(ctx, _realId, _bx, _by, scale, animName, frameIdx)) return;
+    }
+  }
+  if(typeof BEAST_LAYERS !== "undefined" && BEAST_LAYERS[_realId]) {
+    const def = BEAST_LAYERS[_realId];
+    const bounds = (typeof getBeastBounds === "function") ? getBeastBounds(def) : null;
+    if(bounds) {
+      const targetVisualH = 386 * 0.9;
+      const actualScale = (targetVisualH * scale) / bounds.h;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(actualScale, actualScale);
+      const centerX = (bounds.minX + bounds.maxX) / 2;
+      const bottomY = bounds.maxY;
+      ctx.translate(-centerX, -bottomY);
+      const world = (typeof resolveBossWorld === "function") ? resolveBossWorld(def, { keys:{} }, 0) : {};
+      const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
+      for(const L of sorted) {
+        const wp = world[L.id];
+        if(!wp) continue;
+        const w = def.canvas.w * L.w;
+        const h = def.canvas.h * L.h;
+        const ppx = w * L.pivot.x;
+        const ppy = h * L.pivot.y;
+        ctx.save();
+        ctx.translate(wp.wx, wp.wy);
+        ctx.rotate((L.rot || 0) * Math.PI / 180);
+        ctx.translate(-ppx, -ppy);
+        if(L.id.indexOf("eye") === 0) {
+          ctx.shadowColor = "#ff0000";
+          ctx.shadowBlur = 15;
+        }
+        ctx.fillStyle = L.color;
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = "rgba(0,0,0,0.65)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, w - 2, h - 2);
+        ctx.restore();
+      }
+      ctx.restore();
+      return;
+    }
+  }
+  if(typeof _raidDrawHuman === "function") {
+    const _eq = { head: "ssh68", top: "6b231", primary: "ak74" };
+    const _rar = { head: "一般", top: "一般", primary: "一般" };
+    _raidDrawHuman(ctx, px, py, scale, _eq, _rar, animName, frameIdx, "primary", "enemy", true, false, null);
+  }
+}

@@ -84,3 +84,8 @@ function armorMMToLevel(mm){
   if(mm >= ARMOR_LEVEL_TO_MM[2]) return 2;
   return 1;
 }
+
+
+/* rev-fix-constants-v103: 后院共享常量 */
+const GARDEN_GUARD_DETECT_DIST = 40;
+const BULLET_VISUAL_RADIUS = { normal: 3, grenade: 5, missile: 6 };

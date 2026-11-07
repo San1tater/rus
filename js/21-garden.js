@@ -153,7 +153,8 @@ function _ensureGardenPage(){
         if(_entry && _entry.detail){ _openGardenLogDetail(_entry); }
         return;
       }
-      const _battleItem = _et.closest('.battle-log-item[data-battle-idx]');
+      /* rev-fix-raid-summary-click: 選擇器同時支持舊卡片與新文字總結 */
+      const _battleItem = _et.closest('.battle-log-item[data-battle-idx], .raid-log-summary[data-battle-idx]');
       if(_battleItem){
         const _idx = parseInt(_battleItem.getAttribute('data-battle-idx'), 10);
         const _bl = (state.garden && state.garden.battleLog) || [];
@@ -438,7 +439,20 @@ function onGardenPlotClick(idx){
   else { openGardenPlotDetail(idx); }
 }
 
+function _gardenEnsureStyles(){
+  /* rev-fix-garden-injured-styles: 独立于车站，花园打开时就有 */
+  if(document.getElementById('garden-injured-styles')) return;
+  const st = document.createElement('style');
+  st.id = 'garden-injured-styles';
+  /* rev-fix-servant-tab-injured: 加上 .gs-cell.srv.cant-go */
+  st.textContent = '.tower-guard-btn.cant-go{filter:grayscale(1);opacity:0.45;position:relative}.tower-guard-btn.cant-go::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top right,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px)),linear-gradient(to top left,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px))}'
+    + '.gs-cell.srv.cant-go{filter:grayscale(1);opacity:0.45;position:relative}'
+    + '.gs-cell.srv.cant-go::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:5;background:linear-gradient(to top right,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px)),linear-gradient(to top left,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px))}';
+  document.head.appendChild(st);
+}
+
 function _gardenPlotOwnersHtml(idx, type){
+  _gardenEnsureStyles();
   const servants = (state.servants || []).filter(function(s){
     return s.type === type && s.assignedPlots && s.assignedPlots.indexOf(idx) !== -1;
   });
@@ -459,14 +473,25 @@ function _gardenPlotOwnersHtml(idx, type){
     const color = pct <= 0 ? '#e05252' : (pct <= 30 ? '#e8741e' : (pct <= 70 ? '#e8a33d' : '#4caf50'));
     const tDef = SERVANT_TYPES[s.type] || {name:''};
     html += '<div class="owner-row">';
-    html += '<div class="tower-guard-btn" data-srv-id="' + s.id + '" data-plot-idx="' + idx + '" style="background:' + rarityBg(s.rarity) + '">';
+    /* rev-fix-guard-card-injured: 守衛重傷時加 cant-go */
+    const _isInjured = !!(s.injuredUntil && s.injuredUntil > Date.now());
+    html += '<div class="tower-guard-btn' + (_isInjured ? ' cant-go' : '') + '" data-srv-id="' + s.id + '" data-plot-idx="' + idx + '" style="background:' + rarityBg(s.rarity) + '">';
     html += '<img class="tg-icon" src="' + _img + '" alt="">';
     html += '<div class="tg-name">' + servantLabel(s) + '</div>';
     html += '</div>';
     html += '<div class="owner-info">';
     html += '<div class="owner-line"><span class="' + rarityClass(s.rarity) + '">Lv.' + s.lv + ' ' + tDef.name + '</span></div>';
     html += '<div class="owner-stam-bar"><div class="owner-stam-fill" style="width:' + pct + '%;background:' + color + '"></div></div>';
-    html += '<div class="owner-stam-text">' + stam + ' / ' + effMax + '</div>';
+    html += '<div class="owner-stam-text" style="color:' + color + '">體力 ' + stam + ' / ' + effMax + '</div>';
+    /* rev-fix-guard-hp-bar-v5: 只对守卫显示 HP 条 */
+    if(type === 'guard'){
+      const _maxHp2 = (typeof servantMaxHp === 'function') ? servantMaxHp(s) : (s.hp || 100);
+      const _curHp2 = _isInjured ? 0 : _maxHp2;
+      const _hpPct2 = _isInjured ? 0 : 100;
+      const _hpCol2 = _isInjured ? '#e05252' : '#4caf50';
+      html += '<div class="owner-stam-bar" style="margin-top:2px"><div class="owner-stam-fill" style="width:' + _hpPct2 + '%;background:' + _hpCol2 + '"></div></div>';
+      html += '<div class="owner-stam-text" style="color:' + _hpCol2 + '">' + (_isInjured ? '<span style="color:#e8a33d;font-weight:bold">治療</span> · ' : '') + 'HP ' + _curHp2 + '/' + _maxHp2 + '</div>';
+    }
     html += '</div>';
     html += '</div>';
   }
@@ -590,6 +615,43 @@ function _gardenPickServantForPlot(idx, type){
 }
 
 function _gardenPlotOwnersBind(bd){
+  /* rev-fix-guard-heal-v4: 重伤守卫整个 owner-info 可点 */
+  const _ownerInfos = bd.querySelectorAll('.owner-info');
+  for(let _hi = 0; _hi < _ownerInfos.length; _hi++){
+    (function(_oi){
+      const _row = _oi.closest('.owner-row');
+      if(!_row) return;
+      const _btn = _row.querySelector('.tower-guard-btn[data-srv-id]');
+      if(!_btn) return;
+      const _sid = _btn.getAttribute('data-srv-id');
+      const _plotIdx = parseInt(_btn.getAttribute('data-plot-idx'), 10);
+      const _srv = (state.servants || []).find(function(s){ return s.id === _sid; });
+      if(!_srv) return;
+      const _isInjuredNow = !!(_srv.injuredUntil && _srv.injuredUntil > Date.now());
+      if(!_isInjuredNow) return;
+      _oi.style.cursor = 'pointer';
+      _oi.onclick = function(e){
+        if(e && e.stopPropagation) e.stopPropagation();
+        if(typeof _stConsumeLowestMed !== 'function') return;
+        const _med = _stConsumeLowestMed();
+        if(!_med){
+          if(typeof notify === 'function') notify('沒有醫療品', 'warn');
+          return;
+        }
+        _srv.injuredUntil = 0;
+        _srv._injuredDown = false;
+        _srv.hp = (typeof servantMaxHp === 'function') ? servantMaxHp(_srv) : (_srv.hp || 100);
+        if(_srv._injuredAnimStart) _srv._injuredAnimStart = null;
+        save();
+        if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
+        renderGardenGrid();
+        closeModal();
+        if(isFinite(_plotIdx) && _plotIdx >= 0){
+          setTimeout(function(){ _gardenTowerOpen(_plotIdx); }, 50);
+        }
+      };
+    })(_ownerInfos[_hi]);
+  }
   const btns = bd.querySelectorAll('.tower-guard-btn[data-srv-id]');
   for(let i = 0; i < btns.length; i++){
     (function(el){
@@ -1044,7 +1106,9 @@ function renderGardenServants(box){
           const _star = _isServantWorking(s) ? '<div class="srv-star">★</div>' : '';
           const _label = servantLabel(s);
           const _labelEsc = _servantEscHtml(_label);
-          rowHtml += '<div class="gs-cell filled srv" data-srv-id="' + s.id + '" style="background:' + rarityBg(s.rarity) + ';' + cellStyle + '">' +
+          /* rev-fix-servant-tab-injured: 重伤守卫卡片加 cant-go */
+          const _srvInjured = !!(s.injuredUntil && s.injuredUntil > Date.now());
+          rowHtml += '<div class="gs-cell filled srv' + (_srvInjured ? ' cant-go' : '') + '" data-srv-id="' + s.id + '" style="background:' + rarityBg(s.rarity) + ';' + cellStyle + '">' +
             '<img class="srv-portrait" src="' + _img + '" alt="">' +
             _star +
             '<div class="srv-tag">' + _labelEsc + '</div>' +
@@ -1277,12 +1341,24 @@ function openServantDetail(srvId, returnFn){
 body += '<button class="btn danger" id="srv-dismiss" style="margin-left:auto;padding:4px 12px;font-size:11px;flex:0 0 auto">解僱</button>';
 
   body += '</div>';
+  /* rev-fix-servant-hp-bar-v6: HP 条在体力条下面 */
+  const _isInjuredDetail = !!(srv.injuredUntil && srv.injuredUntil > Date.now());
   body += '<div class="detail-sub">' + srv.rarity + ' · Lv.' + srv.lv + ' · ' + def.name + (srv.resting ? ' · <span style="color:#7a6f60">休息中</span>' : (srv.stamina <= 0 ? ' · <span style="color:#e05252">偷懶中</span>' : '')) + '</div>';
   body += '<div class="stat-line"><span class="k">當前效果</span><span class="v" style="color:#4caf50;font-weight:bold">' + servantLevelEffectText(srv) + '</span></div>';
   body += '<div style="margin:8px 0 4px">';
   body += '<div style="font-size:10px;color:#7a6f60;margin-bottom:3px;display:flex;justify-content:space-between"><span>體力</span><span>' + stam + ' / ' + maxStam + '（' + stamPct + '%）</span></div>';
   body += '<div style="height:6px;background:#1a1510;border-radius:3px;overflow:hidden;border:1px solid #2a231c"><div style="height:100%;width:' + stamPct + '%;background:' + stamColor + '"></div></div>';
   body += '</div>';
+  const _maxHpV = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : (srv.hp || 100);
+  let _curHpV = (srv.hp !== undefined && srv.hp !== null) ? srv.hp : _maxHpV;
+  if(_isInjuredDetail) _curHpV = 0;
+  const _hpPctV = _maxHpV > 0 ? Math.round(_curHpV / _maxHpV * 100) : 0;
+  const _hpColV = _isInjuredDetail ? '#e05252' : (_curHpV < _maxHpV ? '#e8a33d' : '#4caf50');
+  body += '<div style="margin:8px 0 4px"' + (_isInjuredDetail ? ' class="srv-detail-heal" data-heal="1" style="cursor:pointer;margin:8px 0 4px"' : '') + '>';
+  body += '<div style="font-size:10px;color:' + (_isInjuredDetail ? '#e05252' : '#7a6f60') + ';margin-bottom:3px;display:flex;justify-content:space-between"><span>HP</span><span>' + _curHpV + ' / ' + _maxHpV + '（' + _hpPctV + '%）' + (_isInjuredDetail ? ' · <span style="color:#e8a33d;font-weight:bold">治療</span>' : '') + '</span></div>';
+  body += '<div style="height:6px;background:#1a1510;border-radius:3px;overflow:hidden;border:1px solid #2a231c"><div style="height:100%;width:' + _hpPctV + '%;background:' + _hpColV + '"></div></div>';
+  body += '</div>';
+  /* rev-fix-servant-detail-dedup: 删除重复的当前效果 + 体力条 */
   if(srv.lv < SERVANT_MAX_LV){
     const _need = servantExpNeed(srv.lv);
     const _cur = srv.exp || 0;
@@ -1319,6 +1395,25 @@ body += '<button class="btn danger" id="srv-dismiss" style="margin-left:auto;pad
   body += '<div style="font-size:9px;color:#5a5040;margin-top:4px;line-height:1.5">需與商人訂閱食物生產線後生效</div>';
   const _detailOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
   const bd = openModal({ title: '僕人詳情', body: body, footer: ft, onClose: _detailOnClose });
+  /* rev-fix-servant-heal-v3: 点击整个 HP 条区域治疗 */
+  const _healArea = bd.querySelector('.srv-detail-heal[data-heal]');
+  if(_healArea) _healArea.onclick = function(){
+    if(typeof _stConsumeLowestMed !== 'function') return;
+    const _med = _stConsumeLowestMed();
+    if(!_med){
+      if(typeof notify === 'function') notify('沒有醫療品', 'warn');
+      return;
+    }
+    srv.injuredUntil = 0;
+    srv._injuredDown = false;
+    srv.hp = _maxHpV;
+    if(srv._injuredAnimStart) srv._injuredAnimStart = null;
+    save();
+    closeModal();
+    if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
+    renderGardenGrid();
+    openServantDetail(srvId, returnFn);
+  };
   const _wdBtn = ft.querySelector('#srv-withdraw');
   if(_wdBtn) _wdBtn.onclick = function(){
     const _list = srv.assignedPlots || [];
@@ -1849,6 +1944,16 @@ function _gardenActorTick(){
       }
     }
     if(a.type === 'guard'){
+/* rev-fix-raid-guard-actor: 戰鬥中守衛位置由 raid canvas 固定，跳過 actor 狀態機 */
+if(window._raidLiveActive) continue;
+/* rev-fix-injured-guard-no-move: 重伤守卫不移动，保持倒地 */
+if(a._srv && a._srv.injuredUntil && a._srv.injuredUntil > Date.now()){
+  a.tx = a.x;
+  a.ty = a.y;
+  a.state = 'injured';
+  a.task = null;
+  continue;
+}
 if(a.stamina <= 0){
         if(!a.restPos){
           const gridRect = grid.getBoundingClientRect();
@@ -2190,6 +2295,7 @@ function _gardenRenderActors(now){
   const _sortedActors = _gardenActors.slice().sort(function(a, b){ return (a.y || 0) - (b.y || 0); });
   for(const a of _sortedActors){
     if(!a.initialized) continue;
+    /* rev-fix-raid-guard-actor-v2: 守衛在 actor canvas 上繪製（不跳過） */
     if(typeof a.tx !== 'number'){ a.tx = a.x || 0; a.ty = a.y || 0; }
     if(typeof a.x !== 'number'){ a.x = a.tx; a.y = a.ty; }
     if(typeof a._lastRenderTime !== 'number') a._lastRenderTime = now;
@@ -2207,19 +2313,47 @@ function _gardenRenderActors(now){
     } else {
       a.x = a.tx; a.y = a.ty;
     }
-    const _moving = Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2)) > 0.8;
     let animName = 'idle';
-    if(_moving) animName = 'walk';
-    else if(a.state === 'work') animName = 'fire_primary';
-    else animName = 'idle';
-const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
-    if(!a._animStart || a._animName !== animName){
-      a._animStart = now;
+    let animStart = now;
+    /* rev-fix-injured-guard-death-anim-v2: 重伤守卫 _injuredAnimStart 存到 srv 对象上，不被 sync 清空 */
+    const _srvRef = (state.servants || []).find(function(s){ return s.id === a.id; });
+    const _guardInjured = (a.type === 'guard' && _srvRef && _srvRef.injuredUntil && _srvRef.injuredUntil > Date.now());
+    if(_guardInjured){
+      animName = 'dead';
+      /* rev-fix-injured-anim-start-v3: 用 performance.now() 基准 */
+      if(!_srvRef._injuredAnimStart){
+        _srvRef._injuredAnimStart = now;
+      }
+      animStart = _srvRef._injuredAnimStart;
       a._animName = animName;
-      a._animFrame = 0;
+      a._animStart = animStart;
+    } else if(a._combatUnit && a._combatUnit.alive && window._raidLiveActive && typeof getUnitAnimState === 'function'){
+      const _as = getUnitAnimState(a._combatUnit, now);
+      animName = _as.name;
+      animStart = _as.startTime;
+    } else {
+      const _moving = Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2)) > 0.8;
+      if(_moving) animName = 'walk';
+      else if(a.state === 'work') animName = 'fire_primary';
+      else animName = 'idle';
+      if(!a._animStart || a._animName !== animName){
+        a._animStart = now;
+      }
+      animStart = a._animStart;
     }
-    const elapsed = now - a._animStart;
-    a._animFrame = Math.floor(elapsed / (1000 / anim.fps)) % anim.frameCount;
+    const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
+    a._animName = animName;
+    a._animStart = animStart;
+    const _elapsed = Math.max(0, now - animStart);
+    let _f3 = Math.floor(_elapsed / (1000 / anim.fps));
+    if(anim.loop){ _f3 = _f3 % anim.frameCount; }
+    else if(_f3 > anim.frameCount - 1){ _f3 = anim.frameCount - 1; }
+    a._animFrame = _f3;
+    /* rev-fix-raid-actor-sync: 同步 animName / animFrame 給 _combatUnit，供 spawnBullet 的 _getRaidMuzzleWorld 使用 */
+    if(a._combatUnit){
+      a._combatUnit.animName = animName;
+      a._combatUnit.animFrame = a._animFrame;
+    }
     ctx.save();
     const equipped = {};
     const equippedRarity = {};
@@ -2247,7 +2381,23 @@ const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
     }
     let _facingLeft = (typeof a._facingLeft === 'boolean') ? a._facingLeft : false;
     if(window._raidLiveActive && a.type === 'guard'){ _facingLeft = false; }
-    _raidDrawHuman(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, _facingLeft, _hasBucket, _handItem);
+    /* rev-fix-dead-y-center: 让尸体居中在自己格子内（格子高 64，尸体高约 58） */
+    const _drawY = (animName === 'dead') ? (a.y - 32) : a.y;
+    (window.drawHumanSprite || _raidDrawHuman)(ctx, a.x, _drawY, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, _facingLeft, _hasBucket, _handItem);
+    /* rev-fix-raid-actor-bar: 守衛戰鬥中在 actor canvas 上畫血條 */
+    if(a._combatUnit && a._combatUnit.alive && window._raidLiveActive){
+      const _cu = a._combatUnit;
+      const _bw = 34, _bh = 4;
+      const _bx = a.x - _bw / 2;
+      /* rev-fix-raid-bar-above-name: 血條在姓名條上方，不被遮住 */
+      const _by = a.y - 56 * 1.26 - 26;
+      ctx.fillStyle = 'rgba(0,0,0,.75)';
+      ctx.fillRect(_bx - 1, _by - 1, _bw + 2, _bh + 2);
+      ctx.fillStyle = '#1a1010';
+      ctx.fillRect(_bx, _by, _bw, _bh);
+      ctx.fillStyle = '#4caf50';
+      ctx.fillRect(_bx, _by, _bw * Math.max(0, _cu.hp / _cu.maxHp), _bh);
+    }
     if(a._srv){
       const _lbl = servantLabel(a._srv);
       ctx.save();
@@ -2286,7 +2436,8 @@ function _gardenStartActorCanvasLoop(){
       _gardenActorCanvasRAF = null;
       return;
     }
-    _gardenRenderActors(Date.now());
+    /* rev-fix-timebase-unify: 用 performance.now()，和 spawnBullet 的 _fireAnimStart 一致 */
+    _gardenRenderActors(performance.now());
     _gardenActorCanvasRAF = requestAnimationFrame(tick);
   };
   _gardenActorCanvasRAF = requestAnimationFrame(tick);
@@ -3099,33 +3250,84 @@ function _openOfflineGardenDetail(entry){
 
 function _openBattleLogDetail(entry){
   if(!entry) return;
+  /* rev-fix-raid-battleLog: 新格式 entry.summary，舊格式 entry 本身 */
+  const _s = entry.summary || entry;
   const win = entry.win;
   let body = '<div class="detail-title ' + (win?'r-傳奇':'r-破舊') + '">' + (win?'⚔️ 勝利':'💀 失敗') + '</div>';
   body += '<div class="detail-sub">' + _esc(entry.region || '') + '</div>';
-  body += '<div class="stat-line"><span class="k">回合</span><span class="v">' + entry.rounds + '</span></div>';
-  body += '<div class="stat-line"><span class="k">守衛</span><span class="v">' + entry.guardAlive + ' / ' + entry.guardTotal + '</span></div>';
-  body += '<div class="stat-line"><span class="k">敵人</span><span class="v">' + entry.enemyCount + '</span></div>';
-  body += '<div class="stat-line"><span class="k">彈藥</span><span class="v">' + entry.ammoUsed + ' 發</span></div>';
-  body += '<div class="stat-line"><span class="k">總傷害</span><span class="v">' + entry.totalDmg + '</span></div>';
-  if(entry.guardAmmoList && entry.guardAmmoList.length){
+  body += '<div class="stat-line"><span class="k">回合</span><span class="v">' + (_s.rounds||0) + '</span></div>';
+  body += '<div class="stat-line"><span class="k">守衛</span><span class="v">' + (_s.guardAlive||0) + ' / ' + (_s.guardTotal||0) + '</span></div>';
+  body += '<div class="stat-line"><span class="k">敵人</span><span class="v">' + (_s.enemyCount||0) + '</span></div>';
+  body += '<div class="stat-line"><span class="k">彈藥</span><span class="v">' + (_s.ammoUsed||0) + ' 發</span></div>';
+  body += '<div class="stat-line"><span class="k">總傷害</span><span class="v">' + (_s.totalDmg||0) + '</span></div>';
+  if(_s.guardAmmoList && _s.guardAmmoList.length){
     body += '<div class="divider"></div><div style="font-size:11px;color:#e8a33d;margin-bottom:4px">守衛表現</div>';
-    for(const ga of entry.guardAmmoList){
+    for(const ga of _s.guardAmmoList){
       body += '<div class="stat-line"><span class="k">' + _esc((ga.coord||'') + ' ' + ga.name) + '</span><span class="v">' + ga.ammoName + '×' + ga.count + ' 傷' + ga.dmg + '</span></div>';
     }
   }
-  if(!win && entry.broken && entry.broken.length){
-    body += '<div class="divider"></div><div style="color:#e05252;font-size:11px">損壞：' + entry.broken.join(' ') + '</div>';
+  if(!win && _s.broken && _s.broken.length){
+    body += '<div class="divider"></div><div style="color:#e05252;font-size:11px">損壞：' + _s.broken.join(' ') + '</div>';
   }
-  if(!win && entry.stolen && entry.stolen.length){
-    body += '<div style="color:#e05252;font-size:11px">掠奪：' + _lootHtml(entry.stolen, '#e05252') + '</div>';
+  if(!win && _s.stolen && _s.stolen.length){
+    body += '<div style="color:#e05252;font-size:11px">掠奪：' + _lootHtml(_s.stolen, '#e05252') + '</div>';
   }
-  if(win && entry.loot && entry.loot.length){
-    body += '<div class="divider"></div><div style="color:#4caf50;font-size:11px">獲得：' + _lootHtml(entry.loot, '#4caf50') + '</div>';
+  if(win && _s.loot && _s.loot.length){
+    body += '<div class="divider"></div><div style="color:#4caf50;font-size:11px">獲得：' + _lootHtml(_s.loot, '#4caf50') + '</div>';
   }
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
   ft.innerHTML = '';
   openModal({ title: '戰鬥詳情', body: body, footer: ft });
+}
+
+/* rev-fix-raid-realtime-log: 只更新右欄（戰鬥日誌），不重建左欄（生產日誌） */
+function _gardenRefreshBattleLogNow(){
+  try {
+    if(typeof _gardenActiveTab === 'undefined' || _gardenActiveTab !== 'log') return;
+    const p = document.getElementById('garden-page');
+    if(!p || !p.classList.contains('on')) return;
+    const box = p.querySelector('#gp-content');
+    if(!box) return;
+    const rw = box.querySelector('.gs-wrap[data-col="battle"]');
+    if(!rw) return;
+    const battleLog = (state.garden && state.garden.battleLog) || [];
+    let right = '';
+    if(!battleLog.length){
+      right = '<div class="gs-empty" style="position:static;padding:20px 0">暫無戰鬥</div>';
+    } else {
+      for(let i = 0; i < battleLog.length; i++){
+        const e = battleLog[i];
+        if(e.kills !== undefined || e.status !== undefined || e.summary !== undefined){
+          if(e.kills && e.kills.length){
+            for(const k of e.kills){
+              /* rev-fix-raid-log-timestamp-v2: 加时间戳 */
+            const _ts3 = k.t ? (('0' + new Date(k.t).getHours()).slice(-2) + ':' + ('0' + new Date(k.t).getMinutes()).slice(-2)) : '';
+            right += '<div class="garden-log-line raid-log-kill" style="padding-left:0;border-left:none">' + (_ts3 ? '<span class="gl-time">' + _ts3 + '</span> ' : '') + (k.html || '') + '</div>';
+            }
+          }
+          if(e.status && e.status.length){
+            for(const s of e.status){
+              var _sCls = s.cls ? (' ' + s.cls) : '';
+              right += '<div class="garden-log-line raid-log-status' + _sCls + '" style="padding-left:0;border-left:none">' + (s.html || '') + '</div>';
+            }
+          }
+          if(e.summary){
+            const _sum = e.summary;
+            const _win = e.win;
+            const _txt = (_win?'⚔️ 防禦成功':'💀 後院失守') + ' · ' + (e.region||'') + ' · 擊殺 ' + (_sum.enemyCount||0) + ' · 彈藥 ' + (_sum.ammoUsed||0) + ' · 傷害 ' + (_sum.totalDmg||0);
+            right += '<div class="garden-log-line raid-log-summary" data-battle-idx="' + i + '" style="padding-left:0;border-left:none;cursor:pointer;text-decoration:underline dotted;color:#e8a33d">' + _txt + '</div>';
+          }
+        } else {
+          const _win = e.win;
+          const _txt = (_win?'⚔️勝':'💀敗') + ' ' + (e.region||'') + ' · ' + e.rounds + '回 · 守' + e.guardAlive + '/' + e.guardTotal + ' · 敵' + e.enemyCount + ' · 彈' + e.ammoUsed + ' · 傷' + e.totalDmg;
+          right += '<div class="garden-log-line raid-log-summary" data-battle-idx="' + i + '" style="padding-left:0;border-left:none;cursor:pointer;text-decoration:underline dotted;color:#e8a33d">' + _txt + '</div>';
+        }
+      }
+    }
+    rw.innerHTML = right;
+    rw.scrollTop = rw.scrollHeight;
+  } catch(e){}
 }
 
 function renderGardenLog(box){
@@ -3153,17 +3355,42 @@ function renderGardenLog(box){
   }
   left += '</div>';
   let right = '<div class="gs-wrap" data-col="battle">';
-  /* rev-fix-raid-log-unify: 移除實時日誌，右欄只顯示歷史戰鬥記錄 */
+  /* rev-fix-raid-battleLog: 文字形式渲染（kills + status + summary） */
   if(!battleLog.length){
     right += '<div class="gs-empty" style="position:static;padding:20px 0">暫無戰鬥</div>';
   } else {
     for(let i = 0; i < battleLog.length; i++){
       const e = battleLog[i];
-      const win = e.win;
-      right += '<div class="battle-log-item ' + (win?'win':'lose') + '" data-battle-idx="' + i + '" style="cursor:pointer">';
-      right += '<div class="bl-head"><span class="bl-title">' + (win?'⚔️勝':'💀敗') + ' ' + _esc(e.region||'') + '</span><span class="bl-time">' + tsFull(e.t) + '</span></div>';
-      right += '<div class="bl-row">' + e.rounds + '回 · 守' + e.guardAlive + '/' + e.guardTotal + ' · 敵' + e.enemyCount + ' · 彈' + e.ammoUsed + ' · 傷' + e.totalDmg + '</div>';
-      right += '</div>';
+      /* 新格式：kills + status + summary */
+      if(e.kills !== undefined || e.status !== undefined || e.summary !== undefined){
+        if(e.kills && e.kills.length){
+          for(const k of e.kills){
+            /* rev-fix-raid-log-timestamp: 加时间戳 */
+            /* rev-fix-tsstr-scope: tsStr 在 _gardenRefreshBattleLogNow 内未定义 → 内联 */
+            const _ts = k.t ? (('0' + new Date(k.t).getHours()).slice(-2) + ':' + ('0' + new Date(k.t).getMinutes()).slice(-2)) : '';
+            right += '<div class="garden-log-line raid-log-kill" style="padding-left:0;border-left:none">' + (_ts ? '<span class="gl-time">' + _ts + '</span> ' : '') + (k.html || '') + '</div>';
+          }
+        }
+        if(e.status && e.status.length){
+          for(const s of e.status){
+            var _sCls2 = s.cls ? (' ' + s.cls) : '';
+            /* rev-fix-raid-log-timestamp-v3: 加时间戳 */
+            const _ts4 = s.t ? (('0' + new Date(s.t).getHours()).slice(-2) + ':' + ('0' + new Date(s.t).getMinutes()).slice(-2)) : '';
+            right += '<div class="garden-log-line raid-log-status' + _sCls2 + '" style="padding-left:0;border-left:none">' + (_ts4 ? '<span class="gl-time">' + _ts4 + '</span> ' : '') + (s.html || '') + '</div>';
+          }
+        }
+        if(e.summary){
+          const _sum = e.summary;
+          const _win = e.win;
+          const _txt = (_win?'⚔️ 防禦成功':'💀 後院失守') + ' · ' + (e.region||'') + ' · 擊殺 ' + (_sum.enemyCount||0) + ' · 彈藥 ' + (_sum.ammoUsed||0) + ' · 傷害 ' + (_sum.totalDmg||0);
+          right += '<div class="garden-log-line raid-log-summary" data-battle-idx="' + i + '" style="padding-left:0;border-left:none;cursor:pointer;text-decoration:underline dotted;color:#e8a33d">' + _txt + '</div>';
+        }
+      } else {
+        /* 舊格式：一行總結 */
+        const _win = e.win;
+        const _txt = (_win?'⚔️勝':'💀敗') + ' ' + (e.region||'') + ' · ' + e.rounds + '回 · 守' + e.guardAlive + '/' + e.guardTotal + ' · 敵' + e.enemyCount + ' · 彈' + e.ammoUsed + ' · 傷' + e.totalDmg;
+        right += '<div class="garden-log-line raid-log-summary" data-battle-idx="' + i + '" style="padding-left:0;border-left:none;cursor:pointer;text-decoration:underline dotted;color:#e8a33d">' + _txt + '</div>';
+      }
     }
   }
   right += '</div>';

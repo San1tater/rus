@@ -33,7 +33,10 @@ function rollEnemyRarity(t){
 
 function pickEnemyWeapon(e,r,t){
   var p=ENEMY_WEAPON_POOLS[e]||ENEMY_WEAPON_POOLS.raider;
-  var w=(RARITY_ORDER.indexOf(r)>=RARITY_ORDER.indexOf('精品'))&&Math.random()<0.5;
+  /* rev-fix-enemy-weapon-tier: 高 tier 提高 t2 概率（0.5 → 0.65 → 0.80 → 0.95 → 1.10） */
+  var _tier = t || 1;
+  var _t2Chance = 0.5 + (_tier - 1) * 0.15;
+  var w=(RARITY_ORDER.indexOf(r)>=RARITY_ORDER.indexOf('精品'))&&Math.random()<_t2Chance;
   var a=(w&&p.t2.length)?p.t2:p.t1;
   return a.length?pick(a):pick(PISTOL_POOL);
 }

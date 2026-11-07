@@ -107,46 +107,33 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
     if(!toU.alive) return;
     const hit = Math.random() * 100 < (fromU.isGuard ? fromU.hitRate : 75);
     if(!hit) return;
-    let dmg;
+    /* rev-fix-attack-unify: 統一結算 */
+    let atkInfo;
     if(fromU.isGuard){
-      const ammo = fromU.ammoId ? AMMO[fromU.ammoId] : null;
-      dmg = ammo ? Math.round(ammo.dmg * (RARITY_MULT[fromU.ammoRarity] || 1)) : Math.round((fromU.weaponDef.dmg || 20) * (RARITY_MULT[fromU.weaponRarity] || 1));
-      if(Math.random() < fromU.critRate) dmg = Math.round(dmg * fromU.critMult);
-    } else {
-      /* rev-fix-raid-offline-enemy-dmg: 與步戰一致 — 彈藥傷害 × 稀有度倍率 + 暴擊 */
-      if(fromU.ammoId && AMMO[fromU.ammoId]){
-        const _aDef = AMMO[fromU.ammoId];
-        dmg = Math.round(_aDef.dmg * (RARITY_MULT[_aDef.rarity] || 1));
-      } else {
-        dmg = fromU.dmg || 10;
-      }
-      const _aRarE2 = fromU.ammoId && AMMO[fromU.ammoId] ? AMMO[fromU.ammoId].rarity : '一般';
-      const _isCritE2 = Math.random() < calcCritRate(fromU.rarity || '一般', _aRarE2);
-      if(_isCritE2) dmg = Math.round(dmg * calcCritMult(fromU.rarity || '一般', _aRarE2));
-    }
-    const tgt = { hp: toU.hp, armor: toU.armor };
-    const pen = fromU.isGuard ? (fromU.ammoId && AMMO[fromU.ammoId] ? (AMMO[fromU.ammoId].penMM || 0) : (fromU.weaponDef.penMM || 0)) : (fromU.pen || 0);
-    /* rev-fix-raid-offline-armor-provider: 與步戰一致 — roll 部位 + 部位護甲 */
-    const _armorProvider = toU.isGuard ? function(part){
-        if(part === 'head' || part === 'face'){
-          const h = toU.equipped && toU.equipped.head;
-          return h ? armorMMForSlot(h, part) : 0;
-        }
-        if(part === 'top'){
-          const t = toU.equipped && toU.equipped.top;
-          return t ? armorMMForSlot(t, 'top') : 0;
-        }
-        return 0;
-      } : function(part){
-        return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(toU, part) : 0;
+      atkInfo = {
+        ammoId: fromU.ammoId,
+        ammoRarity: fromU.ammoRarity,
+        weaponRarity: fromU.weaponRarity,
+        penMM: (fromU.ammoId && AMMO[fromU.ammoId]) ? (AMMO[fromU.ammoId].penMM || 0) : (fromU.weaponDef.penMM || 0),
+        fallbackDmg: 20
       };
-    const res = applyDamage(tgt, dmg, pen, { armorProvider: _armorProvider });
-    toU.hp = tgt.hp; toU.armor = tgt.armor;
-    const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
+    } else {
+      atkInfo = {
+        ammoId: fromU.ammoId,
+        ammoRarity: (fromU.ammoId && AMMO[fromU.ammoId]) ? AMMO[fromU.ammoId].rarity : '一般',
+        weaponRarity: fromU.rarity || '一般',
+        penMM: fromU.pen || 0,
+        fallbackDmg: fromU.dmg || 10
+      };
+    }
+    const r = _resolveSingleAttack(atkInfo, toU);
+    toU.hp = Math.max(0, toU.hp - r.hpLost);
+    toU.armor = Math.max(0, (toU.armor || 0) - r.armorLost);
+    const shown = r.totalShown;
     fromU.dmgDone = (fromU.dmgDone || 0) + shown;
     if(fromU.isGuard && fromU.srv) servantAddExp(fromU.srv, 2);
-      if(fromU.isGuard && fromU.ammoId && shown === 0) fromU._stopFire = true;
-      if(toU.hp <= 0) toU.alive = false;
+    if(fromU.isGuard && fromU.ammoId && shown === 0) fromU._stopFire = true;
+    if(toU.hp <= 0) toU.alive = false;
   }
   let round = 0;
   const maxRounds = 30;
@@ -249,6 +236,21 @@ function _gardenRaidCollectGuards(){
   return result;
 }
 
+/* rev-fix-raid-tier: 按 spawnWeights 随机 tier */
+function _rollTierByWeights(weights){
+  if(!weights || typeof weights !== 'object') return 1;
+  const keys = Object.keys(weights);
+  if(!keys.length) return 1;
+  let total = 0;
+  for(const k of keys) total += weights[k];
+  let r = Math.random() * total;
+  for(const k of keys){
+    r -= weights[k];
+    if(r <= 0) return parseInt(k, 10);
+  }
+  return parseInt(keys[keys.length - 1], 10);
+}
+
 function _gardenRaidGenEnemies(){
   const regions = (typeof getActiveRegions === 'function') ? getActiveRegions() : ['廢棄工廠'];
   const region = (state.activeRegion && regions.indexOf(state.activeRegion) !== -1) ? state.activeRegion : regions[0];
@@ -260,7 +262,9 @@ function _gardenRaidGenEnemies(){
   const enemies = [];
   for(let i = 0; i < count; i++){
     const eid = pick(R.enemies);
-    const inst = (typeof generateEnemyInstance === 'function') ? generateEnemyInstance(eid, 1) : null;
+    /* rev-fix-raid-tier: 按 spawnWeights 随机 tier（无则默认 1） */
+    const _t = _rollTierByWeights(R.spawnWeights);
+    const inst = (typeof generateEnemyInstance === 'function') ? generateEnemyInstance(eid, _t) : null;
     if(!inst) continue;
     enemies.push(inst);
   }
@@ -277,430 +281,12 @@ function _raidCleanupAll(){
 }
 
 /* ===== 僕人繪製輔助 ===== */
-function _raidDrawWorkerHelmet(ctx, B, anim, fi, color){
-  const L = GAME_LAYERS.find(function(l){ return l.id === 'head'; });
-  if(!L) return;
-  const keys = anim.keys[L.id] || [];
-  const key = keys[fi] || {rot:0, dx:0, dy:0};
-  const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-  const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-  const w = B.w * L.w;
-  const h = B.h * L.h;
-  const px = w * L.pivot.x;
-  const py = h * L.pivot.y;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate((key.rot || 0) * Math.PI / 180);
-  ctx.translate(-px, -py);
-  const cxL = w * 0.5;
-  const cyL = h * 0.45;
-  const r = w * 0.72;
-  ctx.fillStyle = color;
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cxL, cyL, r, Math.PI, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-}
 
-function drawBucketUnit(ctx, u){
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(u.bx - u.topHalf, u.topY);
-  ctx.lineTo(u.bx + u.topHalf, u.topY);
-  ctx.lineTo(u.bx + u.botHalf, u.botY);
-  ctx.lineTo(u.bx - u.botHalf, u.botY);
-  ctx.closePath();
-  ctx.fillStyle = '#9aa2aa';
-  ctx.fill();
-  ctx.strokeStyle = '#464d55';
-  ctx.lineWidth = 5;
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-  ctx.restore();
-}
 
-function drawHandItemUnit(ctx, u){
-  if(u.handItemType === 'sack'){
-    const cx = u.bagX;
-    const cy = u.bagY;
-    ctx.save();
-    ctx.fillStyle = '#ede4d3';
-    ctx.strokeStyle = '#464d55';
-    ctx.lineWidth = 5;
-    ctx.lineJoin = 'round';
-    const topW = 42, topH = 31;
-    ctx.beginPath();
-    ctx.moveTo(cx - topW/2, cy - topH);
-    ctx.lineTo(cx + topW/2, cy - topH);
-    ctx.lineTo(cx, cy);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    const botW = 87, botH = 87;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + botW/2, cy + botH);
-    ctx.lineTo(cx - botW/2, cy + botH);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  } else if(u.handItemType === 'shovel'){
-    const ax = u.anchorX;
-    const ay = u.anchorY;
-    const D_W = 30, D_H = 36;
-    const HANDLE_LEN = 148, HANDLE_W = 6;
-    const HEAD_W = 45, HEAD_H = 57;
-    const forkY = ay + D_H;
-    const handleBot = forkY + HANDLE_LEN;
-    const headBot = handleBot + HEAD_H;
-    ctx.save();
-    ctx.strokeStyle = '#9a9a9a';
-    ctx.lineWidth = HANDLE_W;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(ax, forkY);
-    ctx.lineTo(ax - D_W/2, ay);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(ax, forkY);
-    ctx.lineTo(ax + D_W/2, ay);
-    ctx.stroke();
-    ctx.lineWidth = HANDLE_W + 2;
-    ctx.beginPath();
-    ctx.moveTo(ax - D_W/2, ay);
-    ctx.lineTo(ax + D_W/2, ay);
-    ctx.stroke();
-    ctx.lineWidth = HANDLE_W;
-    ctx.lineCap = 'butt';
-    ctx.beginPath();
-    ctx.moveTo(ax, forkY);
-    ctx.lineTo(ax, handleBot);
-    ctx.stroke();
-    ctx.fillStyle = '#8a8f95';
-    ctx.strokeStyle = '#464d55';
-    ctx.lineWidth = 3;
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(ax - HEAD_W/2, handleBot);
-    ctx.lineTo(ax + HEAD_W/2, handleBot);
-    ctx.lineTo(ax + HEAD_W/2 + 2, headBot);
-    ctx.lineTo(ax - HEAD_W/2 - 2, headBot);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = '#5a6068';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(ax, handleBot + 5);
-    ctx.lineTo(ax, headBot - 8);
-    ctx.stroke();
-    ctx.restore();
-  } else if(u.handItemType === 'clipboard'){
-    const w = 90, h = 110;
-    const cx = u.armMidX;
-    const cy = u.armMidY + 7;
-    ctx.save();
-    ctx.fillStyle = '#3a78c8';
-    ctx.fillRect(cx - w/2, cy - h/2, w, h);
-    ctx.restore();
-  } else if(u.handItemType === 'flask'){
-    const positions = u.flaskPositions || [];
-    const R = 37;
-    const NECK_W = 26;
-    const NECK_H = 52;
-    const halfNeck = NECK_W / 2;
-    const BODY_OFFSET = R + NECK_H/2 - 3;
-    for(const pos of positions){
-      const cx = pos.x;
-      const cy = pos.y + BODY_OFFSET;
-      const neckTopY = cy - R - NECK_H;
-      const neckBottomY = cy - R + 5;
-      const _dy = neckBottomY - cy;
-      const _angleRight = Math.atan2(_dy, halfNeck);
-      const _angleLeft = Math.atan2(_dy, -halfNeck);
-      ctx.save();
-      ctx.fillStyle = 'rgba(80,138,100,0.92)';
-      ctx.strokeStyle = '#1f3a2a';
-      ctx.lineWidth = 8;
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx - halfNeck, neckTopY);
-      ctx.lineTo(cx - halfNeck, neckBottomY);
-      ctx.arc(cx, cy, R, _angleLeft, _angleRight, true);
-      ctx.lineTo(cx + halfNeck, neckTopY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx - halfNeck - 8, neckTopY);
-      ctx.lineTo(cx + halfNeck + 8, neckTopY);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(180,230,200,0.55)';
-      ctx.beginPath();
-      ctx.ellipse(cx - R*0.32, cy - R*0.25, R*0.32, R*0.14, -0.4, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-}
 
 /* ===== 人形繪製（僕人 / 守衛 / 農民 / 監工 / 敵人） ===== */
-function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType, flipX, hasBucket, handItem, noWorkerHelmet, legOverride){
-  var anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
-  var fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  var B = { x:30, y:30, w:340, h:460 };
-  var ORIG_FOOT_X = 200, ORIG_FOOT_Y = 515;
-  var TYPE_COLORS = {
-    farmer:  { body:'#5a9a48', legs:'#3a6a2e' },
-    guard:   { body:'#5088bb', legs:'#2e4a6a' },
-    foreman: { body:'#e0a830', legs:'#d8d0c0' },
-    enemy:   { body:'#8b2a2a', legs:'#3a1010' }
-  };
-  var _colors = servantType ? TYPE_COLORS[servantType] : null;
-  if(_colors){
-    for(var li = 0; li < GAME_LAYERS.length; li++){
-      var L = GAME_LAYERS[li];
-      L._oldColor = L.color;
-      if(L.id === 'right_leg' || L.id === 'left_leg') L.color = _colors.legs;
-      else if(L.id === 'torso' || L.id === 'back_arm' || L.id === 'front_arm') L.color = _colors.body;
-    }
-  }
-  ctx.save();
-  ctx.translate(px, py);
-  if(animName === 'dead'){ ctx.rotate(-Math.PI / 2); ctx.translate(-ORIG_FOOT_X * scale, 0); }
-  ctx.scale(flipX ? -scale : scale, scale);
-  ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
 
-  var units = [];
-  for(var gi = 0; gi < GAME_LAYERS.length; gi++) units.push({z:GAME_LAYERS[gi].z, kind:'layer', layer:GAME_LAYERS[gi]});
 
-  if(equipped.head){
-    var cH = (typeof HEAD_ARMOR_LAYOUT !== 'undefined' && HEAD_ARMOR_LAYOUT[equipped.head]) ? HEAD_ARMOR_LAYOUT[equipped.head] : HERO_VISIBLE_EQ.head;
-    var lH = GAME_LAYERS.find(function(l){ return l.id === cH.layer; });
-    if(lH){
-      var imgH = getHeroImg('icons/items/' + resolveIconId(equipped.head) + '.png');
-      units.push({z:lH.z+0.5, kind:'eq', layerId:cH.layer, ox:cH.ox, oy:cH.oy, scale:cH.scale, rotation:cH.rotation, img:imgH});
-    }
-  }
-  if(equipped.top){
-    var cT = getTopCfg(equipped.top);
-    var lT = GAME_LAYERS.find(function(l){ return l.id === cT.layer; });
-    if(lT){
-      var imgT = getHeroImg('icons/items/' + resolveIconId(equipped.top) + '.png');
-      units.push({z:lT.z+0.5, kind:'eq', layerId:cT.layer, ox:cT.ox, oy:cT.oy, scale:cT.scale, rotation:cT.rotation, img:imgT});
-    }
-  }
-  var wpS = null, wpI = null;
-  if(weaponSlotOverride && equipped[weaponSlotOverride]){ wpS = weaponSlotOverride; wpI = equipped[weaponSlotOverride]; }
-  else if(equipped.primary){ wpS = 'primary'; wpI = equipped.primary; }
-  else if(equipped.secondary){ wpS = 'secondary'; wpI = equipped.secondary; }
-  else if(equipped.melee){ wpS = 'melee'; wpI = equipped.melee; }
-  if(wpS && wpI && !_isMeleeWeapon(wpI)){
-    var cW = getWeaponCfg(wpS, wpI);
-    if(cW){
-      var lW = GAME_LAYERS.find(function(l){ return l.id === cW.layer; });
-      if(lW){
-        var imgW = getHeroImg('icons/items/' + resolveIconId(wpI) + '.png');
-        units.push({z:lW.z-0.5, kind:'eq', layerId:cW.layer, ox:cW.ox, oy:cW.oy, scale:cW.scale, rotation:cW.rotation, img:imgW, trim:cW.trim});
-      }
-    }
-  }
-
-  if(hasBucket){
-    var _fa = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
-    var _ba = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
-    if(_fa && _ba){
-      var _fk = (anim.keys && anim.keys[_fa.id] && anim.keys[_fa.id][fi]) || {rot:0,dx:0,dy:0};
-      var _bk = (anim.keys && anim.keys[_ba.id] && anim.keys[_ba.id][fi]) || {rot:0,dx:0,dy:0};
-      var _fCx = B.x + B.w * (_fa.x + (_fk.dx||0) * 0.01);
-      var _fCy = B.y + B.h * (_fa.y + (_fk.dy||0) * 0.01);
-      var _fW = B.w * _fa.w, _fH = B.h * _fa.h;
-      var _fMidX = _fCx + _fW * (0.5 - _fa.pivot.x);
-      var _fMidY = _fCy + _fH * (0.5 - _fa.pivot.y);
-      var _bCx = B.x + B.w * (_ba.x + (_bk.dx||0) * 0.01);
-      var _bCy = B.y + B.h * (_ba.y + (_bk.dy||0) * 0.01);
-      var _bW = B.w * _ba.w, _bH = B.h * _ba.h;
-      var _bMidX = _bCx + _bW * (0.5 - _ba.pivot.x);
-      var _bMidY = _bCy + _bH * (0.5 - _ba.pivot.y);
-      var _bkx = (_fMidX + _bMidX) / 2;
-      var _bky = (_fMidY + _bMidY) / 2;
-      units.push({z:58, kind:'bucket', bx:_bkx, topY:_bky-38, botY:_bky+97, topHalf:54, botHalf:39});
-    }
-  }
-
-  if(handItem === 'stick' || handItem === 'clipboard' || handItem === 'flask'){
-    var _fa2 = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
-    var _ba2 = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
-    if(_fa2 && _ba2){
-      var _fk2 = (anim.keys && anim.keys[_fa2.id] && anim.keys[_fa2.id][fi]) || {rot:0,dx:0,dy:0};
-      var _bk2 = (anim.keys && anim.keys[_ba2.id] && anim.keys[_ba2.id][fi]) || {rot:0,dx:0,dy:0};
-      var _fCx2 = B.x + B.w * (_fa2.x + (_fk2.dx||0) * 0.01);
-      var _fCy2 = B.y + B.h * (_fa2.y + (_fk2.dy||0) * 0.01);
-      var _fW2 = B.w * _fa2.w, _fH2 = B.h * _fa2.h;
-      var _fMidX2 = _fCx2 + _fW2 * (0.5 - _fa2.pivot.x);
-      var _fMidY2 = _fCy2 + _fH2 * (0.5 - _fa2.pivot.y);
-      var _bCx2 = B.x + B.w * (_ba2.x + (_bk2.dx||0) * 0.01);
-      var _bCy2 = B.y + B.h * (_ba2.y + (_bk2.dy||0) * 0.01);
-      var _bW2 = B.w * _ba2.w, _bH2 = B.h * _ba2.h;
-      var _bMidX2 = _bCx2 + _bW2 * (0.5 - _ba2.pivot.x);
-      var _bMidY2 = _bCy2 + _bH2 * (0.5 - _ba2.pivot.y);
-      if(handItem === 'stick'){
-        units.push({z:60, kind:'handitem', handItemType:'sack', bagX:_bMidX2, bagY:_bMidY2});
-        var _shovelX = _fCx2 + _fW2 * (1 - _fa2.pivot.x) - _fW2 * 0.10;
-        var _shovelY = _fCy2 + _fH2 * (0 - _fa2.pivot.y) - 7;
-        units.push({z:59, kind:'handitem', handItemType:'shovel', anchorX:_shovelX, anchorY:_shovelY});
-      } else if(handItem === 'clipboard'){
-        units.push({z:58, kind:'handitem', handItemType:'clipboard', armMidX:(_fMidX2+_bMidX2)/2, armMidY:(_fMidY2+_bMidY2)/2});
-      } else if(handItem === 'flask'){
-        var _flaskRX = _fCx2 + _fW2 * (0.85 - _fa2.pivot.x);
-        var _flaskRY = _fCy2 + _fH2 * (0.5 - _fa2.pivot.y);
-        var _flaskLX = _bCx2 + _bW2 * (0.2 - _ba2.pivot.x);
-        var _flaskLY = _bCy2 + _bH2 * (0.5 - _ba2.pivot.y);
-        units.push({z:61, kind:'handitem', handItemType:'flask', flaskPositions:[{x:_flaskLX, y:_flaskLY}, {x:_flaskRX, y:_flaskRY}]});
-      }
-    }
-  }
-
-  units.sort(function(a,b){ return a.z - b.z; });
-
-  for(var ui = 0; ui < units.length; ui++){
-    var u = units[ui];
-    if(u.kind === 'layer'){
-      if(legOverride && legOverride[u.layer.id] && typeof legOverride[u.layer.id].rot === 'number'){
-        drawBodyLayerWithRot(ctx, u.layer, B, anim, fi, legOverride[u.layer.id].rot);
-      } else {
-        drawBodyLayer(ctx, u.layer, B, anim, fi);
-      }
-    }
-    else if(u.kind === 'bucket') drawBucketUnit(ctx, u);
-    else if(u.kind === 'handitem') drawHandItemUnit(ctx, u);
-    else drawEqLayer(ctx, u, B, anim, fi);
-  }
-
-  if(!noWorkerHelmet && servantType === 'foreman') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ffffff');
-  else if(!noWorkerHelmet && servantType === 'farmer') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ff8800');
-
-  ctx.restore();
-
-  if(_colors){
-    for(var ri = 0; ri < GAME_LAYERS.length; ri++){
-      var L2 = GAME_LAYERS[ri];
-      if(typeof L2._oldColor !== 'undefined'){ L2.color = L2._oldColor; delete L2._oldColor; }
-    }
-  }
-}
-
-function drawBodyLayerWithRot(ctx, L, B, anim, fi, rotOverride){
-  var keys = anim.keys[L.id] || [];
-  var key = keys[fi] || {rot:0, dx:0, dy:0};
-  var cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-  var cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-  var w = B.w * L.w;
-  var h = B.h * L.h;
-  var px = w * L.pivot.x;
-  var py = h * L.pivot.y;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(rotOverride * Math.PI / 180);
-  ctx.translate(-px, -py);
-  ctx.fillStyle = L.color;
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, w - 2, h - 2);
-  ctx.restore();
-}
-
-function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
-  var _realId = enemyId;
-  if(typeof HUMAN_ENEMY_DATA !== "undefined"){
-    if(!HUMAN_ENEMY_DATA[enemyId] && HUMAN_ENEMY_DATA["human_" + enemyId]){
-      _realId = "human_" + enemyId;
-    }
-  }
-  if(typeof HUMAN_ENEMY_DATA !== "undefined" && HUMAN_ENEMY_DATA[_realId]){
-    const def = HUMAN_ENEMY_DATA[_realId];
-    const anims = def.anims;
-    if(!anims) return;
-    let anim = anims[animName];
-    if(!anim && animName === 'walk') anim = GAME_ANIMS.walk;
-    if(!anim) anim = anims.idle;
-    if(!anim) return;
-    const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-    if(!window._rev510_raidEquipCache) window._rev510_raidEquipCache = {};
-    if(!window._rev510_raidEquipCache[_realId]){
-      window._rev510_raidEquipCache[_realId] = (typeof _rev506_getRandomEquip === "function")
-        ? _rev506_getRandomEquip(_realId) : null;
-    }
-    const equip = window._rev510_raidEquipCache[_realId];
-    const ox = px - def.canvas.w * scale / 2;
-    const oy = py - def.canvas.h * scale;
-    const _isDeath = (animName === "death");
-    if(typeof _rev506_drawHumanCorpse === "function"){
-      _rev506_drawHumanCorpse(ctx, _realId, scale, ox, oy, def, anim, fi, equip, _isDeath);
-      return;
-    }
-  }
-  if(typeof _drawEnemyAt === "function"){
-    var _bdef = (typeof BEAST_LAYERS !== "undefined" && BEAST_LAYERS[_realId]);
-    if(_bdef){
-      var _bx = px - _bdef.canvas.w * scale / 2;
-      var _by = py - _bdef.canvas.h * scale;
-      if(_drawEnemyAt(ctx, _realId, _bx, _by, scale, animName, frameIdx)) return;
-    }
-  }
-  if(typeof BEAST_LAYERS !== "undefined" && BEAST_LAYERS[_realId]) {
-    const def = BEAST_LAYERS[_realId];
-    const bounds = (typeof getBeastBounds === "function") ? getBeastBounds(def) : null;
-    if(bounds) {
-      const targetVisualH = 386 * 0.9;
-      const actualScale = (targetVisualH * scale) / bounds.h;
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.scale(actualScale, actualScale);
-      const centerX = (bounds.minX + bounds.maxX) / 2;
-      const bottomY = bounds.maxY;
-      ctx.translate(-centerX, -bottomY);
-      const world = (typeof resolveBossWorld === "function") ? resolveBossWorld(def, { keys:{} }, 0) : {};
-      const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
-      for(const L of sorted) {
-        const wp = world[L.id];
-        if(!wp) continue;
-        const w = def.canvas.w * L.w;
-        const h = def.canvas.h * L.h;
-        const ppx = w * L.pivot.x;
-        const ppy = h * L.pivot.y;
-        ctx.save();
-        ctx.translate(wp.wx, wp.wy);
-        ctx.rotate((L.rot || 0) * Math.PI / 180);
-        ctx.translate(-ppx, -ppy);
-        if(L.id.indexOf("eye") === 0) {
-          ctx.shadowColor = "#ff0000";
-          ctx.shadowBlur = 15;
-        }
-        ctx.fillStyle = L.color;
-        ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = "rgba(0,0,0,0.65)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(1, 1, w - 2, h - 2);
-        ctx.restore();
-      }
-      ctx.restore();
-      return;
-    }
-  }
-  if(typeof _raidDrawHuman === "function") {
-    const _eq = { head: "ssh68", top: "6b231", primary: "ak74" };
-    const _rar = { head: "一般", top: "一般", primary: "一般" };
-    _raidDrawHuman(ctx, px, py, scale, _eq, _rar, animName, frameIdx, "primary", "enemy", true, false, null);
-  }
-}
 
 /* ===== 塔彈藥解析（供防禦戰使用） ===== */
 function _gardenTowerResolveAmmo(cfg, wDef){
@@ -787,11 +373,14 @@ function _gardenRaidApplyResult(sim, region){
     const used = Math.min(g.ammoUsed, g.ammoBudget);
     if(used > 0) invRemove(g.ammoId, g.ammoRarity, used);
   }
+  /* rev-fix-guard-injured-keep: 守卫死亡不删除，走重伤路径 */
   const died = sim.guards.filter(function(g){ return !g.alive; });
-  if(died.length){
-    const toRemove = {};
-    for(const g of died) toRemove[g.srv.id] = true;
-    state.servants = (state.servants || []).filter(function(s){ return !toRemove[s.id]; });
+  for(const g of died){
+    if(g.srv && !g.srv.injuredUntil){
+      g.srv.hp = 0;
+      g.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
+      g.srv._injuredDown = true;
+    }
   }
   if(!sim.win){
     if(sim.brokenPlots === undefined){
@@ -882,12 +471,10 @@ function _gardenRaidLogBattle(sim, region){
   }
   let totalDmg = 0;
   for(const gd of sim.guards) totalDmg += (gd.dmgDone || 0);
-  const entry = {
-    t: Date.now(),
-    win: sim.win,
-    region: region,
+  const _summary = {
     rounds: sim.rounds,
-    enemyCount: sim.enemies.length,
+    /* rev-fix-raid-initial-count: 用初始敵人數，避免戰鬥中 splice 後為 0 */
+    enemyCount: sim.initialEnemyCount || sim.enemies.length,
     guardTotal: sim.guards.length,
     guardAlive: sim.guards.filter(function(x){ return x.alive; }).length,
     ammoUsed: Object.keys(ammoMap).reduce(function(s, k){ return s + ammoMap[k].count; }, 0),
@@ -898,9 +485,17 @@ function _gardenRaidLogBattle(sim, region){
     stolen: sim.stolen ? sim.stolen.map(function(x){ return { id: x.id, rarity: x.rarity || '一般', name: (CROPS[x.id] ? CROPS[x.id].name : x.id), count: x.count }; }) : [],
     loot: sim.loot ? sim.loot.map(function(x){ const d = itemDef(x.id); return { id: x.id, rarity: x.rarity || '一般', name: d ? d.name : x.id, count: x.count }; }) : []
   };
-  if(!Array.isArray(g.battleLog)) g.battleLog = [];
-  g.battleLog.push(entry);
-  if(g.battleLog.length > 30) g.battleLog.splice(0, g.battleLog.length - 30);
+  /* rev-fix-raid-battleLog: 有活動 entry 則更新，否則新建（離線模擬） */
+  var _entry = window._raidActiveBattleEntry;
+  if(!_entry){
+    _entry = { t: Date.now(), win: sim.win, region: region, kills: [], status: [], summary: null };
+    if(!Array.isArray(g.battleLog)) g.battleLog = [];
+    g.battleLog.push(_entry);
+    if(g.battleLog.length > 30) g.battleLog.splice(0, g.battleLog.length - 30);
+  }
+  _entry.win = sim.win;
+  _entry.summary = _summary;
+  window._raidActiveBattleEntry = null;
 }
 
 /* ===== 戰鬥中狀態（僅標記，不再收集實時日誌） ===== */
@@ -935,6 +530,8 @@ function _lootHtml(items, color){
 /* ===== 防禦戰主演出 ===== */
 function _gardenRaidShowBattle(guards, enemies, region){
   if(window._raidLiveActive){ console.warn('[raid] raid 已在進行中，忽略重複觸發'); return; }
+  /* rev-fix-raid-initial-count: 開戰時記錄敵人總數，供總結用 */
+  const _initialEnemyCount = (enemies && enemies.length) || 0;
   const page = document.getElementById('garden-page');
   if(!page) return;
   const wrap = page.querySelector('.gp-grid-wrap');
@@ -998,8 +595,22 @@ function _gardenRaidShowBattle(guards, enemies, region){
 
     /* rev-fix-raid-log-unify: 改用 pushLog 寫入 state.logs */
     const logEntries = [];
+    /* rev-fix-raid-battleLog: 每次戰鬥創建一個 battleLog entry */
+    var _battleEntry = { t: Date.now(), win: null, region: region, kills: [], status: [], summary: null };
+    window._raidActiveBattleEntry = _battleEntry;
+    var _gBL = (typeof _gardenMerchantInit === 'function') ? _gardenMerchantInit() : null;
+    if(_gBL){
+      if(!Array.isArray(_gBL.battleLog)) _gBL.battleLog = [];
+      _gBL.battleLog.push(_battleEntry);
+      if(_gBL.battleLog.length > 30) _gBL.battleLog.splice(0, _gBL.battleLog.length - 30);
+    }
     function addLog(text, cls){
-      if(typeof pushLog === 'function') pushLog(text, [], 'garden_raid');
+      /* rev-fix-raid-battleLog: 寫入當前 entry.status（狀態日誌） */
+      if(window._raidActiveBattleEntry){
+        window._raidActiveBattleEntry.status.push({ t: Date.now(), html: text, cls: cls || '' });
+        /* rev-fix-raid-realtime-log: 實時刷新日誌欄 */
+        if(typeof _gardenRefreshBattleLogNow === 'function') _gardenRefreshBattleLogNow();
+      }
     }
 
     const CHAR_PX = Math.min(74, Math.max(40, Math.floor(wrapH * 0.18)));
@@ -1047,10 +658,13 @@ function _gardenRaidShowBattle(guards, enemies, region){
       else if(ms === 'mag') budget = Math.min(stock, magCap);
       else budget = stock;
       guardUnits.push({
-        srv: s, name: servantLabel(s) + ' Lv.' + s.lv,
+        /* rev-fix-raid-guard-name: name 只用 servantLabel，去掉 Lv.N */
+        srv: s, name: servantLabel(s),
         rpm: g.weaponDef.rpm || 600,
         x: pr.left - wrapRect.left + pr.width / 2,
         y: pr.top - wrapRect.top + pr.height - 4,
+        /* rev-fix-raid-worldx: 守衛 worldX 由塔螢幕位置換算 */
+        worldX: ((pr.left - wrapRect.left + pr.width / 2) - wrapW / 2) / (CHAR_PX / 1.7),
         hp: maxHp, maxHp: maxHp,
         armor: armor, maxArmor: armor, armorLevel: armorLevel,
         alive: true, isGuard: true,
@@ -1063,6 +677,23 @@ function _gardenRaidShowBattle(guards, enemies, region){
         animName: 'idle', animFrame: 0, animNext: 0, hurtUntil: 0,
         nextFireAt: 0
       });
+    }
+    /* rev-fix-raid-guard-pos: 從 _gardenActors 同步守衛當前位置 + 關聯 _combatUnit */
+    if(typeof _gardenActors !== 'undefined' && _gardenActors && _gardenActors.length){
+      for(const _gu of guardUnits){
+        if(!_gu.srv) continue;
+        for(const _ga of _gardenActors){
+          if(_ga.id === _gu.srv.id){
+            if(typeof _ga.x === 'number' && typeof _ga.y === 'number'){
+              _gu.x = _ga.x;
+              _gu.y = _ga.y;
+            }
+            _ga._combatUnit = _gu;
+            _gu._actor = _ga;
+            break;
+          }
+        }
+      }
     }
     window._raidGuardUnits = guardUnits;
 
@@ -1109,10 +740,16 @@ function _gardenRaidShowBattle(guards, enemies, region){
         hp: e.maxHp, maxHp: e.maxHp,
         armor: e.armor || 0, maxArmor: e.maxArmor || 0,
         alive: true, isGuard: false,
-        state: 'walking_in',
+        /* rev-fix-raid-no-state: 移除 walking_in 狀態機 */
         walkSpeed: 1.4,
         weaponId: (e.primaryWeapon && e.primaryWeapon.id) || 'ak74',
-        weaponId: 'ak74',
+        /* rev-fix-raid-rpg-data: 拷貝 RPG / 手榴彈字段 */
+        hasRPG: !!e.hasRPG,
+        rpgAmmo: e.rpgAmmo || 0,
+        rpgRarity: e.rpgRarity || null,
+        rpgDmg: e.rpgDmg || 0,
+        rpgPenMM: e.rpgPenMM || 0,
+        grenade: e.grenade || null,
         animName: 'idle', animFrame: 0, animNext: 0, hurtUntil: 0,
         nextFireAt: 0,
         destroyUntil: 0,
@@ -1135,28 +772,35 @@ function _gardenRaidShowBattle(guards, enemies, region){
     for(const e of enemyUnits) e.nextFireAt = _t0 + 800 + Math.random() * 500;
 
     function tickAnim(u, now){
-      if(u.isGuard){
-        if(!u._animStart || u._lastAnimName !== u.animName){
+      /* rev-fix-tickanim-walk: 不覆盖 u.animName（保留移动循环/tickDestroyPhase 设的 walk） */
+      const _as = (typeof getUnitAnimState === 'function') ? getUnitAnimState(u, now) : { name: 'idle', startTime: now };
+      let _animName, _animStart;
+      if(_as.name !== 'idle'){
+        /* action 动画（hurt/reload/fire）覆盖 */
+        _animName = _as.name;
+        _animStart = _as.startTime;
+        u.animName = _animName;
+        u._animStart = _animStart;
+        u._lastAnimName = _animName;
+      } else {
+        /* 无 action → 保留 u.animName（walk / idle） */
+        _animName = u.animName || 'idle';
+        if(!u._lastAnimName || u._lastAnimName !== _animName){
           u._animStart = now;
-          u._lastAnimName = u.animName;
+          u._lastAnimName = _animName;
         }
-        u.animFrame = (typeof computeAnimFrame === 'function') ? computeAnimFrame(u.animName, u._animStart, now) : 0;
-        return;
+        _animStart = u._animStart || now;
       }
       let anim = null;
       if(typeof _resolveEnemyAnims === 'function'){
         const _eid = (typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA['human_' + u.id]) ? 'human_' + u.id : u.id;
         const _anims = _resolveEnemyAnims(_eid);
-        if(_anims && _anims[u.animName]) anim = _anims[u.animName];
+        if(_anims && _anims[_animName]) anim = _anims[_animName];
       }
-      if(!anim) anim = GAME_ANIMS[u.animName] || GAME_ANIMS.idle;
+      if(!anim) anim = GAME_ANIMS[_animName] || GAME_ANIMS.idle;
       if(!anim) return;
-      if(!u._animStart || u._lastAnimName !== u.animName){
-        u._animStart = now;
-        u._lastAnimName = u.animName;
-      }
       const interval = 1000 / anim.fps;
-      const elapsed = Math.max(0, now - u._animStart);
+      const elapsed = Math.max(0, now - _animStart);
       let f = Math.floor(elapsed / interval);
       if(anim.loop){ f = f % anim.frameCount; }
       else if(f > anim.frameCount - 1){ f = anim.frameCount - 1; }
@@ -1199,19 +843,27 @@ function _gardenRaidShowBattle(guards, enemies, region){
       }
     }
 
-    function drawBullet(b){
+function drawBullet(b){
+      /* rev-fix-bullet-v103: 从 BULLET_VISUAL_RADIUS 常量读 */
+      const _br = (typeof BULLET_VISUAL_RADIUS !== 'undefined') ? BULLET_VISUAL_RADIUS : { normal: 3, grenade: 5, missile: 6 };
+      const _chf = (typeof CHAR_HEIGHT_FACTOR !== 'undefined') ? CHAR_HEIGHT_FACTOR : 0.15;
+      const _z1 = document.getElementById('zone1');
+      const _ehExpl = (_z1 ? _z1.clientHeight : 500) * _chf;
+      const _scale = Math.max(0.1, CHAR_PX / _ehExpl);
+      let _baseR = _br.normal;
+      if(b.missile){ _baseR = _br.missile; }
+      else if(b.big || b.isGrenade){ _baseR = _br.grenade; }
+      const _r = _baseR * _scale;
       ctx.save();
       const _bcol = b.isEnemy ? '#ff6060' : (_RARITY_COLOR[b.rarity] || '#ffd680');
       ctx.fillStyle = _bcol;
       ctx.shadowColor = _bcol;
       ctx.shadowBlur = 12;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, 4.5, 0, Math.PI * 2);
+      ctx.arc(b.x, b.y, _r, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-    }
-
-    function drawDamage(d, now){
+    }    function drawDamage(d, now){
       const age = now - d.startTime;
       if(age > MAX_DMG_AGE) return;
       const t = age / MAX_DMG_AGE;
@@ -1238,42 +890,127 @@ function _gardenRaidShowBattle(guards, enemies, region){
     function enemiesAlive(){ return enemyUnits.some(function(u){ return u.alive; }); }
 
     function spawnBullet(fromU, toU, hit, isEnemy){
-      const sx = fromU.x + (isEnemy ? -MUZZLE_X_LEFT : MUZZLE_X_RIGHT);
-      const sy = fromU.y - MUZZLE_Y_UP;
+      /* rev-fix-raid-muzzle: 守衛用 _getRaidMuzzleWorld 精確計算槍口位置 */
+      let _mzPos = null;
+      if(fromU.isGuard && typeof _getRaidMuzzleWorld === 'function'){
+        /* rev-fix-raid-muzzle-scale: 守衛在 actor canvas 上繪製，用 actor canvas 的 scale（56/386） */
+        _mzPos = _getRaidMuzzleWorld(fromU, 56 / 386);
+      }
+      const sx = _mzPos ? _mzPos.x : (fromU.x + (isEnemy ? -MUZZLE_X_LEFT : MUZZLE_X_RIGHT));
+      const sy = _mzPos ? _mzPos.y : (fromU.y - MUZZLE_Y_UP);
       let tx = toU.x;
       let ty = toU.y - MUZZLE_Y_UP;
       if(!hit){
         tx += (Math.random() - 0.5) * 70;
         ty += (Math.random() - 0.5) * 50;
       }
-      let dmg = 0, crit = false;
-      if(hit){
-        if(isEnemy){
-          /* rev-fix-raid-online-enemy-dmg: 與步戰一致 — 彈藥傷害 × 稀有度倍率 + 暴擊 */
-          if(fromU.ammoId && AMMO[fromU.ammoId]){
-            const _aDef = AMMO[fromU.ammoId];
-            dmg = Math.round(_aDef.dmg * (RARITY_MULT[_aDef.rarity] || 1));
-          } else {
-            dmg = fromU.dmg || 10;
-          }
-          const _aRarE = fromU.ammoId && AMMO[fromU.ammoId] ? AMMO[fromU.ammoId].rarity : '一般';
-          const _isCritE = Math.random() < calcCritRate(fromU.rarity || '一般', _aRarE);
-          if(_isCritE) dmg = Math.round(dmg * calcCritMult(fromU.rarity || '一般', _aRarE));
-          crit = _isCritE;
-        } else {
-          const ammo = fromU.ammoId ? AMMO[fromU.ammoId] : null;
-          const baseDmg = ammo ? Math.round(ammo.dmg * (RARITY_MULT[fromU.ammoRarity] || 1)) : Math.round((fromU.weaponDef.dmg || 20) * (RARITY_MULT[fromU.weaponRarity] || 1));
-          dmg = baseDmg;
-          if(Math.random() < fromU.critRate){ dmg = Math.round(dmg * fromU.critMult); crit = true; }
-        }
-      }
-      bullets.push({ sx, sy, tx, ty, x: sx, y: sy, t: 0, speed: 2.5, hit, crit, damage: dmg, isEnemy, fromU, toU, rarity: fromU.isGuard ? (fromU.ammoRarity || '一般') : '一般' });
-      const wAnim = isEnemy ? 'hurt' : (fromU.weaponSlot === 'secondary' ? 'fire_secondary' : 'fire_primary');
-      fromU.animName = wAnim; fromU.animFrame = 0; fromU.animNext = 0;
-      const _fu = fromU;
+      /* rev-fix-attack-unify: 傷害計算移至 onBulletHit 統一處理 */
+      bullets.push({ sx, sy, tx, ty, x: sx, y: sy, t: 0, speed: 2.5, hit, isEnemy, fromU, toU, rarity: fromU.isGuard ? (fromU.ammoRarity || '一般') : '一般' });
+      /* rev-fix-anim-state-unified: 设时间戳，不用 setTimeout；敌人用 fire_primary 而非 hurt */
+      const wAnim = (fromU.weaponSlot === 'secondary') ? 'fire_secondary' : 'fire_primary';
+      const _animDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS[wAnim]) ? GAME_ANIMS[wAnim] : null;
+      const _animDur = _animDef ? Math.round(_animDef.frameCount / _animDef.fps * 1000) : 250;
+      fromU._fireAnimName = wAnim;
+      fromU._fireAnimStart = performance.now();
+      fromU._fireAnimUntil = performance.now() + _animDur;
+    }
+
+    /* rev-fix-raid-rpg-fire: 後院版 RPG，走 applyDamage + 濺射 */
+    function _raidEnemyFireRPG(e, target, now){
+      if(!e || !target) return;
+      const _rar = e.rpgRarity || e.rarity || '一般';
+      const _baseDmg = e.rpgDmg || (100 * ((typeof RARITY_MULT !== 'undefined' && RARITY_MULT[_rar]) || 1));
+      const _penMM = e.rpgPenMM || 600;
+      const hit = Math.random() < 0.6;
+      const sx = e.x;
+      const sy = e.y - 20;
+      const tx = hit ? target.x : (target.x + (Math.random() - 0.5) * 80);
+      const ty = target.y - 20;
+      e.animName = 'fire_primary'; e.animFrame = 0;
+      const _fu = e;
       setTimeout(function(){
-        if(_fu.alive && _fu.animName === wAnim && _fu.state === 'combat'){ _fu.animName = 'idle'; _fu.animFrame = 0; _fu.animNext = 0; }
-      }, 160);
+        if(_fu.alive && _fu.animName === 'fire_primary'){ _fu.animName = 'idle'; _fu.animFrame = 0; }
+      }, 300);
+      bullets.push({
+        sx: sx, sy: sy, tx: tx, ty: ty, x: sx, y: sy, t: 0, speed: 1.2,
+        hit: hit, isEnemy: true, big: true, missile: true,
+        fromU: e, toU: target, rarity: _rar,
+        _onHit: function(){
+          if(!hit || !target.alive) return;
+          const _cr = (typeof calcCritRate === 'function') ? calcCritRate(_rar, _rar) : 0.1;
+          const _cm = (typeof calcCritMult === 'function') ? calcCritMult(_rar, _rar) : 1.5;
+          const crit = Math.random() < _cr;
+          const dmg = Math.round(_baseDmg * (crit ? _cm : 1));
+          /* 主目標 */
+          const proxy = { hp: target.hp, armor: target.armor || 0 };
+          const res = applyDamage(proxy, dmg, _penMM, {
+            armorProvider: function(part){
+              if(part === 'head' || part === 'face'){
+                const h = target.equipped && target.equipped.head;
+                return h ? armorMMForSlot(h, part) : 0;
+              }
+              if(part === 'top'){
+                const t2 = target.equipped && target.equipped.top;
+                return t2 ? armorMMForSlot(t2, 'top') : 0;
+              }
+              return 0;
+            }
+          });
+          target.hp = Math.max(0, target.hp - res.hpLost);
+          target.armor = Math.max(0, (target.armor || 0) - res.armorLost);
+          const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
+          damageTexts.push({ x: target.x, y: target.y - CHAR_PX - 18, text: '-' + shown + (crit ? '!' : ''), crit: crit, isEnemy: true, startTime: Date.now() });
+          target.hurtUntil = Date.now() + 180;
+          target.animName = 'hurt'; target.animFrame = 0;
+          const _tg = target;
+          setTimeout(function(){
+            if(_tg.alive && _tg.animName === 'hurt'){ _tg.animName = 'idle'; _tg.animFrame = 0; }
+          }, 180);
+          if(target.hp <= 0){
+            target.alive = false;
+            target.animName = 'idle'; target.animFrame = 0;
+          }
+          /* rev-fix-splash-shared: 濺射改調共用函數（用 worldX） */
+          const _rpgWX = (typeof target.worldX === 'number') ? target.worldX : 0;
+          const _nearbyList = [];
+          for(const g of guardUnits){
+            if(g === target) continue;
+            if(!g.alive) continue;
+            _nearbyList.push({ target: g, worldX: (typeof g.worldX === 'number') ? g.worldX : 0 });
+          }
+          _applySplashDamage(target, _rpgWX, _nearbyList, dmg, {
+            maxR: 8, blastPen: 18, splashRatio: 0.35,
+            armorProviderFn: function(g){
+              return function(part){
+                if(part === 'head' || part === 'face'){
+                  const h2 = g.equipped && g.equipped.head;
+                  return h2 ? armorMMForSlot(h2, part) : 0;
+                }
+                if(part === 'top'){
+                  const t3 = g.equipped && g.equipped.top;
+                  return t3 ? armorMMForSlot(t3, 'top') : 0;
+                }
+                return 0;
+              };
+            },
+            onHit: function(g, hpLost, armorLost){
+              const _sShown = hpLost > 0 ? hpLost : armorLost;
+              if(_sShown > 0){
+                damageTexts.push({ x: g.x, y: g.y - CHAR_PX - 18, text: '-' + _sShown, crit: false, isEnemy: true, startTime: Date.now() });
+              }
+              if(g.hp <= 0){
+                g.alive = false;
+                g.animName = 'idle'; g.animFrame = 0;
+                if(g.srv){
+                  g.srv.hp = 0;
+                  g.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
+                  g.srv._injuredDown = true;
+                }
+              }
+            }
+          });
+        }
+      });
     }
 
     function updateBullets(dt){
@@ -1294,46 +1031,77 @@ function _gardenRaidShowBattle(guards, enemies, region){
     function onBulletHit(b){
       const toU = b.toU;
       if(!toU || !toU.alive){
-        if(!b.hit) addLog(b.fromU.name + ' → ' + toU.name + '：已死', 'miss');
+        /* rev-fix-raid-remove-dead-log: 目標已死，靜默丟棄子彈 */
         return;
       }
       if(!b.hit){
         damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 18, text: 'MISS', crit: false, isEnemy: b.isEnemy, startTime: Date.now() });
         return;
       }
-      const tgt = { hp: toU.hp, armor: toU.armor };
-      const pen = b.fromU.isGuard ? (b.fromU.ammoId && AMMO[b.fromU.ammoId] ? (AMMO[b.fromU.ammoId].penMM || 0) : (b.fromU.weaponDef.penMM || 0)) : (b.fromU.pen || 0);
-      /* rev-fix-raid-online-armor-provider: 與步戰一致 — roll 部位 + 部位護甲 */
-      const _armorProvider = toU.isGuard ? function(part){
-        if(part === 'head' || part === 'face'){
-          const h = toU.equipped && toU.equipped.head;
-          return h ? armorMMForSlot(h, part) : 0;
-        }
-        if(part === 'top'){
-          const t = toU.equipped && toU.equipped.top;
-          return t ? armorMMForSlot(t, 'top') : 0;
-        }
-        return 0;
-      } : function(part){
-        return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(toU, part) : 0;
-      };
-      const res = applyDamage(tgt, b.damage, pen, { armorProvider: _armorProvider });
-      toU.hp = tgt.hp; toU.armor = tgt.armor;
-      const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
+      /* rev-fix-attack-unify: 調用 _resolveSingleAttack 統一結算 */
+      let atkInfo;
+      if(b.fromU.isGuard){
+        atkInfo = {
+          ammoId: b.fromU.ammoId,
+          ammoRarity: b.fromU.ammoRarity,
+          weaponRarity: b.fromU.weaponRarity,
+          penMM: (b.fromU.ammoId && AMMO[b.fromU.ammoId]) ? (AMMO[b.fromU.ammoId].penMM || 0) : (b.fromU.weaponDef.penMM || 0),
+          fallbackDmg: 20
+        };
+      } else {
+        atkInfo = {
+          ammoId: b.fromU.ammoId,
+          ammoRarity: (b.fromU.ammoId && AMMO[b.fromU.ammoId]) ? AMMO[b.fromU.ammoId].rarity : '一般',
+          weaponRarity: b.fromU.rarity || '一般',
+          penMM: b.fromU.pen || 0,
+          fallbackDmg: b.fromU.dmg || 10
+        };
+      }
+      const r = _resolveSingleAttack(atkInfo, toU);
+      toU.hp = Math.max(0, toU.hp - r.hpLost);
+      toU.armor = Math.max(0, (toU.armor || 0) - r.armorLost);
+      const shown = r.totalShown;
       b.fromU.dmgDone = (b.fromU.dmgDone || 0) + shown;
       if(b.fromU.isGuard && b.fromU.srv) servantAddExp(b.fromU.srv, 2);
-      toU.hurtUntil = Date.now() + 180;
-      toU.animName = 'hurt'; toU.animFrame = 0; toU.animNext = 0;
-      const _tu = toU;
-      setTimeout(function(){
-        if(_tu.alive && _tu.animName === 'hurt' && _tu.state === 'combat'){ _tu.animName = 'idle'; _tu.animFrame = 0; _tu.animNext = 0; }
-      }, 180);
-      damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 18, text: '-' + shown + (b.crit ? '!' : ''), crit: b.crit, isEnemy: b.isEnemy, startTime: Date.now() });
+      /* rev-fix-anim-state-unified: 受伤时长从 GAME_ANIMS 计算，同时设两套时间戳 */
+      const _hurtAnimDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.hurt) ? GAME_ANIMS.hurt : null;
+      const _hurtDurVal = _hurtAnimDef ? Math.round(_hurtAnimDef.frameCount / _hurtAnimDef.fps * 1000) : 180;
+      toU.hurtUntil = Date.now() + _hurtDurVal;
+      toU._hurtStart = performance.now();
+      toU._hurtUntil = performance.now() + _hurtDurVal;
+      damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 18, text: '-' + shown + (r.crit ? '!' : ''), crit: r.crit, isEnemy: b.isEnemy, startTime: Date.now() });
       if(toU.hp <= 0){
         toU.alive = false;
         toU.animName = 'idle'; toU.animFrame = 0;
         damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 30, text: b.isEnemy ? '☠' : '✖', crit: false, isEnemy: b.isEnemy, startTime: Date.now() });
-        addLog((b.isEnemy ? '☠ ' : '✖ ') + toU.name + ' 倒下', b.isEnemy ? 'kill' : 'down');
+        /* rev-fix-raid-kill-vs-down: 守卫击杀敌人 →「擊殺」，敌人击杀守卫 →「被 X 用 Y 擊倒」 */
+        if(window._raidActiveBattleEntry && b.fromU && b.toU){
+          var _fromHtml, _wHtml, _toHtml, _logText;
+          if(b.fromU.isGuard){
+            _fromHtml = '<span class="r-' + ((b.fromU.srv && b.fromU.srv.rarity) || '一般') + '">' + b.fromU.name + '</span>';
+            _wHtml = '<span class="' + (typeof rarityClass === 'function' ? rarityClass(b.fromU.weaponRarity || '一般') : 'r-一般') + '">' + ((b.fromU.weaponDef && b.fromU.weaponDef.name) || '武器') + '</span>';
+            _toHtml = '<b class="r-' + (b.toU.rarity || '一般') + '">' + b.toU.name + '</b>';
+            _logText = _fromHtml + ' 用 ' + _wHtml + ' 擊殺 ' + _toHtml;
+          } else {
+            _fromHtml = '<span class="r-' + (b.fromU.rarity || '一般') + '">' + b.fromU.name + '</span>';
+            _wHtml = '<span class="r-' + (b.fromU.rarity || '一般') + '">' + ((b.fromU.weaponId && WEAPONS[b.fromU.weaponId] && WEAPONS[b.fromU.weaponId].name) || '武器') + '</span>';
+            _toHtml = '<b class="r-' + ((b.toU.srv && b.toU.srv.rarity) || '一般') + '">' + b.toU.name + '</b>';
+            if(b.toU.isGuard){
+              _logText = _toHtml + ' 被 ' + _fromHtml + ' 用 ' + _wHtml + ' <span class="lose">擊倒</span>';
+            } else {
+              _logText = _fromHtml + ' 用 ' + _wHtml + ' 擊殺 ' + _toHtml;
+            }
+          }
+          window._raidActiveBattleEntry.kills.push({ t: Date.now(), html: _logText });
+          /* rev-fix-raid-realtime-log: 實時刷新日誌欄 */
+          if(typeof _gardenRefreshBattleLogNow === 'function') _gardenRefreshBattleLogNow();
+        }
+        /* rev-fix-raid-guard-injured: 守衛被擊殺 → 重傷 4h */
+        if(toU.isGuard && toU.srv){
+          toU.srv.hp = 0;
+          toU.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
+          toU.srv._injuredDown = true;
+        }
         /* rev-fix-corpse-timing: 敵人屍體移入獨立數組，不計時 */
         if(!toU.isGuard){
           corpses.push({ x: toU.x, y: toU.y, id: toU.id, animStart: Date.now(), fadeStartAt: 0, fadeDuration: 1000 });
@@ -1346,20 +1114,8 @@ function _gardenRaidShowBattle(guards, enemies, region){
     function triggerSurrender(){
       window._raidSurrenderWorkers = true;
       addLog('🚩 工作僕人投降', 'lose');
-      if(typeof _gardenActors !== 'undefined' && _gardenActors.length){
-        const _deadGuardIds = {};
-        for(const g of guardUnits){
-          if(!g.alive && g.srv) _deadGuardIds[g.srv.id] = true;
-        }
-        _gardenActors = _gardenActors.filter(function(a){ return !_deadGuardIds[a.id]; });
-      }
-      setTimeout(function(){
-        if(battleState !== 'ended' && battleState !== 'ending'){
-          console.warn('[raid] 投降后 8 秒未结束，强制结束');
-          battleState = 'ending';
-          endBattle(false);
-        }
-      }, 8000);
+      /* rev-fix-guard-corpse-in-raid: 不删除死亡守卫的 actor，保留尸体 */
+      /* rev-fix-raid-no-force-end: 移除 8 秒強制結束 */
     }
 
     function startDestroyPhase(){
@@ -1377,6 +1133,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
         if(p.broken) continue;
         candidates.push(i);
       }
+      const _PXPM = CHAR_PX / 1.7;
       let _ci = 0;
       for(const e of alive){
         e.state = 'walk_to_field';
@@ -1387,15 +1144,19 @@ function _gardenRaidShowBattle(guards, enemies, region){
           const plotEl = grid.querySelector('.gp-plot[data-idx="' + idx + '"]');
           if(plotEl){
             const pr = plotEl.getBoundingClientRect();
+            /* rev-fix-raid-destroy-worldx: 用 worldX 而非像素 */
             e.targetX = pr.left - wrapRect.left + pr.width / 2;
             e.targetY = pr.top - wrapRect.top + pr.height - 4;
+            e.targetWorldX = ((pr.left - wrapRect.left + pr.width / 2) - wrapW / 2) / _PXPM;
           } else {
             e.state = 'running_away';
+            e.targetWorldX = null;
             e.targetX = wrapW + 200;
             e.targetY = e.y;
           }
         } else {
           e.state = 'running_away';
+          e.targetWorldX = null;
           e.targetX = wrapW + 200;
           e.targetY = e.y;
         }
@@ -1412,21 +1173,34 @@ function _gardenRaidShowBattle(guards, enemies, region){
         }
         return;
       }
-      const spd = 180 * dt;
+      const _PXPM = CHAR_PX / 1.7;
+      const _walkSpeedM = 1.4;
       for(const e of liveEnemies){
         if(e.state === 'walk_to_field'){
-          const dx = e.targetX - e.x;
-          const dy = e.targetY - e.y;
-          const d = Math.sqrt(dx*dx + dy*dy);
-          if(d < 6){
+          if(typeof e.targetWorldX !== 'number'){
+            /* 無格子 → 跑走 */
+            e.state = 'running_away';
+            e.targetX = wrapW + 200;
+            e.targetY = e.y;
+            continue;
+          }
+          const _dxWX = e.targetWorldX - e.worldX;
+          /* rev-fix-raid-destroy-worldx: 用 worldX 移動 */
+          if(Math.abs(_dxWX) < 0.3){
+            e.worldX = e.targetWorldX;
+            e.x = wrapW * 0.5 + e.worldX * _PXPM;
+            e.y = e.targetY;
             e.state = 'destroying';
             e.destroyUntil = now + 2000;
             e.animName = 'idle'; e.animFrame = 0; e.animNext = 0;
             addLog(e.name + ' 開始破壞田地', 'kill');
           } else {
-            const step = Math.min(d, spd);
-            e.x += (dx / d) * step;
-            e.y += (dy / d) * step;
+            const _stepM = Math.min(Math.abs(_dxWX), _walkSpeedM * dt);
+            e.worldX += Math.sign(_dxWX) * _stepM;
+            e.x = wrapW * 0.5 + e.worldX * _PXPM;
+            /* y 也慢慢走向目標 */
+            const _dy = e.targetY - e.y;
+            if(Math.abs(_dy) > 0.5) e.y += Math.sign(_dy) * Math.min(Math.abs(_dy), 180 * dt);
             e.animName = 'walk';
           }
         } else if(e.state === 'destroying'){
@@ -1452,7 +1226,8 @@ function _gardenRaidShowBattle(guards, enemies, region){
             e.gone = true;
             e.alive = false;
           } else {
-            e.x += Math.sign(dx) * Math.min(d, spd * 1.6);
+            /* rev-fix-spd-undef: spd 未定義 → 用 180 * dt */
+            e.x += Math.sign(dx) * Math.min(d, 180 * dt * 1.6);
             e.animName = 'walk';
           }
         }
@@ -1465,39 +1240,69 @@ function _gardenRaidShowBattle(guards, enemies, region){
         for(const g of guardUnits){
           if(!g.alive) continue;
           if(now < g.nextFireAt) continue;
-          /* rev-fix-garden-range: 守衛只打射程內（用 worldX 米） */
           const _guardRangeM = (typeof _rangeOfWeaponDef === 'function' ? _rangeOfWeaponDef(g.weaponDef) : 15);
-          const alive = enemyUnits.filter(function(e){ return e.alive && e.state === 'combat' && (typeof e.worldX === 'number' ? e.worldX : 0) <= _guardRangeM; });
+          const _gWX = (typeof g.worldX === 'number') ? g.worldX : 0;
+          /* rev-fix-raid-detect: 已發現 + 射程內 */
+          const alive = enemyUnits.filter(function(e){
+            if(!e.alive) return false;
+            const _eWX = (typeof e.worldX === 'number') ? e.worldX : 0;
+            const _dist = Math.abs(_eWX - _gWX);
+            const _eDetect = (typeof ENEMY_DETECT_DIST !== 'undefined' && ENEMY_DETECT_DIST[e.rarity]) || 225;
+            if(_dist > _eDetect) return false;
+            if(_dist > _guardRangeM) return false;
+            return true;
+          });
           if(!alive.length) continue;
           if(g.ammoId){
             if(g.ammoUsed >= g.ammoBudget) continue;
             g.ammoUsed++;
           }
-          const target = alive[Math.floor(Math.random() * alive.length)];
+          let target = null;
+          const _rpgTargets = alive.filter(function(e){ return e.hasRPG && e.rpgAmmo > 0; });
+          if(_rpgTargets.length){
+            target = _rpgTargets[Math.floor(Math.random() * _rpgTargets.length)];
+          } else {
+            target = alive[Math.floor(Math.random() * alive.length)];
+          }
           const hit = Math.random() * 100 < g.hitRate;
           spawnBullet(g, target, hit, false);
           g.nextFireAt = now + 60000 / g.rpm;
         }
         for(const e of enemyUnits){
-          if(!e.alive || e.state !== 'combat') continue;
+          if(!e.alive) continue;
           if(now < e.nextFireAt) continue;
-          /* rev-fix-garden-range: 敵人只打射程內的守衛（用 worldX 米） */
+          const _eWX = (typeof e.worldX === 'number') ? e.worldX : 0;
+          /* rev-fix-raid-detect: 敵人先發現守衛（40 米） */
+          const _detectDistE = (typeof GARDEN_GUARD_DETECT_DIST !== 'undefined') ? GARDEN_GUARD_DETECT_DIST : 40;
+          const _detected = guardUnits.filter(function(g){
+            if(!g.alive) return false;
+            const _gWX = (typeof g.worldX === 'number') ? g.worldX : 0;
+            return Math.abs(_gWX - _eWX) <= _detectDistE;
+          });
+          if(!_detected.length) continue;
+          if(e.hasRPG && e.rpgAmmo > 0){
+            const _RPG_RANGE = (typeof RPG_COMBAT_RANGE !== 'undefined') ? RPG_COMBAT_RANGE : 150;
+            const _rpgInRange = _detected.filter(function(g){
+              const _gWX = (typeof g.worldX === 'number') ? g.worldX : 0;
+              return Math.abs(_gWX - _eWX) <= _RPG_RANGE;
+            });
+            if(_rpgInRange.length){
+              e.rpgAmmo--;
+              const target = _rpgInRange[Math.floor(Math.random() * _rpgInRange.length)];
+              _raidEnemyFireRPG(e, target, now);
+              e.nextFireAt = now + 5000;
+              continue;
+            }
+          }
           const _eWeaponDef = (typeof WEAPONS !== 'undefined' && e.weaponId) ? WEAPONS[e.weaponId] : null;
           const _enemyRangeM = (typeof _rangeOfWeaponDef === 'function' && _eWeaponDef) ? _rangeOfWeaponDef(_eWeaponDef) : 15;
-          const alive = guardUnits.filter(function(g){ return g.alive && (typeof e.worldX === 'number' ? e.worldX : 0) <= _enemyRangeM; });
+          const alive = _detected.filter(function(g){
+            const _gWX = (typeof g.worldX === 'number') ? g.worldX : 0;
+            return Math.abs(_gWX - _eWX) <= _enemyRangeM;
+          });
           if(!alive.length) continue;
           const target = alive[Math.floor(Math.random() * alive.length)];
-          /* rev-fix-garden-chain: 連射鏈命中率（與探索模式一致） */
-          const _nowMs = Date.now();
-          if(_nowMs - (e._chainLast || 0) > (e._chainResetMs || 600)) e._chainShots = 0;
-          e._chainShots = (e._chainShots || 0) + 1;
-          e._chainLast = _nowMs;
-          const _chainN = e._chainShots;
-          let _effMode;
-          if(_chainN === 1) _effMode = '點射';
-          else if(_chainN <= 3) _effMode = '短點射';
-          else if(_chainN <= 7) _effMode = '長點射';
-          else _effMode = '掃射';
+          const _effMode = _getFireChainMode(e);
           const _hb = 0.55;
           const _modeMult = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[_effMode]) || 1.0;
           const hc = _hb * _modeMult;
@@ -1507,7 +1312,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
         }
         if(!enemiesAlive()){
           battleState = 'ending';
-          addLog('⚔️ 防禦成功', 'win');
+          /* rev-fix-raid-remove-noise: 防禦成功日誌移除（總結行已顯示） */
           /* rev-fix-corpse-timing: 延時 4000ms，讓 3 秒停留 + 1 秒淡出完整播放 */
           setTimeout(function(){ endBattle(true); }, 4000);
           return;
@@ -1528,6 +1333,10 @@ function _gardenRaidShowBattle(guards, enemies, region){
       battleState = 'ended';
       window._raidLiveActive = false;
       try { window._raidSurrenderWorkers = false; } catch(e){}
+      /* rev-fix-raid-actor-cleanup: 清空守衛 actor 的 _combatUnit 引用 */
+      if(typeof _gardenActors !== 'undefined' && _gardenActors){
+        for(const _ga of _gardenActors){ _ga._combatUnit = null; }
+      }
       try {
         if(typeof _gardenActors !== 'undefined' && _gardenActors.length){
           for(const a of _gardenActors){ if(a.state === 'surrender') a.state = 'idle'; }
@@ -1538,7 +1347,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
         for(var _oi = 0; _oi < _ovs.length; _oi++){ try{ _ovs[_oi].remove(); }catch(_e){} }
       } catch(e){ console.warn('[endBattle remove ov]', e); }
       try {
-        const sim = { log: logEntries, guards: guardUnits, enemies: enemyUnits, win: win, rounds: 1, brokenPlots: brokenPlots.slice() };
+        const sim = { log: logEntries, guards: guardUnits, enemies: enemyUnits, win: win, rounds: 1, brokenPlots: brokenPlots.slice(), initialEnemyCount: _initialEnemyCount };
         _gardenRaidApplyResult(sim, region);
       } catch(e){ console.warn('[raid apply]', e); }
       try { _gardenActiveTab = 'log'; } catch(e){}
@@ -1570,45 +1379,45 @@ function _gardenRaidShowBattle(guards, enemies, region){
       const nowD = Date.now();
       ctx.clearRect(0, 0, wrapW, wrapH);
 
-      /* rev-fix-garden-walk: 敵人 worldX 推進，PX_PER_METER 換算 */
+      /* rev-fix-move-combat-only: 移动循环只在 combat 阶段执行，destroying 阶段保留 tickDestroyPhase 设的 walk 动画 */
       const _PX_PER_METER = CHAR_PX / 1.7;
+      if(battleState === 'combat'){
       for(const u of enemyUnits){
-        if(u.state === 'walking_in' && u.alive){
-          if(typeof u.worldX !== 'number') u.worldX = 50;
-          u.worldX -= (u.walkSpeed || 1.4) * dt;
-          if(u.worldX <= 0) u.worldX = 0;
-          u.x = wrapW * 0.5 + u.worldX * _PX_PER_METER;
-          u.animName = 'walk';
-          let _inRange = false;
-          for(const g of guardUnits){
-            if(!g.alive) continue;
-            const _guardRangeM = (typeof _rangeOfWeaponDef === 'function' ? _rangeOfWeaponDef(g.weaponDef) : 15);
-            if(u.worldX <= _guardRangeM){ _inRange = true; break; }
-          }
-          if(_inRange || u.worldX <= 0){
-            u.state = 'combat';
-            u.nextFireAt = nowP + 500;
-            u.animName = 'idle';
+        if(!u.alive) continue;
+        if(typeof u.worldX !== 'number') continue;
+        let _nearestG = null, _nearestDist = Infinity;
+        for(const g of guardUnits){
+          if(!g.alive) continue;
+          const _gWX = (typeof g.worldX === 'number') ? g.worldX : 0;
+          const _d = Math.abs(_gWX - u.worldX);
+          if(_d < _nearestDist){ _nearestDist = _d; _nearestG = g; }
+        }
+        let _isMoving = false;
+        if(_nearestG){
+          const _eWeaponDef = (typeof WEAPONS !== 'undefined' && u.weaponId) ? WEAPONS[u.weaponId] : null;
+          const _uRange = (typeof _rangeOfWeaponDef === 'function' && _eWeaponDef) ? _rangeOfWeaponDef(_eWeaponDef) : 15;
+          const _detectDist = (typeof GARDEN_GUARD_DETECT_DIST !== 'undefined') ? GARDEN_GUARD_DETECT_DIST : 40;
+          /* rev-fix-move-v103: 没发现 或 不在射程内 → 继续前进 */
+          if(_nearestDist > _detectDist || _nearestDist > _uRange){
+            const _gWX = (typeof _nearestG.worldX === 'number') ? _nearestG.worldX : 0;
+            const _dir = _gWX > u.worldX ? 1 : -1;
+            u.worldX += _dir * (u.walkSpeed || 1.4) * dt;
+            _isMoving = true;
           }
         }
+        u.x = wrapW * 0.5 + u.worldX * _PX_PER_METER;
+        const _isActionAnim = (u.animName === 'fire_primary' || u.animName === 'fire_secondary' || u.animName === 'hurt' || u.animName === 'death');
+        if(!_isActionAnim){
+          u.animName = _isMoving ? 'walk' : 'idle';
+        }
+      }
       }
 
       for(let i = damageTexts.length - 1; i >= 0; i--){
         if(nowD - damageTexts[i].startTime > MAX_DMG_AGE) damageTexts.splice(i, 1);
       }
 
-      for(const u of guardUnits){
-        if(!u.alive) continue;
-        const barW = 34, barH = 4;
-        const bx = u.x - barW / 2;
-        const by = u.y - CHAR_PX - 8;
-        ctx.fillStyle = 'rgba(0,0,0,.75)';
-        ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
-        ctx.fillStyle = '#1a1010';
-        ctx.fillRect(bx, by, barW, barH);
-        ctx.fillStyle = '#4caf50';
-        ctx.fillRect(bx, by, barW * Math.max(0, u.hp / u.maxHp), barH);
-      }
+      /* rev-fix-raid-actor-draw: 守衛由 actor canvas 繪製，raid canvas 不重複畫 */
 
       /* rev-fix-corpse-timing: 所有敵人已進入 corpses → 統一觸發計時 */
       if(corpses.length > 0 && enemyUnits.length === 0){
@@ -1642,10 +1451,31 @@ function _gardenRaidShowBattle(guards, enemies, region){
       for(const b of bullets) drawBullet(b);
       for(const d of damageTexts) drawDamage(d, nowD);
 
+      /* rev-fix-raid-bubbles: 螢幕外敵人氣泡（同探索） */
+      if(_enemyBubbles){
+        var _bh = '';
+        for(var _bi = 0; _bi < enemyUnits.length; _bi++){
+          var _be = enemyUnits[_bi];
+          if(!_be.alive) continue;
+          if(_be.x <= wrapW - 10) continue;
+          var _bd = Math.abs(_be.worldX || 0);
+          var _brc = {'破舊':'#b87333','一般':'#e0e0e0','庫存':'#4caf50','精品':'#2196f3','傳奇':'#ffb300'}[_be.rarity] || '#e0e0e0';
+          var _barc = Math.round(Math.max(0, _be.hp / _be.maxHp) * 360);
+          var _bdt = _bd < 1 ? _bd.toFixed(1) : Math.round(_bd);
+          _bh += '<div style="width:44px;height:44px;border-radius:50%;border:2px solid ' + _brc + ';background:conic-gradient(#e05252 0deg ' + _barc + 'deg, rgba(20,18,16,0.95) ' + _barc + 'deg 360deg);box-sizing:border-box;position:relative"><div style="position:absolute;inset:4px;border-radius:50%;background:rgba(14,12,10,0.95);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;color:#ffb300">' + _bdt + '</div></div>';
+        }
+        if(_enemyBubbles.innerHTML !== _bh) _enemyBubbles.innerHTML = _bh;
+      }
+
       requestAnimationFrame(renderLoop);
     }
 
-    addLog('⚔️ 戰鬥開始 · ' + region, 'round');
+    /* rev-fix-raid-remove-noise: 戰鬥開始日誌移除（無意義） */
     requestAnimationFrame(renderLoop);
   });
 }
+
+/* rev-fix-anim-ref-unify: 暴露繪製函數為 window 別名，供其他模組調用 */
+window.drawHumanSprite = _raidDrawHuman;
+window.drawEnemySprite = _raidDrawEnemy;
+window._drawWorkerHelmet = _raidDrawWorkerHelmet;

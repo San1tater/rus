@@ -11,17 +11,106 @@ const SECOND_HIT_RATE = 0.8;
 const DEATH_CD_MS = 60000;
 
 const FOOT_RANGE_DEFAULT = 15;
+
+/* rev-fix-fire-chain-unify: 連射鏈統一 — 點射→短→長→掃射 */
+function _getFireChainMode(unit, nowMs){
+  if(!unit) return '點射';
+  var now = nowMs || Date.now();
+  if(now - (unit._chainLast || 0) > (unit._chainResetMs || 600)) unit._chainShots = 0;
+  unit._chainShots = (unit._chainShots || 0) + 1;
+  unit._chainLast = now;
+  var n = unit._chainShots;
+  if(n === 1) return '點射';
+  if(n <= 3) return '短點射';
+  if(n <= 7) return '長點射';
+  return '掃射';
+}
+
+/* rev-fix-anim-state-unified: 通用动画状态查询（探索 + 后院共用）
+ * unit: 任何带 _hurtUntil / _reloadEnd / _fireAnimUntil 字段的单位
+ * 返回: { name, startTime }
+ * 连续开火时 _fireAnimStart 每发更新 → startTime 每发重置 → 帧从 0 开始
+ */
+function getUnitAnimState(unit, now){
+  if(!unit) return { name: 'idle', startTime: now };
+  if(unit._hurtUntil && now < unit._hurtUntil){
+    return { name: 'hurt', startTime: unit._hurtStart || now };
+  }
+  if(unit._reloadEnd && now < unit._reloadEnd){
+    return { name: 'reload', startTime: unit._reloadStart || now };
+  }
+  if(unit._fireAnimUntil && now < unit._fireAnimUntil){
+    return { name: unit._fireAnimName || 'fire_primary', startTime: unit._fireAnimStart || now };
+  }
+  return { name: 'idle', startTime: now };
+}
+
+/* rev-fix-attack-unify: 單次攻擊結算統一 — 傷害×稀有度+暴擊+applyDamage
+ * atk: { ammoId, ammoRarity, weaponRarity, penMM, fallbackDmg, noCrit }
+ * tgt: 目標對象（需要 hp / armor 字段，以及 isGuard / isPlayer / isPassenger / equipped / helmet / body）
+ * opts: { armorProviderFn }  （可選，覆蓋默認 armorProvider）
+ * 返回: { crit, hpLost, armorLost, totalShown }
+ * 注意：不修改 tgt.hp / tgt.armor，調用方自行減
+ */
+function _resolveSingleAttack(atk, tgt, opts){
+  opts = opts || {};
+  var ammoDef = (atk.ammoId && typeof AMMO !== 'undefined' && AMMO[atk.ammoId]) ? AMMO[atk.ammoId] : null;
+  var aRar = atk.ammoRarity || (ammoDef ? ammoDef.rarity : '一般');
+  var wRar = atk.weaponRarity || '一般';
+  var baseDmg;
+  if(ammoDef){
+    baseDmg = Math.round(ammoDef.dmg * (RARITY_MULT[aRar] || 1));
+  } else {
+    baseDmg = atk.fallbackDmg || 10;
+  }
+  var penMM = (atk.penMM != null) ? atk.penMM : ((ammoDef && ammoDef.penMM) || 0);
+  var crit = false;
+  if(!atk.noCrit){
+    var cr = (typeof calcCritRate === 'function') ? calcCritRate(wRar, aRar) : 0.1;
+    var cm = (typeof calcCritMult === 'function') ? calcCritMult(wRar, aRar) : 1.5;
+    if(Math.random() < cr){ baseDmg = Math.round(baseDmg * cm); crit = true; }
+  }
+  var armorProvider = opts.armorProviderFn;
+  if(!armorProvider){
+    if(tgt.isGuard){
+      armorProvider = function(part){
+        if(part === 'head' || part === 'face'){
+          var h = tgt.equipped && tgt.equipped.head;
+          return h ? armorMMForSlot(h, part) : 0;
+        }
+        if(part === 'top'){
+          var t = tgt.equipped && tgt.equipped.top;
+          return t ? armorMMForSlot(t, 'top') : 0;
+        }
+        return 0;
+      };
+    } else if(tgt.isPlayer){
+      armorProvider = function(part){ return (typeof getPlayerArmorMMForPart === 'function') ? getPlayerArmorMMForPart(part) : 0; };
+    } else if(tgt.isPassenger && tgt.srv){
+      armorProvider = function(part){ return (typeof getPassengerArmorMMForPart === 'function') ? getPassengerArmorMMForPart(tgt, part) : 0; };
+    } else {
+      armorProvider = function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(tgt, part) : 0; };
+    }
+  }
+  var proxy = { hp: tgt.hp || 0, armor: tgt.armor || 0 };
+  var res = applyDamage(proxy, baseDmg, penMM, { armorProvider: armorProvider });
+  return { crit: crit, hpLost: res.hpLost, armorLost: res.armorLost, totalShown: res.hpLost > 0 ? res.hpLost : res.armorLost };
+}
+
+
 const FOOT_RANGE_SHORT = 20;
 
 function _rangeOfWeaponDef(wd){
   if(!wd) return FOOT_RANGE_DEFAULT;
   if(wd.slot === 'melee') return 0.75;
+  /* rev-fix-throw-range: 手榴彈射程 30 米 */
+  if(wd.slot === 'throwable') return 30;
   if(wd._shortRange) return FOOT_RANGE_SHORT;
   return (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[wd.type]) || FOOT_RANGE_DEFAULT;
 }
 
 function _eRange(e){
-  if(e.hasRPG && e.rpgAmmo > 0) return (typeof RPG_COMBAT_RANGE !== 'undefined') ? RPG_COMBAT_RANGE : 60;
+  if(e.hasRPG && e.rpgAmmo > 0) return (typeof RPG_COMBAT_RANGE !== 'undefined') ? RPG_COMBAT_RANGE : 150;
   const w = e.primaryWeapon || e.secondaryWeapon;
   if(!w) return 8;
   const wd = WEAPONS[w.id];
@@ -385,6 +474,44 @@ function _autoFireFoot(now){
           state.player.throwableStock--;
           p._nextFireAt = now + 1200;
           _threw = true;
+          /* rev-fix-throw-refill: 欄空時從庫存補 1 顆（按 throwableExplore 偏好） */
+          if(state.player.throwableStock <= 0){
+            try {
+              var _tp = state.preferences.throwableExplore || {};
+              var _tpri = _tp.priority || '一般';
+              var _tex = _tp.exclude || [];
+              var _tfb = _tp.fallback || 'desc';
+              var _tcands = [];
+              for(var _tk in state.inventory){
+                if(state.inventory[_tk] <= 0) continue;
+                var _tparts = _tk.split('@');
+                var _tid = _tparts[0], _trar = _tparts[1];
+                var _tdef = (typeof WEAPONS !== 'undefined') ? WEAPONS[_tid] : null;
+                if(!_tdef || _tdef.slot !== 'throwable') continue;
+                if(_tex.indexOf(_trar) >= 0) continue;
+                _tcands.push({ id: _tid, rarity: _trar });
+              }
+              if(_tcands.length){
+                var _tpriIdx = (typeof RARITY_ORDER !== 'undefined') ? RARITY_ORDER.indexOf(_tpri) : 1;
+                _tcands.sort(function(a, b){
+                  var _ai = RARITY_ORDER.indexOf(a.rarity);
+                  var _bi = RARITY_ORDER.indexOf(b.rarity);
+                  var _ad = Math.abs(_ai - _tpriIdx);
+                  var _bd = Math.abs(_bi - _tpriIdx);
+                  if(_ad !== _bd) return _ad - _bd;
+                  if(_tfb === 'desc') return _bi - _ai;
+                  return _ai - _bi;
+                });
+                var _tchosen = _tcands[0];
+                if(typeof invRemove === 'function') invRemove(_tchosen.id, _tchosen.rarity, 1);
+                state.player.equipped = state.player.equipped || {};
+                state.player.equipped.throwable = _tchosen.id;
+                state.player.equippedRarity = state.player.equippedRarity || {};
+                state.player.equippedRarity.throwable = _tchosen.rarity;
+                state.player.throwableStock = 1;
+              }
+            } catch(_te){ console.warn('[throwable refill]', _te); }
+          }
         }
       }
     }
@@ -660,17 +787,8 @@ function _firePlayer(p, t, now, w){
     }
   }
 
-  /* rev-fix-chain-accuracy: 探索模式連續射擊命中率動態遞減（1→短→長→掃） */
-  const _chainNow = performance.now();
-  if(_chainNow - (c._playerChainLast || 0) > (c._playerChainResetMs || 600)) c._playerChainShots = 0;
-  c._playerChainShots = (c._playerChainShots || 0) + 1;
-  c._playerChainLast = _chainNow;
-  const _chainN = c._playerChainShots;
-  let _effMode;
-  if(_chainN === 1) _effMode = '點射';
-  else if(_chainN <= 3) _effMode = '短點射';
-  else if(_chainN <= 7) _effMode = '長點射';
-  else _effMode = '掃射';
+  /* rev-fix-fire-chain-unify: 改用 _getFireChainMode */
+  const _effMode = _getFireChainMode(c);
 
   let hr = (typeof getHitRate === 'function') ? getHitRate(w.def.type, _effMode, w.def.scopeBonus || 0) : 30;
   if(!c.playerFirst) hr *= SECOND_HIT_RATE;
@@ -839,17 +957,8 @@ function _firePassenger(a, t, now, w){
   a._fireAnimUntil = _perfNow + 250;
   if(a.srv){ a.srv._standStart = _wallNow; a.srv._standUntil = _wallNow + 150; }
 
-  /* rev-fix-chain-accuracy: 載員連續射擊命中率動態遞減 */
-  const _chainNowA = performance.now();
-  if(_chainNowA - (a._chainLast || 0) > (a._chainResetMs || 600)) a._chainShots = 0;
-  a._chainShots = (a._chainShots || 0) + 1;
-  a._chainLast = _chainNowA;
-  const _chainNA = a._chainShots;
-  let _effModeA;
-  if(_chainNA === 1) _effModeA = '點射';
-  else if(_chainNA <= 3) _effModeA = '短點射';
-  else if(_chainNA <= 7) _effModeA = '長點射';
-  else _effModeA = '掃射';
+  /* rev-fix-fire-chain-unify: 改用 _getFireChainMode */
+  const _effModeA = _getFireChainMode(a);
 
   /* rev-fix-passenger-scope: 瞄具加成，與守衛一致 */
   const _scopeBonusA = (a.weapon && a.weapon.def && a.weapon.def.scopeBonus) || 0;
@@ -877,22 +986,19 @@ function _firePassenger(a, t, now, w){
     _target: t,
     _onHit: function() {
       if(!hit || t.hp <= 0) return;
-      /* rev-fix-foot-dmg-rarity: 步戰傷害 × 彈藥稀有度倍率 */
-      const ammoDmg = am.def.dmg * (RARITY_MULT[am.rarity] || 1);
-      const ammoPenMM = am.def.penMM || 0;
-      const _wRar = w.rarity || '一般';
-      const _aRar = am.rarity || '一般';
-      const _cr = (typeof servantCritRate === 'function') ? servantCritRate(_wRar, _aRar) : 0.1;
-      const _cm = (typeof servantCritMult === 'function') ? servantCritMult(_wRar, _aRar) : 1.5;
-      const crit = Math.random() < _cr;
-      const baseDmg = Math.round(ammoDmg * (crit ? _cm : 1));
-
-      const res = applyDamage(t, baseDmg, ammoPenMM, {
-        armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(t, part) : 0; }
-      });
-
-      const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
-      _float(t, '-' + shown + (crit ? '!' : ''), crit ? 'crit' : (res.hpLost > 0 ? '' : 'armor'));
+      /* rev-fix-attack-unify: 統一結算 */
+      const r = _resolveSingleAttack({
+        ammoId: am.id,
+        ammoRarity: am.rarity,
+        weaponRarity: w.rarity,
+        penMM: am.def.penMM || 0,
+        fallbackDmg: w.def.dmg || 20
+      }, t);
+      t.hp = Math.max(0, t.hp - r.hpLost);
+      t.armor = Math.max(0, (t.armor || 0) - r.armorLost);
+      const crit = r.crit;
+      const shown = r.totalShown;
+      _float(t, '-' + shown + (crit ? '!' : ''), crit ? 'crit' : (r.hpLost > 0 ? '' : 'armor'));
       if(t.hp > 0){
         const _hurtDurPs = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.hurt) ? Math.round(GAME_ANIMS.hurt.frameCount / GAME_ANIMS.hurt.fps * 1000) : 500;
         t._hurtStart = performance.now();
@@ -933,7 +1039,7 @@ function _enemyFire(e, now){
     return;
   }
 
-  if(e.hasRPG && e.rpgAmmo > 0 && Math.abs(e.worldX - p.worldX) <= (typeof RPG_COMBAT_RANGE !== 'undefined' ? RPG_COMBAT_RANGE : 60)){
+  if(e.hasRPG && e.rpgAmmo > 0 && Math.abs(e.worldX - p.worldX) <= (typeof RPG_COMBAT_RANGE !== 'undefined' ? RPG_COMBAT_RANGE : 150)){
     e.rpgAmmo--;
     _enemyFireRPG(e, p, now);
     e._nextFireAt = now + 5000;
@@ -956,23 +1062,18 @@ function _enemyFire(e, now){
   }
   if(w.ammoCount !== undefined) w.ammoCount--;
 
+  /* rev-fix-anim-duration-unified: 从 GAME_ANIMS 计算时长 */
+  const _fpAnimDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.fire_primary) ? GAME_ANIMS.fire_primary : null;
+  const _fpDur = _fpAnimDef ? Math.round(_fpAnimDef.frameCount / _fpAnimDef.fps * 1000) : 250;
+  e._fireAnimName = 'fire_primary';
   e._fireAnimStart = now;
-  e._fireAnimUntil = now + 250;
+  e._fireAnimUntil = now + _fpDur;
 
   const mz = _getEnemyMuzzlePos(e, p);
   const px = EXPLORE_HERO_X_RATIO;
 
-  /* rev-fix-chain-accuracy: 敵人連續射擊命中率動態遞減 */
-  const _chainNowE = performance.now();
-  if(_chainNowE - (e._chainLast || 0) > (e._chainResetMs || 600)) e._chainShots = 0;
-  e._chainShots = (e._chainShots || 0) + 1;
-  e._chainLast = _chainNowE;
-  const _chainNE = e._chainShots;
-  let _effModeE;
-  if(_chainNE === 1) _effModeE = '點射';
-  else if(_chainNE <= 3) _effModeE = '短點射';
-  else if(_chainNE <= 7) _effModeE = '長點射';
-  else _effModeE = '掃射';
+  /* rev-fix-fire-chain-unify: 改用 _getFireChainMode */
+  const _effModeE = _getFireChainMode(e);
   const _modeMultE = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[_effModeE]) || 1.0;
 
   const _hb = p.isVehicle ? 0.25 : (e.hitBase || 0.55);
@@ -1022,11 +1123,15 @@ function _enemyFire(e, now){
       }
 
       if(p.isPlayer){
-        const res = applyDamage({ hp: p.hp, armor: p.armor }, dmg, penMM, {
-          armorProvider: function(part){ return (typeof getPlayerArmorMMForPart === 'function') ? getPlayerArmorMMForPart(part) : 0; }
-        });
-        p.hp = Math.max(0, p.hp - res.hpLost);
-        p.armor = Math.max(0, p.armor - res.armorLost);
+        const r = _resolveSingleAttack({
+          ammoId: w.ammoId || null,
+          ammoRarity: _aRarE,
+          weaponRarity: _wRarE,
+          penMM: penMM,
+          fallbackDmg: e.dmg || 10
+        }, p);
+        p.hp = Math.max(0, p.hp - r.hpLost);
+        p.armor = Math.max(0, (p.armor || 0) - r.armorLost);
         state.player.hp = p.hp;
         state.player.armor = p.armor;
         _playHurt(performance.now());
@@ -1036,7 +1141,7 @@ function _enemyFire(e, now){
           var _wNameK = (w && w.id && typeof WEAPONS !== 'undefined' && WEAPONS[w.id]) ? WEAPONS[w.id].name : (w && w.id ? w.id : '武器');
           c._playerKiller = { name: _eNameK, weapon: _wNameK, wRarity: (w && w.rarity) || '一般', aRarity: e.rarity || '一般' };
         }
-        _float(p, '-' + (res.hpLost + res.armorLost), _isCritE ? 'crit' : '');
+        _float(p, '-' + (r.hpLost + r.armorLost), r.crit ? 'crit' : '');
         /* rev-fix-evac-on-player-death */
         if(p.hp <= 0 && typeof _evac === 'function' && !(window._explore && window._explore.evacuatingPassengers)){
           try { _evac(); } catch(e){}
@@ -1045,11 +1150,15 @@ function _enemyFire(e, now){
       }
 
       if(p.isPassenger && p.srv){
-        const res = applyDamage({ hp: p.hp, armor: p.armor }, dmg, penMM, {
-          armorProvider: function(part){ return (typeof getPassengerArmorMMForPart === 'function') ? getPassengerArmorMMForPart(p, part) : 0; }
-        });
-        p.hp = Math.max(0, p.hp - res.hpLost);
-        p.armor = Math.max(0, p.armor - res.armorLost);
+        const r = _resolveSingleAttack({
+          ammoId: w.ammoId || null,
+          ammoRarity: _aRarE,
+          weaponRarity: _wRarE,
+          penMM: penMM,
+          fallbackDmg: e.dmg || 10
+        }, p);
+        p.hp = Math.max(0, p.hp - r.hpLost);
+        p.armor = Math.max(0, (p.armor || 0) - r.armorLost);
         if(p.hp <= 0){
           p.hp = 0;
           if(p.srv){ p.srv.hp = 0; p.srv.injuredUntil = Date.now() + 4 * 3600 * 1000; p.srv._injuredDown = true; }
@@ -1066,19 +1175,51 @@ function _enemyFire(e, now){
             pushLog('<span class="' + _sClsD + '">' + _sNameD + '</span> 被 <span class="' + _eClsD + '">' + _eNameD + '</span> 用 <span class="' + _wClsD + '">' + _wNameD + '</span> <span class="lose">擊倒</span>', [], 'explore');
           }
         }
-        _float(p, '-' + res.hpLost, '');
+        _float(p, '-' + r.hpLost, '');
       }
     }
   });
 }
 
 
+/* rev-fix-splash-shared: 通用濺射傷害處理（探索 + 後院共用） */
+function _applySplashDamage(mainTarget, mainTargetWorldX, nearbyList, baseDmg, opts){
+  if(!nearbyList || !nearbyList.length) return;
+  opts = opts || {};
+  const maxR = (typeof opts.maxR === 'number') ? opts.maxR : 8;
+  const blastPen = (typeof opts.blastPen === 'number') ? opts.blastPen : 18;
+  const splashRatio = (typeof opts.splashRatio === 'number') ? opts.splashRatio : 0.35;
+  for(let i = 0; i < nearbyList.length; i++){
+    const item = nearbyList[i];
+    const tgt = item.target;
+    if(!tgt) continue;
+    if(tgt === mainTarget) continue;
+    const dist = Math.abs(item.worldX - mainTargetWorldX);
+    if(dist >= maxR) continue;
+    const tt = dist / maxR;
+    const falloff = 1 - tt * tt;
+    if(falloff <= 0) continue;
+    const splashDmg = Math.max(1, Math.round(baseDmg * splashRatio * falloff));
+    const splashPen = blastPen * falloff;
+    const armorProvider = opts.armorProviderFn ? opts.armorProviderFn(tgt) : null;
+    const proxy = { hp: tgt.hp || 0, armor: tgt.armor || 0 };
+    const res = applyDamage(proxy, splashDmg, splashPen, armorProvider ? { armorProvider: armorProvider } : {});
+    tgt.hp = proxy.hp;
+    tgt.armor = proxy.armor;
+    if(opts.onHit) opts.onHit(tgt, res.hpLost, res.armorLost);
+  }
+}
+
 function _enemyFireRPG(e, p, now){
   const c = window._combat;
   if(!c) return;
 
+  /* rev-fix-anim-duration-unified: 从 GAME_ANIMS 计算时长 */
+  const _fpAnimDefR = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.fire_primary) ? GAME_ANIMS.fire_primary : null;
+  const _fpDurR = _fpAnimDefR ? Math.round(_fpAnimDefR.frameCount / _fpAnimDefR.fps * 1000) : 400;
+  e._fireAnimName = 'fire_primary';
   e._fireAnimStart = now;
-  e._fireAnimUntil = now + 400;
+  e._fireAnimUntil = now + _fpDurR;
   const mz = _getEnemyMuzzlePos(e, p, true);
   const px = EXPLORE_HERO_X_RATIO;
   const hit = Math.random() < 0.6;
@@ -1154,58 +1295,55 @@ function _enemyFireRPG(e, p, now){
         _float(p, '-' + res.hpLost, crit ? 'crit' : '');
       }
 
-      /* rev-fix-rpg-splash-heat: RPG 視為 HEAT，走距離衰減 + 穿甲衰減 + 部位護甲 */
-      const _RPG_SPLASH = { blastPen: 18, maxR: 8, splashRatio: 0.35 };
-      const mainWX = p.worldX;
+      /* rev-fix-splash-shared: 調用共用濺射函數 */
+      const _nearbyList = [];
       for(let i = 0; i < c.allies.length; i++){
         const a = c.allies[i];
         if(a === p) continue;
         if(a.hp <= 0) continue;
         if(a.isVehicle) continue;
-        const _dist = Math.abs(a.worldX - mainWX);
-        if(_dist >= _RPG_SPLASH.maxR) continue;
-        const _t = _dist / _RPG_SPLASH.maxR;
-        const _falloff = 1 - _t * _t;
-        if(_falloff <= 0) continue;
-        const _splashDmg = Math.max(1, Math.round(baseDmg * _RPG_SPLASH.splashRatio * _falloff));
-        const _splashPen = _RPG_SPLASH.blastPen * _falloff;
-        let _armorProvider = null;
-        if(a.isPlayer){
-          _armorProvider = function(part){ return (typeof getPlayerArmorMMForPart === 'function') ? getPlayerArmorMMForPart(part) : 0; };
-        } else if(a.isPassenger && a.srv){
-          _armorProvider = (function(_a){ return function(part){ return (typeof getPassengerArmorMMForPart === 'function') ? getPassengerArmorMMForPart(_a, part) : 0; }; })(a);
-        }
-        const _proxy = { hp: a.hp, armor: a.armor || 0 };
-        const _res = applyDamage(_proxy, _splashDmg, _splashPen, { armorProvider: _armorProvider });
-        a.hp = _proxy.hp;
-        a.armor = _proxy.armor;
-        const _shownSplash = _res.hpLost > 0 ? _res.hpLost : _res.armorLost;
-        if(a.isPlayer){
-          state.player.hp = a.hp;
-          state.player.armor = a.armor;
-          _playHurt(performance.now());
-          if(a.hp <= 0 && typeof _evac === 'function' && !(window._explore && window._explore.evacuatingPassengers)){
-            try { _evac(); } catch(e){}
-          }
-        }
-        if(a.isPassenger && a.hp <= 0 && a.srv){
-          a.srv.hp = 0;
-          a.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
-          a._retreating = true;
-          a._injuredDown = true;
-          if(typeof pushLog === 'function'){
-            const _eNameSP = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
-            const _eClsSP = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
-            const _sRarSP = (a.srv && a.srv.rarity) ? a.srv.rarity : '一般';
-            const _sClsSP = (typeof rarityClass === 'function') ? rarityClass(_sRarSP) : '';
-            const _sNameSP = (typeof servantLabel === 'function' ? servantLabel(a.srv) : '載員');
-            const _wClsSP = (typeof rarityClass === 'function') ? rarityClass(rar || '一般') : '';
-            pushLog('<span class="' + _sClsSP + '">' + _sNameSP + '</span> 被 <span class="' + _eClsSP + '">' + _eNameSP + '</span> 用 <span class="' + _wClsSP + '">RPG</span> <span class="lose">擊倒</span>', [], 'explore');
-          }
-        }
-        _float(a, '-' + _shownSplash, _res.hpLost > 0 ? '' : 'armor');
-        if(a.isPlayer && a.hp <= 0){ endBattle(false); return; }
+        _nearbyList.push({ target: a, worldX: a.worldX });
       }
+      _applySplashDamage(p, p.worldX, _nearbyList, baseDmg, {
+        maxR: 8, blastPen: 18, splashRatio: 0.35,
+        armorProviderFn: function(tgt){
+          if(tgt.isPlayer){
+            return function(part){ return (typeof getPlayerArmorMMForPart === 'function') ? getPlayerArmorMMForPart(part) : 0; };
+          }
+          if(tgt.isPassenger && tgt.srv){
+            return (function(_a){ return function(part){ return (typeof getPassengerArmorMMForPart === 'function') ? getPassengerArmorMMForPart(_a, part) : 0; }; })(tgt);
+          }
+          return null;
+        },
+        onHit: function(tgt, hpLost, armorLost){
+          const _shownSplash = hpLost > 0 ? hpLost : armorLost;
+          if(tgt.isPlayer){
+            state.player.hp = tgt.hp;
+            state.player.armor = tgt.armor;
+            _playHurt(performance.now());
+            if(tgt.hp <= 0 && typeof _evac === 'function' && !(window._explore && window._explore.evacuatingPassengers)){
+              try { _evac(); } catch(e){}
+            }
+          }
+          if(tgt.isPassenger && tgt.hp <= 0 && tgt.srv){
+            tgt.srv.hp = 0;
+            tgt.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
+            tgt._retreating = true;
+            tgt._injuredDown = true;
+            if(typeof pushLog === 'function'){
+              const _eNameSP = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
+              const _eClsSP = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
+              const _sRarSP = (tgt.srv && tgt.srv.rarity) ? tgt.srv.rarity : '一般';
+              const _sClsSP = (typeof rarityClass === 'function') ? rarityClass(_sRarSP) : '';
+              const _sNameSP = (typeof servantLabel === 'function' ? servantLabel(tgt.srv) : '載員');
+              const _wClsSP = (typeof rarityClass === 'function') ? rarityClass(rar || '一般') : '';
+              pushLog('<span class="' + _sClsSP + '">' + _sNameSP + '</span> 被 <span class="' + _eClsSP + '">' + _eNameSP + '</span> 用 <span class="' + _wClsSP + '">RPG</span> <span class="lose">擊倒</span>', [], 'explore');
+            }
+          }
+          _float(tgt, '-' + _shownSplash, hpLost > 0 ? '' : 'armor');
+          if(tgt.isPlayer && tgt.hp <= 0){ endBattle(false); return; }
+        }
+      });
     }
   });
 }
@@ -1320,7 +1458,9 @@ function _passengerThrowGrenade(a, t, gDef, gRar, now){
           if(typeof pushLog === 'function'){
             const _aRar = (a.srv && a.srv.rarity) ? a.srv.rarity : '一般';
             const _aCls = (typeof rarityClass === 'function') ? rarityClass(_aRar) : 'r-一般';
-            pushLog('<span class="' + _aCls + '">' + (typeof servantLabel === 'function' ? servantLabel(a.srv) : '載員') + '</span> 用手榴彈擊殺 <b class="r-' + (r.target.rarity || '一般') + '">' + _en + '</b>', [], 'explore');
+            /* rev-fix-passenger-grenade-name: 用 gDef.name，不写死「手榴彈」 */
+            const _wCls = (typeof rarityClass === 'function') ? rarityClass(gRar) : 'r-一般';
+            pushLog('<span class="' + _aCls + '">' + (typeof servantLabel === 'function' ? servantLabel(a.srv) : '載員') + '</span> 用 <span class="' + _wCls + '">' + (gDef.name || '手榴彈') + '</span> 擊殺 <b class="r-' + (r.target.rarity || '一般') + '">' + _en + '</b>', [], 'explore');
           }
           if(typeof servantAddExp === 'function') servantAddExp(a.srv, 3);
         }
@@ -1340,8 +1480,12 @@ function _enemyThrowGrenade(e, p, now){
   const gDef = WEAPONS[gid];
   if(!gDef) return;
 
+  /* rev-fix-anim-duration-unified: 从 GAME_ANIMS 计算时长 */
+  const _fpAnimDefG = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.fire_primary) ? GAME_ANIMS.fire_primary : null;
+  const _fpDurG = _fpAnimDefG ? Math.round(_fpAnimDefG.frameCount / _fpAnimDefG.fps * 1000) : 400;
+  e._fireAnimName = 'fire_primary';
   e._fireAnimStart = now;
-  e._fireAnimUntil = now + 400;
+  e._fireAnimUntil = now + _fpDurG;
   const mz = _getEnemyMuzzlePos(e, p);
   const px = EXPLORE_HERO_X_RATIO;
 
@@ -1497,18 +1641,10 @@ function _render(){
       continue;
     }
 
-    let animName = 'idle';
-    let animStart = _renderNow;
-    if(e._hurtUntil && _renderNow < e._hurtUntil){
-      animName = 'hurt';
-      animStart = e._hurtStart || _renderNow;
-    } else if(e._reloadEnd && _renderNow < e._reloadEnd){
-      animName = 'reload';
-      animStart = e._reloadStart || _renderNow;
-    } else if(e._fireAnimUntil && _renderNow < e._fireAnimUntil){
-      animName = 'fire_primary';
-      animStart = e._fireAnimStart || _renderNow;
-    }
+    /* rev-fix-anim-state-unified: 调 getUnitAnimState */
+    const _as = (typeof getUnitAnimState === 'function') ? getUnitAnimState(e, _renderNow) : { name: 'idle', startTime: _renderNow };
+    const animName = _as.name;
+    const animStart = _as.startTime;
     const frame = (typeof computeAnimFrame === 'function') ? computeAnimFrame(animName, animStart, _renderNow) : 0;
 
     const pwId = (e.hasRPG && e.rpgAmmo > 0) ? 'rpg'
@@ -1519,7 +1655,7 @@ function _render(){
     const eqR = { head: e.rarity || '一般', top: e.rarity || '一般', primary: e.rarity || '一般' };
     if(typeof _raidDrawHuman !== 'function') continue;
     ctx.save();
-    try { _raidDrawHuman(ctx, sx, fy, eh / 386, eq, eqR, animName, frame, pwId ? 'primary' : null, 'enemy', true, false, null); } catch(err){}
+    try { (window.drawHumanSprite || _raidDrawHuman)(ctx, sx, fy, eh / 386, eq, eqR, animName, frame, pwId ? 'primary' : null, 'enemy', true, false, null); } catch(err){}
     ctx.restore();
   }
 
@@ -1557,22 +1693,25 @@ function _render(){
     
     if(bx < -10 || bx > W + 10 || by < -10 || by > H + 10) continue;
     const _bulletColor = window._rarityBulletColor(bb.rarity);
+    const _brC = (typeof BULLET_VISUAL_RADIUS !== 'undefined') ? BULLET_VISUAL_RADIUS : { normal: 3, grenade: 5, missile: 6 };
     if(bb.missile){
+      const _missileR = _brC.missile;
       ctx.save();
       ctx.shadowColor = _bulletColor;
       ctx.shadowBlur = 24;
       ctx.fillStyle = _bulletColor;
-      ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bx, by, _missileR, 0, Math.PI * 2); ctx.fill();
       ctx.shadowBlur = 0;
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.beginPath(); ctx.arc(bx, by, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bx, by, _missileR * 0.3, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     } else {
+      const _bR = bb.big ? _brC.grenade : _brC.normal;
       ctx.save();
       ctx.shadowColor = _bulletColor;
       ctx.shadowBlur = 8;
       ctx.fillStyle = _bulletColor;
-      ctx.beginPath(); ctx.arc(bx, by, bb.big ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bx, by, _bR, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
   }
