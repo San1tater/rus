@@ -15,8 +15,6 @@
   --c-run: #e8741e;
 }
 
-/* [rev819] 回滚滚动条显示 */
-
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;font-size:12px;touch-action:manipulation;user-select:none;overscroll-behavior:none}
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh}
@@ -29,8 +27,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#7a6f60;font-size:11px;gap:2px}
 .tab.active{color:var(--c-accent)}
 .tab .ico{font-size:18px}
-/* .toast removed by user request */
-
 .scene{position:absolute;inset:0}
 .bg-scroll{position:absolute;inset:0;overflow:hidden}
 .bg-track{display:flex;width:200%;height:100%;animation:bgscroll var(--spd,10s) linear infinite;will-change:transform;transform:translateZ(0);backface-visibility:hidden}
@@ -137,7 +133,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .damage-header .bar .fill{height:100%;background:linear-gradient(90deg,#e05252,#ffb300);transition:width .2s}
 .fighter{position:absolute;transform:translateX(-50%);z-index:3}
 .fighter .sprite{border-radius:6px;position:relative;cursor:crosshair;background-size:contain;background-position:center;background-repeat:no-repeat}
-.hero-f .sprite{width:88px;height:118px;background-image:none;position:relative;overflow:visible} /* v78-sprite */  /* v78-sprite */ /* v78-sprite */ /* v78-sprite */ /* v77-sprite-wide */
+.hero-f .sprite{width:88px;height:118px;background-image:none;position:relative;overflow:visible}
 .hero-f .sprite canvas{width:100%;height:100%;display:block}
 .boss-f .sprite{width:280px;height:280px}
 .boss-f .sprite img{width:100%;height:100%;object-fit:contain;display:block}
@@ -148,7 +144,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .hpbar-wrap .bar.hp .fill{background:#e05252}
 .hpbar-wrap .bar.ap .fill{background:#4a90d9}
 .hpbar-wrap .nm{font-size:8px;color:var(--c-accent);text-align:center;white-space:nowrap;text-shadow:0 0 3px #000;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%)}
-/* rev545: .hpbar-wrap.has-shield .nm 由 JS 动态覆盖，不再硬编码 */
 .bullet{position:absolute;width:5px;height:5px;background:#ffe08a;border-radius:50%;box-shadow:0 0 6px #ffb300;transform:translate(-50%,-50%)}
 .bullet.enemy{background:#ff5252;box-shadow:0 0 6px #e05252}
 /* ============================================================
@@ -536,15 +531,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .raid-report-ft{flex:0 0 auto;padding:10px 14px;border-top:1px solid #2a231c;background:#17140f;display:flex}
 .raid-report-ft .btn{flex:1}
 
-/* 舊元素停用 */
-
 @keyframes raidBannerIn{from{opacity:0;transform:translateX(-50%) scale(.7)}to{opacity:1;transform:translateX(-50%) scale(1)}}
-/* 舊風格移除（若殘留） */
-
-/* 舊元素徹底禁用 */
-
-/* 舊 raid-* 全禁 */
-
 .raid-overlay{position:absolute;inset:0;z-index:200;pointer-events:auto;overflow:hidden}
 
 .raid-topbar-title{color:var(--c-accent);font-weight:bold;font-size:11px;letter-spacing:1px}
@@ -553,8 +540,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .raid-top-btn:hover{background:#3a2f25;color:var(--c-accent)}
 .raid-top-btn.primary{background:#8a5f18;color:#fff;border-color:var(--c-accent)}
 .raid-canvas{position:absolute;left:0;top:0;z-index:11;display:block;pointer-events:none}
-/* 舊元素徹底禁用 */
-
 .gp-actor-layer{display:none !important}
 .raid-banner-win, .raid-banner-lose, .raid-side, .raid-unit, .raid-sprite, .raid-enemy-zone, .raid-enemy, .raid-guard, .raid-proj, .raid-dmg, .raid-float, .raid-unit-sprite, .raid-unit-hpwrap, .raid-unit-name, .raid-hp-wrap, .raid-name, .raid-hp, #gp-actor-layer{display:none !important;visibility:hidden !important;pointer-events:none !important}
 .raid-float-btns{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:30;pointer-events:auto}
@@ -845,8 +830,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .garage-showcase img{max-width:100%;max-height:160px;object-fit:contain;display:block}.garage-vehicle-name-bar{text-align:center;font-size:14px;font-weight:bold;color:var(--c-accent);letter-spacing:1px;padding:6px 0;flex:0 0 auto}.garage-stat-row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:11px;color:#a89a85;border-bottom:1px dashed #241d16;min-width:0}
 .garage-stat-row:last-child{border-bottom:none}
 .garage-stat-row .k{flex:0 0 auto;color:#7a6f60}
-/* .garage-stat-row .v dead removed v17.5-r2 *//* ===== rev561e: 車場頁（大圖 + 分欄底部） ===== */
-/* #garage-page{z-index:9200} dup removed v17.5-r2 */
+/* ===== rev561e: 車場頁（大圖 + 分欄底部） ===== */
 .garage-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 8px;gap:6px;overflow:hidden}
 .garage-showcase{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;position:relative;padding:6px}
 .garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;display:block}.garage-vehicle-name-bar{position:absolute;top:6px;left:8px;font-size:11px;font-weight:bold;color:var(--c-accent);background:rgba(14,12,10,.78);padding:2px 8px;border-radius:4px;border:1px solid #3a2f25;letter-spacing:0.5px;pointer-events:none}
@@ -857,12 +841,10 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 
 .garage-stat-row{display:flex;justify-content:space-between;gap:6px;padding:1px 0;font-size:10px;line-height:1.5;min-width:0}
 .garage-stat-row .k{flex:0 0 auto;color:#7a6f60}
-/* .garage-stat-row .v dead removed v17.5-r2 */.garage-research-empty{font-size:11px;color:#5a5040;line-height:1.4;padding:2px 0}
+.garage-research-empty{font-size:11px;color:#5a5040;line-height:1.4;padding:2px 0}
 .garage-research-bar{height:6px;background:#0e0c0a;border-radius:3px;overflow:hidden;border:1px solid #2a231c}
 .garage-research-bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,var(--c-accent),#ffd680);transition:width .2s}
 .garage-research-exp{font-size:9px;color:#a89a85;text-align:right;font-family:Menlo,Consolas,monospace;line-height:1.3}/* ===== 縱向 WT 科技樹 ===== */
-/* .wt-tech-wrap dead removed v17.5-r2 */
-/* .wt-tech-canvas dead removed v17.5-r2 */
 .wt-node{position:absolute;background:#1a1510;border:2px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px 3px;box-sizing:border-box;cursor:pointer;user-select:none;overflow:hidden;transition:transform .1s,border-color .15s,box-shadow .15s}
 .wt-node:active{transform:scale(.95)}
 .wt-node-img{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -883,7 +865,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .wt-node.researching .wt-node-mark{color:#a45ede}
 
 /* ===== rev561f: 車場頁最終佈局 ===== */
-/* #garage-page{z-index:9200} dup removed v17.5-r2 */
 .garage-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 8px;gap:6px;overflow:hidden}
 .garage-showcase{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;position:relative;padding:6px}
 .garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;display:block}.garage-vehicle-name-bar{position:absolute;top:6px;left:8px;font-size:11px;font-weight:bold;color:var(--c-accent);background:rgba(14,12,10,.78);padding:2px 8px;border-radius:4px;border:1px solid #3a2f25;letter-spacing:0.5px;pointer-events:none}
@@ -894,7 +875,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .garage-bottom-left{flex:1 1 0;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:3px 8px;display:flex;flex-direction:column;justify-content:space-around}
 .garage-stat-row{display:flex;justify-content:space-between;gap:6px;padding:0;font-size:9px;line-height:1.45;min-width:0}
 .garage-stat-row .k{flex:0 0 auto;color:#7a6f60}
-/* .garage-stat-row .v dead removed v17.5-r2 */
 
 /* 右半：研發 + 按鈕 */
 .garage-bottom-right{flex:0 0 44%;min-width:0;display:flex;flex-direction:column;gap:4px}.garage-research-img-wrap{flex:1 1 0;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -904,7 +884,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .garage-research-bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,var(--c-accent),#ffd680)}
 .garage-research-exp{flex:0 0 auto;font-size:9px;color:#a89a85;text-align:right;font-family:Menlo,Consolas,monospace;line-height:1.2}
 .garage-research-empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#5a5040;text-align:center;padding:4px}/* ===== rev561g: 車場頁 v3 ===== */
-/* #garage-page{z-index:9200} dup removed v17.5-r2 */
 .garage-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 8px;gap:6px;overflow:hidden}
 .garage-showcase{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;position:relative;padding:6px}
 .garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;display:block}.garage-vehicle-name-bar{position:absolute;top:6px;left:8px;font-size:11px;font-weight:bold;color:var(--c-accent);background:rgba(14,12,10,.78);padding:2px 8px;border-radius:4px;border:1px solid #3a2f25;letter-spacing:0.5px;pointer-events:none;z-index:2}
@@ -933,7 +912,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .garage-req-row span{white-space:nowrap}
 .garage-req-row .ok{color:#4caf50}
 .garage-req-row .bad{color:#e05252}/* ===== 縱向 WT 科技樹 ===== */
-/* .wt-tech-wrap dead removed v17.5-r2 *//* .wt-tech-canvas dead removed v17.5-r2 */
 .wt-node{position:absolute;background:#1a1510;border:2px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px 3px;box-sizing:border-box;cursor:pointer;user-select:none;overflow:hidden;transition:transform .1s,border-color .15s,box-shadow .15s}
 .wt-node:active{transform:scale(.95)}
 .wt-node-img{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -954,7 +932,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .wt-node.researching .wt-node-mark{color:#a45ede}
 
 /* ===== rev561h: 車場頁 v4 最終樣式 ===== */
-/* #garage-page{z-index:9200} dup removed v17.5-r2 */
 .garage-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 8px;gap:6px;overflow:hidden}
 .garage-showcase{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;background:#1a1510;border:1px solid #2a231c;border-radius:8px;overflow:hidden;position:relative;padding:6px}
 .garage-showcase img{max-width:100%;max-height:100%;object-fit:contain;display:block}.garage-vehicle-name-bar{position:absolute;top:6px;left:8px;font-size:11px;font-weight:bold;color:var(--c-accent);background:rgba(14,12,10,.78);padding:2px 8px;border-radius:4px;border:1px solid #3a2f25;letter-spacing:0.5px;pointer-events:none;z-index:2}
@@ -987,8 +964,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .garage-tech-detail-img-wrap{width:100%;height:170px;background:#151210 no-repeat center center;background-size:contain;border:1px solid #2a231c;border-radius:6px;margin-bottom:10px;box-sizing:border-box}
 
 /* 縱向 WT 科技樹（保持不變） */
-/* .wt-tech-wrap dead removed v17.5-r2 */
-/* .wt-tech-canvas dead removed v17.5-r2 */
 .wt-node{position:absolute;background:#1a1510;border:2px solid #3a2f25;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px 3px;box-sizing:border-box;cursor:pointer;user-select:none;overflow:hidden;transition:transform .1s,border-color .15s,box-shadow .15s}
 .wt-node:active{transform:scale(.95)}
 .wt-node-img{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -1045,7 +1020,6 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 #btr-support-canvas{z-index:1 !important}
 
 /* [rev-fix-ms] rev570 允许科技树窄屏横向滑动（滚动条隐藏规则见 rev561i 段落） */
-/* .wt-tech-wrap dead removed v17.5-r2 */
 
 /* rev600: 載具卡片統一背景圖（科技樹節點 / 車場展示 / 研發目標） */
 .wt-node-img,
