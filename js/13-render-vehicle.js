@@ -7,6 +7,13 @@ const VEHICLE_REAL_HEIGHTS = {
   bmp1: 2.15, bmp1m: 2.25, bmp2: 2.45, bmp3: 2.40, bmd4: 2.17
 };
 
+/* rev142: 載具可被發現半徑 R = 80 × 車高 / 玩家身高，取整十 */
+window.getVehicleDetectableR = function(vid){
+  const _h = VEHICLE_REAL_HEIGHTS[vid] || 2.5;
+  const _playerH = (typeof PLAYER_HEIGHT_M !== 'undefined') ? PLAYER_HEIGHT_M : 1.7;
+  return Math.round(80 * _h / _playerH / 10) * 10;
+};
+
 function _measureImgContentBounds(img){
   if(!window._vehContentBoundsCache) window._vehContentBoundsCache = {};
   const key = img.src || '';
@@ -1042,7 +1049,7 @@ const BTRSupport = {
     if(this.active && this.phase === 'support' && window._explore && window._explore._lootingUntil > 0){
       window._explore._lootingUntil = 0;
       window._explore._corpseLootTriggered = false;
-      if(window._explore._pendingLootEvent) window._explore._pendingLootEvent = null;
+      if(window._explore._pendingLootEvents) window._explore._pendingLootEvents = null;
     }
     if(this.phase === 'wreck'){
       this._updateWreck(t, now);
@@ -1182,33 +1189,72 @@ const BTRSupport = {
     try { this._finishSupportAndLog(); } catch(e){}
     this._cleanup();
     this.active = false;
+    /* [v178 R8] 兜底：wreck 結束時確保 ex 狀態乾淨（R5 已清，此處為最終保險） */
+    if(window._explore){
+      if(window._explore.combatEvent) window._explore.combatEvent = null;
+      if(window._explore.mode === 'combat' || window._explore.mode === 'vehicle'){
+        window._explore.mode = 'walk';
+      }
+    }
   },
 
   _onPhaseEnter(phase){
+    if(phase === 'arrive'){
+      /* 問題 3：車門開啟即切 vehicle，玩家不再射擊/受擊 */
+      const _cArr = window._combat;
+      if(_cArr && _cArr.active && _cArr.sceneType === 'foot'){
+        const _g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
+        const _vid = _g ? _g.currentVehicle : 'btr80';
+        const _vdef = (typeof VEHICLES !== 'undefined') ? VEHICLES[_vid] : null;
+        const _vh = (_vdef && _vdef.hp) ? _vdef.hp : 500;
+        const _exWX = (window._explore && window._explore.worldX) ? window._explore.worldX : 0;
+        _cArr.sceneType = 'vehicle';
+        _cArr.allies = [{ isVehicle: true, vehicleId: _vid, hp: _vh, maxHp: _vh, armorGrid: [30,20,15], armorLevel: 5, worldX: _exWX }];
+        _cArr._playerMag = { inMag: 0, ammoRef: null, weaponId: null };
+        _cArr._playerReloadEnd = 0;
+        _cArr._playerSwitchEnd = 0;
+        _cArr._fireAnim = null;
+        _cArr._playerAnimUntil = 0;
+        _cArr.bullets = _cArr.bullets.filter(function(b){ return b.enemy; });
+      }
+    }
     if(phase === 'support'){
       this.lastTickSec = -1;
       if(typeof window._exploreSetVehicleMode === 'function') window._exploreSetVehicleMode(true);
+      const _cSup = window._combat;
+      if(_cSup && _cSup.active && _cSup.sceneType === 'foot'){
+        const _g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
+        const _vid = _g ? _g.currentVehicle : 'btr80';
+        const _vdef = (typeof VEHICLES !== 'undefined') ? VEHICLES[_vid] : null;
+        const _vh = (_vdef && _vdef.hp) ? _vdef.hp : 500;
+        const _exWX = (window._explore && window._explore.worldX) ? window._explore.worldX : 0;
+        _cSup.sceneType = 'vehicle';
+        _cSup.allies = [{ isVehicle: true, vehicleId: _vid, hp: _vh, maxHp: _vh, armorGrid: [30,20,15], armorLevel: 5, worldX: _exWX }];
+        _cSup._playerMag = { inMag: 0, ammoRef: null, weaponId: null };
+        _cSup._playerReloadEnd = 0;
+        _cSup._playerSwitchEnd = 0;
+        _cSup._fireAnim = null;
+        _cSup._playerAnimUntil = 0;
+        _cSup.bullets = _cSup.bullets.filter(function(b){ return b.enemy; });
+        if(typeof pushLog === 'function') pushLog('<span class="pl">玩家</span> 進入載具，切換為載具戰', [], 'explore');
+      }
     } else if(phase === 'lift'){
       /* v28: BTR 结束直接清 ex，不依赖 _forceEndVehicleCombat */
-      if(window._explore){
+      /* [v179 F2a] 只在载具战时清 ex。若 R5 已切 foot，保留步战状态，不再误清。 */
+      var _cLiftF2 = window._combat;
+      var _isVehLiftF2 = !!(_cLiftF2 && _cLiftF2.active && _cLiftF2.sceneType === 'vehicle');
+      if(window._explore && _isVehLiftF2){
         if(window._explore.mode === 'combat' || window._explore.mode === 'vehicle'){
           window._explore.mode = 'walk';
         }
         window._explore.combatEvent = null;
-        window._explore._pendingLootEvent = null;
+        window._explore._pendingLootEvents = null;
       }
-      if(typeof window._combatCleanup === 'function'){
-        try{ window._combatCleanup(); }catch(e){}
-      }
-      if(typeof window._forceEndVehicleCombat === 'function'){
-        try{ window._forceEndVehicleCombat(); }catch(e){}
-      }
-      /* v26: 强制结束载具战并清理 ex.mode / ex.combatEvent */
+      /* [v179 F2a] _combatCleanup 已交由 _forceEndVehicleCombat 内部条件判断 */
       if(typeof window._forceEndVehicleCombat === 'function'){
         try{ window._forceEndVehicleCombat(); }catch(e){ console.warn('[lift forceEnd]', e); }
       } else {
         if(typeof window._exploreSetVehicleMode === 'function') window._exploreSetVehicleMode(false);
-        if(typeof window._combatCleanup === 'function') window._combatCleanup();
       }
     }
   },
@@ -1230,18 +1276,19 @@ const BTRSupport = {
         if(m._preselectedTarget && !_mainTarget && m.weaponId !== 'pkt') _mainTarget = m._preselectedTarget;  /* rev-fix-pkt-follow */
       }
     }
+    /* rev143: 載具主炮同步瞄準——以 canEngage 統一判定（含目標 R 與自身射程） */
     for(const m of _ready){
       if(m._syncGroup === 'main'){
         if(_mainTarget && m._preselectedTarget !== _mainTarget){
           if(_p){
             const _rM = (typeof VEHICLE_RANGE_M !== 'undefined' && VEHICLE_RANGE_M[m.weaponId]) || 300;
-            if(Math.abs(_mainTarget.worldX - _p.worldX) <= _rM) m._preselectedTarget = _mainTarget;
+            if(window.canEngage(_rM, _mainTarget, Math.abs(_mainTarget.worldX - _p.worldX))) m._preselectedTarget = _mainTarget;
           }
         }
       } else {
         if(_mainTarget && _p){
           const _r = (typeof VEHICLE_RANGE_M !== 'undefined' && VEHICLE_RANGE_M[m.weaponId]) || 300;
-          if(Math.abs(_mainTarget.worldX - _p.worldX) <= _r){
+          if(window.canEngage(_r, _mainTarget, Math.abs(_mainTarget.worldX - _p.worldX))){
             m._preselectedTarget = _mainTarget;
             continue;
           }
@@ -1783,10 +1830,15 @@ const BTRSupport = {
       /* rev-fix-keep-corpses: 不清空 ex.corpses，讓屍體繼續隨世界向左移出 */
       window._explore._lootingUntil = 0;
       window._explore._corpseLootTriggered = false;
-      window._explore._pendingLootEvent = null;
+      window._explore._pendingLootEvents = null;
       if(window._explore.mode === 'combat') window._explore.mode = 'walk';
     }
-    window._combatActive = false;
+    /* [v179 F1] 只在「战斗不存在」或「战斗是载具战」时清 _combatActive。
+       若 R5 已把 c 切成 foot，不误清 foot 战斗，否则 _tick 走 walk 速度分支
+       → 玩家滑行、载员 _mode 冻结不射不动。 */
+    if(!window._combat || !window._combat.active || window._combat.sceneType === 'vehicle'){
+      window._combatActive = false;
+    }
     if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
     if(this.canvas){ this.canvas.remove(); this.canvas = null; this.ctx = null; }
     this.fireFx = [];

@@ -30,7 +30,7 @@ const RPG_COMBAT_RANGE = 150;
 
 const ENEMY_DETECT_BASE = 225;
 const ENEMY_DETECT_OFFSET = 0;
-const ENEMY_DETECT_DIST = (function(){
+const ENEMY_DETECTABLE_R = (function(){
   var out = {};
   var rarities = ['破舊','一般','庫存','精品','傳奇'];
   for(var i = 0; i < rarities.length; i++){
@@ -41,7 +41,7 @@ const ENEMY_DETECT_DIST = (function(){
   }
   return out;
 })();
-const PLAYER_DETECT_DIST = { attack:120, stealth:40 };
+const PLAYER_DETECTABLE_R = { attack:80, stealth:40 };
 const ENEMY_HIT_BASE = 0.55;
 
 const EVENT_INTERVAL_MS = 10000;
@@ -87,5 +87,8 @@ function armorMMToLevel(mm){
 
 
 /* rev-fix-constants-v103: 后院共享常量 */
-const GARDEN_GUARD_DETECT_DIST = 40;
+const GARDEN_GUARD_DETECTABLE_R = 40;
+/* rev142: 載員 R=80；玩家身高作為載具 R 計算基準 */
+const SERVANT_DETECTABLE_R = 80;
+const PLAYER_HEIGHT_M = 1.7;
 const BULLET_VISUAL_RADIUS = { normal: 3, grenade: 5, missile: 6 };

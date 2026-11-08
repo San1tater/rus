@@ -297,18 +297,24 @@ function _renderEnemyCorpseCanvas(enemy, fxH){
   if(amY !== null && amY < bb.maxY) cHU = amY - bb.minY;
   var eq = null;
   if(isH){
-    var _pool = _EQI[drawId] || _EQI.human_raider;
-    var _pwId = (enemy.primaryWeapon && enemy.primaryWeapon.id) ? enemy.primaryWeapon.id
-             : (enemy.secondaryWeapon && enemy.secondaryWeapon.id) ? enemy.secondaryWeapon.id
-             : null;
-    if(_pwId && _isMeleeWeapon(_pwId)) _pwId = null;
-    if(!_pwId){
-      _pwId = _pickR(_pool.primary);
+    /* [v182 G13] 装备缓存到 enemy._corpseEquip。
+       原代码每次调用 _pickR 随机，同一 enemy 被 _onBTRKillTarget + onVictoryStart
+       两次渲染时装备不同 → 玩家看到「尸体装备变化」。 */
+    if(!enemy._corpseEquip){
+      var _pool = _EQI[drawId] || _EQI.human_raider;
+      var _pwId = (enemy.primaryWeapon && enemy.primaryWeapon.id) ? enemy.primaryWeapon.id
+               : (enemy.secondaryWeapon && enemy.secondaryWeapon.id) ? enemy.secondaryWeapon.id
+               : null;
       if(_pwId && _isMeleeWeapon(_pwId)) _pwId = null;
+      if(!_pwId){
+        _pwId = _pickR(_pool.primary);
+        if(_pwId && _isMeleeWeapon(_pwId)) _pwId = null;
+      }
+      var _head = enemy.helmet || _pickR(_pool.head);
+      var _body = enemy.body || _pickR(_pool.top);
+      enemy._corpseEquip = { head:_head || null, top:_body || null, primary:_pwId || null };
     }
-    var _head = enemy.helmet || _pickR(_pool.head);
-    var _body = enemy.body || _pickR(_pool.top);
-    eq = { head:_head || null, top:_body || null, primary:_pwId };
+    eq = enemy._corpseEquip;
   }
   var pL = 0, pR = 0, pT = 0;
   if(isH){ pL = 60; pR = 60; if(eq.primary) pT = Math.round(386 * 0.2); }
@@ -322,12 +328,6 @@ function _renderEnemyCorpseCanvas(enemy, fxH){
   _drawHumanCorpse(ctx, drawId, sc, -(bb.minX - pL) * sc, -(bb.minY - pT) * sc, def, dA, lf, eq, true);
   return { canvas: cvs, drawW: dW, drawH: dH };
 }
-
-/* 手持農具視覺 */
-
-
-/* 完整版 `_raidDrawHuman`：含 bucket/flask/sack/shovel/clipboard/workerHelmet */
-
 
 window._renderEnemyCorpseCanvas = _renderEnemyCorpseCanvas;
 window._drawHumanCorpse = _drawHumanCorpse;

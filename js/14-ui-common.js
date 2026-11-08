@@ -583,21 +583,6 @@ function openLogHistory(){
 
 /* ============== 控制中心 / 偏好 ============== */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* ===== 補丁：renderEquipZone（舊 03-boss-render.js 遺漏，14-ui-common 未收錄） ===== */
 if(typeof renderEquipZone === 'undefined'){
   window.renderEquipZone = function(z2){

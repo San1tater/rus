@@ -134,6 +134,14 @@ window._tickHeroWalkSwitch = function(now){
   const ex = window._explore;
   if(!ex || !ex.active) return;
   if(typeof heroAnim === 'undefined') return;
+  /* [v187 H32] 全局守卫：非 heal_melee 时清 eqSlot / healItem。
+     H21 只在 walk/idle 分支清，combat/vehicle/dead/healing 模式下不清——
+     战斗中 heal 被打断 → eqSlot='__hidden__' 残留 → 武器一直不显示。
+     这里在模式判定之前清，所有模式都生效。 */
+  if(heroAnim.name !== 'heal_melee'){
+    if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
+    if(heroAnim.healItem) heroAnim.healItem = null;
+  }
   if(ex.mode === 'combat' || ex.mode === 'vehicle' || ex.mode === 'dead' || ex.mode === 'healing') return;
   if(window._combatActive) return;
   /* rev-fix-tickHeroWalkSwitch-v2: 補全 fire_* / switch_* 守衛 */
@@ -144,6 +152,14 @@ window._tickHeroWalkSwitch = function(now){
     heroAnim.name = want;
     heroAnim.frame = 0;
     heroAnim.lastUpdate = now;
+    /* [v184b H21] 从 heal_melee 切到 walk/idle 时清 eqSlot / healItem。
+       原代码只清 heroAnim.name，eqSlot='__hidden__' 残留 → 武器一直不显示。
+       _updatePAnim 里 v180 F6d 也有类似逻辑，但 _updatePAnim 只在战斗中跑，
+       探索模式 healing 结束（或被打断）由这里处理。 */
+    if(want === 'walk' || want === 'idle'){
+      heroAnim.healItem = null;
+      if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
+    }
   }
 };
 

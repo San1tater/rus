@@ -4578,10 +4578,6 @@ function _removeFromStation(srvId){
 }
 
 
-/* === openServantAssign（從舊 07-garden.js rev255 移植） === */
-/* === openServantAssign End === */
-
-
 /* === _isServantWorking（renderGardenServants 排序依賴） === */
 /* === gardenHarvest（玩家手動收穫） === */
 /* === _refreshServantListNow（指派/撤回/改名後實時刷新僕人列表） === */

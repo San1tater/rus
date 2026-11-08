@@ -280,14 +280,6 @@ function _raidCleanupAll(){
   }
 }
 
-/* ===== 僕人繪製輔助 ===== */
-
-
-
-/* ===== 人形繪製（僕人 / 守衛 / 農民 / 監工 / 敵人） ===== */
-
-
-
 /* ===== 塔彈藥解析（供防禦戰使用） ===== */
 function _gardenTowerResolveAmmo(cfg, wDef){
   if(!wDef || !wDef.cal) return null;
@@ -1246,11 +1238,7 @@ function drawBullet(b){
           const alive = enemyUnits.filter(function(e){
             if(!e.alive) return false;
             const _eWX = (typeof e.worldX === 'number') ? e.worldX : 0;
-            const _dist = Math.abs(_eWX - _gWX);
-            const _eDetect = (typeof ENEMY_DETECT_DIST !== 'undefined' && ENEMY_DETECT_DIST[e.rarity]) || 225;
-            if(_dist > _eDetect) return false;
-            if(_dist > _guardRangeM) return false;
-            return true;
+            return window.canEngage(_guardRangeM, e, Math.abs(_eWX - _gWX));
           });
           if(!alive.length) continue;
           if(g.ammoId){
@@ -1273,7 +1261,7 @@ function drawBullet(b){
           if(now < e.nextFireAt) continue;
           const _eWX = (typeof e.worldX === 'number') ? e.worldX : 0;
           /* rev-fix-raid-detect: 敵人先發現守衛（40 米） */
-          const _detectDistE = (typeof GARDEN_GUARD_DETECT_DIST !== 'undefined') ? GARDEN_GUARD_DETECT_DIST : 40;
+          const _detectDistE = (typeof GARDEN_GUARD_DETECTABLE_R !== 'undefined') ? GARDEN_GUARD_DETECTABLE_R : 40;
           const _detected = guardUnits.filter(function(g){
             if(!g.alive) return false;
             const _gWX = (typeof g.worldX === 'number') ? g.worldX : 0;
@@ -1282,9 +1270,10 @@ function drawBullet(b){
           if(!_detected.length) continue;
           if(e.hasRPG && e.rpgAmmo > 0){
             const _RPG_RANGE = (typeof RPG_COMBAT_RANGE !== 'undefined') ? RPG_COMBAT_RANGE : 150;
-            const _rpgInRange = _detected.filter(function(g){
+            const _rpgInRange = guardUnits.filter(function(g){
+              if(!g.alive) return false;
               const _gWX = (typeof g.worldX === 'number') ? g.worldX : 0;
-              return Math.abs(_gWX - _eWX) <= _RPG_RANGE;
+              return window.canEngage(_RPG_RANGE, g, Math.abs(_gWX - _eWX));
             });
             if(_rpgInRange.length){
               e.rpgAmmo--;
@@ -1296,9 +1285,10 @@ function drawBullet(b){
           }
           const _eWeaponDef = (typeof WEAPONS !== 'undefined' && e.weaponId) ? WEAPONS[e.weaponId] : null;
           const _enemyRangeM = (typeof _rangeOfWeaponDef === 'function' && _eWeaponDef) ? _rangeOfWeaponDef(_eWeaponDef) : 15;
-          const alive = _detected.filter(function(g){
+          const alive = guardUnits.filter(function(g){
+            if(!g.alive) return false;
             const _gWX = (typeof g.worldX === 'number') ? g.worldX : 0;
-            return Math.abs(_gWX - _eWX) <= _enemyRangeM;
+            return window.canEngage(_enemyRangeM, g, Math.abs(_gWX - _eWX));
           });
           if(!alive.length) continue;
           const target = alive[Math.floor(Math.random() * alive.length)];
@@ -1396,7 +1386,7 @@ function drawBullet(b){
         if(_nearestG){
           const _eWeaponDef = (typeof WEAPONS !== 'undefined' && u.weaponId) ? WEAPONS[u.weaponId] : null;
           const _uRange = (typeof _rangeOfWeaponDef === 'function' && _eWeaponDef) ? _rangeOfWeaponDef(_eWeaponDef) : 15;
-          const _detectDist = (typeof GARDEN_GUARD_DETECT_DIST !== 'undefined') ? GARDEN_GUARD_DETECT_DIST : 40;
+          const _detectDist = (typeof GARDEN_GUARD_DETECTABLE_R !== 'undefined') ? GARDEN_GUARD_DETECTABLE_R : 40;
           /* rev-fix-move-v103: 没发现 或 不在射程内 → 继续前进 */
           if(_nearestDist > _detectDist || _nearestDist > _uRange){
             const _gWX = (typeof _nearestG.worldX === 'number') ? _nearestG.worldX : 0;

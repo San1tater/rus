@@ -189,11 +189,6 @@ function _start(cfg){
   window._combatActive = true;
   _setupCanvas();
 
-  if(typeof pushLog === 'function'){
-    const names = cfg.enemies.map(function(e){ return (ENEMIES[e.eid] || { name: e.eid }).name; }).join('、');
-    pushLog('<span class="pl">玩家</span> 遭遇 ' + cfg.enemies.length + ' 名敵人（' + names + '）', [], 'explore');
-  }
-
   requestAnimationFrame(_loop);
 }
 
@@ -204,7 +199,7 @@ function _setupCanvas(){
   if(!c){
     c = document.createElement('canvas');
     c.id = 'combat-overlay';
-    c.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:9;';
+    c.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:6;';
     z1.appendChild(c);
   }
   const w = z1.clientWidth, h = z1.clientHeight;
@@ -260,32 +255,39 @@ function _loop(now){
   c.lastTick = now;
 
   if(!c.resolved){
+    _syncWorldEnemies(now);
     _tickAI(dt, now);
     _tickBullets(dt);
     _updatePAnim(now);
 
-    let ea = false, aa = false;
-    for(let i = 0; i < c.enemies.length; i++) if(c.enemies[i].hp > 0){ ea = true; break; }
-    for(let j = 0; j < c.allies.length; j++) if(c.allies[j].hp > 0){ aa = true; break; }
+    if(c.sceneType === 'vehicle'){
+      /* v176 修復5：載具戰不因「當前 c.enemies 敵人清空」而 resolve。
+         根因：一旦 resolve → _cleanup → window._combat = null →
+         _syncWorldEnemies / _tickAI 停止運行 → 前方 225m 內的 event 敵人永不激活。
+         這造成「載具後半段沒有敵人」+「下車時 225m 內全部事件一次性激活被集火」。
 
-    if(!ea) _resolve(true);
-    else if(!aa){
-      if(c._fromVehicleWreck && !c._enemiesRetreating){
-        c._enemiesRetreating = true;
-      }
-      if(c._enemiesRetreating){
-        let _allGone = true;
-        for(let i = 0; i < c.enemies.length; i++){
-          const e = c.enemies[i];
-          if(e.hp > 0 && e.worldX > -12){
-            e.worldX -= 10 * dt;
-            _allGone = false;
-          }
-        }
-        if(_allGone){
-          _resolve(false);
-        }
-      } else {
+         載具戰的正確結束時機：
+         1. BTR lift 階段的 _forceEndVehicleCombat（正常結束）
+         2. 玩家下車的 _resolveVehicleLeave（下車）
+         3. 玩家死亡的 _forceLeave（駕駛/玩家死亡）
+
+         這些路徑都會自行設定 c.active = false 並調用 _cleanup，
+         不需要在這裡靠 ea = false 自動 resolve。 */
+    } else {
+      /* [v179 F5] 玩家死亡 = 立即失敗，不依賴載員存活。
+         原邏輯遍歷所有 allies：玩家 hp=0 但載員活著 → aa=true → 不 resolve → 死鎖。 */
+      let ea = false;
+      const _playerF5 = c.allies[0];
+      const aa = !!(_playerF5 && _playerF5.hp > 0);
+      for(let i = 0; i < c.enemies.length; i++) if(c.enemies[i].hp > 0){ ea = true; break; }
+
+      if(!ea) _resolve(true);
+      /* [v182c H6] 玩家 hp=0 立即失败，不走 _enemiesRetreating 延后。
+         原逻辑：aa=false 时走 _enemiesRetreating 分支，等所有敌人 worldX < -12 才 _resolve(false)。
+         但 _syncWorldEnemies 每帧把新敌人加入 c.enemies（新事件敌人也被 isDiscovered 激活），
+         _allGone 永远 false → 永不 _resolve → 玩家 hp=0 不倒地，敌人持续生成快速左跑，背景不动。
+         玩家死亡应即时 resolve，敌人撤退动画不需要。 */
+      else if(!aa){
         _resolve(false);
       }
     }
@@ -327,6 +329,16 @@ function _updatePAnim(now){
   if(!c || typeof heroAnim === 'undefined' || c.sceneType === 'vehicle') return;
   const p = c.allies[0];
   if(!p || !p.isPlayer) return;
+  /* 治療中保持 heal_melee，不被 walk/idle 覆蓋（否則 frame 永遠停在 0） */
+  const _exHeal = window._explore;
+  if(_exHeal && _exHeal.mode === 'healing') return;
+
+  /* [v180 F6d] 非 heal_melee 狀態下，清治療殘留。
+     避免手持醫療包行走 + eqSlot='__hidden__' 導致武器被隱藏。 */
+  if(heroAnim.name !== 'heal_melee' && heroAnim.healItem){
+    heroAnim.healItem = null;
+    if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
+  }
 
   if(now < c._hurtUntil){
     if(heroAnim.name !== 'hurt'){ heroAnim.name = 'hurt'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
@@ -410,6 +422,48 @@ function _playSwitch(now, toSecondary){
   heroAnim.lastUpdate = now;
 }
 
+function _isDiscovered(en, evWorldX, isV, p, ex){
+  const dist = Math.abs(evWorldX - ex.worldX);
+  const playerR = (typeof PLAYER_DETECTABLE_R !== 'undefined') ? (PLAYER_DETECTABLE_R[state.preferences.actionMode] || 80) : 80;
+  const enemyR = (typeof ENEMY_DETECTABLE_R !== 'undefined') ? (ENEMY_DETECTABLE_R[en.rarity] || 225) : 225;
+  if(dist <= playerR) return true;
+  if(dist <= enemyR) return true;
+  if(isV && p && p.vehicleId && typeof window.getVehicleDetectableR === 'function'){
+    const vehR = window.getVehicleDetectableR(p.vehicleId) || 80;
+    if(dist <= vehR) return true;
+  }
+  return false;
+}
+
+function _syncWorldEnemies(now){
+  const c = window._combat;
+  const ex = window._explore;
+  if(!c || !ex || !c.active || c.resolved) return;
+  const _activeSet = new Set(c.enemies);
+  const _p = c.allies[0];
+  if(!_p) return;
+  const isV = c.sceneType === 'vehicle' && _p.isVehicle;
+  for(const node of ex.nodes){
+    for(const ev of node.events){
+      if(ev.cleared) continue;
+      if(ev.type !== 'combat') continue;
+      if(!ev.content || !ev.content.length) continue;
+      if(isV && ev.worldX <= ex.worldX) continue;
+      for(let j = 0; j < ev.content.length; j++){
+        const en = ev.content[j];
+        if(!en || en.hp <= 0) continue;
+        if(_activeSet.has(en)) continue;
+        if(!_isDiscovered(en, ev.worldX, isV, _p, ex)) continue;
+        en.worldX = ev.worldX + (j - (ev.content.length - 1) / 2) * 1.5;
+        en._initWorldX = en.worldX;
+        en._nextFireAt = now + REACTION_SECOND_MS;
+        c.enemies.push(en);
+        _activeSet.add(en);
+      }
+    }
+  }
+}
+
 function _tickAI(dt, now){
   const c = window._combat;
   if(!c) return;
@@ -426,22 +480,46 @@ function _tickAI(dt, now){
   if(!p) return;
   const _isVeh = (c.sceneType === 'vehicle');
 
-  for(let i = 0; i < c.enemies.length; i++){
+  /* v176 修復7：倒序遍歷，已死 / 被撞死的條目立即從 c.enemies 移除，
+     避免載具戰 30 秒累積數百個 hp=0 的僵尸條目。倒序 splice 安全。 */
+  for(let i = c.enemies.length - 1; i >= 0; i--){
     const e = c.enemies[i];
-    if(e.hp <= 0) continue;
-    if(_isVeh && (!isFinite(e.worldX) || e.worldX <= p.worldX + 2.0)){
+    if(e.hp <= 0){ c.enemies.splice(i, 1); continue; }
+    if(_isVeh && (!isFinite(e.worldX) || e.worldX <= p.worldX + ((typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(p.vehicleId) : 3.6))){
       e.hp = 0;
       e.gone = true;
+      c.enemies.splice(i, 1);
       continue;
     }
-    const d = Math.abs(e.worldX - p.worldX);
+    /* rev142: 敵人的靠近與開火都用 canEngage 統一判定 */
     const r = _eRange(e);
-    if(d > r && e.worldX > p.worldX){
-      e.worldX -= Math.min(8, 1.4 * dt);   /* rev-fix-enemy-approach-speed: 與玩家速度一致 */
-      if(e.worldX < p.worldX) e.worldX = p.worldX;
+    let _anyTarget142 = false;
+    for(let _ai142 = 0; _ai142 < c.allies.length; _ai142++){
+      const _a142 = c.allies[_ai142];
+      if(_a142.hp <= 0) continue;
+      if(window.canEngage(r, _a142, Math.abs(_a142.worldX - e.worldX))){ _anyTarget142 = true; break; }
     }
-    const d2 = Math.abs(e.worldX - p.worldX);
-    if(d2 <= r && now >= e._nextFireAt) _enemyFire(e, now);
+    if(!_anyTarget142 && e.worldX > p.worldX){
+      /* 敵人沒發現玩家（不在 getEntityDetectableR(p) 內）→ 原地待命，不主動靠近 */
+      const _detectR = (typeof window.getEntityDetectableR === 'function') ? window.getEntityDetectableR(p) : 80;
+      if(Math.abs(e.worldX - p.worldX) <= _detectR){
+        /* [v185b H25] 敌人不能越过任何我方单位（玩家或载员）。
+           找敌人前方（左侧）最近的我方单位 worldX，敌人世界坐标不能低于它 + 0.5m。
+           修「敌人穿过 firing 载员走到载员身后」。 */
+        let _minAllowedX = p.worldX + 0.5;
+        for(let _aiH25 = 1; _aiH25 < c.allies.length; _aiH25++){
+          const _aH25 = c.allies[_aiH25];
+          if(_aH25.hp <= 0) continue;
+          if(_aH25._retreating) continue;
+          if(_aH25.worldX < e.worldX && (_aH25.worldX + 0.5) > _minAllowedX){
+            _minAllowedX = _aH25.worldX + 0.5;
+          }
+        }
+        e.worldX -= Math.min(8, 1.4 * dt);
+        if(e.worldX < _minAllowedX) e.worldX = _minAllowedX;
+      }
+    }
+    if(_anyTarget142 && now >= e._nextFireAt) _enemyFire(e, now);
   }
 
   if(c.sceneType === 'vehicle') return;
@@ -451,14 +529,20 @@ function _tickAI(dt, now){
 function _autoFireFoot(now){
   const c = window._combat, p = c.allies[0];
   if(!p) return;
-  if(c._playerReloadEnd && now < c._playerReloadEnd) return;
+  /* rev144: 換彈期間僅推遲玩家開火，不影響載員射擊 */
+  if(c._playerReloadEnd && now < c._playerReloadEnd){
+    p._nextFireAt = c._playerReloadEnd;
+  }
   const alive = [];
   for(let i = 0; i < c.enemies.length; i++) if(c.enemies[i].hp > 0) alive.push(c.enemies[i]);
   if(!alive.length) return;
 
   let _playerTarget = null;
 
-  if(p.isPlayer && p.hp > 0 && now >= (p._nextFireAt || 0)){
+  /* 問題 3：車門開啟後玩家不射擊，由載具承傷 */
+  const _btr = window.BTRSupport;
+  const _btrPlayerProtected = !!(_btr && _btr.active && (_btr.phase === 'arrive' || _btr.phase === 'sink' || _btr.phase === 'center' || _btr.phase === 'support'));
+  if(p.isPlayer && !_btrPlayerProtected && p.hp > 0 && now >= (p._nextFireAt || 0)){
     /* rev-fix-player-grenade-branch: 10% 概率優先投雷 */
     let _threw = false;
     if(typeof getThrowableCount === 'function' && getThrowableCount() > 0 && Math.random() < 0.10){
@@ -466,7 +550,9 @@ function _autoFireFoot(now){
       if(_gt && _gt.def && _gt.def.slot === 'throwable'){
         const _gr = _rangeOfWeaponDef(_gt.def);
         const _gir = [];
-        for(let _ga = 0; _ga < alive.length; _ga++) if(Math.abs(alive[_ga].worldX - p.worldX) <= _gr) _gir.push(alive[_ga]);
+        for(let _ga = 0; _ga < alive.length; _ga++){
+          if(window.canEngage(_gr, alive[_ga], Math.abs(alive[_ga].worldX - p.worldX))) _gir.push(alive[_ga]);
+        }
         if(_gir.length){
           _gir.sort(function(x, y){ return Math.abs(x.worldX - p.worldX) - Math.abs(y.worldX - p.worldX); });
           _playerThrowGrenade(p, _gir[0], now, _gt);
@@ -519,7 +605,9 @@ function _autoFireFoot(now){
       if(w && w.def){
         const r = _rangeOfWeaponDef(w.def);
         const ir = [];
-        for(let a = 0; a < alive.length; a++) if(Math.abs(alive[a].worldX - p.worldX) <= r) ir.push(alive[a]);
+        for(let a = 0; a < alive.length; a++){
+          if(window.canEngage(r, alive[a], Math.abs(alive[a].worldX - p.worldX))) ir.push(alive[a]);
+        }
         if(ir.length){
           ir.sort(function(x, y){ return Math.abs(x.worldX - p.worldX) - Math.abs(y.worldX - p.worldX); });
           const ok = _firePlayer(p, ir[0], now, w);
@@ -536,7 +624,16 @@ function _autoFireFoot(now){
     if(now < (a2._nextFireAt || 0)) continue;
     const r2 = _rangeOfWeaponDef(a2.weapon.def);
     const ir2 = [];
-    for(let b = 0; b < alive.length; b++) if(Math.abs(alive[b].worldX - a2.worldX) <= r2) ir2.push(alive[b]);
+    /* [v182c H7] 载员开火用 dist <= r2 而非 canEngage。
+       原 canEngage 会额外检查 dist <= R_enemy（敌人 detectableR），
+       rare 敌人（傳奇 R=45m）在载员 50m 外时 canEngage 返回 false，
+       但 _tickAlliesPositions 已判定 _mode='firing'（dist <= 自身射程 50m）
+       → 载员 firing 状态却不射火 → 用户看到「玩家打、载员不打」。
+       载员只看自身射程，与 _tickAlliesPositions 的 firing 判定一致。 */
+    for(let b = 0; b < alive.length; b++){
+      const _dist2 = Math.abs(alive[b].worldX - a2.worldX);
+      if(_dist2 <= r2) ir2.push(alive[b]);
+    }
     if(!ir2.length) continue;
     ir2.sort(function(x, y){ return Math.abs(x.worldX - a2.worldX) - Math.abs(y.worldX - a2.worldX); });
     _firePassenger(a2, ir2[0], now, a2.weapon);
@@ -890,7 +987,7 @@ function _firePassenger(a, t, now, w){
     }
     if(_chosenG141 && _chosenDef141){
       const _gr141 = _rangeOfWeaponDef(_chosenDef141);
-      if(Math.abs(t.worldX - a.worldX) <= _gr141){
+      if(window.canEngage(_gr141, t, Math.abs(t.worldX - a.worldX))){
         invRemove(_chosenG141.id, _chosenG141.rarity, 1);
         a._nextGrenadeAt = now + 1500;
         _passengerThrowGrenade(a, t, _chosenDef141, _chosenG141.rarity, now);
@@ -913,8 +1010,23 @@ function _firePassenger(a, t, now, w){
     const firstAmmo = _consumePassengerAmmo(a, def.cal);
     if(!firstAmmo){
       a._retreating = true;
+      a._mode = null;
+      if(window._explore && window._explore.passengersFollowing && a.srv){
+        const _pf = window._explore.passengersFollowing;
+        for(let _pi = 0; _pi < _pf.length; _pi++){
+          const _it = _pf[_pi];
+          if(_it.srv && _it.srv.id === a.srv.id){
+            _it._retreating = true;
+            _it._retreatSpeed = true;
+            _it.targetX = 1.8 + _pi * 0.05;
+            break;
+          }
+        }
+      }
       if(typeof pushLog === 'function'){
-        pushLog('<span class="lose">' + (typeof servantLabel === 'function' ? servantLabel(a.srv) : '載員') + '</span> 彈藥耗盡，撤退', [], 'explore');
+        const _sRar = (a.srv && a.srv.rarity) ? a.srv.rarity : '一般';
+        const _sCls = (typeof rarityClass === 'function') ? rarityClass(_sRar) : 'r-一般';
+        pushLog('<span class="' + _sCls + '">' + (typeof servantLabel === 'function' ? servantLabel(a.srv) : '載員') + '</span> 彈藥耗盡，撤退', [], 'explore');
       }
       return;
     }
@@ -1031,20 +1143,37 @@ function _enemyFire(e, now){
   if(!c) return;
   if(e._reloadEnd && now < e._reloadEnd) return;
 
+  /* 問題 3：車門開啟後玩家不受擊，由載具承傷 */
+  const _btr = window.BTRSupport;
+  const _btrProtect = !!(_btr && _btr.active && (_btr.phase === 'arrive' || _btr.phase === 'sink' || _btr.phase === 'center' || _btr.phase === 'support'));
+
+  /* rev142: 目標池改用 canEngage 統一判定 */
+  const _eRange142 = _eRange(e);
   const aliveAllies = [];
-  for(let i = 0; i < c.allies.length; i++){ if(c.allies[i].hp > 0) aliveAllies.push(c.allies[i]); }
+  for(let i = 0; i < c.allies.length; i++){
+    const _a142 = c.allies[i];
+    if(_a142.hp <= 0) continue;
+    if(_a142._retreating) continue;
+    if(_btrProtect && _a142.isPlayer) continue;
+    if(window.canEngage(_eRange142, _a142, Math.abs(_a142.worldX - e.worldX))) aliveAllies.push(_a142);
+  }
   if(!aliveAllies.length) return;
 
   const p = aliveAllies[Math.floor(Math.random() * aliveAllies.length)];
 
   if(e.grenade && e.grenade.count > 0 && Math.random() < 0.15){
-    e.grenade.count--;
-    _enemyThrowGrenade(e, p, now);
-    e._nextFireAt = now + 1500;
-    return;
+    const _gDef = (typeof WEAPONS !== 'undefined' && e.grenade.id) ? WEAPONS[e.grenade.id] : null;
+    const _gRange = (_gDef && typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(_gDef) : 30;
+    if(window.canEngage(_gRange, p, Math.abs(e.worldX - p.worldX))){
+      e.grenade.count--;
+      _enemyThrowGrenade(e, p, now);
+      e._nextFireAt = now + 1500;
+      return;
+    }
   }
 
-  if(e.hasRPG && e.rpgAmmo > 0 && Math.abs(e.worldX - p.worldX) <= (typeof RPG_COMBAT_RANGE !== 'undefined' ? RPG_COMBAT_RANGE : 150)){
+  const _rpgRange144 = (typeof RPG_COMBAT_RANGE !== 'undefined') ? RPG_COMBAT_RANGE : 150;
+  if(e.hasRPG && e.rpgAmmo > 0 && window.canEngage(_rpgRange144, p, Math.abs(e.worldX - p.worldX))){
     e.rpgAmmo--;
     _enemyFireRPG(e, p, now);
     e._nextFireAt = now + 5000;
@@ -1096,7 +1225,7 @@ function _enemyFire(e, now){
   const duration = Math.max(50, (distPx / (1200 + _approachPx)) * 1000);
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: tx, ty: mz.y, t: 0,
+    sx: mz.x, sy: mz.y, tx: tx, ty: mz.y + (Math.random() - 0.5) * 0.15, t: 0,
     start: performance.now(), duration: duration,
     enemy: true, hit: hit,
     rarity: (w && w.ammoId && typeof AMMO !== 'undefined' && AMMO[w.ammoId]) ? (AMMO[w.ammoId].rarity || '一般') : '一般',
@@ -1147,7 +1276,21 @@ function _enemyFire(e, now){
           c._playerKiller = { name: _eNameK, weapon: _wNameK, wRarity: (w && w.rarity) || '一般', aRarity: e.rarity || '一般' };
         }
         _float(p, '-' + (r.hpLost + r.armorLost), r.crit ? 'crit' : '');
-        /* rev-fix-evac-on-player-death */
+        /* [v183 H16] 玩家死亡立即设 dead 状态，不等 _loop 的 aa 判定触发 _resolve。
+           原代码只调 _evac()，依赖 _resolve(false) 的 300ms setTimeout 设置 dead。
+           期间若 _resolve 被其他路径干扰，玩家会「hp=0 但保持 idle」。 */
+        if(p.hp <= 0){
+          state.player.hp = 0;
+          state.player.deadUntil = Date.now() + 60000;
+          if(window._explore){
+            window._explore.mode = 'dead';
+            window._explore.deadUntil = performance.now() + 60000;
+            window._explore.combatEvent = null;
+          }
+          if(typeof heroAnim !== 'undefined'){
+            heroAnim.name = 'dead'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now();
+          }
+        }
         if(p.hp <= 0 && typeof _evac === 'function' && !(window._explore && window._explore.evacuatingPassengers)){
           try { _evac(); } catch(e){}
         }
@@ -1273,6 +1416,19 @@ function _enemyFireRPG(e, p, now){
           c._playerKiller = { name: _eNameK2, weapon: 'RPG', wRarity: rar || '一般', aRarity: e.rarity || '一般' };
         }
         _float(p, '-' + (res.hpLost + res.armorLost), crit ? 'crit' : '');
+        /* [v183 H17] 玩家被 RPG 打死立即设 dead 状态（双保险）。 */
+        if(p.hp <= 0){
+          state.player.hp = 0;
+          state.player.deadUntil = Date.now() + 60000;
+          if(window._explore){
+            window._explore.mode = 'dead';
+            window._explore.deadUntil = performance.now() + 60000;
+            window._explore.combatEvent = null;
+          }
+          if(typeof heroAnim !== 'undefined'){
+            heroAnim.name = 'dead'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now();
+          }
+        }
         /* rev-fix-evac-rpg: 玩家被 RPG 打到倒地也撤載員 */
         if(p.hp <= 0 && typeof _evac === 'function' && !(window._explore && window._explore.evacuatingPassengers)){
           try { _evac(); } catch(e){}
@@ -1307,6 +1463,7 @@ function _enemyFireRPG(e, p, now){
         if(a === p) continue;
         if(a.hp <= 0) continue;
         if(a.isVehicle) continue;
+        if(a._retreating) continue;   /* 需求：撤退中的載員不受任何敵人攻擊 */
         _nearbyList.push({ target: a, worldX: a.worldX });
       }
       _applySplashDamage(p, p.worldX, _nearbyList, baseDmg, {
@@ -1510,7 +1667,8 @@ function _enemyThrowGrenade(e, p, now){
     rarity: gRar, _target: p,
     _onHit: function() {
       /* rev-fix-grenade-unified: 每破片走 applyDamage（roll 部位、穿甲、暴擊） */
-      const targets = c.allies.filter(function(a){ return a.hp > 0; });
+      /* 需求：撤退中的載員不受任何敵人攻擊 */
+      const targets = c.allies.filter(function(a){ return a.hp > 0 && !a._retreating; });
       const results = _applyGrenadeToTargets(targets, gDef, gRar, hitRate, gDef.penMM || 0, function(a){
         return function(part){
           if(a.isPlayer && typeof getPlayerArmorMMForPart === 'function') return getPlayerArmorMMForPart(part);
@@ -1727,7 +1885,6 @@ function _render(){
     ctx.fillStyle = ff.cls === 'crit' ? '#ff3030' : (ff.cls === 'miss' ? '#a89a85' : (ff.cls === 'armor' ? '#5ab0ff' : '#ffb300'));
     ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'center';
-    ctx.globalAlpha = Math.max(0, 1 - ff.age);
     ctx.fillText(ff.text, ff.x * W, ff.y * H - ff.age * 40);
     ctx.restore();
   }
@@ -1800,6 +1957,22 @@ function _resolve(win){
   c.resolved = true;
   c.victory = win;
 
+  if(win){
+    const ex = window._explore;
+    if(ex && ex.nodes){
+      for(const node of ex.nodes){
+        for(const ev of node.events){
+          if(ev.cleared) continue;
+          if(ev.type !== 'combat') continue;
+          if(!ev.content || !ev.content.length) continue;
+          if(ev.content.every(function(en){ return en.hp <= 0; })){
+            ev.cleared = true;
+          }
+        }
+      }
+    }
+  }
+
   /* rev-fix-online-servant: 2% 掉僕人（與離線一致） */
   if(win && Math.random() < 0.02 && typeof grantRandomServant === 'function'){
     var _svr = grantRandomServant();
@@ -1811,10 +1984,7 @@ function _resolve(win){
     }
   }
 
-  if(typeof pushLog === 'function'){
-    if(win) pushLog('<span class="pl">玩家</span> <span class="win">戰鬥勝利</span>（' + c.enemies.length + ' 名敵人）', [], 'explore');
-    /* rev-fix-player-killer-resolve: 失敗日誌改由 onResolve 統一輸出「被 X 用 Y 擊倒」 */
-  }
+  /* 戰鬥勝利日誌已移除——不是關卡式戰鬥，沒有「X 名敵人」語義 */
 
   if(win){
     if(typeof c.onVictoryStart === 'function'){ try { c.onVictoryStart(); } catch(e){} }
@@ -1835,12 +2005,39 @@ window._playerShouldStandStill = function(){
   if(!c || !c.active || c.resolved || c.sceneType === 'vehicle') return false;
   const p = c.allies[0];
   if(!p || !p.isPlayer) return false;
+  /* [v182c H5] 玩家 hp<=0 时不算 stand still——否则 ts=0 → bg 不滚，
+     用户看到「玩家 hp=0 背景不动」的僵局。hp=0 时应该走死亡流程。 */
+  if(p.hp <= 0) return false;
+
+  /* v174 修復1：以 heroAnim.name 為唯一事實來源。
+     v172 只寫了 fire_primary / fire_secondary，漏了 reload / heal_melee /
+     attack_melee / switch_* / hurt —— 換彈時 heroAnim.name === 'reload' 不匹配，
+     會走到底部 canEngage，敵人若在射程外就返回 false → ts=1.4 → 滑行。
+     這裡把「所有腿不動的動畫狀態」全部覆蓋。 */
+  if(typeof heroAnim !== 'undefined'){
+    const _n = heroAnim.name;
+    if(_n === 'fire_primary' || _n === 'fire_secondary'
+       || _n === 'reload' || _n === 'heal_melee'
+       || _n === 'attack_melee' || _n === 'hurt'
+       || _n === 'switch_secondary' || _n === 'switch_melee'){
+      return true;
+    }
+  }
+
+  /* 時序兜底（保留原邏輯，作為安全網） */
+  const _now = performance.now();
+  if(c._playerAnimUntil && _now < c._playerAnimUntil) return true;
+  if(c._playerReloadEnd && _now < c._playerReloadEnd) return true;
+  if(c._playerSwitchEnd && _now < c._playerSwitchEnd) return true;
+  if(c._hurtUntil && _now < c._hurtUntil) return true;
+
+  /* 敵人在射程內 → 站定 */
   const w = _getPW();
   if(!w || !w.def) return false;
   const r = _rangeOfWeaponDef(w.def);
   for(let i = 0; i < c.enemies.length; i++){
     if(c.enemies[i].hp <= 0) continue;
-    if(Math.abs(c.enemies[i].worldX - p.worldX) <= r) return true;
+    if(window.canEngage(r, c.enemies[i], Math.abs(c.enemies[i].worldX - p.worldX))) return true;
   }
   return false;
 };
@@ -1848,11 +2045,29 @@ window._playerShouldStandStill = function(){
 window._combatPlayerAdvance = function(delta){
   const c = window._combat;
   if(!c || !c.active || c.resolved) return;
+  if(c.sceneType === 'vehicle') return;
   const p = c.allies[0];
-  const minX = p ? p.worldX : 0;
+  if(!p) return;
+  /* [v185b H26] 玩家推进时：
+     (1) firing/waiting 载员被玩家追上 → 让路（推到玩家 + 0.5m）
+         原代码只推敌人，玩家越过 firing 载员 → 载员落到玩家身后。
+     (2) 敌人被推到 max(玩家 + 0.5, 前方最近载员 + 0.5)
+         原代码只推敌人到玩家 + 0.5，可以落在载员身后（穿越载员）。 */
+  /* [v190] 删除「玩家推进推 firing/waiting 载员」——玩家和载员之间不阻挡。
+     这是「载员向右平移」的唯一原因。 */
   for(let i = 0; i < c.enemies.length; i++){
-    c.enemies[i].worldX -= delta;
-    if(c.enemies[i].hp > 0 && c.enemies[i].worldX < minX) c.enemies[i].worldX = minX;
+    const _eH26 = c.enemies[i];
+    if(!_eH26 || _eH26.hp <= 0) continue;
+    let _threshold = p.worldX + 0.5;
+    for(let _aiH26b = 1; _aiH26b < c.allies.length; _aiH26b++){
+      const _aH26b = c.allies[_aiH26b];
+      if(_aH26b.hp <= 0) continue;
+      if(_aH26b._retreating) continue;
+      if(_aH26b.worldX < _eH26.worldX && (_aH26b.worldX + 0.5) > _threshold){
+        _threshold = _aH26b.worldX + 0.5;
+      }
+    }
+    if(_eH26.worldX < _threshold) _eH26.worldX = _threshold;
   }
 };;
 

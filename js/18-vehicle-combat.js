@@ -211,9 +211,10 @@ window._pickBTRTarget = function(wid, syncGroup){
   const p = c.allies[0];
   if(!p || !p.isVehicle) return null;
 
+  const _vhHalf = (typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(p.vehicleId) : 3.6;
   const alive = [];
   for(let i = 0; i < c.enemies.length; i++){
-    if(c.enemies[i].hp > 0 && c.enemies[i].worldX > p.worldX) alive.push(c.enemies[i]);
+    if(c.enemies[i].hp > 0 && c.enemies[i].worldX > p.worldX + _vhHalf) alive.push(c.enemies[i]);
   }
   if(!alive.length) return null;
 
@@ -222,7 +223,7 @@ window._pickBTRTarget = function(wid, syncGroup){
 
   const tg = [];
   for(let a = 0; a < alive.length; a++){
-    if(Math.abs(alive[a].worldX - p.worldX) <= r) tg.push(alive[a]);
+    if(window.canEngage(r, alive[a], Math.abs(alive[a].worldX - p.worldX))) tg.push(alive[a]);
   }
   if(!tg.length) return null;
 
@@ -617,6 +618,8 @@ function _onBTRKillTarget(target, wid, c, usedAmmoId){
           wEl.appendChild(rc.canvas);
           fx.appendChild(wEl);
           var _playerX = (c && c.allies && c.allies[0]) ? c.allies[0].worldX : 0;
+          /* [v182 G14b] 标记已渲染，避免步战胜利时 onVictoryStart 重复生成 corpse */
+          target._corpseRendered = true;
           window._explore.corpses.push({ wrap:wEl, drawW:rc.drawW, drawH:rc.drawH, worldX:window._explore.worldX + (target.worldX - _playerX) });
         }
       }
@@ -1022,6 +1025,24 @@ function _detonate(vid, veh){
   d.members.commander = 0;
   d.members.player = 0;
 
+  /* [v180 F7] 判斷玩家是否還在車上。
+     下車後殘留子彈命中舊載具 → 觸發 _detonate → 不能殺已下車的玩家和載員。
+     判斷方式：c.active && c.sceneType === 'vehicle' && c.allies[0].isVehicle */
+  const _c180 = window._combat;
+  const _playerOnBoard180 = !!(_c180 && _c180.active && _c180.sceneType === 'vehicle'
+                              && _c180.allies && _c180.allies[0] && _c180.allies[0].isVehicle);
+
+  if(!_playerOnBoard180){
+    /* [v180 F7] 玩家已下車：只摧毀載具（彈藥架歸零、部件全毀），不殺玩家和載員 */
+    if(state.vehicleAmmo && state.vehicleAmmo[vid]){
+      for(const _wid180 in state.vehicleAmmo[vid]) state.vehicleAmmo[vid][_wid180].current = 0;
+    }
+    if(typeof pushLog === 'function'){
+      pushLog('載具<span class="run">彈藥架</span><span class="lose">殉爆</span>（玩家已下車，無人員傷亡）', [], 'explore');
+    }
+    return;
+  }
+
   const _now = Date.now();
   const _crew = state.station && state.station.crew;
   if(_crew){
@@ -1173,14 +1194,105 @@ function _resolveVehicleLeave(reason){
       weapon: _pw,
       _nextFireAt: performance.now() + 800
     }];
+    /* [v192 F1] 車毀下車後補回載員到 c.allies。
+       原代碼只建玩家，載員在 _disembark 後進入 ex.passengersFollowing，
+       但不在 c.allies 裡 → _autoFireFoot / _tickAlliesPositions 不遍歷
+       → 敵彈穿過、載員不還擊。此處主動觸發 _disembark（若尚未），
+       再從 ex.passengersFollowing 讀非撤退載員，按 _startCombat 的
+       同一結構加入 c.allies。 */
+    if(b && b.active && typeof _disembark === 'function' && !b._wreckDisembarked){
+      b._wreckDisembarked = true;
+      try { _disembark(); } catch(e){ console.warn('[v192 F1 disembark]', e); }
+    }
+    if(window._explore && Array.isArray(window._explore.passengersFollowing)){
+      const _exWX2 = (typeof window._explore.worldX === 'number') ? window._explore.worldX : 0;
+      const _fw2 = window._explore.passengersFollowing;
+      const _publicPool2 = [];
+      for(let _pi2 = 0; _pi2 < _fw2.length; _pi2++){
+        const _p2 = _fw2[_pi2].p;
+        if(!_p2 || !_p2.ammoBox || !_p2.ammoBox.ammoId) continue;
+        const _adef2 = (typeof AMMO !== 'undefined') ? AMMO[_p2.ammoBox.ammoId] : null;
+        if(!_adef2 || !_adef2.cal) continue;
+        _publicPool2.push({
+          cal: _adef2.cal,
+          id: _p2.ammoBox.ammoId,
+          rarity: _p2.ammoBox.rarity || '一般',
+          count: _p2.ammoBox.count || 0,
+          _src: _p2.ammoBox
+        });
+      }
+      for(let _fi2 = 0; _fi2 < _fw2.length; _fi2++){
+        const _f2 = _fw2[_fi2];
+        if(!_f2 || !_f2.srv || _f2._retreating) continue;
+        const _srv2 = _f2.srv;
+        if(_srv2.injuredUntil && _srv2.injuredUntil > Date.now()) continue;
+        if(typeof _srv2.hp === 'number' && _srv2.hp <= 0) continue;
+        const _pp2 = _f2.p || {};
+        const _pwDef2 = _pp2.primaryWeapon ? itemDef(_pp2.primaryWeapon) : null;
+        const _wO2 = _pwDef2 ? { id: _pp2.primaryWeapon, rarity: _pp2.primaryWeaponRarity || '一般', def: _pwDef2, slot: 'primary' } : null;
+        let _armor2 = 0, _armorLevel2 = 0;
+        for(const _slot2 of ['head','top']){
+          const _id2 = (_slot2 === 'head') ? _pp2.helmet : _pp2.body;
+          const _rar2 = (_slot2 === 'head') ? (_pp2.helmetRarity || '一般') : (_pp2.bodyRarity || '一般');
+          if(!_id2) continue;
+          _armor2 += (typeof equipArmorValue === 'function') ? (equipArmorValue(_id2, _rar2) || 0) : 0;
+          const _d2 = ARMOR[_id2];
+          if(_d2 && _d2.level) _armorLevel2 = Math.max(_armorLevel2, _d2.level);
+        }
+        const _maxHp2 = (typeof servantMaxHp === 'function') ? servantMaxHp(_srv2) : 100;
+        c.allies.push({
+          isPassenger: true, srv: _srv2,
+          hp: _maxHp2, maxHp: _maxHp2,
+          armor: _armor2, maxArmor: _armor2, armorLevel: _armorLevel2,
+          worldX: _exWX2,
+          weapon: _wO2,
+          equipData: {
+            head: _pp2.helmet || null,
+            top: _pp2.body || null,
+            primary: _pp2.primaryWeapon || null
+          },
+          ammoPouch: _pp2.ammoPouch ? { ammoId: _pp2.ammoPouch.ammoId, rarity: _pp2.ammoPouch.rarity, count: _pp2.ammoPouch.count } : null,
+          ammoBox: _pp2.ammoBox ? { ammoId: _pp2.ammoBox.ammoId, rarity: _pp2.ammoBox.rarity, count: _pp2.ammoBox.count } : null,
+          _publicPool: _publicPool2,
+          grenades: Array.isArray(_pp2.grenades) ? _pp2.grenades.map(function(g){
+            if(typeof g === 'string') return { id: g, rarity: '一般' };
+            if(g && g.id) return { id: g.id, rarity: g.rarity || '一般' };
+            return null;
+          }).filter(function(g){ return g !== null; }) : []
+        });
+      }
+    }
     c.playerFirst = true;
     c.engaged = true;
     c._playerMag = { inMag: 0, ammoRef: null, weaponId: null };
     c._playerReloadEnd = 0;
     c._fireAnim = null;
     c._playerAnimUntil = 0;
-    for(let i = 0; i < c.enemies.length; i++){
-      if(c.enemies[i].worldX < 0) c.enemies[i].worldX = 5;
+    const _exWX = (window._explore && typeof window._explore.worldX === 'number') ? window._explore.worldX : 0;
+    /* v177 修復6：舊邏輯把「後方敵人瞬移到前方 5m」，導致下車一落地被十幾個
+       敵人近身圍殺。改為：只保留前方且活著的敵人（含 0.5m 緩衝），
+       後方敵人直接從交戰列表移除——它們仍在 event content 裡，
+       玩家後續步行時會自然遇到。 */
+    c.enemies = c.enemies.filter(function(e){
+      return e.hp > 0 && isFinite(e.worldX) && e.worldX >= _exWX + 0.5;
+    });
+    /* [v178 R5] 缺陷A2/A3/A4+D：下車後清後方事件 + 復位 ex 狀態。
+       引擎/履帶/駕駛員陣亡走 enterWreckMode → 本分支 → 3.5s 後 _finishWreck
+       → _cleanup 因 sceneType 已改 foot 而 cb 不跑 → 需在此手動清。
+       同時清後方事件避免下車時 isV=false 把身後 225m 事件全激活造成刷臉。 */
+    if(window._explore && window._explore.nodes){
+      for(const _node178 of window._explore.nodes){
+        for(const _ev178 of _node178.events){
+          if(_ev178.cleared) continue;
+          if(_ev178.type !== 'combat') continue;
+          if(_ev178.worldX <= _exWX) _ev178.cleared = true;
+        }
+      }
+    }
+    if(window._explore){
+      window._explore.mode = 'walk';
+      window._explore.combatEvent = null;
+      window._explore._pendingLootEvents = null;
     }
     if(typeof pushLog === 'function') pushLog('<span class="pl">玩家</span> 下車繼續作戰', [], 'explore');
   }
@@ -1335,7 +1447,8 @@ window._radioBTRTrigger = function(){
 window._forceEndVehicleCombat = function(){
   var c = window._combat;
   var ex = window._explore;
-  if(c && c.active){
+  /* [v179 F2b] 只在载具战时强制结束。若 R5 已切 foot，不误杀步战。 */
+  if(c && c.active && c.sceneType === 'vehicle'){
     var cb = c.onResolve;
     c.active = false;
     c.onResolve = null;
@@ -1345,19 +1458,19 @@ window._forceEndVehicleCombat = function(){
     if(typeof cb === 'function'){
       try{ cb(true); }catch(e){ console.warn('[forceEnd] onResolve', e); }
     }
-  } else {
-    /* 没战斗也清理残留 */
+  } else if(!c || !c.active){
+    /* 真的没战斗才清理残留 */
     if(typeof window._combatCleanup === 'function'){
       try{ window._combatCleanup(); }catch(e){}
     }
   }
-  /* 无论有没有战斗，都清理 ex 状态 */
-  if(ex){
+  /* [v179 F2b] 只在「没战斗」或「载具战」时清 ex；foot 战不动 */
+  if(ex && (!c || !c.active || c.sceneType === 'vehicle')){
     if(ex.mode === 'combat' || ex.mode === 'vehicle'){
       ex.mode = 'walk';
     }
     ex.combatEvent = null;
-    ex._pendingLootEvent = null;
+    ex._pendingLootEvents = null;
   }
   if(typeof window._exploreSetVehicleMode === 'function'){
     try{ window._exploreSetVehicleMode(false); }catch(e){}

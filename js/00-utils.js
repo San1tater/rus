@@ -1,4 +1,10 @@
 
+/* ═══════════════════════════════════════════════════════════
+ * 【術語鎖】本項目所有 *_DETECTABLE_R 一律讀作「該實體的可被發現半徑 R」。
+ * 本項目沒有「主動探測距離」。
+ * 開火條件（唯一一條）：dist ≤ R_目標 且 dist ≤ 自身射程
+ * 由 window.canEngage(range, target, dist) 統一判定。
+ * ═══════════════════════════════════════════════════════════ */
 (function(){
 'use strict';
 window.escapeHtml = function(s){
@@ -33,5 +39,39 @@ window.hasCrewTalent = function(role, talentId){
     }
   }
   return false;
+};
+
+/* rev142: 統一的「可被發現半徑 R」查詢入口 */
+window.getEntityDetectableR = function(entity){
+  if(!entity) return 80;
+  if(entity.isVehicle){
+    return (typeof window.getVehicleDetectableR === 'function') ? window.getVehicleDetectableR(entity.vehicleId) : 80;
+  }
+  if(entity.isPassenger){
+    return (typeof SERVANT_DETECTABLE_R !== 'undefined') ? SERVANT_DETECTABLE_R : 80;
+  }
+  if(entity.isPlayer){
+    if(typeof PLAYER_DETECTABLE_R === 'undefined') return 80;
+    var _mode = (typeof state !== 'undefined' && state.preferences && state.preferences.actionMode) ? state.preferences.actionMode : 'attack';
+    return PLAYER_DETECTABLE_R[_mode] || 80;
+  }
+  if(entity.isGuard){
+    return (typeof GARDEN_GUARD_DETECTABLE_R !== 'undefined') ? GARDEN_GUARD_DETECTABLE_R : 40;
+  }
+  if(entity.rarity && typeof ENEMY_DETECTABLE_R !== 'undefined'){
+    return ENEMY_DETECTABLE_R[entity.rarity] || 225;
+  }
+  if(typeof entity.detectableR === 'number'){
+    return entity.detectableR;
+  }
+  return 80;
+};
+
+/* rev142: 統一交戰判定——目標須在「自身的可被發現距離」內、且在自己的射程內 */
+window.canEngage = function(attackerRange, targetOrR, dist){
+  var R;
+  if(typeof targetOrR === 'number') R = targetOrR;
+  else R = window.getEntityDetectableR(targetOrR);
+  return dist <= R && dist <= attackerRange;
 };
 })();

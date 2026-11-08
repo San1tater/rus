@@ -646,6 +646,12 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
 
 function renderExploreHeroCanvas(){
   if(typeof currentTab === 'undefined' || currentTab !== 'explore') return;
+  /* [v187 H33] 渲染层兜底：非 heal_melee 时清 eqSlot / healItem。
+     即使 H32 因某种原因没跑（比如 tick 循环挂了），渲染层也保证不残留。 */
+  if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'heal_melee'){
+    if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
+    if(heroAnim.healItem) heroAnim.healItem = null;
+  }
   const canvas = document.getElementById('hero-canvas');
   if(!canvas) return;
   const zone = document.getElementById('zone1');
@@ -664,7 +670,13 @@ function renderExploreHeroCanvas(){
       ctx.rect(0, 0, w, h * clipH);
       ctx.clip();
     }
-    drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, heroAnim.eqSlot || null, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO + offsetX, null, heroAnim.healItem || null);
+    /* [v180 F6e] 只在 heal_melee 動畫時傳 healItem，避免其他動畫狀態渲染治療圖標 */
+    /* [v184b H19-C] 只在 heal_melee 时传 eqSlot / healItem。
+       v180 F6e 只改了 healItem，没改 eqSlot——healing 被打断后
+       eqSlot='__hidden__' 残留，导致武器一直不显示。 */
+    const _eqSlotH19 = (heroAnim.name === 'heal_melee') ? (heroAnim.eqSlot || null) : null;
+    const _healItemH19 = (heroAnim.name === 'heal_melee') ? (heroAnim.healItem || null) : null;
+    drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, _eqSlotH19, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO + offsetX, null, _healItemH19);
     if(clipH < 1.0) ctx.restore();
   }
 }

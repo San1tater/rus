@@ -161,7 +161,7 @@ function generateEnemyInstance(e,t){
     helmetRarity: rarity,
     body: body,
     bodyRarity: rarity,
-    detectDist: ENEMY_DETECT_DIST[rarity] || 80,
+    detectableR: ENEMY_DETECTABLE_R[rarity] || 80,
     hitBase: ENEMY_HIT_BASE,
     worldX: 0
   };
