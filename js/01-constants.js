@@ -92,3 +92,14 @@ const GARDEN_GUARD_DETECTABLE_R = 40;
 const SERVANT_DETECTABLE_R = 80;
 const PLAYER_HEIGHT_M = 1.7;
 const BULLET_VISUAL_RADIUS = { normal: 3, grenade: 5, missile: 6 };
+
+/* [v198] 現實彈速（m/s） */
+const AMMO_SPEED_MS = {
+  '9x18': 315, '9x19': 380, '5.45': 880, '7.62': 715, '7.62x54': 830,
+  '9x39': 290, '12ga': 400, '12.7': 290, '20/70': 400, '23x75': 340
+};
+function _ammoSpeedForCal(cal){
+  if(!cal) return 500;
+  if(typeof AMMO_SPEED_MS !== 'undefined' && AMMO_SPEED_MS[cal]) return AMMO_SPEED_MS[cal];
+  return 500;
+}

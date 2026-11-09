@@ -100,6 +100,16 @@ function _resolveSingleAttack(atk, tgt, opts){
 
 const FOOT_RANGE_SHORT = 20;
 
+function _hexToRgba(hex, a){
+  if(!hex) return 'rgba(255,255,255,' + a + ')';
+  if(hex.indexOf('rgb') === 0) return hex.replace(')', ', ' + a + ')').replace('rgb(', 'rgba(');
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16);
+  const g = parseInt(h.substring(2,4),16);
+  const b = parseInt(h.substring(4,6),16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
 function _rangeOfWeaponDef(wd){
   if(!wd) return FOOT_RANGE_DEFAULT;
   if(wd.slot === 'melee') return 0.75;
@@ -115,6 +125,161 @@ function _eRange(e){
   if(!w) return 8;
   const wd = WEAPONS[w.id];
   return _rangeOfWeaponDef(wd);
+}
+
+function _spawnMuzzleFx(c, x, y, scale){
+  const fxEl = document.getElementById('combat-overlay');
+  const W = fxEl ? fxEl.clientWidth : 400;
+  const H = fxEl ? fxEl.clientHeight : 500;
+  const px = x * W;
+  const py = y * H;
+
+  c.smokes = c.smokes || [];
+  // Jet 發射煙
+  c.smokes.push({
+    x: px, y: py + (Math.random() - 0.5) * 8,
+    vx: 1500 * scale, vy: (Math.random() - 0.5) * 10 * scale,
+    life: 1, rate: 1 / 0.12,
+    sizeX: 10 * scale, sizeY: 3 * scale,
+    growX: 200 * scale, growY: 60 * scale,
+    alpha0: 0.95, isJet: true,
+    friction: 0.94
+  });
+  // Spread 擴散煙
+  c.smokes.push({
+    x: px + (Math.random() - 0.5) * 8,
+    y: py + (Math.random() - 0.5) * 8,
+    vx: 250 * scale + Math.random() * 150, vy: (Math.random() - 0.5) * 15 * scale,
+    life: 1, rate: 1 / (0.8 + Math.random() * 0.4),
+    sizeX: 4 * scale, sizeY: 4 * scale,
+    growX: 40 * scale, growY: 40 * scale,
+    alpha0: 0.15, isJet: false,
+    friction: 0.95
+  });
+  // Fire 槍口焰（15% 概率）
+  if(Math.random() < 0.15){
+    c.fireFx = c.fireFx || [];
+    const blobs = [];
+    for(let j = 0; j < 3; j++){
+      blobs.push({
+        ox: (Math.random() - 0.5) * 8,
+        oy: (Math.random() - 0.5) * 8,
+        r: 12 + Math.random() * 4
+      });
+    }
+    c.fireFx.push({
+      x: px + 12 * scale, y: py,
+      startTime: performance.now(),
+      size: scale,
+      blobs: blobs
+    });
+  }
+}
+
+function _updateMuzzleFx(c, dt){
+  if(c.smokes){
+    for(let i = c.smokes.length - 1; i >= 0; i--){
+      const p = c.smokes[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      const _fric = Math.pow(p.friction, dt * 60);
+      p.vx *= _fric;
+      p.vy *= _fric;
+      p.sizeX += p.growX * dt;
+      p.sizeY += p.growY * dt;
+      p.life -= p.rate * dt;
+      if(p.life <= 0) c.smokes.splice(i, 1);
+    }
+  }
+  if(c.fireFx){
+    const nowMs = performance.now();
+    for(let i = c.fireFx.length - 1; i >= 0; i--){
+      if(nowMs > c.fireFx[i].startTime + 60) c.fireFx.splice(i, 1);
+    }
+  }
+}
+
+function _renderMuzzleFx(c, ctx, W, H){
+  if(c.smokes){
+    for(let i = 0; i < c.smokes.length; i++){
+      const p = c.smokes[i];
+      let a = p.isJet ? p.alpha0 * Math.pow(Math.max(0, p.life), 1.5) : p.alpha0 * Math.pow(Math.max(0, p.life), 3.0);
+      if(a < 0.01) continue;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      if(p.isJet){
+        ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
+        ctx.globalAlpha = a;
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeY);
+        g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        g.addColorStop(0.5, 'rgba(230, 240, 255, 0.6)');
+        g.addColorStop(1, 'rgba(200, 210, 220, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.globalAlpha = a;
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeX);
+        g.addColorStop(0, 'rgba(235, 235, 240, 0.8)');
+        g.addColorStop(0.5, 'rgba(210, 210, 215, 0.2)');
+        g.addColorStop(1, 'rgba(190, 190, 195, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.sizeX, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  if(c.fireFx){
+    const nowMs = performance.now();
+    for(let i = 0; i < c.fireFx.length; i++){
+      const f = c.fireFx[i];
+      const age = nowMs - f.startTime;
+      if(age > 60) continue;
+      const fade = 1 - age / 60;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      for(let j = 0; j < f.blobs.length; j++){
+        const b = f.blobs[j];
+        const baseR = b.r * fade * f.size;
+        if(baseR <= 0) continue;
+        const gCore = ctx.createRadialGradient(b.ox, b.oy, 0, b.ox, b.oy, baseR);
+        gCore.addColorStop(0, 'rgba(255,255,220,' + (fade * 0.9) + ')');
+        gCore.addColorStop(0.5, 'rgba(255,180,50,' + (fade * 0.7) + ')');
+        gCore.addColorStop(1, 'rgba(200,20,0,0)');
+        ctx.fillStyle = gCore;
+        ctx.beginPath();
+        ctx.arc(b.ox, b.oy, baseR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+}
+
+function _renderTracers(c, ctx, W, H){
+  if(!c.tracers) return;
+  const nowMs = performance.now();
+  for(let i = 0; i < c.tracers.length; i++){
+    const tr = c.tracers[i];
+    const age = nowMs - tr.born;
+    if(age > tr.dur) continue;
+    const alpha = (1 - age / tr.dur) * (tr.hit ? 0.95 : 0.65);
+    const grad = ctx.createLinearGradient(tr.sx * W, tr.sy * H, tr.tx * W, tr.ty * H);
+    grad.addColorStop(0, _hexToRgba(tr.color, 0));
+    grad.addColorStop(0.5, _hexToRgba(tr.color, alpha * 0.5));
+    grad.addColorStop(0.92, _hexToRgba(tr.color, alpha));
+    grad.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tr.sx * W, tr.sy * H);
+    ctx.lineTo(tr.tx * W, tr.ty * H);
+    ctx.stroke();
+  }
 }
 
 function _start(cfg){
@@ -134,6 +299,9 @@ function _start(cfg){
     enemies: cfg.enemies || [],
     bullets: [],
     floats: [],
+    smokes: [],
+    fireFx: [],
+    tracers: [],
     lastTick: now,
     playerFireReadyAt: now + (pf ? REACTION_FIRST_MS : REACTION_SECOND_MS),
     enemyFireReadyAt: now + (pf ? REACTION_SECOND_MS : REACTION_FIRST_MS),
@@ -900,7 +1068,6 @@ function _firePlayer(p, t, now, w){
   const tx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
 
   const hit = Math.random() * 100 < hr;
-  const _tx = hit ? tx : (tx + 0.15);
 
   const _pBulletRar = (w.def.slot === 'throwable')
     ? (w.rarity || '一般')
@@ -908,13 +1075,25 @@ function _firePlayer(p, t, now, w){
 
   const distPx = Math.abs(t.worldX - p.worldX) * sm.bgPixelsPerMeter;
   const _approachPx = Math.max(0, (window._explore && window._explore._currentSpeed) || 0) * sm.bgPixelsPerMeter;
-  const duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
+  let _tx, duration, isFast = false;
+  if(w.def.cal){
+    const _spd = (typeof _ammoSpeedForCal === 'function') ? _ammoSpeedForCal(w.def.cal) : 500;
+    duration = Math.max(16, (Math.abs(t.worldX - p.worldX) / _spd) * 1000);
+    _tx = hit ? tx : ((tx >= mz.x) ? 1.5 : -0.5);
+    isFast = true;
+    c.tracers.push({ sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, born: performance.now(), dur: 200, color: window._rarityBulletColor(_pBulletRar), hit: hit });
+    if(typeof _spawnMuzzleFx === 'function') _spawnMuzzleFx(c, mz.x, mz.y, w.def.type === '機槍' ? 1.2 : 1.0);
+  } else {
+    _tx = hit ? tx : (tx + 0.15);
+    duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
+  }
 
   c.bullets.push({
     sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: false, hit: hit, rarity: _pBulletRar,
     big: (w.def.slot === 'throwable'), arc: (w.def.slot === 'throwable'),
+    isFast: isFast,
     _target: t,
     _onHit: function() {
       if(!hit || t.hp <= 0) return;
@@ -1093,16 +1272,27 @@ function _firePassenger(a, t, now, w){
   const tx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
 
   const hit = Math.random() * 100 < hr;
-  const _tx = hit ? tx : (tx + 0.15);
 
   const distPx = Math.abs(t.worldX - a.worldX) * sm.bgPixelsPerMeter;
   const _approachPx = Math.max(0, (window._explore && window._explore._currentSpeed) || 0) * sm.bgPixelsPerMeter;
-  const duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
+  let _tx, duration, isFast = false;
+  if(def.cal){
+    const _spd = (typeof _ammoSpeedForCal === 'function') ? _ammoSpeedForCal(def.cal) : 500;
+    duration = Math.max(16, (Math.abs(t.worldX - a.worldX) / _spd) * 1000);
+    _tx = hit ? tx : ((tx >= mz.x) ? 1.5 : -0.5);
+    isFast = true;
+    c.tracers.push({ sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, born: performance.now(), dur: 200, color: window._rarityBulletColor((am && am.rarity) ? am.rarity : '一般'), hit: hit });
+    if(typeof _spawnMuzzleFx === 'function') _spawnMuzzleFx(c, mz.x, mz.y, def.type === '機槍' ? 1.2 : 1.0);
+  } else {
+    _tx = hit ? tx : (tx + 0.15);
+    duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
+  }
 
   c.bullets.push({
     sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: false, hit: hit, rarity: (am && am.rarity) ? am.rarity : '一般',
+    isFast: isFast,
     _target: t,
     _onHit: function() {
       if(!hit || t.hp <= 0) return;
@@ -1225,10 +1415,24 @@ function _enemyFire(e, now){
 
   const distPx = Math.abs(p.worldX - e.worldX) * c.sm.bgPixelsPerMeter;
   const _approachPx = Math.max(0, (window._explore && window._explore._currentSpeed) || 0) * c.sm.bgPixelsPerMeter;
-  const duration = Math.max(50, (distPx / (1200 + _approachPx)) * 1000);
+  const _ty = mz.y + (Math.random() - 0.5) * 0.15;
+  let _tx, duration, isFast = false;
+  if(_wdX && _wdX.cal){
+    const _spd = (typeof _ammoSpeedForCal === 'function') ? _ammoSpeedForCal(_wdX.cal) : 500;
+    duration = Math.max(16, (Math.abs(p.worldX - e.worldX) / _spd) * 1000);
+    _tx = hit ? tx : ((tx < mz.x) ? -0.5 : 1.5);
+    isFast = true;
+    const _rar = (w && w.ammoId && typeof AMMO !== 'undefined' && AMMO[w.ammoId]) ? AMMO[w.ammoId].rarity : '一般';
+    c.tracers.push({ sx: mz.x, sy: mz.y, tx: _tx, ty: _ty, born: performance.now(), dur: 200, color: window._rarityBulletColor(_rar), hit: hit });
+    if(typeof _spawnMuzzleFx === 'function') _spawnMuzzleFx(c, mz.x, mz.y, 1.0);
+  } else {
+    _tx = tx;
+    duration = Math.max(50, (distPx / (1200 + _approachPx)) * 1000);
+  }
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: tx, ty: mz.y + (Math.random() - 0.5) * 0.15, t: 0,
+    sx: mz.x, sy: mz.y, tx: _tx, ty: _ty, t: 0,
+    isFast: isFast,
     start: performance.now(), duration: duration,
     enemy: true, hit: hit,
     rarity: (w && w.ammoId && typeof AMMO !== 'undefined' && AMMO[w.ammoId]) ? (AMMO[w.ammoId].rarity || '一般') : '一般',
@@ -1380,12 +1584,12 @@ function _enemyFireRPG(e, p, now){
   const dmg = e.rpgDmg || (100 * (RARITY_MULT[rar] || 1));
   const penMM = e.rpgPenMM || 600;
 
-  const distPx = Math.abs(p.worldX - e.worldX) * c.sm.bgPixelsPerMeter;
   const _approachPx = Math.max(0, (window._explore && window._explore._currentSpeed) || 0) * c.sm.bgPixelsPerMeter;
-  const duration = Math.max(50, (distPx / (800 + _approachPx)) * 1000);
+  const duration = Math.max(16, (Math.abs(p.worldX - e.worldX) / 280) * 1000);
+  const _tx = hit ? tx : ((tx < mz.x) ? -0.5 : 1.5);
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: tx, ty: mz.y, t: 0,
+    sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: true, big: true, missile: true, hit: hit,
     rarity: rar, _target: p,
@@ -1719,9 +1923,21 @@ function _tickBullets(dt){
     }
     
     if(b.missile){
-      const _bx = b.sx + (b.tx - b.sx) * b.t;
-      const _by = b.sy + (b.ty - b.sy) * b.t;
-      c.missileSmoke.push({ x: _bx, y: _by, age: 0, size: 0.015 + Math.random() * 0.010 });
+      /* [v198b] 高速導彈尾煙插值：按距離生成，不按幀生成，確保不會斷檔 */
+      const _dtT = b.duration > 0 ? (dt * 1000) / b.duration : 0;
+      const _startT = Math.max(0, b.t - _dtT);
+      const _endT = Math.min(1, b.t);
+      const _span = _endT - _startT;
+      if(_span > 0){
+        // 根據飛過的距離插值生成粒子，保證密度
+        const _steps = Math.max(1, Math.ceil(_span * 300));
+        for(let _k = 0; _k < _steps; _k++){
+          const _kt = _startT + _span * (_k / _steps);
+          const _bx = b.sx + (b.tx - b.sx) * _kt;
+          const _by = b.sy + (b.ty - b.sy) * _kt;
+          c.missileSmoke.push({ x: _bx, y: _by, age: 0, size: 0.015 + Math.random() * 0.010 });
+        }
+      }
     }
     
     if(b.t >= 1){
@@ -1742,6 +1958,13 @@ function _tickBullets(dt){
   for(let j = c.floats.length - 1; j >= 0; j--){
     c.floats[j].age += dt;
     if(c.floats[j].age > 1.2) c.floats.splice(j, 1);
+  }
+  if(typeof _updateMuzzleFx === 'function') _updateMuzzleFx(c, dt);
+  if(c.tracers){
+    const nowMs = performance.now();
+    for(let i = c.tracers.length - 1; i >= 0; i--){
+      if(nowMs - c.tracers[i].born > c.tracers[i].dur) c.tracers.splice(i, 1);
+    }
   }
 }
 
@@ -1826,25 +2049,30 @@ function _render(){
   }
 
   if(c.missileSmoke){
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter'; // 加色混合，徹底消除圓形邊界
     for(let si = 0; si < c.missileSmoke.length; si++){
       const s = c.missileSmoke[si];
       const sa = 1 - s.age / 1.2;
       if(sa <= 0) continue;
       const sr = s.size * W * (1 + s.age * 1.5);
-      ctx.save();
-      ctx.globalAlpha = sa * 0.75;
+      ctx.globalAlpha = sa * 0.15; // 進一步降低單粒子濃度，避免過曝
       const sg = ctx.createRadialGradient(s.x * W, s.y * H, 0, s.x * W, s.y * H, sr);
       sg.addColorStop(0, 'rgba(230,230,235,0.9)');
-      sg.addColorStop(0.6, 'rgba(200,200,210,0.3)');
+      sg.addColorStop(0.6, 'rgba(200,200,210,0.2)');
       sg.addColorStop(1, 'rgba(180,180,190,0)');
       ctx.fillStyle = sg;
       ctx.beginPath(); ctx.arc(s.x * W, s.y * H, sr, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
     }
+    ctx.restore();
   }
+
+  if(typeof _renderMuzzleFx === 'function') _renderMuzzleFx(c, ctx, W, H);
+  if(typeof _renderTracers === 'function') _renderTracers(c, ctx, W, H);
 
   for(let b = 0; b < c.bullets.length; b++){
     const bb = c.bullets[b];
+    if(bb.isFast) continue;
     let drawT = Math.min(1, bb.t);
     let bx = (bb.sx + (bb.tx - bb.sx) * drawT) * W;
     let by = (bb.sy + (bb.ty - bb.sy) * drawT) * H;
@@ -1861,15 +2089,32 @@ function _render(){
     const _bulletColor = window._rarityBulletColor(bb.rarity);
     const _brC = (typeof BULLET_VISUAL_RADIUS !== 'undefined') ? BULLET_VISUAL_RADIUS : { normal: 3, grenade: 5, missile: 6 };
     if(bb.missile){
-      const _missileR = _brC.missile;
+      /* [v198c] 將原本的圓點改為朝向目標的流線錐體 */
+      const _angle = Math.atan2(bb.ty - bb.sy, bb.tx - bb.sx);
       ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(_angle);
       ctx.shadowColor = _bulletColor;
-      ctx.shadowBlur = 24;
+      ctx.shadowBlur = 20;
+      
+      // 彈頭（流線型）
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(8, 0);
+      ctx.lineTo(-6, 3);
+      ctx.lineTo(-6, -3);
+      ctx.closePath();
+      ctx.fill();
+
+      // 尾焰
       ctx.fillStyle = _bulletColor;
-      ctx.beginPath(); ctx.arc(bx, by, _missileR, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.beginPath(); ctx.arc(bx, by, _missileR * 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-6, 2.5);
+      ctx.lineTo(-16, 0);
+      ctx.lineTo(-6, -2.5);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
     } else {
       const _bR = bb.big ? _brC.grenade : _brC.normal;

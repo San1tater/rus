@@ -482,7 +482,9 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
     _ammoObj.current = Math.max(0, (_ammoObj.current || 0) - 1);
   }
 
-  if(_preselectedDead) return true;
+  if(_preselectedDead) {
+    // [v206] 目標死了依然要把砲彈打出去，讓它落到原定位置爆炸
+  }
 
   const g = (function(){
     const cr = state.station && state.station.crew;
@@ -535,43 +537,52 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
 
   const hit = Math.random() * 100 < hr;
 
-  const sm = c.sm;
-  const relTarget = target.worldX - p.worldX;
-  let tx;
-  if(relTarget <= sm.screenRightWorld){
-    tx = EXPLORE_HERO_X_RATIO + (relTarget / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-  } else {
-    tx = 1.05;
-  }
-  /* 載具不繪製子彈；視覺特效由 BTRSupport 處理 */
+  const _distM = Math.abs(target.worldX - p.worldX);
+  let _spd = 800;
+  if(_usedAmmoId && typeof VEHICLE_AMMO_SPEED_MS !== 'undefined' && VEHICLE_AMMO_SPEED_MS[_usedAmmoId]) _spd = VEHICLE_AMMO_SPEED_MS[_usedAmmoId];
+  else if(typeof VEHICLE_AMMO_SPEED_MS !== 'undefined' && VEHICLE_AMMO_SPEED_MS[wid]) _spd = VEHICLE_AMMO_SPEED_MS[wid];
+  
+  const _duration = Math.max(16, _distM / _spd * 1000);
 
-  /* rev-fix-splash: 未命中時仍觸發濺射（落點爆炸），ratioMult 0.6 */
-  if(!hit){
-    const _spMiss = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
-    if(_spMiss && target){
-      _applyVehicleSplash(_spMiss, target, baseDmg, 0.6, wid, _usedAmmoId);
+  c.bullets.push({
+    sx: 0.1, sy: 0.5, 
+    tx: 0.9, ty: 0.5,
+    start: performance.now(),
+    duration: _duration,
+    enemy: false, 
+    isFast: true,
+    _onHit: function(){
+      // [v206] 抵達落點後結算
+      if(!hit){
+        const _spMiss = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
+        if(_spMiss && target){
+          _applyVehicleSplash(_spMiss, target, baseDmg, 0.6, wid, _usedAmmoId);
+        }
+        return;
+      }
+      
+      // 如果目標在飛彈抵達前死了，只觸發濺射
+      if(target.hp > 0){
+        const mainProxy = { hp: target.hp, armor: target.armor || 0 };
+        const mainRes = applyDamage(mainProxy, finalDmg, penMM, {
+          armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(target, part) : 0; }
+        });
+        target.hp = mainProxy.hp;
+        if(target.armor !== undefined) target.armor = mainProxy.armor;
+        const _shownMain = mainRes.hpLost > 0 ? mainRes.hpLost : mainRes.armorLost;
+        _vehicleCombatFloat(target.worldX, '-' + _shownMain + (crit ? '!' : ''), crit ? 'crit' : (mainRes.hpLost > 0 ? 'enemy' : 'armor'));
+        if(target.hp <= 0){
+          _onBTRKillTarget(target, wid, c, _usedAmmoId);
+        }
+      }
+
+      const _spMain = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
+      if(_spMain){
+        _applyVehicleSplash(_spMain, target, baseDmg, 1.0, wid, _usedAmmoId);
+      }
     }
-    return true;
-  }
-
-  /* rev-fix-splash: 主目標走普通穿甲（不再 isHE: true 繞過護甲） */
-  const mainProxy = { hp: target.hp, armor: target.armor || 0 };
-  const mainRes = applyDamage(mainProxy, finalDmg, penMM, {
-    armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(target, part) : 0; }
   });
-  target.hp = mainProxy.hp;
-  if(target.armor !== undefined) target.armor = mainProxy.armor;
-  const _shownMain = mainRes.hpLost > 0 ? mainRes.hpLost : mainRes.armorLost;
-  _vehicleCombatFloat(target.worldX, '-' + _shownMain + (crit ? '!' : ''), crit ? 'crit' : (mainRes.hpLost > 0 ? 'enemy' : 'armor'));
-  if(target.hp <= 0){
-    _onBTRKillTarget(target, wid, c, _usedAmmoId);
-  }
 
-  /* rev-fix-splash: 濺射走單次 applyDamage，穿甲值隨 (1-t²) 衰減 */
-  const _spMain = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
-  if(_spMain){
-    _applyVehicleSplash(_spMain, target, baseDmg, 1.0, wid, _usedAmmoId);
-  }
   return true;
 };
 
@@ -1118,15 +1129,21 @@ function _detonate(vid, veh){
     }
   }
 
-  const _c = window._combat;
-  if(_c){ _c.active = false; _c.onResolve = null; }
-  const _b = window.BTRSupport;
-  if(_b && _b.active){
-    if(typeof _b._finishSupportAndLog === 'function'){ try { _b._finishSupportAndLog(); } catch(e){} }
-    try { _b._cleanup(); } catch(e){}
-    _b.active = false;
+  /* [v201] 不要暴力清空 _combat，必須走 _resolveVehicleLeave 的死亡結算流程 */
+  if(typeof window._resolveVehicleLeave === 'function'){
+    window._resolveVehicleLeave('detonated');
+  } else {
+    const _c = window._combat;
+    if(_c){ _c.active = false; _c.onResolve = null; }
+    const _b = window.BTRSupport;
+    if(_b && _b.active){
+      if(typeof _b._finishSupportAndLog === 'function'){ try { _b._finishSupportAndLog(); } catch(e){} }
+      try { _b._cleanup(); } catch(e){}
+      _b.active = false;
+      _b.phase = null;
+    }
+    if(typeof window._combatCleanup === 'function') window._combatCleanup();
   }
-  if(typeof window._combatCleanup === 'function') window._combatCleanup();
 }
 
 function _forceLeave(vid, veh, reason){

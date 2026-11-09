@@ -1342,6 +1342,10 @@ function _tick(now){
     if(state.player){ state.player.deadUntil = 0; state.player.hp = state.player.maxHp; state.player.armor = state.player.maxArmor; }
     if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
     if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'walk'; heroAnim.frame = 0; }
+    /* [v201] 徹底清理殘留狀態，強制復活 */
+    window._combatActive = false;
+    window._combat = null;
+    ex._currentSpeed = 1.4;
     _updateBgTransform();
     return;
   }
@@ -1432,7 +1436,7 @@ function _tick(now){
     }
   }
 
-  const _isWreckPause = !!(window.BTRSupport && window.BTRSupport.phase === 'wreckPause');
+  const _isWreckPause = !!(window.BTRSupport && window.BTRSupport.active && window.BTRSupport.phase === 'wreckPause');
   const k = Math.min(1, dt * 8);
   if(_isWreckPause){ ex._currentSpeed = 0; }
   else if(ts === 0){ ex._currentSpeed = 0; }

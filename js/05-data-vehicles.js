@@ -230,6 +230,19 @@ const VEHICLE_ARMOR_RHA = {
 };
 
 /* 載具基礎命中率（百分比） */
+/* [v206] 載具武器真實彈速（m/s） */
+const VEHICLE_AMMO_SPEED_MS = {
+  // 主炮
+  '3bm42': 1700, '3of26': 850, '3bk29': 915,
+  '3uof17': 750,
+  'pg15v': 665, 'og15v': 700,
+  // 機炮與機槍
+  '2a42': 960, '2a72': 960,
+  'kpvt': 1000, 'nsvt': 845, 'pkt': 825,
+  // 導彈
+  'atgm': 280
+};
+
 const VEHICLE_BASE_HR = {
   btr80:50,btr80a:50,btr82:50,btr82a:50,btr90:50,
   bmp1:55,bmp1m:55,bmp2:55,bmp3:60,bmd4:60,
