@@ -3,6 +3,14 @@
 
 let battle = null;
 
+/* [v222] Boss戰特效 canvas 清理 */
+function _cleanBossFxCanvases(){
+  ['boss-fx-canvas', 'boss-aimhit-canvas'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el && el.parentNode) el.parentNode.removeChild(el);
+  });
+}
+
 const BATTLE_ONESHOT_ANIMS = ['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
 
 function stopBattleMovement(){
@@ -1717,33 +1725,7 @@ function battleLoop(now){
       const _ctx = _cvs.getContext('2d');
       _ctx.clearRect(0, 0, _cvs.width, _cvs.height);
       
-      /* [v213-fix] 渲染曳光 */
-      if (battle.tracers) {
-        const _trNow = performance.now();
-        for (let i = battle.tracers.length - 1; i >= 0; i--) {
-          const tr = battle.tracers[i];
-          const age = _trNow - tr.born;
-          if (age >= tr.dur) {
-            battle.tracers.splice(i, 1);
-            continue;
-          }
-          const alpha = (1 - age / tr.dur) * (tr.hit ? 0.95 : 0.65);
-          const grad = _ctx.createLinearGradient(tr.sx * _cvs.width, tr.sy * _cvs.height, tr.tx * _cvs.width, tr.ty * _cvs.height);
-          grad.addColorStop(0, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, 0) : 'rgba(255,255,255,0)');
-          grad.addColorStop(0.5, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, alpha * 0.5) : 'rgba(255,255,255,' + (alpha*0.5) + ')');
-          grad.addColorStop(0.92, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, alpha) : 'rgba(255,255,255,' + alpha + ')');
-          grad.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
-          _ctx.strokeStyle = grad;
-          _ctx.lineWidth = 2.2;
-          _ctx.lineCap = 'round';
-          _ctx.beginPath();
-          _ctx.moveTo(tr.sx * _cvs.width, tr.sy * _cvs.height);
-          _ctx.lineTo(tr.tx * _cvs.width, tr.ty * _cvs.height);
-          _ctx.stroke();
-        }
-      }
-      
-      window.MuzzleFX.render(_ctx);
+            window.MuzzleFX.render(_ctx);
     }
   }
 
@@ -1829,3 +1811,4 @@ function startBossBattle(bid){
   battle.lastTime = performance.now();
   requestAnimationFrame(battleLoop);
 }
+

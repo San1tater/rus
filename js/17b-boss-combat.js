@@ -621,6 +621,7 @@ function endBattle(victory){
     b.active = false;
     b.settling = false;
     showBattleResult(bossDef, b, victory, loot);
+    if(typeof _cleanBossFxCanvases === 'function') _cleanBossFxCanvases();
     battle = null;
   }
 }
@@ -631,6 +632,7 @@ function finishBattleSettle(){
   if(!rd) return;
   battle.active = false;
   showBattleResult(rd.bossDef, battle, rd.victory, rd.loot);
+  if(typeof _cleanBossFxCanvases === 'function') _cleanBossFxCanvases();
   battle = null;
 }
 

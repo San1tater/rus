@@ -8,12 +8,6 @@
 
 /* ===== 地塊類型 ===== */
 
-
-
-
-
-
-
 function _getPlotTypeIconHtml(type, size, flexNone, fill){
   const _flex = flexNone ? ';flex:0 0 auto' : '';
   const _t = GARDEN_PLOT_TYPES[type];
@@ -1145,8 +1139,6 @@ function renderGardenServants(box){
   _retry();
 }
 
-
-
 /* ===== 指派僕人（20 格勾選式） ===== */
 function openServantAssign(srvId, returnFn){
   const srv = (state.servants || []).find(function(s){ return s.id === srvId; });
@@ -1493,8 +1485,6 @@ function openConfirm(msg, onOk, onCancel){
 /* ===== 僕人任務系統（體力 + 叫醒 + 演員循環） ===== */
 let _gardenActors = [];
 let _gardenActorTimer = null;
-
-
 
 function servantAddExp(srv, n){
   if(!srv || srv.lv >= SERVANT_MAX_LV) return;
@@ -2565,45 +2555,6 @@ function _gardenLog(text, cls, rarity, detail){
   if(!Array.isArray(state.garden.log)) state.garden.log = [];
   state.garden.log.push({ t: Date.now(), text: String(text), cls: cls || '', rarity: rarity || '', detail: detail || null });
   if(state.garden.log.length > 100) state.garden.log.splice(0, state.garden.log.length - 100);
-}
-
-function _gardenServantLeaveCheck(silent){
-  const now = Date.now();
-  const leaving = [];
-  state.servants = (state.servants || []).filter(function(s){
-    if(s.lv > 1) return true;
-    if((s.exp || 0) > 0) return true;
-    if(s.assignedPlots && s.assignedPlots.length > 0) return true;
-    const grace = SERVANT_LEAVE_GRACE[s.rarity] || 24 * 3600 * 1000;
-    const obtained = s.obtainedAt || now;
-    if(now - obtained < grace) return true;
-    leaving.push(s);
-    return false;
-  });
-  const seedReward = {}, matReward = {};
-  if(!leaving.length) return { count: 0, seeds: seedReward, mats: matReward };
-  const seedNames = Object.keys(SEEDS);
-  const matNames = ['wood','metal','screws','cloth','gears','electronics'];
-  for(const s of leaving){
-    const r = SERVANT_LEAVE_REWARD[s.rarity] || SERVANT_LEAVE_REWARD['一般'];
-    const sc = rndInt(r.seedMin, r.seedMax);
-    for(let i = 0; i < sc; i++){
-      const sid = pick(seedNames);
-      gardenStorageAdd(sid, s.rarity, 1);
-      const k = sid + '@' + s.rarity;
-      seedReward[k] = (seedReward[k] || 0) + 1;
-    }
-    const mc = rndInt(r.matMin, r.matMax);
-    for(let i = 0; i < mc; i++){
-      const mid = pick(matNames);
-      invAdd(mid, '一般', 1);
-      matReward[mid] = (matReward[mid] || 0) + 1;
-    }
-  }
-  if(!silent){
-    _gardenLog(leaving.length + ' 僕人離開', 'leave');
-  }
-  return { count: leaving.length, seeds: seedReward, mats: matReward };
 }
 
 function _gardenMealTick(now){
@@ -4576,7 +4527,6 @@ function _removeFromStation(srvId){
     });
   }
 }
-
 
 /* === _isServantWorking（renderGardenServants 排序依賴） === */
 /* === gardenHarvest（玩家手動收穫） === */
