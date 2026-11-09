@@ -365,6 +365,7 @@ function _disembark(){
       srv: srv, p: p,
       screenX: 0.35 + _newCount * 0.01,
       targetX: 0.35,
+      worldX: ex.worldX,
       animFrame: 0, animNext: 0, fadeIn: 1,
       clipH: 0,
       _spawnAt: performance.now() + _newCount * 100
@@ -403,6 +404,9 @@ function _evac(){
       it._retreating = true;
       it._retreatSpeed = true;
     }
+    /* [v195d] 清殘留等待標誌，撤離時播 run 而非被 idle 壓住。 */
+    it._standingWait = false;
+    it._forceRunAnim = true;
     it.targetX = 1.8 + i * 0.05;
     if(it.srv && _alliesBySrvId145[it.srv.id]){
       _alliesBySrvId145[it.srv.id]._retreating = true;
@@ -450,9 +454,11 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
     : _slotMovingRaw;
   const worldMoving = _exSpeed > 0.5 && !_looting;
   const moving = _slotMoving || worldMoving;
+  const _inCombatD = !!(window._combat && window._combat.active);
   let animN;
-  if(animOverride){ animN = animOverride; }
-  else if(moving){ animN = evac ? 'run' : 'walk'; }
+  if(item._standingWait && !_inCombatD){ animN = 'idle'; }
+  else if(animOverride){ animN = animOverride; }
+  else if(moving){ animN = (evac || (item._forceRunAnim && !_inCombatD)) ? 'run' : 'walk'; }
   else { animN = 'idle'; }
   if(!item.animStart || item._lastAnimN !== animN){
     item.animStart = now;
@@ -660,8 +666,11 @@ function _renderPass(now){
       /* [v186 H30] 战斗结束后（无 _a2_f），直接吸附到 targetX，不平滑。
          原旧 fallback 用 targetX - screenX 平滑追，worldX 不变但 screenX 移动 = 滑行。
          战斗结束时载员已随玩家归位（或接近归位），吸附不会有大的视觉跳跃。 */
-      s.screenX = s.targetX;
-      s._renderForceMoving = false;
+      const _relWX = (typeof s.worldX === 'number' ? s.worldX : ex.worldX) - ex.worldX;
+      const _targetScreenX = ((s.targetX != null) ? s.targetX : EXPLORE_HERO_X_RATIO)
+                           + (_relWX / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
+      s.screenX = _targetScreenX;
+      s._renderForceMoving = (s._forceRunAnim === true) || (Math.abs(_relWX) > 0.05 && s._standingWait !== true);
     }
   }
   const _nowRp = Date.now();
@@ -814,6 +823,8 @@ function _lootVictory(events){
   if(!events) return;
   if(!Array.isArray(events)) events = [events];
   const got = [];
+  const _sealsGot = {};
+  const _sealsRegion = {};
   for(const ev of events){
     if(!ev || !ev.content) continue;
     for(let i = 0; i < ev.content.length; i++){
@@ -822,10 +833,24 @@ function _lootVictory(events){
         invAdd(lo[j].id, lo[j].rarity, lo[j].count);
         got.push(lo[j]);
       }
+      /* [v195c] 每敵人撿屍給 3 玩家經驗。addExp 內升級自動 pushLog。 */
+      if(typeof addExp === 'function') addExp(3);
+    }
+    /* [v195c] 每事件點撿屍 roll 一次信物，機率取 REGIONS[region].sealRate。 */
+    const _R = (ev.region && typeof REGIONS !== 'undefined') ? REGIONS[ev.region] : null;
+    if(_R && _R.sealRate && _R.seal && Math.random() < _R.sealRate){
+      state.seals[_R.seal] = Math.max(0, parseInt(state.seals[_R.seal] || 0, 10)) + 1;
+      _sealsGot[_R.seal] = (_sealsGot[_R.seal] || 0) + 1;
+      _sealsRegion[_R.seal] = _R.name || ev.region;
     }
   }
   if(got.length && typeof pushLog === 'function'){
     pushLog('<span class="pl">玩家</span> 拾取 ' + got.map(function(l){ return fmtItemSpan(l.id, l.rarity, l.count); }).join('、'), got, 'explore');
+  }
+  for(const _sk in _sealsGot){
+    if(typeof pushLog === 'function'){
+      pushLog('<span class="win">獲得 ' + (_sealsRegion[_sk] || _sk) + ' 信物 ×' + _sealsGot[_sk] + '</span>', [], 'explore');
+    }
   }
 }
 
@@ -992,6 +1017,7 @@ function _startCombat(ev, first){
         if(!_isDiscovered(_en, _e.worldX, isV, allies[0], ex)) continue;
         _en.worldX = _e.worldX + (_j - (_e.content.length - 1) / 2) * 1.5;
         _en._initWorldX = _en.worldX;
+        _en._eventRef = _e;
         enemies.push(_en);
       }
     }
@@ -1176,7 +1202,18 @@ function _tickAlliesPositions(now){
         _handled = true;
       }
     }
-    if(_handled) continue;
+    if(_handled){
+      if(a.srv && ex.passengersFollowing){
+        for(let _piSync = 0; _piSync < ex.passengersFollowing.length; _piSync++){
+          const _itSync = ex.passengersFollowing[_piSync];
+          if(_itSync.srv && _itSync.srv.id === a.srv.id){
+            _itSync.worldX = a.worldX;
+            break;
+          }
+        }
+      }
+      continue;
+    }
     if(a.worldX < ex.worldX - 0.5){
       a._mode = 'chasing';
       a.worldX = Math.min(ex.worldX, a.worldX + 2.8 * dt);
@@ -1195,6 +1232,15 @@ function _tickAlliesPositions(now){
         /* 载员超前玩家 → 不动 */
       } else {
         a.worldX = ex.worldX;
+      }
+    }
+    if(a.srv && ex.passengersFollowing){
+      for(let _piSync = 0; _piSync < ex.passengersFollowing.length; _piSync++){
+        const _itSync = ex.passengersFollowing[_piSync];
+        if(_itSync.srv && _itSync.srv.id === a.srv.id){
+          _itSync.worldX = a.worldX;
+          break;
+        }
       }
     }
   }
@@ -1421,6 +1467,35 @@ function _tick(now){
   }
   if(_delta > 0.001 && typeof window._combatPlayerAdvance === 'function') window._combatPlayerAdvance(_delta);
   _updateCorpsesLayout();
+
+  /* [v194 3] 無戰鬥時載員 worldX 三態：超前等待、落後追趕、到位跟隨。 */
+  if(!window._combat || !window._combat.active){
+    const _pfNC = ex.passengersFollowing || [];
+    if(_pfNC.length){
+      const _dtNC = Math.min(0.1, (now - (ex._lastNoCombatTick || now)) / 1000);
+      ex._lastNoCombatTick = now;
+      for(let _piNC = 0; _piNC < _pfNC.length; _piNC++){
+        const _itNC = _pfNC[_piNC];
+        if(_itNC._retreating) continue;
+        if(typeof _itNC.worldX !== 'number') _itNC.worldX = ex.worldX;
+        const _relWXNC = _itNC.worldX - ex.worldX;
+        if(_relWXNC > 0.01){
+          _itNC._standingWait = true;
+          _itNC._forceRunAnim = false;
+        } else if(_relWXNC < -0.01){
+          _itNC.worldX = Math.min(ex.worldX, _itNC.worldX + 2.8 * _dtNC);
+          _itNC._standingWait = false;
+          _itNC._forceRunAnim = true;
+        } else {
+          _itNC.worldX = ex.worldX;
+          _itNC._standingWait = false;
+          _itNC._forceRunAnim = false;
+        }
+      }
+    } else {
+      ex._lastNoCombatTick = now;
+    }
+  }
 
   if(ex._lootingUntil > 0 && now < ex._lootingUntil){
     if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'idle'){ heroAnim.name = 'idle'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }

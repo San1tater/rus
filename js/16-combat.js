@@ -456,6 +456,7 @@ function _syncWorldEnemies(now){
         if(!_isDiscovered(en, ev.worldX, isV, _p, ex)) continue;
         en.worldX = ev.worldX + (j - (ev.content.length - 1) / 2) * 1.5;
         en._initWorldX = en.worldX;
+        en._eventRef = ev;
         en._nextFireAt = now + REACTION_SECOND_MS;
         c.enemies.push(en);
         _activeSet.add(en);
@@ -489,6 +490,8 @@ function _tickAI(dt, now){
       e.hp = 0;
       e.gone = true;
       c.enemies.splice(i, 1);
+      if(typeof addExp === 'function') addExp(3);
+      if(typeof window._settleVehicleEventIfCleared === 'function') window._settleVehicleEventIfCleared(e);
       continue;
     }
     /* rev142: 敵人的靠近與開火都用 canEngage 統一判定 */

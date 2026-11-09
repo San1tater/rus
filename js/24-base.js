@@ -600,11 +600,13 @@ function onBuildCell(i){
     const _isMax = b.maxLv && slot.lv >= b.maxLv;
     let body='<div class="detail-title">'+buildingIcon(slot.id)+' '+b.name+' Lv.'+slot.lv+(_isMax ? ' (MAX)' : '')+'</div>' +
       '<div class="detail-sub">'+b.desc+'</div>' +
-      '<div class="stat-line"><span class="k">當前效果</span><span class="v">'+curBonus+'</span></div>' +
-      (_isMax ? '' : '<div class="stat-line"><span class="k">升級後</span><span class="v">'+nextBonus+'</span></div>') +
-      '<div class="divider"></div>' +
-      '<div style="font-size:11px;color:#e8a33d;margin-bottom:4px">升級需求（等值一般）</div>';
-    for(const [k,v] of Object.entries(upCost)){const have=materialEquivalent(k);const ok=have>=v;body+='<div class="stat-line"><span class="k">'+MATERIALS[k].name+'</span><span class="v" style="color:'+(ok?'#4caf50':'#e05252')+'">'+have+'/'+v+'</span></div>';}
+      '<div class="stat-line"><span class="k">當前效果</span><span class="v">'+curBonus+'</span></div>';
+    if(!_isMax){
+      body += '<div class="stat-line"><span class="k">升級後</span><span class="v">'+nextBonus+'</span></div>';
+      body += '<div class="divider"></div>';
+      body += '<div style="font-size:11px;color:#e8a33d;margin-bottom:4px">升級需求（等值一般）</div>';
+      for(const [k,v] of Object.entries(upCost)){const have=materialEquivalent(k);const ok=have>=v;body+='<div class="stat-line"><span class="k">'+MATERIALS[k].name+'</span><span class="v" style="color:'+(ok?'#4caf50':'#e05252')+'">'+have+'/'+v+'</span></div>';}
+    }
     const ft=el('div','modal-ft');
     const isWorkbench=slot.id==='workbench';
     ft.innerHTML = (_isMax

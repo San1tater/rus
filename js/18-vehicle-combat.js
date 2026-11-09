@@ -400,6 +400,9 @@ function _applyHESplash(wid, mainTarget, baseDmg, isCrit, penMM, ammoId){
         (function(){var _vidH140=(state.garage&&state.garage.currentVehicle)||'btr80';var _wn=(typeof window._vehicleWeaponDisplayName==='function')?window._vehicleWeaponDisplayName(wid,_vidH140):({ '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid]||(wid?wid.toUpperCase():'未知武器'));var _af={'3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','3uof17':'3UOF17 高爆','pg15v':'PG-15V 破甲','og15v':'OG-15V 高爆'}[ammoId];var _fm=_af?('（'+_af+'）'):(ammoId==='atgm'?'（反坦克導彈）':(ammoId?'（'+ammoId+'）':''));pushLog('<span class="run">'+_wn+_fm+'</span> 濺射擊殺 <b class="r-'+(t.enemy.rarity||'一般')+'">'+eName+'</b>', [], 'explore');})();
       }
       if(typeof _grantBTRCrewExp === 'function') _grantBTRCrewExp(3);
+      /* [v195c D] 車戰濺射擊殺：每敵人 3 玩家經驗 + 事件清空時 roll 信物。 */
+      if(typeof addExp === 'function') addExp(3);
+      if(typeof window._settleVehicleEventIfCleared === 'function') window._settleVehicleEventIfCleared(t.enemy);
       if(t.type === 'event' && t.event && t.event.content){
         t.event.content = t.event.content.filter(function(x){ return x !== t.enemy; });
         if(!t.event.content.length) t.event.cleared = true;
@@ -572,6 +575,23 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   return true;
 };
 
+window._settleVehicleEventIfCleared = function(enemy){
+  const ev = enemy && enemy._eventRef;
+  if(!ev || ev._settled) return;
+  if(!ev.content) return;
+  for(let i = 0; i < ev.content.length; i++){
+    if(ev.content[i] && ev.content[i].hp > 0) return;
+  }
+  ev._settled = true;
+  const _R = (ev.region && typeof REGIONS !== 'undefined') ? REGIONS[ev.region] : null;
+  if(_R && _R.seal && _R.sealRate && Math.random() < _R.sealRate){
+    state.seals[_R.seal] = Math.max(0, parseInt(state.seals[_R.seal] || 0, 10)) + 1;
+    if(typeof pushLog === 'function'){
+      pushLog('<span class="win">獲得 ' + (_R.name || ev.region) + ' 信物 ×1</span>', [], 'explore');
+    }
+  }
+};
+
 function _onBTRKillTarget(target, wid, c, usedAmmoId){
   if(!c && window._combat) c = window._combat;
   var eName = (typeof ENEMIES !== 'undefined' && ENEMIES[target.eid]) ? ENEMIES[target.eid].name : target.eid;
@@ -592,6 +612,9 @@ function _onBTRKillTarget(target, wid, c, usedAmmoId){
   }
   if(typeof pushLog === 'function') pushLog('<span class="run">' + wn + form + '</span> 擊殺 <b class="r-' + target.rarity + '">' + eName + '</b>', [], 'explore');
   if(typeof _grantBTRCrewExp === 'function') _grantBTRCrewExp(3);
+  /* [v195c C] 車戰直接命中擊殺：每敵人 3 玩家經驗 + 事件清空時 roll 信物。 */
+  if(typeof addExp === 'function') addExp(3);
+  if(typeof window._settleVehicleEventIfCleared === 'function') window._settleVehicleEventIfCleared(target);
   if(window.BTRSupport){
     window.BTRSupport.killCount = (window.BTRSupport.killCount || 0) + 1;
     if(!window.BTRSupport.kills) window.BTRSupport.kills = {};

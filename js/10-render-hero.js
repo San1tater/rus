@@ -530,6 +530,14 @@ function drawEqLayer(ctx, u, B, anim, fi){
     baseW = u.trim.w * (u.scale || 1.0);
     baseH = u.trim.h * (u.scale || 1.0);
     drawX = 0;
+  } else if(u._fitMax){
+    /* [v196] 長邊歸一化：最大邊固定 400*scale，另一邊按比例。
+       用於 healItem（water/salewa 是 64×127，原邏輯 baseH = baseW/ar 會爆到 1.98 倍）。 */
+    const _maxSide = 400 * (u.scale || 0.3);
+    const _ar = img.naturalWidth / img.naturalHeight;
+    if(_ar >= 1){ baseW = _maxSide; baseH = _maxSide / _ar; }
+    else { baseH = _maxSide; baseW = _maxSide * _ar; }
+    drawX = -baseW / 2;
   } else {
     baseW = 400 * (u.scale || 0.3);
     const ar = img.naturalWidth / img.naturalHeight;
@@ -625,7 +633,7 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
     const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
     if(_fa){
       const _hImg = getHeroImg(`icons/items/${resolveIconId(healItemId)}.png`);
-      units.push({ z: _fa.z - 0.4, kind:'eq', layerId: 'front_arm', ox: 0.88, oy: 0.15, scale: 0.35, rotation: 45, img: _hImg });
+      units.push({ z: _fa.z - 0.4, kind:'eq', layerId: 'front_arm', ox: 0.88, oy: 0.15, scale: 0.35, rotation: 45, img: _hImg, _fitMax: true });
     }
   }
 
