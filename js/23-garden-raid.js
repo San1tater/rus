@@ -753,6 +753,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
 
     const bullets = [];
     const damageTexts = [];
+
     /* rev-fix-corpse-timing: 獨立屍體數組 */
     const corpses = [];
     const MAX_DMG_AGE = 900;
@@ -921,15 +922,21 @@ function drawBullet(b){
         rarity: _rar, isFast: _isFast, color: _color
       });
 
-      // 統一加入曳光線（與探索模式一致）
-      if (!window._raidTracers) window._raidTracers = [];
-      window._raidTracers.push({
-        sx, sy, tx, ty,
-        born: performance.now(),
-        dur: 200,
-        color: _color,
-        hit: hit
-      });
+      // [v216] 曳光僅敵人
+      if (isEnemy) {
+        if (!window._raidTracers) window._raidTracers = [];
+        window._raidTracers.push({
+          sx, sy, tx, ty,
+          born: performance.now(),
+          dur: 200,
+          color: _color,
+          hit: hit
+        });
+      }
+
+      // [v210] 統一調用全局煙火模塊
+      if(window.MuzzleFX) window.MuzzleFX.spawn(sx, sy, fromU.isGuard ? 1.0 : 0.9, isEnemy);
+    
 
       const wAnim = (fromU.weaponSlot === 'secondary') ? 'fire_secondary' : 'fire_primary';
       const _animDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS[wAnim]) ? GAME_ANIMS[wAnim] : null;
@@ -1473,7 +1480,14 @@ function drawBullet(b){
       }
       for(const u of enemyUnits) drawUnit(u, nowD);
       
+      // [v210] 統一更新與渲染
+      if(window.MuzzleFX) {
+        window.MuzzleFX.update(dt);
+        window.MuzzleFX.render(ctx);
+      }
+
       // [v208] 跳過快速子彈的實體繪製，改為繪製曳光
+    
       for(const b of bullets) {
         if (!b.isFast) drawBullet(b);
       }

@@ -501,13 +501,20 @@ function applyHydraDamage(dmg, isCrit, penMM, isThrowable){
 /* ============== 子彈視覺 ============== */
 function updateBullets(dt){
   if(!battle) return;
-  const layer = document.getElementById('battle-fx');
-  if(!layer) return;
+  const now = performance.now();
 
   for(let i = battle.bullets.length - 1; i >= 0; i--){
     const b = battle.bullets[i];
-    b.t += dt * 3.5;
+    
+    if(b.startTime && b.duration) {
+      b.t = (now - b.startTime) / b.duration;
+    } else {
+      b.t += dt * 3.5;
+    }
+
     if(b.t >= 1){
+      if(b._onHit) { try { b._onHit(); } catch(err){ console.error(err); } }
+      
       if(b.enemy){
         const dodge = clamp(0.15 + state.player.level * 0.005, 0, 0.5);
         if(Math.random() > dodge){
@@ -527,22 +534,7 @@ function updateBullets(dt){
       continue;
     }
   }
-
-  layer.querySelectorAll('.bullet').forEach(function(e){ if(e.id !== 'aim-marker') e.remove(); });
-  for(const b of battle.bullets){
-    const x = b.sx + (b.tx - b.sx) * b.t;
-    let y = b.sy + (b.ty - b.sy) * b.t;
-    if(b.arc){
-      const arcH = 0.18;
-      y -= 4 * arcH * b.t * (1 - b.t);
-    }
-    const e = document.createElement('div');
-    e.className = 'bullet' + (b.enemy ? ' enemy' : '');
-    e.style.left = (x * 100) + '%';
-    e.style.top = (y * 100) + '%';
-    if(b.big) e.style.transform = 'translate(-50%,-50%) scale(1.8)';
-    layer.appendChild(e);
-  }
+  /* [v212] 移除彈幕 DOM 繪製，僅保留邏輯 */
 }
 
 /* ============== 戰鬥結束 ============== */

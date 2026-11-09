@@ -127,86 +127,61 @@ function _eRange(e){
   return _rangeOfWeaponDef(wd);
 }
 
-function _spawnMuzzleFx(c, x, y, scale){
-  const fxEl = document.getElementById('combat-overlay');
-  const W = fxEl ? fxEl.clientWidth : 400;
-  const H = fxEl ? fxEl.clientHeight : 500;
-  const px = x * W;
-  const py = y * H;
-
-  c.smokes = c.smokes || [];
-  // Jet 發射煙
-  c.smokes.push({
-    x: px, y: py + (Math.random() - 0.5) * 8,
-    vx: 1500 * scale, vy: (Math.random() - 0.5) * 10 * scale,
-    life: 1, rate: 1 / 0.12,
-    sizeX: 10 * scale, sizeY: 3 * scale,
-    growX: 200 * scale, growY: 60 * scale,
-    alpha0: 0.95, isJet: true,
-    friction: 0.94
-  });
-  // Spread 擴散煙
-  c.smokes.push({
-    x: px + (Math.random() - 0.5) * 8,
-    y: py + (Math.random() - 0.5) * 8,
-    vx: 250 * scale + Math.random() * 150, vy: (Math.random() - 0.5) * 15 * scale,
-    life: 1, rate: 1 / (0.8 + Math.random() * 0.4),
-    sizeX: 4 * scale, sizeY: 4 * scale,
-    growX: 40 * scale, growY: 40 * scale,
-    alpha0: 0.15, isJet: false,
-    friction: 0.95
-  });
-  // Fire 槍口焰（15% 概率）
-  if(Math.random() < 0.15){
-    c.fireFx = c.fireFx || [];
-    const blobs = [];
-    for(let j = 0; j < 3; j++){
-      blobs.push({
-        ox: (Math.random() - 0.5) * 8,
-        oy: (Math.random() - 0.5) * 8,
-        r: 12 + Math.random() * 4
-      });
-    }
-    c.fireFx.push({
-      x: px + 12 * scale, y: py,
-      startTime: performance.now(),
-      size: scale,
-      blobs: blobs
+/* [v210] 全局煙火系統，供步戰與後院共用 */
+window.MuzzleFX = {
+  smokes: [],
+  fireFx: [],
+  spawn: function(px, py, scale, isEnemy){
+    const _dir = isEnemy ? -1 : 1;
+    // Jet
+    this.smokes.push({
+      x: px, y: py + (Math.random() - 0.5) * 8 * scale,
+      vx: 1500 * scale * _dir, vy: (Math.random() - 0.5) * 10 * scale,
+      life: 1, rate: 1 / 0.12,
+      sizeX: 10 * scale, sizeY: 3 * scale,
+      growX: 200 * scale, growY: 60 * scale,
+      alpha0: 0.95, isJet: true, friction: 0.94
     });
-  }
-}
-
-function _updateMuzzleFx(c, dt){
-  if(c.smokes){
-    for(let i = c.smokes.length - 1; i >= 0; i--){
-      const p = c.smokes[i];
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
+    // Spread
+    this.smokes.push({
+      x: px + (Math.random() - 0.5) * 8,
+      y: py + (Math.random() - 0.5) * 8,
+      vx: (250 + Math.random() * 150) * scale * _dir, vy: (Math.random() - 0.5) * 15 * scale,
+      life: 1, rate: 1 / (0.8 + Math.random() * 0.4),
+      sizeX: 4 * scale, sizeY: 4 * scale,
+      growX: 40 * scale, growY: 40 * scale,
+      alpha0: 0.15, isJet: false, friction: 0.95
+    });
+    // Fire
+    if(Math.random() < 0.15){
+      const blobs = [];
+      for(let j = 0; j < 3; j++){
+        blobs.push({ ox: (Math.random() - 0.5) * 8 * scale, oy: (Math.random() - 0.5) * 8 * scale, r: (12 + Math.random() * 4) * scale });
+      }
+      this.fireFx.push({ x: px + 12 * scale * _dir, y: py, startTime: performance.now(), blobs: blobs });
+    }
+  },
+  update: function(dt){
+    for(let i = this.smokes.length - 1; i >= 0; i--){
+      const p = this.smokes[i];
+      p.x += p.vx * dt; p.y += p.vy * dt;
       const _fric = Math.pow(p.friction, dt * 60);
-      p.vx *= _fric;
-      p.vy *= _fric;
-      p.sizeX += p.growX * dt;
-      p.sizeY += p.growY * dt;
+      p.vx *= _fric; p.vy *= _fric;
+      p.sizeX += p.growX * dt; p.sizeY += p.growY * dt;
       p.life -= p.rate * dt;
-      if(p.life <= 0) c.smokes.splice(i, 1);
+      if(p.life <= 0) this.smokes.splice(i, 1);
     }
-  }
-  if(c.fireFx){
     const nowMs = performance.now();
-    for(let i = c.fireFx.length - 1; i >= 0; i--){
-      if(nowMs > c.fireFx[i].startTime + 60) c.fireFx.splice(i, 1);
+    for(let i = this.fireFx.length - 1; i >= 0; i--){
+      if(nowMs > this.fireFx[i].startTime + 60) this.fireFx.splice(i, 1);
     }
-  }
-}
-
-function _renderMuzzleFx(c, ctx, W, H){
-  if(c.smokes){
-    for(let i = 0; i < c.smokes.length; i++){
-      const p = c.smokes[i];
+  },
+  render: function(ctx){
+    for(let i = 0; i < this.smokes.length; i++){
+      const p = this.smokes[i];
       let a = p.isJet ? p.alpha0 * Math.pow(Math.max(0, p.life), 1.5) : p.alpha0 * Math.pow(Math.max(0, p.life), 3.0);
       if(a < 0.01) continue;
-      ctx.save();
-      ctx.translate(p.x, p.y);
+      ctx.save(); ctx.translate(p.x, p.y);
       if(p.isJet){
         ctx.scale(p.sizeX / Math.max(1, p.sizeY), 1);
         ctx.globalAlpha = a;
@@ -214,73 +189,38 @@ function _renderMuzzleFx(c, ctx, W, H){
         g.addColorStop(0, 'rgba(255, 255, 255, 1)');
         g.addColorStop(0.5, 'rgba(230, 240, 255, 0.6)');
         g.addColorStop(1, 'rgba(200, 210, 220, 0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, p.sizeY, 0, Math.PI * 2); ctx.fill();
       } else {
         ctx.globalAlpha = a;
         const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.sizeX);
         g.addColorStop(0, 'rgba(235, 235, 240, 0.8)');
         g.addColorStop(0.5, 'rgba(210, 210, 215, 0.2)');
         g.addColorStop(1, 'rgba(190, 190, 195, 0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(0, 0, p.sizeX, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, p.sizeX, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore();
     }
-  }
-  if(c.fireFx){
     const nowMs = performance.now();
-    for(let i = 0; i < c.fireFx.length; i++){
-      const f = c.fireFx[i];
+    for(let i = 0; i < this.fireFx.length; i++){
+      const f = this.fireFx[i];
       const age = nowMs - f.startTime;
       if(age > 60) continue;
       const fade = 1 - age / 60;
-      ctx.save();
-      ctx.translate(f.x, f.y);
+      ctx.save(); ctx.translate(f.x, f.y);
       for(let j = 0; j < f.blobs.length; j++){
         const b = f.blobs[j];
-        const baseR = b.r * fade * f.size;
+        const baseR = b.r * fade;
         if(baseR <= 0) continue;
         const gCore = ctx.createRadialGradient(b.ox, b.oy, 0, b.ox, b.oy, baseR);
         gCore.addColorStop(0, 'rgba(255,255,220,' + (fade * 0.9) + ')');
         gCore.addColorStop(0.5, 'rgba(255,180,50,' + (fade * 0.7) + ')');
         gCore.addColorStop(1, 'rgba(200,20,0,0)');
-        ctx.fillStyle = gCore;
-        ctx.beginPath();
-        ctx.arc(b.ox, b.oy, baseR, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = gCore; ctx.beginPath(); ctx.arc(b.ox, b.oy, baseR, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore();
     }
   }
-}
-
-function _renderTracers(c, ctx, W, H){
-  if(!c.tracers) return;
-  const nowMs = performance.now();
-  for(let i = 0; i < c.tracers.length; i++){
-    const tr = c.tracers[i];
-    const age = nowMs - tr.born;
-    if(age > tr.dur) continue;
-    const alpha = (1 - age / tr.dur) * (tr.hit ? 0.95 : 0.65);
-    const grad = ctx.createLinearGradient(tr.sx * W, tr.sy * H, tr.tx * W, tr.ty * H);
-    grad.addColorStop(0, _hexToRgba(tr.color, 0));
-    grad.addColorStop(0.5, _hexToRgba(tr.color, alpha * 0.5));
-    grad.addColorStop(0.92, _hexToRgba(tr.color, alpha));
-    grad.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(tr.sx * W, tr.sy * H);
-    ctx.lineTo(tr.tx * W, tr.ty * H);
-    ctx.stroke();
-  }
-}
+};
 
 function _start(cfg){
   _cleanup();
@@ -299,8 +239,6 @@ function _start(cfg){
     enemies: cfg.enemies || [],
     bullets: [],
     floats: [],
-    smokes: [],
-    fireFx: [],
     tracers: [],
     lastTick: now,
     playerFireReadyAt: now + (pf ? REACTION_FIRST_MS : REACTION_SECOND_MS),
@@ -1081,8 +1019,9 @@ function _firePlayer(p, t, now, w){
     duration = Math.max(16, (Math.abs(t.worldX - p.worldX) / _spd) * 1000);
     _tx = hit ? tx : ((tx >= mz.x) ? 1.5 : -0.5);
     isFast = true;
-    c.tracers.push({ sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, born: performance.now(), dur: 200, color: window._rarityBulletColor(_pBulletRar), hit: hit });
-    if(typeof _spawnMuzzleFx === 'function') _spawnMuzzleFx(c, mz.x, mz.y, w.def.type === '機槍' ? 1.2 : 1.0);
+
+    const _fxElP = document.getElementById('combat-overlay');
+    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElP? _fxElP.clientWidth : 400), mz.y * (_fxElP? _fxElP.clientHeight : 500), w.def.type === '機槍' ? 1.2 : 1.0, false);
   } else {
     _tx = hit ? tx : (tx + 0.15);
     duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
@@ -1281,8 +1220,9 @@ function _firePassenger(a, t, now, w){
     duration = Math.max(16, (Math.abs(t.worldX - a.worldX) / _spd) * 1000);
     _tx = hit ? tx : ((tx >= mz.x) ? 1.5 : -0.5);
     isFast = true;
-    c.tracers.push({ sx: mz.x, sy: mz.y, tx: _tx, ty: mz.y, born: performance.now(), dur: 200, color: window._rarityBulletColor((am && am.rarity) ? am.rarity : '一般'), hit: hit });
-    if(typeof _spawnMuzzleFx === 'function') _spawnMuzzleFx(c, mz.x, mz.y, def.type === '機槍' ? 1.2 : 1.0);
+
+    const _fxElA = document.getElementById('combat-overlay');
+    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElA? _fxElA.clientWidth : 400), mz.y * (_fxElA? _fxElA.clientHeight : 500), def.type === '機槍' ? 1.2 : 1.0, false);
   } else {
     _tx = hit ? tx : (tx + 0.15);
     duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
@@ -1424,7 +1364,8 @@ function _enemyFire(e, now){
     isFast = true;
     const _rar = (w && w.ammoId && typeof AMMO !== 'undefined' && AMMO[w.ammoId]) ? AMMO[w.ammoId].rarity : '一般';
     c.tracers.push({ sx: mz.x, sy: mz.y, tx: _tx, ty: _ty, born: performance.now(), dur: 200, color: window._rarityBulletColor(_rar), hit: hit });
-    if(typeof _spawnMuzzleFx === 'function') _spawnMuzzleFx(c, mz.x, mz.y, 1.0);
+    const _fxElE = document.getElementById('combat-overlay');
+    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElE? _fxElE.clientWidth : 400), mz.y * (_fxElE? _fxElE.clientHeight : 500), 1.0, true);
   } else {
     _tx = tx;
     duration = Math.max(50, (distPx / (1200 + _approachPx)) * 1000);
@@ -1959,7 +1900,7 @@ function _tickBullets(dt){
     c.floats[j].age += dt;
     if(c.floats[j].age > 1.2) c.floats.splice(j, 1);
   }
-  if(typeof _updateMuzzleFx === 'function') _updateMuzzleFx(c, dt);
+  if(window.MuzzleFX) window.MuzzleFX.update(dt);
   if(c.tracers){
     const nowMs = performance.now();
     for(let i = c.tracers.length - 1; i >= 0; i--){
@@ -1988,6 +1929,30 @@ window._rarityBulletColor = function(rarity){
   const map = { '破舊':'#b87333', '一般':'#e0e0e0', '庫存':'#4caf50', '精品':'#2196f3', '傳奇':'#ffb300' };
   return map[rarity] || '#ffb300';
 };
+
+function _renderTracers(c, ctx, W, H){
+  if(!c.tracers || !c.tracers.length) return;
+  const now = performance.now();
+  for(let i = c.tracers.length - 1; i >= 0; i--){
+    const tr = c.tracers[i];
+    const age = now - tr.born;
+    if(age >= tr.dur){ c.tracers.splice(i, 1); continue; }
+    const alpha = (1 - age / tr.dur) * (tr.hit ? 0.95 : 0.65);
+    const grad = ctx.createLinearGradient(tr.sx * W, tr.sy * H, tr.tx * W, tr.ty * H);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.5, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, alpha * 0.5) : 'rgba(255,255,255,' + (alpha*0.5) + ')');
+    grad.addColorStop(0.92, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, alpha) : 'rgba(255,255,255,' + alpha + ')');
+    grad.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tr.sx * W, tr.sy * H);
+    ctx.lineTo(tr.tx * W, tr.ty * H);
+    ctx.stroke();
+  }
+}
+window._renderTracers = _renderTracers;
 
 function _render(){
   const c = window._combat;
@@ -2067,7 +2032,7 @@ function _render(){
     ctx.restore();
   }
 
-  if(typeof _renderMuzzleFx === 'function') _renderMuzzleFx(c, ctx, W, H);
+  if(window.MuzzleFX) window.MuzzleFX.render(ctx);
   if(typeof _renderTracers === 'function') _renderTracers(c, ctx, W, H);
 
   for(let b = 0; b < c.bullets.length; b++){

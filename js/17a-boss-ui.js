@@ -1264,12 +1264,16 @@ function playerShoot(){
     battle.ammoInMag--;
     const mz = getPlayerMuzzlePos();
     const target = getAimTargetPos();
-    const shotCount = 1 + Math.floor(Math.random() * 3);
-    for(let s = 0; s < shotCount; s++){
-      const jx = (Math.random() - 0.5) * 0.03;
-      const jy = (Math.random() - 0.5) * 0.03;
-      battle.bullets.push({ sx: mz.x, sy: mz.y, tx: clamp(target.x + jx, 0, 1), ty: clamp(target.y + jy, 0, 1), t: 0, player: true });
-    }
+    
+    /* [v211-fix] 生成槍口煙火 */
+    const _fxElB = document.getElementById('battle-fx');
+    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElB? _fxElB.clientWidth : 400), mz.y * (_fxElB? _fxElB.clientHeight : 500), w.def.type === '機槍' ? 1.2 : 1.0, false);
+    
+    /* [v212] 真實彈速與延遲結算 */
+    const _dist = Math.abs(battle.bx - battle.px); 
+    const _spd = (window.AMMO_SPEED_MS && window.AMMO_SPEED_MS[def.cal]) || 800;
+    const _duration = Math.max(16, _dist * 100 / _spd * 1000);
+
     const hitRate = getHitRate(def.type, _effectiveMode, def.scopeBonus || 0);
     const _pdB = 0.6 + clamp(Math.floor(state.proficiency[def.type] || 0) / MAX_PROF_LEVEL, 0, 1) * 0.9;
     const baseDmg = Math.round((battle.ammoRef ? AMMO[battle.ammoRef.id].dmg * (RARITY_MULT[battle.ammoRef.rarity] || 1) : 20) * _pdB);
@@ -1277,24 +1281,43 @@ function playerShoot(){
     const critRate = calcCritRate(w.rarity, battle.ammoRef ? battle.ammoRef.rarity : '一般');
     const critMult = calcCritMult(w.rarity, battle.ammoRef ? battle.ammoRef.rarity : '一般');
     const pellets = battle.ammoRef ? (AMMO[battle.ammoRef.id].pellets || 1) : 1;
-    for(let p = 0; p < pellets; p++){
-      if(Math.random() * 100 < hitRate){
-        let dmg = baseDmg;
-        let isCrit = false;
-        if(Math.random() < critRate){ dmg = Math.round(dmg * critMult); isCrit = true; }
-        if(isWeak){
-          battle.engaged = true;
-          battle.bossHp = Math.max(0, battle.bossHp - dmg);
-          battle.damageDealt += dmg;
-          spawnHitFx(battle.bx, battle.by, '-' + dmg + (isCrit ? '!' : ''), isCrit ? 'crit' : 'weak');
-          if(isBossType(battle.bossId, 'omega') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
-          if(battle.bossHp <= 0){ endBattle(true); return true; }
-        } else {
-          applyBossDamage(dmg, isCrit, ammoPenMM);
-          if(battle.bossHp <= 0) return true;
+
+    battle.bullets.push({
+      sx: mz.x, sy: mz.y, tx: clamp(target.x, 0, 1), ty: clamp(target.y, 0, 1), 
+      startTime: performance.now(), duration: _duration, player: true,
+      _onHit: function(){
+        for(let p = 0; p < pellets; p++){
+          if(Math.random() * 100 < hitRate){
+            let dmg = baseDmg;
+            let isCrit = false;
+            if(Math.random() < critRate){ dmg = Math.round(dmg * critMult); isCrit = true; }
+            /* [v217] 瞄準點小型爆炸特效 */
+            if(!battle.aimHitFx) battle.aimHitFx = [];
+            {
+              const _pCount = isCrit ? 8 : 5;
+              const _parts = [];
+              for(let _pi = 0; _pi < _pCount; _pi++){
+                const _ang = Math.random() * Math.PI * 2;
+                const _spd = 20 + Math.random() * 15;
+                _parts.push({ dx: Math.cos(_ang) * _spd, dy: Math.sin(_ang) * _spd, r: 1.5 + Math.random() * 1.5 });
+              }
+              battle.aimHitFx.push({ x: target.x, y: target.y, startTime: performance.now(), crit: isCrit, particles: _parts });
+            }
+            if(isWeak){
+              battle.engaged = true;
+              battle.bossHp = Math.max(0, battle.bossHp - dmg);
+              battle.damageDealt += dmg;
+              spawnHitFx(battle.bx, battle.by, '-' + dmg + (isCrit ? '!' : ''), isCrit ? 'crit' : 'weak');
+              if(isBossType(battle.bossId, 'omega') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
+              if(battle.bossHp <= 0){ endBattle(true); return; }
+            } else {
+              applyBossDamage(dmg, isCrit, ammoPenMM);
+              if(battle.bossHp <= 0) return;
+            }
+          }
         }
       }
-    }
+    });
   } else {
     if(def.slot === 'throwable'){
       if(getThrowableCount() <= 0){
@@ -1615,6 +1638,115 @@ function battleLoop(now){
     }
   }
   if(typeof updateBullets === 'function') updateBullets(dt);
+  
+  /* [v217] 瞄準點小型爆炸特效渲染 */
+  if(battle && battle.aimHitFx && battle.aimHitFx.length){
+    const _fxLayer = document.getElementById('battle-fx');
+    if(_fxLayer){
+      let _ahCvs = document.getElementById('boss-aimhit-canvas');
+      if(!_ahCvs){
+        _ahCvs = document.createElement('canvas');
+        _ahCvs.id = 'boss-aimhit-canvas';
+        _ahCvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:9;';
+        _fxLayer.appendChild(_ahCvs);
+      }
+      if(_ahCvs.width !== _fxLayer.clientWidth || _ahCvs.height !== _fxLayer.clientHeight){
+        _ahCvs.width = _fxLayer.clientWidth;
+        _ahCvs.height = _fxLayer.clientHeight;
+      }
+      const _ahCtx = _ahCvs.getContext('2d');
+      _ahCtx.clearRect(0, 0, _ahCvs.width, _ahCvs.height);
+      const _ahNow = performance.now();
+      const AIM_HIT_DUR = 250;
+      for(let _i = battle.aimHitFx.length - 1; _i >= 0; _i--){
+        const f = battle.aimHitFx[_i];
+        const age = _ahNow - f.startTime;
+        if(age >= AIM_HIT_DUR){ battle.aimHitFx.splice(_i, 1); continue; }
+        const t = age / AIM_HIT_DUR;
+        const fade = 1 - t;
+        const cx = f.x * _ahCvs.width;
+        const cy = f.y * _ahCvs.height;
+        _ahCtx.save();
+        // 中心小光斑（前 40% 出現）
+        if(t < 0.4){
+          const coreR = (f.crit ? 12 : 9) * fade;
+          const g = _ahCtx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+          g.addColorStop(0, f.crit ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,220,0.9)');
+          g.addColorStop(0.4, f.crit ? 'rgba(255,80,30,0.6)' : 'rgba(255,200,80,0.5)');
+          g.addColorStop(1, 'rgba(255,150,50,0)');
+          _ahCtx.fillStyle = g;
+          _ahCtx.beginPath();
+          _ahCtx.arc(cx, cy, coreR, 0, Math.PI * 2);
+          _ahCtx.fill();
+        }
+        // 火花粒子
+        if(f.particles){
+          _ahCtx.globalAlpha = fade * (f.crit ? 1 : 0.85);
+          _ahCtx.fillStyle = f.crit ? '#ff5030' : '#ffd680';
+          for(let _pi = 0; _pi < f.particles.length; _pi++){
+            const p = f.particles[_pi];
+            const px = cx + p.dx * t;
+            const py = cy + p.dy * t;
+            const pr = p.r * (1 - t * 0.5);
+            _ahCtx.beginPath();
+            _ahCtx.arc(px, py, pr, 0, Math.PI * 2);
+            _ahCtx.fill();
+          }
+        }
+        _ahCtx.restore();
+      }
+    }
+  }
+
+  /* [v211-fix] Boss戰渲染全局煙火 */
+  if(window.MuzzleFX) {
+    window.MuzzleFX.update(dt);
+    const _fxLayer = document.getElementById('battle-fx');
+    if(_fxLayer) {
+      let _cvs = document.getElementById('boss-fx-canvas');
+      if(!_cvs) {
+        _cvs = document.createElement('canvas');
+        _cvs.id = 'boss-fx-canvas';
+        _cvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:9;';
+        _fxLayer.appendChild(_cvs);
+      }
+      if(_cvs.width !== _fxLayer.clientWidth || _cvs.height !== _fxLayer.clientHeight) {
+        _cvs.width = _fxLayer.clientWidth;
+        _cvs.height = _fxLayer.clientHeight;
+      }
+      const _ctx = _cvs.getContext('2d');
+      _ctx.clearRect(0, 0, _cvs.width, _cvs.height);
+      
+      /* [v213-fix] 渲染曳光 */
+      if (battle.tracers) {
+        const _trNow = performance.now();
+        for (let i = battle.tracers.length - 1; i >= 0; i--) {
+          const tr = battle.tracers[i];
+          const age = _trNow - tr.born;
+          if (age >= tr.dur) {
+            battle.tracers.splice(i, 1);
+            continue;
+          }
+          const alpha = (1 - age / tr.dur) * (tr.hit ? 0.95 : 0.65);
+          const grad = _ctx.createLinearGradient(tr.sx * _cvs.width, tr.sy * _cvs.height, tr.tx * _cvs.width, tr.ty * _cvs.height);
+          grad.addColorStop(0, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, 0) : 'rgba(255,255,255,0)');
+          grad.addColorStop(0.5, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, alpha * 0.5) : 'rgba(255,255,255,' + (alpha*0.5) + ')');
+          grad.addColorStop(0.92, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, alpha) : 'rgba(255,255,255,' + alpha + ')');
+          grad.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
+          _ctx.strokeStyle = grad;
+          _ctx.lineWidth = 2.2;
+          _ctx.lineCap = 'round';
+          _ctx.beginPath();
+          _ctx.moveTo(tr.sx * _cvs.width, tr.sy * _cvs.height);
+          _ctx.lineTo(tr.tx * _cvs.width, tr.ty * _cvs.height);
+          _ctx.stroke();
+        }
+      }
+      
+      window.MuzzleFX.render(_ctx);
+    }
+  }
+
   updateFighterPos();
   if(isBossType(battle.bossId, 'hydra')) updateHeadBarsUI();
   updateBattleHeroAnim(now);
@@ -1673,7 +1805,7 @@ function startBossBattle(bid){
     ammoRef: null, ammoInMag: 0, weaponStates: {},
     engaged: false, engagedRange: 0.35, startTime: Date.now(),
     aimPart: defaultAimPartForBoss(bid), lastManualClick: 0,
-    players: [{ id: 'local', isLocal: true }], lastH: 0,
+    players: [{ id: 'local', isLocal: true }], lastH: 0, aimHitFx: [],
     healDisabledUntil: 0, healTimer: null,
     autoHealing: false, chainShots: 0, lastShotTime: 0,
     chainResetMs: 600, shotLockUntil: 0
