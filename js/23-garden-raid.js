@@ -885,7 +885,6 @@ function drawBullet(b){
       /* rev-fix-raid-muzzle: 守衛用 _getRaidMuzzleWorld 精確計算槍口位置 */
       let _mzPos = null;
       if(fromU.isGuard && typeof _getRaidMuzzleWorld === 'function'){
-        /* rev-fix-raid-muzzle-scale: 守衛在 actor canvas 上繪製，用 actor canvas 的 scale（56/386） */
         _mzPos = _getRaidMuzzleWorld(fromU, 56 / 386);
       }
       const sx = _mzPos ? _mzPos.x : (fromU.x + (isEnemy ? -MUZZLE_X_LEFT : MUZZLE_X_RIGHT));
@@ -896,9 +895,28 @@ function drawBullet(b){
         tx += (Math.random() - 0.5) * 70;
         ty += (Math.random() - 0.5) * 50;
       }
-      /* rev-fix-attack-unify: 傷害計算移至 onBulletHit 統一處理 */
-      bullets.push({ sx, sy, tx, ty, x: sx, y: sy, t: 0, speed: 2.5, hit, isEnemy, fromU, toU, rarity: fromU.isGuard ? (fromU.ammoRarity || '一般') : '一般' });
-      /* rev-fix-anim-state-unified: 设时间戳，不用 setTimeout；敌人用 fire_primary 而非 hurt */
+      
+      /* [v207] 真實彈速與延遲結算 */
+      let _cal = null;
+      if(fromU.weaponDef && fromU.weaponDef.cal) _cal = fromU.weaponDef.cal;
+      else if(fromU.ammoId && typeof AMMO !== 'undefined' && AMMO[fromU.ammoId]) _cal = AMMO[fromU.ammoId].cal;
+      
+      let _spd = 500;
+      if(_cal && typeof AMMO_SPEED_MS !== 'undefined' && AMMO_SPEED_MS[_cal]) _spd = AMMO_SPEED_MS[_cal];
+      
+      // 換算為像素距離 (guardUnits 的 worldX 為基準)
+      const _pixelDist = Math.abs(tx - sx);
+      const _worldDist = Math.abs(fromU.worldX - toU.worldX);
+      const _duration = Math.max(16, (_worldDist / _spd) * 1000);
+
+      bullets.push({ 
+        sx, sy, tx, ty, x: sx, y: sy, 
+        startTime: performance.now(), 
+        duration: _duration,
+        hit, isEnemy, fromU, toU, 
+        rarity: fromU.isGuard ? (fromU.ammoRarity || '一般') : '一般' 
+      });
+
       const wAnim = (fromU.weaponSlot === 'secondary') ? 'fire_secondary' : 'fire_primary';
       const _animDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS[wAnim]) ? GAME_ANIMS[wAnim] : null;
       const _animDur = _animDef ? Math.round(_animDef.frameCount / _animDef.fps * 1000) : 250;
@@ -1006,9 +1024,10 @@ function drawBullet(b){
     }
 
     function updateBullets(dt){
+      const nowMs = performance.now();
       for(let i = bullets.length - 1; i >= 0; i--){
         const b = bullets[i];
-        b.t += b.speed * dt;
+        b.t = (nowMs - b.startTime) / b.duration;
         if(b.t >= 1){
           b.x = b.tx; b.y = b.ty;
           onBulletHit(b);
@@ -1023,7 +1042,7 @@ function drawBullet(b){
     function onBulletHit(b){
       const toU = b.toU;
       if(!toU || !toU.alive){
-        /* rev-fix-raid-remove-dead-log: 目標已死，靜默丟棄子彈 */
+        /* [v207] 目標已死，靜默丟棄子彈，防止鞭屍 */
         return;
       }
       if(!b.hit){
