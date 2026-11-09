@@ -462,6 +462,7 @@ function renderBase(){
         const _b=$('#subnav-body');
         if(_b){ _b.innerHTML=renderBaseStats(); _rebindStatsClick(_b); }
       } else if(_tid==='room'){
+        // room tab 未實現，點擊無反應
       }
     };
   });
