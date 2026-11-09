@@ -909,12 +909,26 @@ function drawBullet(b){
       const _worldDist = Math.abs(fromU.worldX - toU.worldX);
       const _duration = Math.max(16, (_worldDist / _spd) * 1000);
 
+      const _isFast = true; // 統一視為高速彈
+      const _rar = fromU.isGuard ? (fromU.ammoRarity || '一般') : '一般';
+      const _color = (typeof window._rarityBulletColor === 'function') ? window._rarityBulletColor(_rar) : '#ffd680';
+
       bullets.push({ 
         sx, sy, tx, ty, x: sx, y: sy, 
         startTime: performance.now(), 
         duration: _duration,
         hit, isEnemy, fromU, toU, 
-        rarity: fromU.isGuard ? (fromU.ammoRarity || '一般') : '一般' 
+        rarity: _rar, isFast: _isFast, color: _color
+      });
+
+      // 統一加入曳光線（與探索模式一致）
+      if (!window._raidTracers) window._raidTracers = [];
+      window._raidTracers.push({
+        sx, sy, tx, ty,
+        born: performance.now(),
+        dur: 200,
+        color: _color,
+        hit: hit
       });
 
       const wAnim = (fromU.weaponSlot === 'secondary') ? 'fire_secondary' : 'fire_primary';
@@ -1083,7 +1097,8 @@ function drawBullet(b){
       damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 18, text: '-' + shown + (r.crit ? '!' : ''), crit: r.crit, isEnemy: b.isEnemy, startTime: Date.now() });
       if(toU.hp <= 0){
         toU.alive = false;
-        toU.animName = 'idle'; toU.animFrame = 0;
+        // [v208] 移除 animName = 'idle' 的強制覆蓋，保留死亡動畫狀態機
+        toU._deathStart = performance.now();
         damageTexts.push({ x: toU.x, y: toU.y - CHAR_PX - 30, text: b.isEnemy ? '☠' : '✖', crit: false, isEnemy: b.isEnemy, startTime: Date.now() });
         /* rev-fix-raid-kill-vs-down: 守卫击杀敌人 →「擊殺」，敌人击杀守卫 →「被 X 用 Y 擊倒」 */
         if(window._raidActiveBattleEntry && b.fromU && b.toU){
@@ -1457,7 +1472,38 @@ function drawBullet(b){
         ctx.restore();
       }
       for(const u of enemyUnits) drawUnit(u, nowD);
-      for(const b of bullets) drawBullet(b);
+      
+      // [v208] 跳過快速子彈的實體繪製，改為繪製曳光
+      for(const b of bullets) {
+        if (!b.isFast) drawBullet(b);
+      }
+      
+      // [v208] 渲染曳光
+      if (window._raidTracers) {
+        const _trNow = performance.now();
+        for (let i = window._raidTracers.length - 1; i >= 0; i--) {
+          const tr = window._raidTracers[i];
+          const age = _trNow - tr.born;
+          if (age >= tr.dur) {
+            window._raidTracers.splice(i, 1);
+            continue;
+          }
+          const alpha = (1 - age / tr.dur) * (tr.hit ? 0.95 : 0.65);
+          const grad = ctx.createLinearGradient(tr.sx, tr.sy, tr.tx, tr.ty);
+          grad.addColorStop(0, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, 0) : 'rgba(255,255,255,0)');
+          grad.addColorStop(0.5, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, alpha * 0.5) : 'rgba(255,255,255,' + (alpha*0.5) + ')');
+          grad.addColorStop(0.92, (typeof _hexToRgba === 'function') ? _hexToRgba(tr.color, alpha) : 'rgba(255,255,255,' + alpha + ')');
+          grad.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 2.2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(tr.sx, tr.sy);
+          ctx.lineTo(tr.tx, tr.ty);
+          ctx.stroke();
+        }
+      }
+      
       for(const d of damageTexts) drawDamage(d, nowD);
 
       /* rev-fix-raid-bubbles: 螢幕外敵人氣泡（同探索） */
