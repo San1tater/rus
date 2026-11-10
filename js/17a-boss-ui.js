@@ -1275,7 +1275,7 @@ function playerShoot(){
     
     /* [v211-fix] 生成槍口煙火 */
     const _fxElB = document.getElementById('battle-fx');
-    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElB? _fxElB.clientWidth : 400), mz.y * (_fxElB? _fxElB.clientHeight : 500), w.def.type === '機槍' ? 1.2 : 1.0, false);
+    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElB? _fxElB.clientWidth : 400), mz.y * (_fxElB? _fxElB.clientHeight : 500), w.def.type === '機槍' ? 1.2 : 1.0, false, 'boss');
     
     /* [v212] 真實彈速與延遲結算 */
     const _dist = Math.abs(battle.bx - battle.px); 
@@ -1725,7 +1725,7 @@ function battleLoop(now){
       const _ctx = _cvs.getContext('2d');
       _ctx.clearRect(0, 0, _cvs.width, _cvs.height);
       
-            window.MuzzleFX.render(_ctx);
+            window.MuzzleFX.render(_ctx, 'boss');
     }
   }
 

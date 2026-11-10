@@ -2234,6 +2234,12 @@ if(a.stamina <= 0){
 
 let _gardenActorCanvasRAF = null;
 
+/* [v230] 後院工作動畫：attack_melee 的循環版，避免 work 狀態卡在最後一幀 */
+if(typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.attack_melee && !GAME_ANIMS.garden_work){
+  GAME_ANIMS.garden_work = JSON.parse(JSON.stringify(GAME_ANIMS.fire_primary));
+  GAME_ANIMS.garden_work.loop = true;
+}
+
 function _gardenGetActorCanvas(){
   const p = document.getElementById('garden-page');
   if(!p) return null;
@@ -2317,7 +2323,7 @@ function _gardenRenderActors(now){
     } else {
       const _moving = Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2)) > 0.8;
       if(_moving) animName = 'walk';
-      else if(a.state === 'work') animName = 'fire_primary';
+      else if(a.state === 'work') animName = 'garden_work';
       else animName = 'idle';
       if(!a._animStart || a._animName !== animName){
         a._animStart = now;

@@ -131,7 +131,9 @@ function _eRange(e){
 window.MuzzleFX = {
   smokes: [],
   fireFx: [],
-  spawn: function(px, py, scale, isEnemy){
+  spawn: function(px, py, scale, isEnemy, owner){
+    /* [v234] owner 預設 explore，用於隔離不同場景的粒子 */
+    const _owner = owner || 'explore';
     const _dir = isEnemy ? -1 : 1;
     // Jet
     this.smokes.push({
@@ -140,7 +142,7 @@ window.MuzzleFX = {
       life: 1, rate: 1 / 0.12,
       sizeX: 10 * scale, sizeY: 3 * scale,
       growX: 200 * scale, growY: 60 * scale,
-      alpha0: 0.95, isJet: true, friction: 0.94
+      alpha0: 0.95, isJet: true, friction: 0.94, _owner: _owner
     });
     // Spread
     this.smokes.push({
@@ -150,7 +152,7 @@ window.MuzzleFX = {
       life: 1, rate: 1 / (0.8 + Math.random() * 0.4),
       sizeX: 4 * scale, sizeY: 4 * scale,
       growX: 40 * scale, growY: 40 * scale,
-      alpha0: 0.15, isJet: false, friction: 0.95
+      alpha0: 0.15, isJet: false, friction: 0.95, _owner: _owner
     });
     // Fire
     if(Math.random() < 0.15){
@@ -158,7 +160,7 @@ window.MuzzleFX = {
       for(let j = 0; j < 3; j++){
         blobs.push({ ox: (Math.random() - 0.5) * 8 * scale, oy: (Math.random() - 0.5) * 8 * scale, r: (12 + Math.random() * 4) * scale });
       }
-      this.fireFx.push({ x: px + 12 * scale * _dir, y: py, startTime: performance.now(), blobs: blobs });
+      this.fireFx.push({ x: px + 12 * scale * _dir, y: py, startTime: performance.now(), blobs: blobs, _owner: _owner });
     }
   },
   update: function(dt){
@@ -176,9 +178,11 @@ window.MuzzleFX = {
       if(nowMs > this.fireFx[i].startTime + 60) this.fireFx.splice(i, 1);
     }
   },
-  render: function(ctx){
+  render: function(ctx, owner){
+    /* [v234] owner 不傳則渲染全部；傳則只渲染匹配的粒子 */
     for(let i = 0; i < this.smokes.length; i++){
       const p = this.smokes[i];
+      if(owner && p._owner !== owner) continue;
       let a = p.isJet ? p.alpha0 * Math.pow(Math.max(0, p.life), 1.5) : p.alpha0 * Math.pow(Math.max(0, p.life), 3.0);
       if(a < 0.01) continue;
       ctx.save(); ctx.translate(p.x, p.y);
@@ -203,6 +207,7 @@ window.MuzzleFX = {
     const nowMs = performance.now();
     for(let i = 0; i < this.fireFx.length; i++){
       const f = this.fireFx[i];
+      if(owner && f._owner !== owner) continue;
       const age = nowMs - f.startTime;
       if(age > 60) continue;
       const fade = 1 - age / 60;
@@ -1021,7 +1026,7 @@ function _firePlayer(p, t, now, w){
     isFast = true;
 
     const _fxElP = document.getElementById('combat-overlay');
-    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElP? _fxElP.clientWidth : 400), mz.y * (_fxElP? _fxElP.clientHeight : 500), w.def.type === '機槍' ? 1.2 : 1.0, false);
+    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElP? _fxElP.clientWidth : 400), mz.y * (_fxElP? _fxElP.clientHeight : 500), w.def.type === '機槍' ? 1.2 : 1.0, false, 'explore');
   } else {
     _tx = hit ? tx : (tx + 0.15);
     duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
@@ -1222,7 +1227,7 @@ function _firePassenger(a, t, now, w){
     isFast = true;
 
     const _fxElA = document.getElementById('combat-overlay');
-    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElA? _fxElA.clientWidth : 400), mz.y * (_fxElA? _fxElA.clientHeight : 500), def.type === '機槍' ? 1.2 : 1.0, false);
+    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElA? _fxElA.clientWidth : 400), mz.y * (_fxElA? _fxElA.clientHeight : 500), def.type === '機槍' ? 1.2 : 1.0, false, 'explore');
   } else {
     _tx = hit ? tx : (tx + 0.15);
     duration = Math.max(50, (distPx / (2000 + _approachPx)) * 1000);
@@ -1365,7 +1370,7 @@ function _enemyFire(e, now){
     const _rar = (w && w.ammoId && typeof AMMO !== 'undefined' && AMMO[w.ammoId]) ? AMMO[w.ammoId].rarity : '一般';
     c.tracers.push({ sx: mz.x, sy: mz.y, tx: _tx, ty: _ty, born: performance.now(), dur: 200, color: window._rarityBulletColor(_rar), hit: hit });
     const _fxElE = document.getElementById('combat-overlay');
-    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElE? _fxElE.clientWidth : 400), mz.y * (_fxElE? _fxElE.clientHeight : 500), 1.0, true);
+    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElE? _fxElE.clientWidth : 400), mz.y * (_fxElE? _fxElE.clientHeight : 500), 1.0, true, 'explore');
   } else {
     _tx = tx;
     duration = Math.max(50, (distPx / (1200 + _approachPx)) * 1000);
@@ -2032,7 +2037,7 @@ function _render(){
     ctx.restore();
   }
 
-  if(window.MuzzleFX) window.MuzzleFX.render(ctx);
+  if(window.MuzzleFX) window.MuzzleFX.render(ctx, 'explore');
   if(typeof _renderTracers === 'function') _renderTracers(c, ctx, W, H);
 
   for(let b = 0; b < c.bullets.length; b++){

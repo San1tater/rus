@@ -886,7 +886,8 @@ function drawBullet(b){
       /* rev-fix-raid-muzzle: 守衛用 _getRaidMuzzleWorld 精確計算槍口位置 */
       let _mzPos = null;
       if(fromU.isGuard && typeof _getRaidMuzzleWorld === 'function'){
-        _mzPos = _getRaidMuzzleWorld(fromU, 56 / 386);
+        /* [v231] 用實際繪製的 SCALE，而非硬編碼 56/386，避免槍口焰偏離 */
+        _mzPos = _getRaidMuzzleWorld(fromU, SCALE);
       }
       const sx = _mzPos ? _mzPos.x : (fromU.x + (isEnemy ? -MUZZLE_X_LEFT : MUZZLE_X_RIGHT));
       const sy = _mzPos ? _mzPos.y : (fromU.y - MUZZLE_Y_UP);
@@ -935,7 +936,7 @@ function drawBullet(b){
       }
 
       // [v210] 統一調用全局煙火模塊
-      if(window.MuzzleFX) window.MuzzleFX.spawn(sx, sy, fromU.isGuard ? 1.0 : 0.9, isEnemy);
+      if(window.MuzzleFX) window.MuzzleFX.spawn(sx, sy, fromU.isGuard ? 1.0 : 0.9, isEnemy, 'raid');
     
 
       const wAnim = (fromU.weaponSlot === 'secondary') ? 'fire_secondary' : 'fire_primary';
@@ -1483,7 +1484,7 @@ function drawBullet(b){
       // [v210] 統一更新與渲染
       if(window.MuzzleFX) {
         window.MuzzleFX.update(dt);
-        window.MuzzleFX.render(ctx);
+        window.MuzzleFX.render(ctx, 'raid');
       }
 
       // [v208] 跳過快速子彈的實體繪製，改為繪製曳光
