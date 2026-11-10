@@ -456,9 +456,9 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
   const moving = _slotMoving || worldMoving;
   const _inCombatD = !!(window._combat && window._combat.active);
   let animN;
-  if(item._standingWait && !_inCombatD){ animN = 'idle'; }
-  else if(animOverride){ animN = animOverride; }
-  else if(moving){ animN = (evac || (item._forceRunAnim && !_inCombatD)) ? 'run' : 'walk'; }
+  /* [v228] 動畫完全由 animOverride 決定 */
+  if(animOverride){ animN = animOverride; }
+  else if(moving){ animN = (evac) ? 'run' : 'walk'; }
   else { animN = 'idle'; }
   if(!item.animStart || item._lastAnimN !== animN){
     item.animStart = now;
@@ -688,6 +688,21 @@ function _renderPass(now){
     let _legO = null;
     let _animStartOverride = null;
     const _perfNow = performance.now();
+
+    /* [v228] 世界座標移動優先判定：有移動 → walk/run，無移動 → idle */
+    const _curWX228 = (typeof it.worldX === 'number') ? it.worldX : ex.worldX;
+    const _prevWX228 = it._renderPrevWX;
+    const _worldMoved228 = (_prevWX228 != null) && Math.abs(_curWX228 - _prevWX228) > 0.0001;
+    it._renderPrevWX = _curWX228;
+    if(_worldMoved228){
+      const _worldDelta228 = Math.abs(_curWX228 - _prevWX228);
+      const _speedMs228 = _worldDelta228 / Math.max(0.001, dtS);
+      _animO = (_speedMs228 > 2.0) ? 'run' : 'walk';
+    } else {
+      _animO = 'idle';
+    }
+
+    /* 動作動畫（受傷/裝彈/開火）優先於移動動畫 */
     if(!it._retreating && _inCombat && it.srv && _alliesBySrvId[it.srv.id]){
       const a = _alliesBySrvId[it.srv.id];
       if(a._injuredDown || a.hp <= 0){
@@ -698,33 +713,9 @@ function _renderPass(now){
       } else if(a._fireAnimUntil && a._fireAnimUntil > _perfNow && a.weapon && a.weapon.id){
         _animO = 'fire_primary';
         _animStartOverride = a._fireAnimStart || _perfNow;
-      } else if(a._mode === 'chasing'){
-        _animO = 'run';
-      } else if(a._mode === 'advancing'){
-        _animO = 'walk';
-      } else if(a._mode === 'firing' || a._mode === 'waiting'){
-        _animO = 'idle';
-      } else if(a._mode === 'following'){
-        /* [v184 H20] following 时 worldX 在变 → walk，不变 → idle。
-           v183b H14 用了 run（2.8 m/s 对应），但 following 速度 1.6 m/s 更接近 walk 的 1.4 m/s。
-           run 只适合 chasing（2.8 m/s 追玩家）。用户反馈 following 用 run 很怪。 */
-        const _worldMovedH20 = Math.abs(a.worldX - (a._lastWorldX != null ? a._lastWorldX : a.worldX)) > 0.0001;
-        _animO = _worldMovedH20 ? 'walk' : 'idle';
       }
-      /* rev-fix-leg: 與玩家一致，fire/reload 期間不使用 legOverride，腿恆為 0 */
-      /* _standStart/_standUntil 仍保留給下方 idle 過渡邏輯使用 */
     }
-    if(!_animO && !it._retreating && it.srv && it.srv._standUntil && _nowRp < it.srv._standUntil && it.srv._standStart != null){
-      _animO = 'idle';
-      const _t = Math.max(0, Math.min(1, (_nowRp - it.srv._standStart) / Math.max(1, it.srv._standUntil - it.srv._standStart)));
-      const _walkAnim = GAME_ANIMS.walk;
-      const _wl = _walkAnim.keys;
-      const _wf = (it.animFrame || 0) % _walkAnim.frameCount;
-      _legO = {
-        right_leg: { rot: (_wl.right_leg[_wf] ? _wl.right_leg[_wf].rot : 0) * (1 - _t) },
-        left_leg: { rot: (_wl.left_leg[_wf] ? _wl.left_leg[_wf].rot : 0) * (1 - _t) }
-      };
-    }
+
     if((_animO === 'fire_primary' || _animO === 'reload') && _animStartOverride){
       it.animStart = _animStartOverride;
       it._lastAnimN = _animO;
