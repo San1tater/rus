@@ -586,9 +586,9 @@ function _gardenMerchantShowConfirm(lineKey, targetLv){
 /* ===== 交易系統 ===== */
 function _tradeItemIconHtml(item, size){
   const _is = 'width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block';
-  if(item.imgIcon) return '<img src="icons/garden/' + item.imgIcon + '.png' + assetSuffix() + '" style="' + _is + '" alt="">';
+  if(item.imgIcon) return '<img src="icons/garden/' + item.imgIcon + '.png' + assetSuffix('icons/garden/' + item.imgIcon + '.png') + '" style="' + _is + '" alt="">';
   if(item.id === 'seed_stock' || item.id === 'seed_premium' || item.id === 'seed_legend'){
-    return '<img src="icons/garden/seeds/seed_pack.png' + assetSuffix() + '" style="' + _is + '" alt="">';
+    return '<img src="icons/garden/seeds/seed_pack.png' + assetSuffix('icons/garden/seeds/seed_pack.png') + '" style="' + _is + '" alt="">';
   }
   if(item.itemIconId) return itemIcon(item.itemIconId, size);
   return '<span style="font-size:22px;line-height:1;display:inline-block;max-width:100%;max-height:100%;overflow:hidden">' + (item.icon || '📦') + '</span>';
@@ -698,7 +698,7 @@ function buyTradeItem(itemId, qty){
     if(!state.garden.ownedSpecialSoil) state.garden.ownedSpecialSoil = {};
     state.garden.ownedSpecialSoil[item.id] = true;
     got.push({
-      imgSrc: 'icons/garden/' + item.imgIcon + '.png' + assetSuffix(),
+      imgSrc: 'icons/garden/' + item.imgIcon + '.png' + assetSuffix('icons/garden/' + item.imgIcon + '.png'),
       rarity: item.rarity || '傳奇',
       name: item.name,
       count: 1

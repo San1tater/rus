@@ -213,7 +213,8 @@ function _renderBg(){
   const _maxIdx = _pathNodes ? (_pathNodes.length - 1) : node.idx;
   const _safeIdx = Math.min(Math.max(0, node.idx), _maxIdx);
   const key = REGION_KEYS[_region.replace(/II$/,'')] + '_r' + _ri + '_n' + _safeIdx;
-  const url = "url('images/bg/" + key + '.png' + (typeof assetSuffix === 'function' ? assetSuffix() : '') + "')";
+  const _p = "images/bg/" + key + ".png";
+  const url = "url('" + _p + (typeof assetSuffix === 'function' ? assetSuffix(_p) : '') + "')";
   const ls = document.querySelectorAll('#zone1 .bg-layer');
   for(let i = 0; i < ls.length; i++) ls[i].style.backgroundImage = url;
   const t = document.querySelector('#zone1 .zone-title');
@@ -246,7 +247,8 @@ function preloadExploreBackgrounds(){
       const route = routes[r];
       if(!route || !route.nodes) continue;
       for(let n = 0; n < route.nodes.length; n++){
-        const url = 'images/bg/' + key + '_r' + r + '_n' + n + '.png' + assetSuffix();
+        const _p = 'images/bg/' + key + '_r' + r + '_n' + n + '.png';
+        const url = _p + assetSuffix(_p);
         if(_bgPreloadCache.has(url)) continue;
         _bgPreloadCache.add(url);
         const img = new Image();
@@ -452,8 +454,7 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
   const _slotMoving = (typeof item._renderForceMoving === 'boolean')
     ? item._renderForceMoving
     : _slotMovingRaw;
-  const worldMoving = _exSpeed > 0.5 && !_looting;
-  const moving = _slotMoving || worldMoving;
+  const moving = _slotMoving;
   const _inCombatD = !!(window._combat && window._combat.active);
   let animN;
   /* [v228] 動畫完全由 animOverride 決定 */
@@ -484,14 +485,30 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
   }
   if(animN === 'dead'){
     ctx.save();
-    ctx.translate(cw / 2 - 193 * sc, chh - 10 - 68 * sc);
+    /* [v245] X 保留原始 offset 避免头部裁切，Y 对齐 chh * 0.95 */
+    ctx.translate(cw / 2 - 193 * sc, chh * 0.95);
     ctx.rotate(Math.PI / 2);
     ctx.scale(sc, sc);
     ctx.translate(-200, -515);
-    const anim = GAME_ANIMS.idle;
+    const anim = GAME_ANIMS.dead;
     const B = { x: 30, y: 30, w: 340, h: 460 };
+    const _stype = item.srv ? item.srv.type : null;
+    const _TYPE_COLORS = {
+      farmer:  { body:'#5a9a48', legs:'#3a6a2e' },
+      guard:   { body:'#5088bb', legs:'#2e4a6a' },
+      foreman: { body:'#e0a830', legs:'#d8d0c0' },
+      enemy:   { body:'#8b2a2a', legs:'#3a1010' }
+    };
+    const _sc = _stype ? _TYPE_COLORS[_stype] : null;
     const units = [];
-    for(const L of GAME_LAYERS){ units.push({ z: L.z, kind:'layer', layer: L }); }
+    for(const L of GAME_LAYERS){
+      const _clone = Object.assign({}, L);
+      if(_sc){
+        if(L.id === 'right_leg' || L.id === 'left_leg') _clone.color = _sc.legs;
+        else if(L.id === 'torso' || L.id === 'back_arm' || L.id === 'front_arm') _clone.color = _sc.body;
+      }
+      units.push({ z: L.z, kind:'layer', layer: _clone });
+    }
     if(eq.head && typeof HEAD_ARMOR_LAYOUT !== 'undefined'){
       const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
       const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
@@ -525,7 +542,9 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
     }
     ctx.restore();
   } else {
-    _raidDrawHuman(ctx, cw / 2, chh * 0.95, sc, eq, eqR, animN, item.animFrame % 8, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
+    /* [v236] 腳底略低於玩家 */
+    const _drawY236 = (animN === 'dead') ? (chh * 0.95) : (chh * 0.96);
+    _raidDrawHuman(ctx, cw / 2, _drawY236, sc, eq, eqR, animN, item.animFrame % 8, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
   }
   ctx.restore();
 }
@@ -663,13 +682,13 @@ function _renderPass(now){
       else s.screenX += Math.sign(_diff_f) * _followStep;
       s._renderForceMoving = Math.abs(_a2_f.worldX - (_a2_f._lastWorldX != null ? _a2_f._lastWorldX : _a2_f.worldX)) > 0.0001;
     } else {
-      /* [v186 H30] 战斗结束后（无 _a2_f），直接吸附到 targetX，不平滑。
-         原旧 fallback 用 targetX - screenX 平滑追，worldX 不变但 screenX 移动 = 滑行。
-         战斗结束时载员已随玩家归位（或接近归位），吸附不会有大的视觉跳跃。 */
+      /* [v236] 無戰鬥 ally 時，用 _followStep 平滑過渡，避免吸附 */
       const _relWX = (typeof s.worldX === 'number' ? s.worldX : ex.worldX) - ex.worldX;
       const _targetScreenX = ((s.targetX != null) ? s.targetX : EXPLORE_HERO_X_RATIO)
                            + (_relWX / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-      s.screenX = _targetScreenX;
+      const _diffE = _targetScreenX - s.screenX;
+      if(Math.abs(_diffE) <= _followStep) s.screenX = _targetScreenX;
+      else s.screenX += Math.sign(_diffE) * _followStep;
       s._renderForceMoving = (s._forceRunAnim === true) || (Math.abs(_relWX) > 0.05 && s._standingWait !== true);
     }
   }
@@ -690,16 +709,21 @@ function _renderPass(now){
     const _perfNow = performance.now();
 
     /* [v228] 世界座標移動優先判定：有移動 → walk/run，無移動 → idle */
-    const _curWX228 = (typeof it.worldX === 'number') ? it.worldX : ex.worldX;
-    const _prevWX228 = it._renderPrevWX;
-    const _worldMoved228 = (_prevWX228 != null) && Math.abs(_curWX228 - _prevWX228) > 0.0001;
-    it._renderPrevWX = _curWX228;
-    if(_worldMoved228){
-      const _worldDelta228 = Math.abs(_curWX228 - _prevWX228);
-      const _speedMs228 = _worldDelta228 / Math.max(0.001, dtS);
-      _animO = (_speedMs228 > 2.0) ? 'run' : 'walk';
+    /* [v243] 撤退分支：screenX 額外步進，worldX 不更新，直接強制 run */
+    if(it._retreating){
+      _animO = 'run';
     } else {
-      _animO = 'idle';
+      const _curWX228 = (typeof it.worldX === 'number') ? it.worldX : ex.worldX;
+      const _prevWX228 = it._renderPrevWX;
+      const _worldMoved228 = (_prevWX228 != null) && Math.abs(_curWX228 - _prevWX228) > 0.0001;
+      it._renderPrevWX = _curWX228;
+      if(_worldMoved228){
+        const _worldDelta228 = Math.abs(_curWX228 - _prevWX228);
+        const _speedMs228 = _worldDelta228 / Math.max(0.001, dtS);
+        _animO = (_speedMs228 > 2.0) ? 'run' : 'walk';
+      } else {
+        _animO = 'idle';
+      }
     }
 
     /* 動作動畫（受傷/裝彈/開火）優先於移動動畫 */
@@ -1045,7 +1069,8 @@ function _startCombat(ev, first){
       }
     },
     onResolve: function(win){
-    if(!win && isV){ win = true; }
+    /* [v240] 殉爆时 state.player.hp 已为 0，不覆盖失败 */
+    if(!win && isV && state.player.hp > 0){ win = true; }
     if(win && ex.combatEvent) ex.combatEvent.cleared = true;
     if(win){
       for(const _rnode of ex.nodes){
@@ -1067,7 +1092,8 @@ function _startCombat(ev, first){
       const _btrActiveNow = !!(_btrNow && _btrNow.active && (_btrNow.phase === 'support' || _btrNow.phase === 'center'));
       ex.mode = _btrActiveNow ? 'vehicle' : 'walk';
       /* rev-fix-heal-after-win: 勝利後若受傷，自動使用醫療包補血，等待治療過程 1200ms（參考 Boss 戰 manualHeal） */
-      if(!_isVNow && state.player.hp < state.player.maxHp){
+      /* [v240] 殉爆时 hp=0，不补血 */
+      if(!_isVNow && state.player.hp > 0 && state.player.hp < state.player.maxHp){
         var _healUsed = [];
         var _medbayLvW = (typeof getBuildingLv === 'function') ? getBuildingLv('medbay') : 0;
         while(state.player.hp < state.player.maxHp){

@@ -3,6 +3,10 @@
 const VERSION = 'v17.5';
 let ASSET_VERSION = localStorage.getItem('wasteland_asset_version') || '';
 const ASSET_PROBE_URL = 'icons/buildings/control.png';
+const ASSET_MAP_KEY = 'wasteland_asset_map';
+/* [v250] 自訂網域時填，github.io 自動推斷 */
+const GH_OWNER = '';
+const GH_REPO = '';
 const ASSET_CACHE_KEY = 'wasteland_asset_version';
 
 const RARITY_ORDER = ['破舊','一般','庫存','精品','傳奇','具名'];

@@ -233,6 +233,15 @@ function init(){
   state.player.armor = Math.min(state.player.armor || 0, state.player.maxArmor);
   save();
   renderCurrentTab();
+  /* [v246] 啟動時預加載所有靜態圖片 */
+  setTimeout(function(){
+    try{
+      if(typeof preloadStaticAssets === 'function'){
+        var _n = preloadStaticAssets();
+        console.log('[assets] 靜態資源預載 ' + _n + ' 張');
+      }
+    }catch(e){ console.warn('[assets] 靜態資源預載失敗', e); }
+  }, 100);
   setTimeout(function(){
     try{
       if(typeof preloadExploreBackgrounds === 'function'){

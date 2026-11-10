@@ -300,14 +300,126 @@ function computeWeaponCharLayout(cfg){
 const heroImgCache = new Map();
 function getHeroImg(src){
   if(!src) return null;
-  const v = assetSuffix();
-  const cacheKey = src;
+  const v = (typeof assetSuffix === "function") ? assetSuffix(src) : "";
+  const cacheKey = src + v;
   if(heroImgCache.has(cacheKey)) return heroImgCache.get(cacheKey);
   const img = new Image();
   img.src = src + v;
   heroImgCache.set(cacheKey, img);
   return img;
 }
+
+/* [v246] 啟動時預加載所有靜態圖片，走 getHeroImg 共享 heroImgCache，一次加載永久緩存 */
+function preloadStaticAssets(){
+  var _ok = 0;
+  try {
+    // 武器
+    if(typeof WEAPONS !== 'undefined'){
+      for(var k in WEAPONS){
+        if(WEAPONS[k] && WEAPONS[k].slot){
+          getHeroImg('icons/items/' + k + '.png'); _ok++;
+        }
+      }
+    }
+    // 防具
+    if(typeof ARMOR !== 'undefined'){
+      for(var k in ARMOR){
+        getHeroImg('icons/items/' + k + '.png'); _ok++;
+      }
+    }
+    // 消耗品
+    if(typeof CONSUMABLES !== 'undefined'){
+      for(var k in CONSUMABLES){
+        getHeroImg('icons/items/' + k + '.png'); _ok++;
+      }
+    }
+    // 彈藥（按口徑映射）
+    if(typeof AMMO_ICON_BY_CAL !== 'undefined'){
+      for(var cal in AMMO_ICON_BY_CAL){
+        getHeroImg('icons/items/' + AMMO_ICON_BY_CAL[cal]); _ok++;
+      }
+    }
+    // 建築
+    if(typeof BUILDINGS !== 'undefined'){
+      getHeroImg('icons/buildings/control.png'); _ok++;
+      for(var k in BUILDINGS){
+        getHeroImg('icons/buildings/' + k + '.png'); _ok++;
+      }
+    }
+    // 種子
+    if(typeof SEEDS !== 'undefined'){
+      for(var k in SEEDS){
+        var _img = SEEDS[k].img || k;
+        getHeroImg('icons/garden/seeds/' + _img + '.png'); _ok++;
+      }
+    }
+    // 作物（成熟 / 幼苗 / 腐爛）
+    if(typeof CROPS !== 'undefined'){
+      for(var k in CROPS){
+        var _img = CROPS[k].img || k;
+        getHeroImg('icons/garden/crops/' + _img + '.png'); _ok++;
+        getHeroImg('icons/garden/sprouts/sprout_' + _img + '.png'); _ok++;
+        getHeroImg('icons/garden/mature/mature_' + _img + '.png'); _ok++;
+        getHeroImg('icons/garden/rotten/rotten_' + _img + '.png'); _ok++;
+      }
+    }
+    // 花園地塊背景 + 特殊物品
+    var _gardenIcons = ['soil','tower_bg','shed_bg','compost_bg','fridge_bg','distillery_bg','black_soil','red_soil','liquor'];
+    for(var i = 0; i < _gardenIcons.length; i++){
+      getHeroImg('icons/garden/' + _gardenIcons[i] + '.png'); _ok++;
+    }
+    getHeroImg('images/garden/default.png'); _ok++;
+    getHeroImg('images/garden/bg.png'); _ok++;
+    // 敵人武器池（關鍵——修屍體沒武器的根本）
+    if(typeof ENEMY_WEAPON_POOLS !== 'undefined'){
+      var _seen = {};
+      for(var eid in ENEMY_WEAPON_POOLS){
+        var pool = ENEMY_WEAPON_POOLS[eid];
+        var _tierKeys = ['t1','t2'];
+        for(var ti = 0; ti < _tierKeys.length; ti++){
+          var arr = pool[_tierKeys[ti]];
+          if(!arr) continue;
+          for(var ai = 0; ai < arr.length; ai++){
+            var wid = arr[ai];
+            if(_seen[wid]) continue;
+            _seen[wid] = 1;
+            getHeroImg('icons/items/' + wid + '.png'); _ok++;
+          }
+        }
+      }
+    }
+    // Boss 圖標
+    if(typeof BOSSES !== 'undefined'){
+      for(var bid in BOSSES){
+        var _base = bid.replace(/_ii$/, '');
+        getHeroImg('icons/bosses/' + _base + '.png'); _ok++;
+      }
+    }
+    // 載具
+    if(typeof VEHICLES !== 'undefined'){
+      for(var vid in VEHICLES){
+        getHeroImg('icons/vehicles/' + vid + '.png'); _ok++;
+      }
+    }
+    getHeroImg('icons/vehicles/card_bg.png'); _ok++;
+    // 僕人
+    if(typeof SERVANT_TYPES !== 'undefined'){
+      for(var st in SERVANT_TYPES){
+        getHeroImg('icons/servants/' + st + '.png'); _ok++;
+      }
+    }
+    // Boss 背景
+    if(typeof BOSSES !== 'undefined'){
+      for(var bid2 in BOSSES){
+        var _base2 = bid2.replace(/_ii$/, '');
+        getHeroImg('images/bg/boss_' + _base2 + '.png'); _ok++;
+      }
+    }
+  } catch(e){ console.warn('[preloadStatic]', e); }
+  return _ok;
+}
+
+window.preloadStaticAssets = preloadStaticAssets;
 
 const heroAnim = { name:'walk', frame:0, lastUpdate:0, forcedEnd:0, eqSlot:null };
 const battleHeroAnim = { name:'idle', frame:0, lastUpdate:0, forcedEnd:0 };
@@ -907,7 +1019,9 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
   }
   ctx.save();
   ctx.translate(px, py);
-  if(animName === 'dead'){ ctx.rotate(-Math.PI / 2); ctx.translate(-ORIG_FOOT_X * scale, 0); }
+  /* [v236] 去掉额外 translate，倒地定位与玩家一致 */
+  /* [v237] 倒地旋转方向与玩家一致 */
+  if(animName === 'dead'){ ctx.rotate(Math.PI / 2); }
   ctx.scale(flipX ? -scale : scale, scale);
   ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
 

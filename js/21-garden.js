@@ -13,8 +13,8 @@ function _getPlotTypeIconHtml(type, size, flexNone, fill){
   const _t = GARDEN_PLOT_TYPES[type];
   if(!_t) return '<span style="font-size:' + size + 'px' + _flex + '">?</span>';
   const _file = _t.imgIcon || _t.bg || type;
-  if(fill) return '<img src="icons/garden/' + _file + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;border-radius:3px" alt="">';
-  return '<img src="icons/garden/' + _file + '.png' + assetSuffix() + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain' + _flex + '" alt="">';
+  if(fill) return '<img src="icons/garden/' + _file + '.png' + assetSuffix('icons/garden/' + _file + '.png') + '" style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;border-radius:3px" alt="">';
+  return '<img src="icons/garden/' + _file + '.png' + assetSuffix('icons/garden/' + _file + '.png') + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain' + _flex + '" alt="">';
 }
 
 function _getAvailableSoilTypes(currentType){
@@ -460,7 +460,7 @@ function _gardenPlotOwnersHtml(idx, type){
     return html;
   }
   for(const s of servants){
-    const _img = 'icons/servants/' + s.type + '.png' + assetSuffix();
+    const _img = 'icons/servants/' + s.type + '.png' + assetSuffix('icons/servants/' + s.type + '.png');
     const effMax = servantEffectiveMaxStamina(s);
     const stam = Math.max(0, s.stamina || 0);
     const pct = effMax > 0 ? Math.round((stam / effMax) * 100) : 0;
@@ -515,7 +515,7 @@ function _gardenPickServantForPlot(idx, type){
       const isFull = cur >= maxSlots;
       const alreadyHere = (s.assignedPlots || []).indexOf(idx) !== -1;
       const _inStn = _isServantInStation(s.id);
-      const _img = 'icons/servants/' + s.type + '.png' + assetSuffix();
+      const _img = 'icons/servants/' + s.type + '.png' + assetSuffix('icons/servants/' + s.type + '.png');
       const dis = alreadyHere || (isFull && !_isExclusiveList);
       const _stnMark = _inStn ? ' 🚂工作中' : '';
       body += '<div class="item-row' + (dis ? ' disabled' : '') + '" data-sid="' + s.id + '"' + (dis ? ' style="opacity:.4"' : '') + '>';
@@ -751,7 +751,7 @@ function openGardenSeedPickerWithRemove(idx, returnFn){
     return (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
   });
   let body = '';
-  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold"><img style="width:28px;height:28px;object-fit:contain;flex:0 0 auto" src="icons/garden/soil.png' + assetSuffix() + '" alt=""><span>土地</span>' + _gardenFertInfoHtml(plot) + '<button class="btn danger" id="soil-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
+  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold"><img style="width:28px;height:28px;object-fit:contain;flex:0 0 auto" src="icons/garden/soil.png' + assetSuffix('icons/garden/soil.png') + '" alt=""><span>土地</span>' + _gardenFertInfoHtml(plot) + '<button class="btn danger" id="soil-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
   body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv || 1) + '</div>';
   body += _gardenPlotOwnersHtml(idx, 'farmer');
   body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px">種植種子</div>';
@@ -1089,7 +1089,7 @@ function renderGardenServants(box){
         if(idx < servants.length){
           const s = servants[idx];
           const tDef = SERVANT_TYPES[s.type] || {name:'?'};
-          const _img = 'icons/servants/' + s.type + '.png' + assetSuffix();
+          const _img = 'icons/servants/' + s.type + '.png' + assetSuffix('icons/servants/' + s.type + '.png');
           const _star = _isServantWorking(s) ? '<div class="srv-star">★</div>' : '';
           const _label = servantLabel(s);
           const _labelEsc = _servantEscHtml(_label);
@@ -1313,7 +1313,7 @@ function openServantDetail(srvId, returnFn){
   ft.innerHTML = ftHtml;
   let body = '';
   body += '<div style="font-size:15px;color:#e8a33d;font-weight:bold;display:flex;align-items:center;gap:8px">';
-  body += '<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:5px;background:' + rarityBg(srv.rarity) + ';flex:0 0 auto"><img style="width:28px;height:28px;object-fit:contain" src="icons/servants/' + srv.type + '.png' + assetSuffix() + '" alt=""></span>';
+  body += '<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:5px;background:' + rarityBg(srv.rarity) + ';flex:0 0 auto"><img style="width:28px;height:28px;object-fit:contain" src="icons/servants/' + srv.type + '.png' + assetSuffix('icons/servants/' + srv.type + '.png') + '" alt=""></span>';
   body += '<span class="' + rarityClass(srv.rarity) + '">' + _servantEscHtml(servantLabel(srv)) + '</span>';
   body += '<span class="srv-rename-btn" style="font-size:11px;color:#e8a33d;cursor:pointer;padding:4px 10px;border:1px solid #3a2f25;border-radius:4px;margin-left:6px">改名</span>';
 {
@@ -3157,7 +3157,7 @@ function _openOfflineGardenDetail(entry){
           _clickable = false;
         } else if(_isGardenExtra){
           def = GARDEN_EXTRAS[it.id];
-          _iconHtml = '<img src="icons/garden/' + def.img + '.png' + assetSuffix() + '" style="width:30px;height:30px;object-fit:contain;display:block" alt="">';
+          _iconHtml = '<img src="icons/garden/' + def.img + '.png' + assetSuffix('icons/garden/' + def.img + '.png') + '" style="width:30px;height:30px;object-fit:contain;display:block" alt="">';
           _clickable = false;
         } else {
           def = itemDef(it.id) || { name: it.id };
@@ -3502,7 +3502,7 @@ function openFoodPolicyPanel(){
   body += '<div style="font-size:10px;color:#7a6f60;margin-bottom:8px;line-height:1.5">調整每位僕人的自動吃飯策略。定時餵食每小時執行一次。</div>';
   for(const srv of servants){
     const def = SERVANT_TYPES[srv.type] || {name:'?'};
-    const _img = 'icons/servants/' + srv.type + '.png' + assetSuffix();
+    const _img = 'icons/servants/' + srv.type + '.png' + assetSuffix('icons/servants/' + srv.type + '.png');
     const plots = (srv.assignedPlots || []).map(function(i){ return plotCoordName(i); }).join('、');
     body += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed #2a231c">';
     body += '<div style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:5px;background:' + rarityBg(srv.rarity) + ';flex:0 0 auto"><img style="width:26px;height:26px;object-fit:contain" src="' + _img + '" alt=""></div>';
@@ -4015,7 +4015,7 @@ function openDistilleryDetail(idx, returnFn){
       else h += '<span style="font-size:24px;color:#5a5040">✦</span>';
       h += '<div style="position:absolute;bottom:1px;right:2px;font-size:10px;font-weight:bold;color:#fff;background:rgba(0,0,0,.78);padding:0 3px;border-radius:3px;line-height:1.35">' + DISTILL_COST + '</div>';
     } else {
-      h += '<img src="icons/garden/liquor.png' + assetSuffix() + '" style="width:42px;height:42px;object-fit:contain" alt="">';
+      h += '<img src="icons/garden/liquor.png' + assetSuffix('icons/garden/liquor.png') + '" style="width:42px;height:42px;object-fit:contain" alt="">';
     }
     return h;
   }

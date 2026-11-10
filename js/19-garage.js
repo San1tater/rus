@@ -427,7 +427,7 @@ function _garageRenderHtml(){
   h += '<div class="garage-main">';
   h += '<div class="garage-showcase" id="garage-showcase-img">';
   h += '<div class="garage-global-exp">🌐 ' + _globalExpVal + '</div>';
-  h += '<img src="icons/vehicles/' + cur.id + '.png' + assetSuffix() + '" alt="">';
+  h += '<img src="icons/vehicles/' + cur.id + '.png' + assetSuffix('icons/vehicles/' + cur.id + '.png') + '" alt="">';
   h += '<div class="garage-vehicle-name-bar">' + cur.name + '</div>';
   h += '</div>';
 
@@ -439,7 +439,7 @@ function _garageRenderHtml(){
   h += '<div class="garage-bottom-right">';
   if(research){
     h += '<div class="garage-research-img-wrap" id="garage-research-target" data-vid="' + research.targetId + '" style="cursor:pointer">';
-    h += '<img src="icons/vehicles/' + research.targetId + '.png' + assetSuffix() + '" alt="">';
+    h += '<img src="icons/vehicles/' + research.targetId + '.png' + assetSuffix('icons/vehicles/' + research.targetId + '.png') + '" alt="">';
     h += '<div class="garage-research-name">' + tgt.name + '</div>';
     h += '</div>';
     const pct = research.need > 0 ? Math.min(100, Math.round(research.have / research.need * 100)) : 0;
@@ -453,8 +453,8 @@ function _garageRenderHtml(){
       const _fLiq = fmtNum(liq);
       const _fLiqMax = fmtNum(tgt.researchCost.liquor);
       h += '<div class="garage-req-row">';
-      h += '<span class="' + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + '"><img src="icons/items/545.png' + assetSuffix() + '" class="req-icon" alt=""> ' + _fAmmo + '/' + _fAmmoMax + '</span>';
-      h += '<span class="' + (liq >= tgt.researchCost.liquor ? 'ok' : 'bad') + '"><img src="icons/garden/liquor.png' + assetSuffix() + '" class="req-icon" alt=""> ' + _fLiq + '/' + _fLiqMax + '</span>';
+      h += '<span class="' + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + '"><img src="icons/items/545.png' + assetSuffix('icons/items/545.png') + '" class="req-icon" alt=""> ' + _fAmmo + '/' + _fAmmoMax + '</span>';
+      h += '<span class="' + (liq >= tgt.researchCost.liquor ? 'ok' : 'bad') + '"><img src="icons/garden/liquor.png' + assetSuffix('icons/garden/liquor.png') + '" class="req-icon" alt=""> ' + _fLiq + '/' + _fLiqMax + '</span>';
       h += '</div>';
     }
   } else {
@@ -511,7 +511,7 @@ function _renderGarageDockList(){
     else cls += ' locked';
 
     h += '<div class="' + cls + '" data-vid="' + vid + '">';
-    h += '<div class="gd-img"><img src="icons/vehicles/' + vid + '.png' + assetSuffix() + '" alt=""></div>';
+    h += '<div class="gd-img"><img src="icons/vehicles/' + vid + '.png' + assetSuffix('icons/vehicles/' + vid + '.png') + '" alt=""></div>';
     h += '<div class="gd-name">' + v.name + '</div>';
     if(isResearching) h += '<div class="gd-mark">🔬</div>';
     else if(isCurrent) h += '<div class="gd-mark">✓</div>';
@@ -665,7 +665,7 @@ function _garageOpenTechTree(){
     else { cls += ' locked'; mark = '?'; }
 
     nodesHtml += '<div class="' + cls + '" data-tech-node="' + n.vid + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + NW + 'px;height:' + NH + 'px">'
-      + '<div class="wt-node-img"><img draggable="false" src="icons/vehicles/' + n.vid + '.png' + assetSuffix() + '" data-fallback="1" alt=""></div>'
+      + '<div class="wt-node-img"><img draggable="false" src="icons/vehicles/' + n.vid + '.png' + assetSuffix('icons/vehicles/' + n.vid + '.png') + '" data-fallback="1" alt=""></div>'
       + '<div class="wt-node-name">' + v.name + '</div>'
       + '<div class="wt-node-mark">' + mark + '</div>'
       + '</div>';
@@ -822,7 +822,7 @@ function _garageShowTechDetail(vid){
 
   let body = '';
   body += '<div class="garage-tech-detail-img-wrap">';
-  body += '<img src="icons/vehicles/' + vid + '.png' + assetSuffix() + '" alt="">';
+  body += '<img src="icons/vehicles/' + vid + '.png' + assetSuffix('icons/vehicles/' + vid + '.png') + '" alt="">';
   body += '<div class="garage-tech-detail-name">' + v.name + ' <span style="color:#7a6f60;font-weight:normal">Tier ' + v.tier + '</span></div>';
   body += '</div>';
 
@@ -853,8 +853,8 @@ function _garageShowTechDetail(vid){
     const canBuy = expDone && ammo >= v.researchCost.ammoCount && liq >= v.researchCost.liquor;
     const isTarget = (g.researchTarget === vid);
     body += '<div class="garage-tech-detail-col-title">研發需求</div>';
-    body += '<div class="tech-detail-row"><span class="k"><img src="icons/items/545.png' + assetSuffix() + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
-    body += '<div class="tech-detail-row"><span class="k"><img src="icons/garden/liquor.png' + assetSuffix() + '" class="req-icon" alt=""> 私酒</span><span class="v ' + (liq >= v.researchCost.liquor ? 'ok' : 'bad') + '">' + Math.floor(liq) + '/' + v.researchCost.liquor + '</span></div>';
+    body += '<div class="tech-detail-row"><span class="k"><img src="icons/items/545.png' + assetSuffix('icons/items/545.png') + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
+    body += '<div class="tech-detail-row"><span class="k"><img src="icons/garden/liquor.png' + assetSuffix('icons/garden/liquor.png') + '" class="req-icon" alt=""> 私酒</span><span class="v ' + (liq >= v.researchCost.liquor ? 'ok' : 'bad') + '">' + Math.floor(liq) + '/' + v.researchCost.liquor + '</span></div>';
     body += '<div class="tech-detail-row"><span class="k">經驗</span><span class="v ' + (expDone ? 'ok' : 'bad') + '">' + prog + '/' + need + '</span></div>';
     body += '<div class="tech-detail-btn-col">';
     if(expDone){

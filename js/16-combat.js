@@ -735,6 +735,7 @@ function _autoFireFoot(now){
   for(let ii = 1; ii < c.allies.length; ii++){
     const a2 = c.allies[ii];
     if(a2.hp <= 0 || a2._retreating || !a2.isPassenger || !a2.weapon || !a2.weapon.def) continue;
+    if(a2._mode === 'advancing' || a2._mode === 'chasing' || a2._mode === 'waiting') continue;
     if(now < (a2._nextFireAt || 0)) continue;
     const r2 = _rangeOfWeaponDef(a2.weapon.def);
     const ir2 = [];
@@ -1116,7 +1117,7 @@ function _firePassenger(a, t, now, w){
       if(window.canEngage(_gr141, t, Math.abs(t.worldX - a.worldX))){
         invRemove(_chosenG141.id, _chosenG141.rarity, 1);
         a._nextGrenadeAt = now + 1500;
-        _passengerThrowGrenade(a, t, _chosenDef141, _chosenG141.rarity, now);
+        _passengerThrowGrenade(a, t, _chosenDef141, _chosenG141.rarity, now, _chosenG141.id);
         return;
       }
     }
@@ -1712,10 +1713,10 @@ function _playerThrowGrenade(p, t, now, w){
   const duration = Math.max(100, (distPx / 600) * 1000);
   const hitRate = getHitRate(gDef.type, '投擲', gDef.scopeBonus || 0) / 100;
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: tx, ty: mz.y, t: 0,
+    sx: mz.x, sy: mz.y, tx: tx, ty: 0.88, t: 0,
     start: performance.now(), duration: duration,
     enemy: false, big: true, arc: true, isGrenade: true, hit: true,
-    rarity: gRar, _target: t,
+    grenadeId: w.id, rarity: gRar, _target: t,
     _onHit: function() {
       const targets = c.enemies.filter(function(en){ return en.hp > 0; });
       const results = _applyGrenadeToTargets(targets, gDef, gRar, hitRate, gDef.penMM || 0, function(en){
@@ -1741,7 +1742,7 @@ function _playerThrowGrenade(p, t, now, w){
 }
 
 /* rev-fix-passenger-grenade: 乘客步戰投雷 */
-function _passengerThrowGrenade(a, t, gDef, gRar, now){
+function _passengerThrowGrenade(a, t, gDef, gRar, now, gid){
   const c = window._combat;
   if(!c) return;
   const sm = c.sm;
@@ -1756,7 +1757,7 @@ function _passengerThrowGrenade(a, t, gDef, gRar, now){
     sx: mz.x, sy: mz.y, tx: tx, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: false, big: true, arc: true, isGrenade: true, hit: true,
-    rarity: gRar, _target: t,
+    grenadeId: gid, rarity: gRar, _target: t,
     _onHit: function() {
       const targets = c.enemies.filter(function(en){ return en.hp > 0; });
       const results = _applyGrenadeToTargets(targets, gDef, gRar, hitRate, gDef.penMM || 0, function(en){
@@ -1817,7 +1818,7 @@ function _enemyThrowGrenade(e, p, now){
     sx: mz.x, sy: mz.y, tx: px, ty: mz.y, t: 0,
     start: performance.now(), duration: duration,
     enemy: true, big: true, arc: true, isGrenade: true, hit: true,
-    rarity: gRar, _target: p,
+    grenadeId: gid, rarity: gRar, _target: p,
     _onHit: function() {
       /* rev-fix-grenade-unified: 每破片走 applyDamage（roll 部位、穿甲、暴擊） */
       /* 需求：撤退中的載員不受任何敵人攻擊 */
@@ -2054,10 +2055,36 @@ function _render(){
       bx += dx * ext;
       by += dy * ext;
     }
+    // 手榴彈 / 拋物線彈道：在 y 軸加入正弦偏移
+    if(bb.arc || bb.isGrenade){
+      const _arcT = Math.min(1, bb.t);
+      const _arcH = Math.sin(_arcT * Math.PI) * H * 0.35;
+      by -= _arcH;
+    }
     
     if(bx < -10 || bx > W + 10 || by < -10 || by > H + 10) continue;
     const _bulletColor = window._rarityBulletColor(bb.rarity);
     const _brC = (typeof BULLET_VISUAL_RADIUS !== 'undefined') ? BULLET_VISUAL_RADIUS : { normal: 3, grenade: 5, missile: 6 };
+    if(bb.isGrenade && bb.grenadeId){
+      const _gimg = (typeof getHeroImg === 'function') ? getHeroImg('icons/items/' + bb.grenadeId + '.png') : null;
+      const _gsize = 20;
+      if(_gimg && _gimg.complete && _gimg.naturalWidth){
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(bb.t * Math.PI * 2);
+        ctx.drawImage(_gimg, -_gsize/2, -_gsize/2, _gsize, _gsize);
+        ctx.restore();
+      } else {
+        ctx.save();
+        const _gc = window._rarityBulletColor(bb.rarity);
+        ctx.fillStyle = _gc;
+        ctx.shadowColor = _gc;
+        ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(bx, by, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      continue;
+    }
     if(bb.missile){
       /* [v198c] 將原本的圓點改為朝向目標的流線錐體 */
       const _angle = Math.atan2(bb.ty - bb.sy, bb.tx - bb.sx);
@@ -2256,6 +2283,12 @@ window._playerShouldStandStill = function(){
   for(let i = 0; i < c.enemies.length; i++){
     if(c.enemies[i].hp <= 0) continue;
     if(window.canEngage(r, c.enemies[i], Math.abs(c.enemies[i].worldX - p.worldX))) return true;
+  }
+  /* 載員 firing 時，玩家也站定，避免載員滑行 */
+  for(let _ai = 1; _ai < c.allies.length; _ai++){
+    const _a = c.allies[_ai];
+    if(_a.hp <= 0 || _a._retreating) continue;
+    if(_a._mode === 'firing') return true;
   }
   return false;
 };

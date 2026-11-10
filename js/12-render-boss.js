@@ -16,7 +16,8 @@ var HYDRA_NECK_MAP = { neck_1:'head_1', neck_2:'head_2', neck_3:'head_3', neck_4
 function getBossBgPath(bossId){
   if(!BOSSES[bossId]) return '';
   const _base = bossId.replace(/_ii$/, '');
-  return 'images/bg/boss_' + _base + '.png' + assetSuffix();
+  const _p = 'images/bg/boss_' + _base + '.png';
+  return _p + assetSuffix(_p);
 }
 
 /* ============== Boss 骨架解析 ============== */

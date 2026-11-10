@@ -1058,6 +1058,8 @@ function _detonate(vid, veh){
   d.members.gunner = 0;
   d.members.commander = 0;
   d.members.player = 0;
+  /* [v236] 标记殉爆，供 onResolve 判断不覆盖失败 */
+  if(window._combat) window._combat._detonated = true;
 
   /* [v180 F7] 判斷玩家是否還在車上。
      下車後殘留子彈命中舊載具 → 觸發 _detonate → 不能殺已下車的玩家和載員。
@@ -1347,6 +1349,18 @@ function _writeVehicleDestroyedLog(reason, vid){
   for(const _pk in _dmg.parts){ if(_dmg.parts[_pk] <= 0) _brokenParts.push(_pk); }
   const _deadMembers = [];
   for(const _mk in _dmg.members){ if(_dmg.members[_mk] <= 0) _deadMembers.push(_mk); }
+  /* 加入隨車載員統計 */
+  if(state.station && Array.isArray(state.station.passengers)){
+    const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
+    for(let _pi = 0; _pi < state.station.passengers.length && _pi < _cap; _pi++){
+      const _p = state.station.passengers[_pi];
+      if(!_p || !_p.srvId) continue;
+      const _srv = (state.servants || []).find(function(s){ return s.id === _p.srvId; });
+      if(_srv && (_srv.hp <= 0 || (_srv.injuredUntil && _srv.injuredUntil > Date.now()))){
+        _deadMembers.push('passenger_' + (_pi + 1));
+      }
+    }
+  }
   const _reasonText = reason === 'detonated' ? '彈藥架殉爆' : '車體擊毀';
   const _summary = [];
   if(_brokenParts.length) _summary.push('損壞 ' + _brokenParts.length + ' 處');
@@ -1398,7 +1412,9 @@ function _openVehicleDestroyedDetail(log){
     body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:4px">陣亡成員</div>';
     const memberLabel = { driver: '駕駛', gunner: '炮手', commander: '車長', player: '玩家' };
     for(let i = 0; i < d.deadMembers.length; i++){
-      body += '<div class="stat-line"><span class="k">' + (memberLabel[d.deadMembers[i]] || d.deadMembers[i]) + '</span><span class="v" style="color:#e05252">陣亡</span></div>';
+      const _mk = d.deadMembers[i];
+      const _lbl = _mk.indexOf('passenger_') === 0 ? ('載員 ' + _mk.replace('passenger_', '#')) : (memberLabel[_mk] || _mk);
+      body += '<div class="stat-line"><span class="k">' + _lbl + '</span><span class="v" style="color:#e05252">陣亡</span></div>';
     }
   }
   if(d.ammoRackDamage > 0){

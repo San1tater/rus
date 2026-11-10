@@ -235,7 +235,8 @@ function _gardenStorageItemIcon(id, size, fallbackIcon){
   if(typeof SEEDS !== 'undefined' && SEEDS[id]) return seedImgHtml(id, size);
   if(typeof CROPS !== 'undefined' && CROPS[id]) return cropImgHtml(id, size);
   if(typeof GARDEN_EXTRAS !== 'undefined' && GARDEN_EXTRAS[id]){
-    return '<img src="icons/garden/' + GARDEN_EXTRAS[id].img + '.png' + assetSuffix() + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain;display:block" alt="">';
+    var _p = 'icons/garden/' + GARDEN_EXTRAS[id].img + '.png';
+    return '<img src="' + _p + assetSuffix(_p) + '" style="width:' + size + 'px;height:' + size + 'px;object-fit:contain;display:block" alt="">';
   }
   return fallbackIcon || '?';
 }
@@ -251,7 +252,19 @@ Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS,SEEDS,CROPS);
 function itemDef(id){return ALL_ITEMS[id]||null;}
 function resolveIconId(id){if(!id) return '';if(id.startsWith('named_')){const parts=id.split('_');if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];}return id;}
 
-function assetSuffix(){ return ASSET_VERSION ? ('?v=' + ASSET_VERSION) : ''; }
+/* [v250] 按檔案版本：查 _ASSET_VERSIONS[path]；無參返回空（走瀏覽器 10 分鐘快取） */
+function assetSuffix(path){
+  if(!path) return "";
+  var v = (window._ASSET_VERSIONS && window._ASSET_VERSIONS[path]) || "";
+  return v ? ("?v=" + v) : "";
+}
+function _loadAssetMap(){
+  try {
+    var raw = localStorage.getItem(ASSET_MAP_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e){ return {}; }
+}
+window._ASSET_VERSIONS = window._ASSET_VERSIONS || _loadAssetMap();
 function rarityBg(rarity){return RARITY_BG[rarity]||'#151210';}
 
 function fmtNum(n){
@@ -266,36 +279,43 @@ function fmtNum(n){
 
 function itemIcon(id,size){
   const s=size||24;
-  if(!id) return '';
-  const v=assetSuffix();
-  if(typeof SEEDS!=='undefined' && SEEDS[id]){
+  if(!id) return "";
+  if(typeof SEEDS!=="undefined" && SEEDS[id]){
     const _img = SEEDS[id].img || id;
-    return `<img src="icons/garden/seeds/${_img}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+    const _p = "icons/garden/seeds/" + _img + ".png";
+    return `<img src="${_p}${assetSuffix(_p)}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
   }
-  if(typeof CROPS!=='undefined' && CROPS[id]){
+  if(typeof CROPS!=="undefined" && CROPS[id]){
     const _img = CROPS[id].img || id;
-    return `<img src="icons/garden/crops/${_img}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+    const _p = "icons/garden/crops/" + _img + ".png";
+    return `<img src="${_p}${assetSuffix(_p)}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
   }
   if(MATERIAL_EMOJI[id]) return `<span style="font-size:${Math.round(s*0.85)}px;line-height:1;display:inline-block">${MATERIAL_EMOJI[id]}</span>`;
   const ammoDef=AMMO[id];
   if(ammoDef && ammoDef.cal){
     const f=AMMO_ICON_BY_CAL[ammoDef.cal];
-    if(f) return `<img src="icons/items/${f}${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+    if(f){
+      const _p = "icons/items/" + f;
+      return `<img src="${_p}${assetSuffix(_p)}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+    }
   }
   const rid=resolveIconId(id);
-  return `<img src="icons/items/${rid}.png${v}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
+  const _p = "icons/items/" + rid + ".png";
+  return `<img src="${_p}${assetSuffix(_p)}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
 }
 function seedImgHtml(seedId, size){
   const s = (typeof SEEDS !== 'undefined') ? SEEDS[seedId] : null;
   if(!s) return `<span style="font-size:${Math.round(size*0.85)}px;line-height:1;display:inline-block">🌰</span>`;
   const img = s.img || seedId;
-  return `<img src="icons/garden/seeds/${img}.png${assetSuffix()}" style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
+  const _p = "icons/garden/seeds/" + img + ".png";
+  return `<img src="${_p}${assetSuffix(_p)}" style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
 }
 function cropImgHtml(cropId, size){
   const c = (typeof CROPS !== 'undefined') ? CROPS[cropId] : null;
   if(!c) return '?';
   const img = c.img || cropId;
-  return `<img src="icons/garden/crops/${img}.png${assetSuffix()}" style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
+  const _p = "icons/garden/crops/" + img + ".png";
+  return `<img src="${_p}${assetSuffix(_p)}" style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
 }
 function cropStageImgHtml(cropId, stage, size){
   const c = (typeof CROPS !== 'undefined') ? CROPS[cropId] : null;
@@ -306,33 +326,68 @@ function cropStageImgHtml(cropId, stage, size){
   else if(stage === 'rotten'){ folder = 'rotten'; file = 'rotten_' + img; }
   else { folder = 'mature'; file = 'mature_' + img; }
   const _fallback = (stage === 'mature')
-    ? ` onerror="this.onerror=null;this.src='icons/garden/crops/${img}.png${assetSuffix()}'"`
+    ? ` onerror="this.onerror=null;this.src='icons/garden/crops/${img}.png${assetSuffix('icons/garden/crops/' + img + '.png')}'"`
     : '';
-  return `<img src="icons/garden/${folder}/${file}.png${assetSuffix()}"${_fallback} style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
+  const _p = "icons/garden/" + folder + "/" + file + ".png";
+  return `<img src="${_p}${assetSuffix(_p)}"${_fallback} style="width:${size}px;height:${size}px;object-fit:contain;display:block" alt="">`;
 }
-function bossIcon(id){const _map={factory_king_ii:"factory_king",lab_queen_ii:"lab_queen",road_tyrant_ii:"road_tyrant",swamp_hydra_ii:"swamp_hydra",core_omega_ii:"core_omega"};const _rid=_map[id]||id;const _tint=(id.indexOf("_ii")>=0)?" boss-ii-tint":"";return `<img src="icons/bosses/${_rid}.png${assetSuffix()}" alt="" class="${_tint}">`;}
-function buildingIcon(id){return `<img src="icons/buildings/${id}.png${assetSuffix()}" alt="">`;}
+function bossIcon(id){const _map={factory_king_ii:"factory_king",lab_queen_ii:"lab_queen",road_tyrant_ii:"road_tyrant",swamp_hydra_ii:"swamp_hydra",core_omega_ii:"core_omega"};const _rid=_map[id]||id;const _tint=(id.indexOf("_ii")>=0)?" boss-ii-tint":"";const _p="icons/bosses/"+_rid+".png";return `<img src="${_p}${assetSuffix(_p)}" alt="" class="${_tint}">`;}
+function buildingIcon(id){const _p="icons/buildings/"+id+".png";return `<img src="${_p}${assetSuffix(_p)}" alt="">`;}
 
-async function probeAssetVersion(){
-  if(location.protocol==='file:') return false;
-  try{
-    const res = await fetch(ASSET_PROBE_URL, { method:'HEAD', cache:'no-cache' });
-    if(!res.ok) return false;
-    const lm = res.headers.get('Last-Modified') || '';
-    const etag = res.headers.get('ETag') || '';
-    const v = lm || etag;
-    if(!v) return false;
-    const encoded = encodeURIComponent(v);
-    const prev = localStorage.getItem(ASSET_CACHE_KEY) || '';
-    if(prev === encoded) return false;
-    ASSET_VERSION = encoded;
-    localStorage.setItem(ASSET_CACHE_KEY, encoded);
-    if(typeof heroImgCache !== 'undefined') heroImgCache.clear();
-    return true;
-  }catch(e){
-    console.warn('[assets] 探測失敗:', e);
-    return false;
+async function _probeGitHubTree(){
+  try {
+    var owner = GH_OWNER, repo = GH_REPO;
+    if(!owner || !repo){
+      var host = location.hostname;
+      if(host.endsWith(".github.io")){
+        owner = host.slice(0, -10);
+        var segs = location.pathname.split("/").filter(function(s){ return s; });
+        repo = segs[0] || (owner + ".github.io");
+      } else { return null; }
+    }
+    var res = await fetch("https://api.github.com/repos/" + owner + "/" + repo + "/git/trees/main?recursive=1", {
+      headers: { "Accept": "application/vnd.github+json" },
+      cache: "no-store"
+    });
+    if(!res.ok) return null;
+    var data = await res.json();
+    if(!data || !Array.isArray(data.tree)) return null;
+    var map = {};
+    for(var i = 0; i < data.tree.length; i++){
+      var it = data.tree[i];
+      if(it && it.type === "blob" && it.path && it.sha){
+        map[it.path] = it.sha.substring(0, 8);
+      }
+    }
+    return map;
+  } catch(e){ return null; }
+}
+async function probeAssetVersion(force){
+  if(location.protocol === "file:") return false;
+  var now = Date.now();
+  if(!force){
+    var lastCheck = parseInt(localStorage.getItem("wasteland_gh_lastcheck") || "0", 10);
+    if(now - lastCheck < 5 * 60 * 1000) return false;
   }
+  var newMap = await _probeGitHubTree();
+  if(!newMap) return false;
+  localStorage.setItem("wasteland_gh_lastcheck", String(now));
+  var oldMap = window._ASSET_VERSIONS || {};
+  var newKeys = Object.keys(newMap);
+  var oldKeys = Object.keys(oldMap);
+  var changed = newKeys.length !== oldKeys.length;
+  if(!changed){
+    for(var i = 0; i < newKeys.length; i++){
+      var k = newKeys[i];
+      if(oldMap[k] !== newMap[k]){ changed = true; break; }
+    }
+  }
+  if(!changed) return false;
+  window._ASSET_VERSIONS = newMap;
+  try { localStorage.setItem(ASSET_MAP_KEY, JSON.stringify(newMap)); } catch(e){}
+  if(typeof heroImgCache !== "undefined") heroImgCache.clear();
+  if(typeof _imgCache !== "undefined"){ try { _imgCache.clear(); } catch(e){} }
+  return true;
 }
 
 function itemCat(id){if(typeof SEEDS!=='undefined'&&SEEDS[id])return 'seed';if(typeof CROPS!=='undefined'&&CROPS[id])return 'crop';if(ARMOR[id])return 'armor';if(WEAPONS[id])return 'weapon';if(AMMO[id])return 'ammo';if(CONSUMABLES[id])return 'consume';if(MATERIALS[id])return 'material';const d=ALL_ITEMS[id];if(d&&d.named)return 'weapon';return 'misc';}

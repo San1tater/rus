@@ -640,6 +640,10 @@ if(typeof renderEquipZone === 'undefined'){
 
     const fontSize = Math.max(7, Math.floor(cellSize * 0.12));
 
+    /* 自動遞補投擲物 */
+    if(typeof ensureThrowableFromBackpack === 'function' && getThrowableCount() <= 0){
+      try { ensureThrowableFromBackpack('explore'); } catch(e){}
+    }
     const slotLayout = {
       head:      { col: 1, row: 0 },
       face:      { col: 1, row: 1 },
@@ -675,7 +679,7 @@ if(typeof renderEquipZone === 'undefined'){
       const isFixed = def && def.fixed;
       let inner = '';
       if(def){
-        inner = '<img class="slot-img" src="icons/items/' + resolveIconId(id) + '.png' + assetSuffix() + '" alt=""><div class="lbl">' + labels[key] + '</div>';
+        inner = '<img class="slot-img" src="icons/items/' + resolveIconId(id) + '.png' + assetSuffix('icons/items/' + resolveIconId(id) + '.png') + '" alt=""><div class="lbl">' + labels[key] + '</div>';
       } else {
         inner = '<div class="nm">' + labels[key] + '</div>';
       }

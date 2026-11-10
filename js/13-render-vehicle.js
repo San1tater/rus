@@ -49,10 +49,13 @@ function _measureImgContentBounds(img){
 
 const _imgCache = new Map();
 function _loadVehicleImg(id){
-  if(_imgCache.has(id)) return _imgCache.get(id);
+  const _p = "icons/vehicles/" + id + ".png";
+  const _v = (typeof assetSuffix === "function") ? assetSuffix(_p) : "";
+  const _key = id + _v;
+  if(_imgCache.has(_key)) return _imgCache.get(_key);
   const img = new Image();
-  img.src = 'icons/vehicles/' + id + '.png' + (typeof assetSuffix === 'function' ? assetSuffix() : '');
-  _imgCache.set(id, img);
+  img.src = _p + _v;
+  _imgCache.set(_key, img);
   return img;
 }
 

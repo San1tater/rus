@@ -222,7 +222,7 @@ function _drawHumanCorpse(ctx, drawId, s, ox, oy, def, anim, fi, eqD, isDeath){
     ctx.rotate(lRR);
     ctx.translate(-pxu, -pyu);
     if(uu.kind === 'layer'){
-      var col = (def.colors && def.colors[Lu.id]) || Lu.color || _DEF_COLORS[Lu.id] || '#5a4a3a';
+      var col = (def.colors && def.colors[Lu.id]) || _DEF_COLORS[Lu.id] || Lu.color || '#5a4a3a';
       ctx.fillStyle = col;
       ctx.fillRect(0, 0, lwu, lhu);
       ctx.strokeStyle = 'rgba(0,0,0,0.65)';

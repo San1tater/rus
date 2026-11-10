@@ -1,4 +1,3 @@
-
 'use strict';
 
 const _ST_FIXED_SLOTS = 9;
@@ -298,7 +297,7 @@ function _stCard(p, srv, pi, cap){
   const _cantGo = (hp <= 0 || over) ? ' cant-go' : '';
   const _overCls = _overCap ? ' over-cap' : '';
   let h = '<div class="st-passenger-card' + _cantGo + _overCls + '" data-passenger="' + pi + '" style="border-color:' + bgc + '">';
-  h += '<div class="st-pass-ico" style="background:' + bgc + '"><img src="icons/servants/' + srv.type + '.png' + assetSuffix() + '"></div>';
+  h += '<div class="st-pass-ico" style="background:' + bgc + '"><img src="icons/servants/' + srv.type + '.png' + assetSuffix('icons/servants/' + srv.type + '.png') + '"></div>';
   h += '<div class="st-pass-info">';
   h += '<div class="st-pass-name ' + rarityClass(srv.rarity) + '">' + servantLabel(srv) + '</div>';
   h += '<div class="st-pass-stat" style="color:' + hpCol + '">HP ' + _stFmtNum(hp) + '/' + _stFmtNum(maxHp) + '</div>';
@@ -388,7 +387,7 @@ function _stRender(page){
       const hpCol2 = hp2 <= 0 ? '#e05252' : '#fff';
       const _isInjured = srv2.injuredUntil && srv2.injuredUntil > Date.now();
       html += '<div class="st-crew-card occupied' + (_isInjured ? ' cant-go' : '') + '" data-crew="' + r2 + '" style="border-color:' + cbg + '">';
-      html += '<div class="st-crew-ico" style="background:' + cbg + '"><img src="icons/servants/' + srv2.type + '.png' + assetSuffix() + '"></div>';
+      html += '<div class="st-crew-ico" style="background:' + cbg + '"><img src="icons/servants/' + srv2.type + '.png' + assetSuffix('icons/servants/' + srv2.type + '.png') + '"></div>';
       html += '<div class="st-crew-info">';
       html += '<div class="st-crew-name ' + rarityClass(srv2.rarity) + '">' + servantLabel(srv2) + '</div>';
       html += '<div class="st-crew-stat" style="color:' + hpCol2 + '">HP ' + _stFmtNum(hp2) + '/' + _stFmtNum(maxHp2) + '</div>';
@@ -439,7 +438,7 @@ function _stRender(page){
       beltRows += '<div class="st-belt-row" data-belt-wid="' + wid + '">';
       beltRows += '<div class="st-belt-name">' + _calPrefix + wid.toUpperCase() + '</div>';
       beltRows += '<div class="st-belt-count">' + _stFmtNum(cu) + ' / ' + _stFmtNum(mx) + '</div>';
-      beltRows += '<div class="st-belt-preset"><img src="icons/ammo/belt_' + pimg + '.png' + assetSuffix() + '" alt="">' + pn + ' ▶</div>';
+      beltRows += '<div class="st-belt-preset"><img src="icons/ammo/belt_' + pimg + '.png' + assetSuffix('icons/ammo/belt_' + pimg + '.png') + '" alt="">' + pn + ' ▶</div>';
       beltRows += '</div>';
     }
   }
@@ -475,7 +474,7 @@ function _stRender(page){
         const srcT = a2.presetBreakdown || a2.breakdown;
         const cnt = (srcT && srcT[d.id]) || 0;
         if(cnt <= 0) continue;
-        icons += '<div class="st-main-icon"><img src="icons/ammo/' + (d.img || d.id) + '.png' + assetSuffix() + '" alt=""><div class="st-main-icon-lbl">×' + _stFmtNum(cnt) + '</div></div>';
+        icons += '<div class="st-main-icon"><img src="icons/ammo/' + (d.img || d.id) + '.png' + assetSuffix('icons/ammo/' + (d.img || d.id) + '.png') + '" alt=""><div class="st-main-icon-lbl">×' + _stFmtNum(cnt) + '</div></div>';
       }
       if(!icons) icons = '<div style="color:#5a5040;font-size:11px;padding:8px">未配置</div>';
       const _calPrefix2 = (_ST_CALIBER_MAP[wid2] ? _ST_CALIBER_MAP[wid2] + 'mm ' : '');
@@ -675,7 +674,7 @@ function _stPickBelt(vid, wid){
     const on = (k === cur);
     const _rowDesc = (_descMap && _descMap[k]) || pr.desc;
     body += '<div class="item-row" data-preset="' + k + '"' + (on ? ' style="border-color:#e8a33d;background:#2a1f10"' : '') + '>';
-    body += '<div class="icon" style="background:transparent;border-color:transparent"><img src="icons/ammo/belt_' + pr.img + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>';
+    body += '<div class="icon" style="background:transparent;border-color:transparent"><img src="icons/ammo/belt_' + pr.img + '.png' + assetSuffix('icons/ammo/belt_' + pr.img + '.png') + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>';
     body += '<div class="info"><div class="nm">' + pr.name + '</div><div class="sub">' + _rowDesc + '</div></div>';
     if(on) body += '<div style="color:#e8a33d;font-weight:bold;padding:0 6px">✓</div>';
     body += '</div>';
@@ -728,7 +727,7 @@ function _stOpenMainAmmoPicker(vid, wid, onClose){
       const d = defs[i];
       const srcS = a.presetBreakdown || a.breakdown;
       const cnt = (srcS && srcS[d.id]) || 0;
-      h += '<div class="st-ammo-cell"><div class="st-ammo-cell-hd"><img src="icons/ammo/' + d.id + '.png' + assetSuffix() + '" alt=""><span class="nm">' + d.name + '</span><span class="cnt" id="st-ammo-cnt-' + d.id + '">' + cnt + '</span></div><input type="range" class="st-main-slider" data-ammo-id="' + d.id + '" min="0" max="' + mr + '" value="' + cnt + '"></div>';
+      h += '<div class="st-ammo-cell"><div class="st-ammo-cell-hd"><img src="icons/ammo/' + d.id + '.png' + assetSuffix('icons/ammo/' + d.id + '.png') + '" alt=""><span class="nm">' + d.name + '</span><span class="cnt" id="st-ammo-cnt-' + d.id + '">' + cnt + '</span></div><input type="range" class="st-main-slider" data-ammo-id="' + d.id + '" min="0" max="' + mr + '" value="' + cnt + '"></div>';
     }
     h += '<button class="btn primary" id="st-ammo-confirm" style="width:100%;margin-top:8px">確認</button>';
     return h;
@@ -801,7 +800,7 @@ function _stCrewDetail(role, srvId){
 
   let body = '';
   body += '<div class="st-pd-head">';
-  body += '<div class="st-pd-sprite" style="background:' + rarityBg(srv.rarity) + '"><img src="icons/servants/' + srv.type + '.png' + assetSuffix() + '"></div>';
+  body += '<div class="st-pd-sprite" style="background:' + rarityBg(srv.rarity) + '"><img src="icons/servants/' + srv.type + '.png' + assetSuffix('icons/servants/' + srv.type + '.png') + '"></div>';
   body += '<div class="st-pd-info">';
   body += '<div class="st-pd-name ' + rarityClass(srv.rarity) + '">' + servantLabel(srv) + '</div>';
   body += '<div class="st-pd-sub">Lv.' + srv.lv + ' · ' + td.name + '</div>';
@@ -873,7 +872,7 @@ function _stPickCrew(role){
     const sv = avail[j];
     const td = SERVANT_TYPES[sv.type] || { name: '?' };
     const _inGarden = Array.isArray(sv.assignedPlots) && sv.assignedPlots.length > 0;
-    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + (_inGarden ? ' 🌱工作中' : '') + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + '</div></div></div>';
+    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix('icons/servants/' + sv.type + '.png') + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + (_inGarden ? ' 🌱工作中' : '') + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + '</div></div></div>';
   }
   const bd = openModal({
     title: _ST_CREW_LABELS[role],
@@ -933,7 +932,7 @@ function _stPickPassenger(){
     const tal = (typeof getServantTalents === 'function') ? getServantTalents(sv) : [];
     const ts = tal.length ? ' · 天賦 ' + tal.length : '';
     const _inGarden = Array.isArray(sv.assignedPlots) && sv.assignedPlots.length > 0;
-    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + (_inGarden ? ' 🌱工作中' : '') + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + ts + '</div></div></div>';
+    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix('icons/servants/' + sv.type + '.png') + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + (_inGarden ? ' 🌱工作中' : '') + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + ts + '</div></div></div>';
   }
   const bd = openModal({ title: '添加載員', body: body, onClose: function(){ closeModal(); _stRefresh(); } });
   const els = bd.querySelectorAll('.item-row');
@@ -996,7 +995,7 @@ function _stDetail(idx){
 
   let body = '';
   body += '<div class="st-pd-head">';
-  body += '<div class="st-pd-sprite" style="background:' + rarityBg(srv.rarity) + '"><img src="icons/servants/' + srv.type + '.png' + assetSuffix() + '"></div>';
+  body += '<div class="st-pd-sprite" style="background:' + rarityBg(srv.rarity) + '"><img src="icons/servants/' + srv.type + '.png' + assetSuffix('icons/servants/' + srv.type + '.png') + '"></div>';
   body += '<div class="st-pd-info">';
   body += '<div class="st-pd-name ' + rarityClass(srv.rarity) + '">' + servantLabel(srv) + '</div>';
   body += '<div class="st-pd-sub">Lv.' + srv.lv + ' · ' + (SERVANT_TYPES[srv.type] ? SERVANT_TYPES[srv.type].name : '') + '</div>';
@@ -1499,7 +1498,7 @@ function _stSwapPassenger(idx){
     const td = SERVANT_TYPES[sv.type] || { name: '?' };
     const _inGarden = Array.isArray(sv.assignedPlots) && sv.assignedPlots.length > 0;
     const _stnMark = _inGarden ? ' 🌱工作中' : '';
-    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix() + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + _stnMark + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + '</div></div></div>';
+    body += '<div class="item-row" data-srv="' + sv.id + '"><div class="icon" style="background:' + rarityBg(sv.rarity) + '"><img src="icons/servants/' + sv.type + '.png' + assetSuffix('icons/servants/' + sv.type + '.png') + '" style="width:100%;height:100%;object-fit:contain"></div><div class="info"><div class="nm ' + rarityClass(sv.rarity) + '">' + servantLabel(sv) + _stnMark + '</div><div class="sub">Lv.' + sv.lv + ' ' + td.name + '</div></div></div>';
   }
   const bd = openModal({ title: '更換載員', body: body, onClose: function(){ closeModal(); _stDetail(idx); } });
   const els = bd.querySelectorAll('.item-row');
