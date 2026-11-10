@@ -1162,13 +1162,8 @@ const BTRSupport = {
   },
 
   _updateWreck(t, now){
-    const _clipDur = 600;
-    const _clipElapsed = now - this._wreckStartClipAt;
-    if(_clipElapsed < _clipDur){
-      this.playerClipH = _clipElapsed / _clipDur;
-    } else {
-      this.playerClipH = 1;
-    }
+    /* [v229] 玩家下車淡入已在 wreckPause 階段完成，wreck 階段不再重算 playerClipH */
+    this.playerClipH = 1;
     const _dt = Math.min(0.05, (now - (this._lastWreckTick || now)) / 1000);
     this._lastWreckTick = now;
     const _ex = window._explore;
