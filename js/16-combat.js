@@ -238,6 +238,7 @@ function _start(cfg){
 
   window._combat = {
     active: true,
+    sparks: [], explosions: [],
     sceneType: cfg.sceneType || 'foot',
     playerFirst: pf,
     allies: cfg.allies || [],
@@ -335,6 +336,154 @@ function _setupCanvas(){
     z1.appendChild(fl);
   }
 }
+
+/* [v272] 全局战斗粒子 FX */
+window._spawnHitSpark = function(owner, sx, sy, crit){
+  if(!owner) return;
+  if(!owner.sparks) owner.sparks = [];
+  var n = crit ? 8 : 5;
+  for(var i = 0; i < n; i++){
+    var ang = Math.random() * Math.PI * 2;
+    var spd = (crit ? 55 : 35) + Math.random() * 30;
+    owner.sparks.push({
+      x: sx, y: sy,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd - 12,
+      life: 0.15 + Math.random() * 0.15,
+      maxLife: 0.3,
+      size: crit ? 1.6 : 1.0,
+      color: crit ? '#ff5030' : '#ffd680'
+    });
+  }
+};
+window._spawnExplosionSmoke = function(owner, sx, sy, radiusPx){
+  if(!owner) return;
+  if(!owner.explosions) owner.explosions = [];
+  var _rad = (typeof radiusPx === 'number' && radiusPx > 0) ? radiusPx : 40;
+  for(var i = 0; i < 18; i++){
+    var ang = Math.PI + Math.random() * Math.PI;
+    var spd = _rad * (0.4 + Math.random() * 0.7);
+    var vx = Math.cos(ang) * spd;
+    var vy = -Math.abs(Math.sin(ang)) * spd * 0.03;
+    owner.explosions.push({
+      x: sx + Math.cos(ang) * _rad * 0.25,
+      y: sy - Math.random() * _rad * 0.05,
+      vx: vx, vy: vy,
+      life: 0.8 + Math.random() * 0.6,
+      maxLife: 1.4,
+      size: _rad * (0.2 + Math.random() * 0.3),
+      growth: _rad * 0.4 * (0.6 + Math.random() * 0.6),
+      isGround: true
+    });
+  }
+};
+window._tickBattleFX = function(owner, dt){
+  if(!owner) return;
+  if(owner.sparks){
+    for(var i = owner.sparks.length - 1; i >= 0; i--){
+      var p = owner.sparks[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 180 * dt;
+      p.life -= dt;
+      if(p.life <= 0) owner.sparks.splice(i, 1);
+    }
+  }
+  if(owner.explosions){
+    for(var j = owner.explosions.length - 1; j >= 0; j--){
+      var q = owner.explosions[j];
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      q.vx *= 0.95;
+      q.vy *= 0.95;
+      q.life -= dt;
+      q.size += q.growth * dt;
+      if(q.life <= 0) owner.explosions.splice(j, 1);
+    }
+  }
+};
+
+/* [v298] 通用子弹绘制：探索/后院共用 */
+window._drawBulletShape = function(ctx, px, py, opts){
+  opts = opts || {};
+  var scale = (typeof opts.scale === 'number' && opts.scale > 0) ? opts.scale : 1;
+  var bcol = opts.color;
+  if(!bcol){
+    if(opts.isEnemy){ bcol = '#ff6060'; }
+    else if(opts.rarity && typeof window._rarityBulletColor === 'function'){ bcol = window._rarityBulletColor(opts.rarity); }
+    else { bcol = '#ffd680'; }
+  }
+  /* 手雷图标 */
+  if(opts.isGrenade && opts.grenadeId){
+    var _gimg = (typeof getHeroImg === 'function') ? getHeroImg('icons/items/' + opts.grenadeId + '.png') : null;
+    var _gsize = 20 * scale;
+    if(_gimg && _gimg.complete && _gimg.naturalWidth){
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate((opts.t || 0) * Math.PI * 2);
+      ctx.drawImage(_gimg, -_gsize/2, -_gsize/2, _gsize, _gsize);
+      ctx.restore();
+      return true;
+    }
+    /* 图标加载失败 → 圆点兜底 */
+  }
+  /* 圆形 */
+  var _br = (typeof BULLET_VISUAL_RADIUS !== 'undefined') ? BULLET_VISUAL_RADIUS : { normal: 3, grenade: 5, missile: 6 };
+  var _r;
+  if(opts.missile){ _r = _br.missile; }
+  else if(opts.big || opts.isGrenade){ _r = _br.grenade; }
+  else { _r = _br.normal; }
+  _r *= scale;
+  ctx.save();
+  ctx.shadowColor = bcol;
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = bcol;
+  ctx.beginPath();
+  ctx.arc(px, py, _r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  return true;
+};
+
+window._renderBattleFX = function(ctx, owner){
+  if(!owner) return;
+  if(owner.sparks){
+    for(var i = 0; i < owner.sparks.length; i++){
+      var p = owner.sparks[i];
+      var a = Math.max(0, Math.min(1, p.life / p.maxLife * 1.6));
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  if(owner.explosions){
+    for(var j = 0; j < owner.explosions.length; j++){
+      var q = owner.explosions[j];
+      var a2 = Math.max(0, Math.min(1, q.life / q.maxLife)) * 0.55;
+      ctx.save();
+      ctx.globalAlpha = a2;
+      var g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, q.size);
+      g.addColorStop(0, 'rgba(180,180,180,0.9)');
+      g.addColorStop(0.5, 'rgba(140,140,140,0.4)');
+      g.addColorStop(1, 'rgba(100,100,100,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      if(q.isGround){
+        ctx.ellipse(q.x, q.y, q.size, q.size * 0.18, 0, 0, Math.PI * 2);
+      } else {
+        ctx.arc(q.x, q.y, q.size, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+};
 
 function _cleanup(){
   window._combatActive = false;
@@ -1298,7 +1447,11 @@ function _enemyFire(e, now){
   }
   if(!aliveAllies.length) return;
 
-  const p = aliveAllies[Math.floor(Math.random() * aliveAllies.length)];
+  // 优先攻击最近目标
+  aliveAllies.sort(function(a,b){
+    return Math.abs(a.worldX - e.worldX) - Math.abs(b.worldX - e.worldX);
+  });
+  const p = aliveAllies[0];
 
   if(e.grenade && e.grenade.count > 0 && Math.random() < 0.15){
     const _gDef = (typeof WEAPONS !== 'undefined' && e.grenade.id) ? WEAPONS[e.grenade.id] : null;
@@ -1343,7 +1496,13 @@ function _enemyFire(e, now){
   e._fireAnimUntil = now + _fpDur;
 
   const mz = _getEnemyMuzzlePos(e, p);
-  const px = EXPLORE_HERO_X_RATIO;
+  const px = (() => {
+    const _p = c.allies[0];
+    if(_p && _p.isVehicle && typeof battle !== 'undefined' && battle && typeof battle.px === 'number'){
+      return battle.px;
+    }
+    return EXPLORE_HERO_X_RATIO;
+  })();
 
   /* rev-fix-fire-chain-unify: 改用 _getFireChainMode */
   const _effModeE = _getFireChainMode(e);
@@ -1523,7 +1682,13 @@ function _enemyFireRPG(e, p, now){
   e._fireAnimStart = now;
   e._fireAnimUntil = now + _fpDurR;
   const mz = _getEnemyMuzzlePos(e, p, true);
-  const px = EXPLORE_HERO_X_RATIO;
+  const px = (() => {
+    const _p = c.allies[0];
+    if(_p && _p.isVehicle && typeof battle !== 'undefined' && battle && typeof battle.px === 'number'){
+      return battle.px;
+    }
+    return EXPLORE_HERO_X_RATIO;
+  })();
   const hit = Math.random() < 0.6;
   const tx = hit ? px : (px - 0.5);
 
@@ -1709,11 +1874,11 @@ function _playerThrowGrenade(p, t, now, w){
   const mz = _getPlayerMuzzlePosFoot();
   const rel = t.worldX - p.worldX;
   const tx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-  const distPx = Math.abs(t.worldX - p.worldX) * sm.bgPixelsPerMeter;
-  const duration = Math.max(100, (distPx / 600) * 1000);
+  const _distM = Math.abs(t.worldX - p.worldX);
+  const duration = Math.max(250, (_distM / 15) * 1000);
   const hitRate = getHitRate(gDef.type, '投擲', gDef.scopeBonus || 0) / 100;
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: tx, ty: 0.88, t: 0,
+    sx: mz.x, sy: mz.y, tx: tx, ty: 0.95, t: 0,
     start: performance.now(), duration: duration,
     enemy: false, big: true, arc: true, isGrenade: true, hit: true,
     grenadeId: w.id, rarity: gRar, _target: t,
@@ -1750,8 +1915,8 @@ function _passengerThrowGrenade(a, t, gDef, gRar, now, gid){
   if(!mz) return;
   const rel = t.worldX - a.worldX;
   const tx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-  const distPx = Math.abs(t.worldX - a.worldX) * sm.bgPixelsPerMeter;
-  const duration = Math.max(100, (distPx / 600) * 1000);
+  const _distM = Math.abs(t.worldX - a.worldX);
+  const duration = Math.max(250, (_distM / 15) * 1000);
   const hitRate = ((typeof servantHitRate === 'function') ? servantHitRate(a.srv, '投擲', 0) : 30) / 100;
   c.bullets.push({
     sx: mz.x, sy: mz.y, tx: tx, ty: mz.y, t: 0,
@@ -1803,7 +1968,13 @@ function _enemyThrowGrenade(e, p, now){
   e._fireAnimStart = now;
   e._fireAnimUntil = now + _fpDurG;
   const mz = _getEnemyMuzzlePos(e, p);
-  const px = EXPLORE_HERO_X_RATIO;
+  const px = (() => {
+    const _p = c.allies[0];
+    if(_p && _p.isVehicle && typeof battle !== 'undefined' && battle && typeof battle.px === 'number'){
+      return battle.px;
+    }
+    return EXPLORE_HERO_X_RATIO;
+  })();
 
   const fragments = gDef.fragments || 1;
   const fragmentDamage = gDef.fragmentDamage || gDef.dmg || 0;
@@ -1811,11 +1982,11 @@ function _enemyThrowGrenade(e, p, now){
   const gDmg = fragmentDamage * (RARITY_MULT[gRar] || 1);
   const hitRate = e.hitBase || 0.55;
 
-  const distPx = Math.abs(p.worldX - e.worldX) * c.sm.bgPixelsPerMeter;
-  const duration = Math.max(100, (distPx / 600) * 1000);
+  const _distM = Math.abs(p.worldX - e.worldX);
+  const duration = Math.max(250, (_distM / 15) * 1000);
 
   c.bullets.push({
-    sx: mz.x, sy: mz.y, tx: px, ty: mz.y, t: 0,
+    sx: mz.x, sy: mz.y, tx: px, ty: 0.95, t: 0,
     start: performance.now(), duration: duration,
     enemy: true, big: true, arc: true, isGrenade: true, hit: true,
     grenadeId: gid, rarity: gRar, _target: p,
@@ -1890,7 +2061,23 @@ function _tickBullets(dt){
     if(b.t >= 1){
       if(!b.resolved){
         b.resolved = true;
-        if(b._onHit) { try { b._onHit(); } catch(err){ console.error(err); } }
+        if(b.isGrenade){
+        var _fxElG = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
+        var _WG = _fxElG ? _fxElG.clientWidth : 400;
+        var _HG = _fxElG ? _fxElG.clientHeight : 500;
+        var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (8 * c.sm.bgPixelsPerMeter) : _WG * 0.12;
+        if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, b.tx * _WG, b.ty * _HG, _radG);
+      }
+      if(b._onHit){
+        window._lastBullet = b;
+        try { b._onHit(); } catch(err){ console.error(err); }
+        window._lastBullet = null;
+      }
+      if(b.isGrenade){
+        const _W = c.playerCanvas ? c.playerCanvas.width : 400;
+        const _H = c.playerCanvas ? c.playerCanvas.height : 500;
+        _spawnExplosionSmoke(c, b.tx * _W, b.ty * _H);
+      }
       }
       if(b.t > 2 || b.hit){
         c.bullets.splice(i, 1);
@@ -1913,22 +2100,25 @@ function _tickBullets(dt){
       if(nowMs - c.tracers[i].born > c.tracers[i].dur) c.tracers.splice(i, 1);
     }
   }
+  _tickBattleFX(c, dt);
 }
-
-
 function _float(t, text, cls){
-  const c = window._combat;
+  var c = window._combat;
   if(!c) return;
-  const p = c.allies[0], px = p ? p.worldX : 0;
-  const rel = t.worldX - px;
-  const sm = c.sm;
-  let sx;
-  if(rel < 0) sx = 0.05;
-  else {
-    sx = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-    if(sx > 0.95) sx = 0.95;
+  var p = c.allies[0], px = p ? p.worldX : 0;
+  var rel = (t && typeof t.worldX === 'number') ? (t.worldX - px) : 0;
+  var sm = c.sm;
+  var sxRaw = EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
+  var fxEl = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
+  var W = fxEl ? fxEl.clientWidth : 400;
+  var H = fxEl ? fxEl.clientHeight : 500;
+  var _b = window._lastBullet;
+  var _sparkX = (_b && typeof _b.tx === 'number') ? _b.tx * W : (sxRaw * W);
+  var _sparkY = (_b && typeof _b.ty === 'number') ? _b.ty * H : (H * 0.58);
+  if(cls !== 'miss' && cls !== 'heal' && text && String(text).indexOf('-') === 0){
+    if(typeof _spawnHitSpark === 'function') _spawnHitSpark(c, _sparkX, _sparkY, cls === 'crit');
   }
-  c.floats.push({ text: text, cls: cls || '', age: 0, x: sx, y: 0.12 });
+  c.floats.push({ text: text, cls: cls || '', age: 0, x: Math.max(0.05, Math.min(0.95, sxRaw)), y: 0.12 });
 }
 
 window._rarityBulletColor = function(rarity){
@@ -2063,65 +2253,14 @@ function _render(){
     }
     
     if(bx < -10 || bx > W + 10 || by < -10 || by > H + 10) continue;
-    const _bulletColor = window._rarityBulletColor(bb.rarity);
-    const _brC = (typeof BULLET_VISUAL_RADIUS !== 'undefined') ? BULLET_VISUAL_RADIUS : { normal: 3, grenade: 5, missile: 6 };
-    if(bb.isGrenade && bb.grenadeId){
-      const _gimg = (typeof getHeroImg === 'function') ? getHeroImg('icons/items/' + bb.grenadeId + '.png') : null;
-      const _gsize = 20;
-      if(_gimg && _gimg.complete && _gimg.naturalWidth){
-        ctx.save();
-        ctx.translate(bx, by);
-        ctx.rotate(bb.t * Math.PI * 2);
-        ctx.drawImage(_gimg, -_gsize/2, -_gsize/2, _gsize, _gsize);
-        ctx.restore();
-      } else {
-        ctx.save();
-        const _gc = window._rarityBulletColor(bb.rarity);
-        ctx.fillStyle = _gc;
-        ctx.shadowColor = _gc;
-        ctx.shadowBlur = 8;
-        ctx.beginPath(); ctx.arc(bx, by, 5, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-      }
-      continue;
-    }
-    if(bb.missile){
-      /* [v198c] 將原本的圓點改為朝向目標的流線錐體 */
-      const _angle = Math.atan2(bb.ty - bb.sy, bb.tx - bb.sx);
-      ctx.save();
-      ctx.translate(bx, by);
-      ctx.rotate(_angle);
-      ctx.shadowColor = _bulletColor;
-      ctx.shadowBlur = 20;
-      
-      // 彈頭（流線型）
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.moveTo(8, 0);
-      ctx.lineTo(-6, 3);
-      ctx.lineTo(-6, -3);
-      ctx.closePath();
-      ctx.fill();
-
-      // 尾焰
-      ctx.fillStyle = _bulletColor;
-      ctx.globalAlpha = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(-6, 2.5);
-      ctx.lineTo(-16, 0);
-      ctx.lineTo(-6, -2.5);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    } else {
-      const _bR = bb.big ? _brC.grenade : _brC.normal;
-      ctx.save();
-      ctx.shadowColor = _bulletColor;
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = _bulletColor;
-      ctx.beginPath(); ctx.arc(bx, by, _bR, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
+    window._drawBulletShape(ctx, bx, by, {
+      rarity: bb.rarity,
+      missile: !!bb.missile,
+      big: !!bb.big,
+      isGrenade: !!bb.isGrenade,
+      grenadeId: bb.grenadeId,
+      t: bb.t
+    });
   }
 
   for(let f = 0; f < c.floats.length; f++){
@@ -2133,9 +2272,8 @@ function _render(){
     ctx.fillText(ff.text, ff.x * W, ff.y * H - ff.age * 40);
     ctx.restore();
   }
+  _renderBattleFX(ctx, c);
 }
-
-
 function _renderFrames(){
   const c = window._combat;
   if(!c) return;

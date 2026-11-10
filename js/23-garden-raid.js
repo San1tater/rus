@@ -665,6 +665,8 @@ function _gardenRaidShowBattle(guards, enemies, region){
         equipped: equipped, equippedRarity: equippedRarity, weaponSlot: weaponSlot,
         ammoId: ammoId, ammoRarity: ammoRarity, ammoStock: stock,
         ammoBudget: budget, ammoUsed: 0, magCap: magCap,
+        _magazine: { inMag: Math.min(magCap, budget) },
+        _reloadEnd: 0, _reloadStart: 0,
         hitRate: hitRate, critRate: critRate, critMult: critMult,
         animName: 'idle', animFrame: 0, animNext: 0, hurtUntil: 0,
         nextFireAt: 0
@@ -753,6 +755,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
 
     const bullets = [];
     const damageTexts = [];
+    const raidOwner = { sparks: [], explosions: [] };
 
     /* rev-fix-corpse-timing: 獨立屍體數組 */
     const corpses = [];
@@ -912,7 +915,13 @@ function drawBullet(b){
       const _duration = Math.max(16, (_worldDist / _spd) * 1000);
 
       const _isFast = true; // 統一視為高速彈
-      const _rar = fromU.isGuard ? (fromU.ammoRarity || '一般') : '一般';
+      let _rar;
+      if(fromU.isGuard){
+        _rar = fromU.ammoRarity || '一般';
+      } else {
+        const _ammoDef = (fromU.ammoId && typeof AMMO !== 'undefined' && AMMO[fromU.ammoId]) ? AMMO[fromU.ammoId] : null;
+        _rar = _ammoDef ? _ammoDef.rarity : (fromU.rarity || '一般');
+      }
       const _color = (typeof window._rarityBulletColor === 'function') ? window._rarityBulletColor(_rar) : '#ffd680';
 
       bullets.push({ 
@@ -958,11 +967,11 @@ function drawBullet(b){
       const sy = e.y - 20;
       const tx = hit ? target.x : (target.x + (Math.random() - 0.5) * 80);
       const ty = target.y - 20;
-      e.animName = 'fire_primary'; e.animFrame = 0;
-      const _fu = e;
-      setTimeout(function(){
-        if(_fu.alive && _fu.animName === 'fire_primary'){ _fu.animName = 'idle'; _fu.animFrame = 0; }
-      }, 300);
+      const _fpAnimDefR = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.fire_primary) ? GAME_ANIMS.fire_primary : null;
+      const _fpDurR = _fpAnimDefR ? Math.round(_fpAnimDefR.frameCount / _fpAnimDefR.fps * 1000) : 400;
+      e._fireAnimName = 'fire_primary';
+      e._fireAnimStart = now;
+      e._fireAnimUntil = now + _fpDurR;
       bullets.push({
         sx: sx, sy: sy, tx: tx, ty: ty, x: sx, y: sy, t: 0, speed: 1.2,
         hit: hit, isEnemy: true, big: true, missile: true,
@@ -1096,6 +1105,9 @@ function drawBullet(b){
       const shown = r.totalShown;
       b.fromU.dmgDone = (b.fromU.dmgDone || 0) + shown;
       if(b.fromU.isGuard && b.fromU.srv) servantAddExp(b.fromU.srv, 2);
+      if(typeof _spawnHitSpark === 'function'){
+        _spawnHitSpark(raidOwner, toU.x, toU.y - CHAR_PX * 0.5, r.crit);
+      }
       /* rev-fix-anim-state-unified: 受伤时长从 GAME_ANIMS 计算，同时设两套时间戳 */
       const _hurtAnimDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.hurt) ? GAME_ANIMS.hurt : null;
       const _hurtDurVal = _hurtAnimDef ? Math.round(_hurtAnimDef.frameCount / _hurtAnimDef.fps * 1000) : 180;
@@ -1284,19 +1296,37 @@ function drawBullet(b){
           });
           if(!alive.length) continue;
           if(g.ammoId){
-            if(g.ammoUsed >= g.ammoBudget) continue;
+            if(g._reloadEnd && now < g._reloadEnd) continue;
+            if(!g._magazine) g._magazine = { inMag: 0 };
+            if(g._magazine.inMag <= 0){
+              const _remaining = g.ammoBudget - g.ammoUsed;
+              if(_remaining <= 0) continue;
+              const _fill = Math.min(g.magCap, _remaining);
+              g._magazine.inMag = _fill;
+              g._reloadEnd = now + 1000;
+              g._reloadStart = now;
+              continue;
+            }
+            g._magazine.inMag--;
             g.ammoUsed++;
           }
           let target = null;
           const _rpgTargets = alive.filter(function(e){ return e.hasRPG && e.rpgAmmo > 0; });
           if(_rpgTargets.length){
-            target = _rpgTargets[Math.floor(Math.random() * _rpgTargets.length)];
+            _rpgTargets.sort(function(a, b){ return Math.abs(a.worldX - _gWX) - Math.abs(b.worldX - _gWX); });
+            target = _rpgTargets[0];
           } else {
-            target = alive[Math.floor(Math.random() * alive.length)];
+            alive.sort(function(a, b){ return Math.abs(a.worldX - _gWX) - Math.abs(b.worldX - _gWX); });
+            target = alive[0];
           }
-          const hit = Math.random() * 100 < g.hitRate;
+          const _gMode = (typeof _getFireChainMode === 'function') ? _getFireChainMode(g) : '點射';
+          const _gScopeBonus = (g.weaponDef && g.weaponDef.scopeBonus) || 0;
+          const _gHitRate = (typeof servantHitRate === 'function')
+            ? servantHitRate(g.srv, _gMode, _gScopeBonus)
+            : (g.hitRate || 20);
+          const hit = Math.random() * 100 < _gHitRate;
           spawnBullet(g, target, hit, false);
-          g.nextFireAt = now + 60000 / g.rpm;
+          g.nextFireAt = now + Math.max(120, 60000 / g.rpm);
         }
         for(const e of enemyUnits){
           if(!e.alive) continue;
@@ -1319,7 +1349,8 @@ function drawBullet(b){
             });
             if(_rpgInRange.length){
               e.rpgAmmo--;
-              const target = _rpgInRange[Math.floor(Math.random() * _rpgInRange.length)];
+              _rpgInRange.sort(function(a, b){ return Math.abs(a.worldX - _eWX) - Math.abs(b.worldX - _eWX); });
+              const target = _rpgInRange[0];
               _raidEnemyFireRPG(e, target, now);
               e.nextFireAt = now + 5000;
               continue;
@@ -1333,14 +1364,15 @@ function drawBullet(b){
             return window.canEngage(_enemyRangeM, g, Math.abs(_gWX - _eWX));
           });
           if(!alive.length) continue;
-          const target = alive[Math.floor(Math.random() * alive.length)];
+          alive.sort(function(a, b){ return Math.abs(a.worldX - _eWX) - Math.abs(b.worldX - _eWX); });
+          const target = alive[0];
           const _effMode = _getFireChainMode(e);
           const _hb = 0.55;
           const _modeMult = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[_effMode]) || 1.0;
           const hc = _hb * _modeMult;
           const hit = Math.random() < hc;
           spawnBullet(e, target, hit, true);
-          e.nextFireAt = now + 60000 / e.rpm;
+          e.nextFireAt = now + Math.max(200, 60000 / e.rpm);
         }
         if(!enemiesAlive()){
           battleState = 'ending';
@@ -1486,6 +1518,8 @@ function drawBullet(b){
         window.MuzzleFX.update(dt);
         window.MuzzleFX.render(ctx, 'raid');
       }
+      if(typeof _tickBattleFX === 'function') _tickBattleFX(raidOwner, dt);
+      if(typeof _renderBattleFX === 'function') _renderBattleFX(ctx, raidOwner);
 
       // [v208] 跳過快速子彈的實體繪製，改為繪製曳光
     
@@ -1548,4 +1582,3 @@ function drawBullet(b){
 /* rev-fix-anim-ref-unify: 暴露繪製函數為 window 別名，供其他模組調用 */
 window.drawHumanSprite = _raidDrawHuman;
 window.drawEnemySprite = _raidDrawEnemy;
-window._drawWorkerHelmet = _raidDrawWorkerHelmet;

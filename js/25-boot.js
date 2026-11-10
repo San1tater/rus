@@ -429,6 +429,8 @@ function _offlineExploreSettle(now, baseTime){
       }
       if(!eventEnemies.length) continue;
       if(!isFinite(eventScore) || eventScore <= 0) eventScore = 100;
+      /* [v309] 按单敌平均分对比 + 数量惩罚，避免 1vN 胜率过低 */
+      const _avgEnemyScore = eventScore / eventEnemies.length;
       /* rev-fix-offline-ammo: 用偏好彈藥計算戰力 */
       var _ammoRef = null;
       if(_mainCal && typeof pickAmmoByPreferenceOrOrder === 'function'){
@@ -442,7 +444,8 @@ function _offlineExploreSettle(now, baseTime){
         var _mDef = itemDef(state.player.equipped.melee);
         if(_mDef) _eventPlayerScore += (_mDef.dmg || 25) * 2;
       }
-      var winRate = _eventPlayerScore / (_eventPlayerScore + eventScore);
+      var winRate = _eventPlayerScore / (_eventPlayerScore + _avgEnemyScore);
+      winRate *= Math.pow(0.85, eventEnemies.length - 1);
       if(!isFinite(winRate)) winRate = 0.5;
       if(winRate < 0.05) winRate = 0.05;
       if(winRate > 0.95) winRate = 0.95;

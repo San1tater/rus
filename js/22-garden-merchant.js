@@ -719,6 +719,9 @@ function buyTradeItem(itemId, qty){
       collected[aid].count += count;
     }
     for(const k in collected) got.push(collected[k]);
+  } else if(item.id === 'f1'){
+    invAdd('f1', '傳奇', qty);
+    got.push({ id: 'f1', rarity: '傳奇', count: qty });
   } else if(item.id === 'medkit'){
     invAdd('ifak', '傳奇', qty);
     got.push({ id: 'ifak', rarity: '傳奇', count: qty });

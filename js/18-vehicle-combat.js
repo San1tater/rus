@@ -325,16 +325,18 @@ function _getSplashRatio(dist, wid, ammoId){
 }
 
 function _vehicleCombatFloat(relWorldX, text, cls){
-  const c = window._combat;
+  var c = window._combat;
   if(!c) return;
-  const sm = c.sm;
-  let sx;
-  if(relWorldX < 0) sx = 0.05;
-  else {
-    sx = EXPLORE_HERO_X_RATIO + (relWorldX / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-    if(sx > 0.95) sx = 0.95;
+  var fxEl = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
+  var W = fxEl ? fxEl.clientWidth : 400;
+  var H = fxEl ? fxEl.clientHeight : 500;
+  var _b = window._lastBullet;
+  var _sparkX = EXPLORE_HERO_X_RATIO * W;
+  var _sparkY = (_b && typeof _b.ty === 'number') ? _b.ty * H : H * 0.6;
+  if(cls !== 'miss' && cls !== 'heal' && text && String(text).indexOf('-') === 0){
+    if(typeof _spawnHitSpark === 'function') _spawnHitSpark(c, _sparkX, _sparkY, cls === 'crit');
   }
-  c.floats.push({ text: text, cls: cls || '', age: 0, x: sx, y: 0.15 });
+  c.floats.push({ text: text, cls: cls || '', age: 0, x: EXPLORE_HERO_X_RATIO, y: 0.15 });
 }
 
 function _applyHESplash(wid, mainTarget, baseDmg, isCrit, penMM, ammoId){

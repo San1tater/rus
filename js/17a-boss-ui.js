@@ -5,7 +5,7 @@ let battle = null;
 
 /* [v222] Boss戰特效 canvas 清理 */
 function _cleanBossFxCanvases(){
-  ['boss-fx-canvas', 'boss-aimhit-canvas'].forEach(function(id){
+  ['boss-fx-canvas', 'boss-aimhit-canvas', 'boss-bullets-canvas'].forEach(function(id){
     var el = document.getElementById(id);
     if(el && el.parentNode) el.parentNode.removeChild(el);
   });
@@ -1362,31 +1362,40 @@ function playerShoot(){
       const _isWeak = isWeakPointHit();
       const _mz = getPlayerMuzzlePos();
       const _target = getAimTargetPos();
-      battle.bullets.push({ sx: _mz.x, sy: _mz.y, tx: _target.x, ty: _target.y, t: 0, player: true, big: true, arc: true });
-
-      let _fragHits = 0, _fragCrits = 0;
-      for(let _fi = 0; _fi < _effFrags; _fi++){
-        if(Math.random() * 100 < _hitRate){
-          let _d = Math.round(_pieceBaseDmg) + rndInt(-2, 2);
-          let _isCrit = false;
-          if(Math.random() < _critRate){ _d = Math.round(_d * _critMult); _isCrit = true; _fragCrits++; }
-          _d = Math.max(1, _d);
-          _fragHits++;
-          if(_isWeak){
-            battle.engaged = true;
-            battle.bossHp = Math.max(0, battle.bossHp - _d);
-            battle.damageDealt += _d;
-            if(isBossType(battle.bossId, 'omega') && battle.arms) damageOmegaArm(battle.aimPart, _d);
-            if(battle.bossHp <= 0){ endBattle(true); return true; }
-          } else {
-            applyBossDamage(_d, _isCrit, def.penMM || 0, true);
-            if(battle.bossHp <= 0) return true;
+      const _battleRef = battle;
+      battle.bullets.push({
+        sx: _mz.x, sy: _mz.y, tx: _target.x, ty: 0.95, t: 0,
+        player: true, big: true, arc: true, isGrenade: true,
+        grenadeId: w.id,
+        startTime: performance.now(), duration: 500,
+        _onHit: function(){
+          let _fragHits = 0, _fragCrits = 0;
+          for(let _fi = 0; _fi < _effFrags; _fi++){
+            if(Math.random() * 100 < _hitRate){
+              let _d = Math.round(_pieceBaseDmg) + rndInt(-2, 2);
+              let _isCrit = false;
+              if(Math.random() < _critRate){ _d = Math.round(_d * _critMult); _isCrit = true; _fragCrits++; }
+              _d = Math.max(1, _d);
+              _fragHits++;
+              if(_isWeak){
+                _battleRef.engaged = true;
+                _battleRef.bossHp = Math.max(0, _battleRef.bossHp - _d);
+                _battleRef.damageDealt += _d;
+                if(isBossType(_battleRef.bossId, 'omega') && _battleRef.arms) damageOmegaArm(_battleRef.aimPart, _d);
+                if(_battleRef.bossHp <= 0){ endBattle(true); return; }
+              } else {
+                applyBossDamage(_d, _isCrit, def.penMM || 0, true);
+                if(_battleRef.bossHp <= 0) return;
+              }
+            }
+          }
+          if(_fragHits > 0){
+            spawnHitFx(_battleRef.bx, _battleRef.by, _fragHits + '片' + (_fragCrits > 0 ? '×' + _fragCrits + '暴' : ''), 'weak');
+            if(!_battleRef.aimHitFx) _battleRef.aimHitFx = [];
+            _battleRef.aimHitFx.push({ x: _target.x, y: _target.y, startTime: performance.now(), crit: _fragCrits > 0, particles: [] });
           }
         }
-      }
-      if(_fragHits > 0){
-        spawnHitFx(battle.bx, battle.by, _fragHits + '片' + (_fragCrits > 0 ? '×' + _fragCrits + '暴' : ''), 'weak');
-      }
+      });
       addProf(battle.weaponSlot, 0.01);
       if(def.type) addProf(def.type, 0.01);
       refreshBattleControlsLive();
@@ -1726,6 +1735,7 @@ function battleLoop(now){
       _ctx.clearRect(0, 0, _cvs.width, _cvs.height);
       
             window.MuzzleFX.render(_ctx, 'boss');
+      
     }
   }
 
@@ -1811,4 +1821,99 @@ function startBossBattle(bid){
   battle.lastTime = performance.now();
   requestAnimationFrame(battleLoop);
 }
+
+
+
+/* [v280] Boss 战 FX 系统（复用 16-combat.js） */
+(function(){
+  if(window._bossFXReuseInstalled) return;
+  window._bossFXReuseInstalled = true;
+
+  function _bossRenderBullets(now){
+    if(!battle || !battle.active) return;
+    var fxEl = document.getElementById('battle-fx');
+    if(!fxEl) return;
+    var cvs = document.getElementById('boss-bullets-canvas');
+    if(!cvs){
+      cvs = document.createElement('canvas');
+      cvs.id = 'boss-bullets-canvas';
+      cvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:10;';
+      fxEl.appendChild(cvs);
+    }
+    var W = fxEl.clientWidth, H = fxEl.clientHeight;
+    if(!W || !H) return;
+    if(cvs.width !== W || cvs.height !== H){ cvs.width = W; cvs.height = H; }
+    var ctx = cvs.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    /* 只绘制手雷，普通子弹保持隐形 */
+    for(var i = 0; i < battle.bullets.length; i++){
+      var bb = battle.bullets[i];
+      if(!bb.isGrenade || bb.isFast) continue;
+      var drawT = Math.min(1, bb.t);
+      var bx = (bb.sx + (bb.tx - bb.sx) * drawT) * W;
+      var by = (bb.sy + (bb.ty - bb.sy) * drawT) * H;
+      var _arcT = Math.min(1, bb.t);
+      var _arcH = Math.sin(_arcT * Math.PI) * H * 0.35;
+      by -= _arcH;
+      if(bx < -30 || bx > W + 30 || by < -30 || by > H + 30) continue;
+      var _gimg = (bb.grenadeId && typeof getHeroImg === 'function') ? getHeroImg('icons/items/' + bb.grenadeId + '.png') : null;
+      var _gsize = 20;
+      if(_gimg && _gimg.complete && _gimg.naturalWidth){
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(bb.t * Math.PI * 2);
+        ctx.drawImage(_gimg, -_gsize/2, -_gsize/2, _gsize, _gsize);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.fillStyle = '#ffd680';
+        ctx.shadowColor = '#ffb300';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(bx, by, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    /* 复用 16-combat.js 的 FX 渲染 */
+    if(typeof _renderBattleFX === 'function'){
+      _renderBattleFX(ctx, battle);
+    }
+  }
+
+  /* 包装 spawnHitFx：命中时生成火花（复用 _spawnHitSpark） */
+  var _origSpawnHitFx = window.spawnHitFx;
+  if(_origSpawnHitFx && !window._bossHitFxReuseWrapped){
+    window._bossHitFxReuseWrapped = true;
+    window.spawnHitFx = function(x, y, txt, cls){
+      _origSpawnHitFx(x, y, txt, cls);
+      if(txt && String(txt).indexOf('-') === 0 && cls !== 'miss' && cls !== 'heal'){
+        var fxEl = document.getElementById('battle-fx');
+        var W = fxEl ? fxEl.clientWidth : 400;
+        var H = fxEl ? fxEl.clientHeight : 500;
+        if(typeof _spawnHitSpark === 'function') _spawnHitSpark(battle, x * W, y * H, cls === 'crit');
+      }
+    };
+  }
+
+  /* 独立 rAF（Boss 战没有统一 tick 帧循环处理 bullets 绘制） */
+  window._bossRenderBullets = _bossRenderBullets;
+  var _lastTime = performance.now();
+  var _raf = function(){
+    requestAnimationFrame(_raf);
+    if(!battle || !battle.active){
+      var cvs = document.getElementById('boss-bullets-canvas');
+      if(cvs && cvs.parentNode) cvs.parentNode.removeChild(cvs);
+      return;
+    }
+    var now = performance.now();
+    var dt = Math.min(0.05, (now - _lastTime) / 1000);
+    _lastTime = now;
+    if(typeof _tickBattleFX === 'function') _tickBattleFX(battle, dt);
+    _bossRenderBullets(now);
+  };
+  requestAnimationFrame(_raf);
+})();
 

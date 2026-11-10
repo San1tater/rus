@@ -513,7 +513,17 @@ function updateBullets(dt){
     }
 
     if(b.t >= 1){
-      if(b._onHit) { try { b._onHit(); } catch(err){ console.error(err); } }
+      var _fxEl = document.getElementById('battle-fx');
+      var _W = _fxEl ? _fxEl.clientWidth : 400;
+      var _H = _fxEl ? _fxEl.clientHeight : 500;
+      var _sm = (battle && battle.sm) ? battle.sm : null;
+      if(b.isGrenade){
+        var _radG = (_sm && _sm.bgPixelsPerMeter) ? (8 * _sm.bgPixelsPerMeter) : (_W * 0.15);
+        if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(battle, b.tx * _W, b.ty * _H, _radG);
+      }
+      battle.bullets.splice(i, 1);
+      if(b._onHit) { window._lastBullet = b; try { b._onHit(); } catch(err){ console.error(err); } window._lastBullet = null; }
+      continue;
       
       if(b.enemy){
         const dodge = clamp(0.15 + state.player.level * 0.005, 0, 0.5);

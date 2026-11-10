@@ -124,7 +124,8 @@ const MERCHANT_TRADE_ITEMS = [
     { id: 'ammo_supply_stock',   name: '庫存彈藥包', desc: '庫存彈藥×30', price: 100, rarity: '庫存', imgIcon: 'ammo_pack', stackable: true },
     { id: 'ammo_supply_premium', name: '精品彈藥包', desc: '精品彈藥×40', price: 300, rarity: '精品', imgIcon: 'ammo_pack', stackable: true },
     { id: 'ammo_supply_legend',  name: '傳奇彈藥包', desc: '傳奇彈藥×50', price: 800, rarity: '傳奇', imgIcon: 'ammo_pack', stackable: true },
-    { id: 'medkit',      name: '傳奇急救包', desc: '傳奇急救包×1', price: 800, rarity: '傳奇', itemIconId: 'ifak',      stackable: true }
+    { id: 'medkit',      name: '傳奇急救包', desc: '傳奇急救包×1', price: 800, rarity: '傳奇', itemIconId: 'ifak',      stackable: true },
+    { id: 'f1',          name: '傳奇手榴彈', desc: 'F-1 手榴彈×1（傳奇）', price: 2000, rarity: '傳奇', itemIconId: 'f1', stackable: true }
   ]}
 ];
 
