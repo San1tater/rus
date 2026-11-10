@@ -519,7 +519,7 @@ function updateBullets(dt){
       var _sm = (battle && battle.sm) ? battle.sm : null;
       if(b.isGrenade){
         var _radG = (_sm && _sm.bgPixelsPerMeter) ? (8 * _sm.bgPixelsPerMeter) : (_W * 0.15);
-        if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(battle, b.tx * _W, b.ty * _H, _radG);
+        if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(battle, b.tx * _W, b.ty * _H, (battle.sm && battle.sm.bgPixelsPerMeter) ? (4.5 * battle.sm.bgPixelsPerMeter) : (_W * 0.08));
       }
       battle.bullets.splice(i, 1);
       if(b._onHit) { window._lastBullet = b; try { b._onHit(); } catch(err){ console.error(err); } window._lastBullet = null; }

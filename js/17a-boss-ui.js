@@ -1391,8 +1391,7 @@ function playerShoot(){
           }
           if(_fragHits > 0){
             spawnHitFx(_battleRef.bx, _battleRef.by, _fragHits + '片' + (_fragCrits > 0 ? '×' + _fragCrits + '暴' : ''), 'weak');
-            if(!_battleRef.aimHitFx) _battleRef.aimHitFx = [];
-            _battleRef.aimHitFx.push({ x: _target.x, y: _target.y, startTime: performance.now(), crit: _fragCrits > 0, particles: [] });
+
           }
         }
       });

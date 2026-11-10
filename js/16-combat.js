@@ -2065,7 +2065,7 @@ function _tickBullets(dt){
         var _fxElG = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
         var _WG = _fxElG ? _fxElG.clientWidth : 400;
         var _HG = _fxElG ? _fxElG.clientHeight : 500;
-        var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (8 * c.sm.bgPixelsPerMeter) : _WG * 0.12;
+        var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : _WG * 0.08;
         if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, b.tx * _WG, b.ty * _HG, _radG);
       }
       if(b._onHit){
@@ -2076,7 +2076,8 @@ function _tickBullets(dt){
       if(b.isGrenade){
         const _W = c.playerCanvas ? c.playerCanvas.width : 400;
         const _H = c.playerCanvas ? c.playerCanvas.height : 500;
-        _spawnExplosionSmoke(c, b.tx * _W, b.ty * _H);
+        const _radDup = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : (_W * 0.08);
+        _spawnExplosionSmoke(c, b.tx * _W, b.ty * _H, _radDup);
       }
       }
       if(b.t > 2 || b.hit){
