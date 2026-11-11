@@ -687,10 +687,10 @@ function _renderPass(now){
         else s.screenX += Math.sign(_dMove178b) * _followStep;
         continue;
       }
-      /* following：檢查射擊/換彈中不移動 */
-      const _perf = performance.now();
-      if(_a2._fireAnimUntil && _a2._fireAnimUntil > _perf) continue;
-      if(_a2._reloadEnd && _a2._reloadEnd > _perf) continue;
+      /* rev-fix-nocontinue: following 不再跳过 screenX 更新。
+       * 载员开火/换弹时 worldX 不变（_busyA 控制），但玩家可能仍在移动，
+       * screenX 应随 worldX 变化平滑跟随。原 continue 会导致 screenX 卡住，
+       * 开火结束后突然追上 → 视觉吸附。 */
     }
     if(s.srv && s.srv._standUntil && _nowWall < s.srv._standUntil) continue;
     if(_looting) continue;
@@ -745,6 +745,9 @@ function _renderPass(now){
     /* [v228] 世界座標移動優先判定：有移動 → walk/run，無移動 → idle */
     /* [v243] 撤退分支：screenX 額外步進，worldX 不更新，直接強制 run */
     if(it._retreating){
+      _animO = 'run';
+    } else if(it._forceRunAnim){
+      /* rev-fix-force-run-priority: 追赶中优先播 run，避免单帧速度波动导致 walk/run 闪烁 */
       _animO = 'run';
     } else {
       const _curWX228 = (typeof it.worldX === 'number') ? it.worldX : ex.worldX;
@@ -1542,15 +1545,24 @@ function _tick(now){
         if(_itNC._retreating) continue;
         if(typeof _itNC.worldX !== 'number') _itNC.worldX = ex.worldX;
         const _relWXNC = _itNC.worldX - ex.worldX;
-        if(_relWXNC > 0.01){
+        /* rev-fix-notick-sync: 阈值 0.5m；中间区间以玩家速度 1.4 m/s 同步，不吸附。 */
+        if(_relWXNC > 0.5){
+          /* 超前战位 0.5m+，停下等 */
           _itNC._standingWait = true;
           _itNC._forceRunAnim = false;
-        } else if(_relWXNC < -0.01){
+        } else if(_relWXNC < -0.5){
+          /* 落后战位 0.5m+，跑步追赶（2.8 m/s） */
           _itNC.worldX = Math.min(ex.worldX, _itNC.worldX + 2.8 * _dtNC);
           _itNC._standingWait = false;
           _itNC._forceRunAnim = true;
         } else {
-          _itNC.worldX = ex.worldX;
+          /* 战位 ±0.5m 内，以 1.4 m/s 同步，不吸附 */
+          const _diffWXNC = ex.worldX - _itNC.worldX;
+          if(Math.abs(_diffWXNC) > 0.0001){
+            const _syncStepNC = 1.4 * _dtNC;
+            const _stepNC = Math.min(Math.abs(_diffWXNC), _syncStepNC);
+            _itNC.worldX += Math.sign(_diffWXNC) * _stepNC;
+          }
           _itNC._standingWait = false;
           _itNC._forceRunAnim = false;
         }
