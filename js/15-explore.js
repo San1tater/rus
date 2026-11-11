@@ -381,6 +381,29 @@ function _disembark(){
     _newCount++;
   }
   ex.passengersFollowing = _newList;
+  /* rev-fix-disembark-allies-sync:
+   * 场景：wreck 阶段 _resolveVehicleLeave 把 _combat.sceneType 改为 'foot' 但 active 仍为 true。
+   * 此时无战斗分支 `if(!window._combat || !window._combat.active)` 不跑；
+   * _tickAlliesPositions 会遍历 c.allies，但这些载员在 _evac 时被设为 _retreating=true → 跳过 → worldX 冻结。
+   * passengersFollowing 重建后的新对象无法通过同步代码更新 → 世界定位冻结。
+   * 修复：清 c.allies 中对应载员的 _retreating，并同步 worldX 到新对象的值。 */
+  if(window._combat && window._combat.active && Array.isArray(window._combat.allies)){
+    const _newBySrvId = {};
+    for(const _it of _newList){
+      if(_it.srv) _newBySrvId[_it.srv.id] = _it;
+    }
+    for(let _ci = 1; _ci < window._combat.allies.length; _ci++){
+      const _a = window._combat.allies[_ci];
+      if(!_a.isPassenger || !_a.srv) continue;
+      const _newIt = _newBySrvId[_a.srv.id];
+      if(_newIt){
+        _a._retreating = false;
+        _a.worldX = _newIt.worldX;
+        _a._mode = null;
+        _a._lastWorldX = _a.worldX;
+      }
+    }
+  }
   ex._rotationOffset = 0;
   ex._lastRotateAt = 0;
   ex.evacuatingPassengers = false;
