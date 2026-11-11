@@ -357,7 +357,9 @@ function _disembark(){
     return;
   }
   const _nowMs = Date.now();
-  const _newList = _retreatingList.slice();
+  /* rev-fix-disembark-rebuild: 无条件重建，不以 _retreatingList 为起点
+   * （避免旧载员 _retreating=true 残留 → _tick 无战斗分支跳过 worldX 更新 → 世界定位冻结） */
+  const _newList = [];
   let _newCount = 0;
   for(let i = 0; i < st.passengers.length; i++){
     if(_newCount >= cap) break;
@@ -367,11 +369,6 @@ function _disembark(){
     if(srv.injuredUntil && srv.injuredUntil > _nowMs) continue;
     if(typeof srv.hp === 'number' && srv.hp <= 0) continue;
     if(srv._injuredDown) srv._injuredDown = false;
-    let _already = false;
-    for(let j = 0; j < _retreatingList.length; j++){
-      if(_retreatingList[j].srv && _retreatingList[j].srv.id === srv.id){ _already = true; break; }
-    }
-    if(_already) continue;
     _newList.push({
       srv: srv, p: p,
       screenX: 0.35 + _newCount * 0.01,
