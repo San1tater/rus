@@ -344,14 +344,19 @@ function _disembark(){
   const vid = g ? g.currentVehicle : 'btr80';
   const cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
   if(cap <= 0){
-    ex.passengersFollowing = _retreatingList;
+    /* rev-fix-disembark-cap0: 当前载具无载员容量（T-80 系列等），清空 passengersFollowing。
+     * 原逻辑保留 _retreatingList 会全部 _retreating=true 残留 → _tick 无战斗分支跳过 → worldX 冻结。
+     * 载员仍在 state.station.passengers 中，下次召唤有容量的载具时 _disembark 会重建。 */
+    ex.passengersFollowing = [];
     ex._rotationOffset = 0;
     ex._lastRotateAt = 0;
     return;
   }
   const st = state.station;
   if(!st || !Array.isArray(st.passengers)){
-    ex.passengersFollowing = _retreatingList;
+    /* rev-fix-disembark-cap0: station 数据异常，清空 passengersFollowing 防御性兜底。
+     * 原逻辑保留 _retreatingList 会全部 _retreating=true 残留 → worldX 冻结。 */
+    ex.passengersFollowing = [];
     ex._rotationOffset = 0;
     ex._lastRotateAt = 0;
     return;
