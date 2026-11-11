@@ -306,21 +306,16 @@ function _vehicleCombatFloat(absWorldX, text, cls){
   var W = fxEl ? fxEl.clientWidth : 400;
   var H = fxEl ? fxEl.clientHeight : 500;
   var _b = window._lastBullet;
-  var _p = c.allies[0];
-  var _rel = (typeof absWorldX === 'number' && _p) ? (absWorldX - _p.worldX) : 0;
-  var _sxN;
-  if(c.sm && c.sm.screenRightWorld > 0){
-    _sxN = EXPLORE_HERO_X_RATIO + (_rel / c.sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-    _sxN = Math.max(0.05, Math.min(0.95, _sxN));
-  } else {
-    _sxN = 0.95;
-  }
-  var _sparkX = _sxN * W;
+  /* rev-fix-spark-v288: 恢复 v288 设计——
+   * 火花 x 固定 0.25*W（玩家/载具位置，不跟随敌人炮口或弹道起点）
+   * 火花 y 用 _b.ty*H（跟随弹道终点的垂直位置，反映敌人从哪个高度命中）
+   * 浮字 x 固定 0.25，y=0.12 */
+  var _sparkX = EXPLORE_HERO_X_RATIO * W;
   var _sparkY = (_b && typeof _b.ty === 'number') ? _b.ty * H : H * 0.6;
   if(cls !== 'miss' && cls !== 'heal' && text && String(text).indexOf('-') === 0){
     if(typeof _spawnHitSpark === 'function') _spawnHitSpark(c, _sparkX, _sparkY, cls === 'crit');
   }
-  c.floats.push({ text: text, cls: cls || '', age: 0, x: _sxN, y: 0.12 });
+  c.floats.push({ text: text, cls: cls || '', age: 0, x: EXPLORE_HERO_X_RATIO, y: 0.12 });
 }
 
 window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
