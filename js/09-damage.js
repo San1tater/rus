@@ -60,11 +60,10 @@ function getPassengerArmorMMForPart(passenger, part){
 }
 
 function applyDamage(target, rawDmg, penetration, armorOpts){
-  let armorLevel = 0, armorMMOverride = null, armorProvider = null, isHE = false;
+  let armorLevel = 0, armorMMOverride = null, armorProvider = null;
   if(armorOpts && typeof armorOpts === 'object'){
     armorProvider = armorOpts.armorProvider || null;
     armorMMOverride = (armorOpts.armorMMOverride != null) ? armorOpts.armorMMOverride : null;
-    isHE = !!armorOpts.isHE;
     armorLevel = armorOpts.armorLevel || 0;
   } else {
     armorLevel = armorOpts || 0;
@@ -76,15 +75,6 @@ function applyDamage(target, rawDmg, penetration, armorOpts){
 
   const result = {armorLost:0, hpLost:0, finalDmg:0, overkill:false, part:null};
   const pool = Math.max(0, Math.round(target.armor || 0));
-
-  if(isHE){
-    const hpDmg = Math.round(rawDmg * 1.2);
-    target.hp = Math.max(0, Math.round((target.hp || 0) - hpDmg));
-    result.hpLost = hpDmg;
-    result.finalDmg = hpDmg;
-    result.overkill = true;
-    return result;
-  }
 
   let armorMM = null;
   if(armorProvider){

@@ -107,3 +107,18 @@ function _ammoSpeedForCal(cal){
   if(typeof AMMO_SPEED_MS !== 'undefined' && AMMO_SPEED_MS[cal]) return AMMO_SPEED_MS[cal];
   return 500;
 }
+
+
+/* rev-fix-scale-unified: 統一視覺比例尺出口。
+ * 契約：所有視覺尺寸以該模式玩家人偶 1.7 m 為基準。
+ * 手雷煙霧 4.5 m → 4.5 * getPixelsPerMeter(mode, H) px。
+ * 注意：Boss 戰的 0.4519 是 battleLoop 的 playerCanvasH 係數，
+ *       若 battleLoop 改了這裡也要同步；battleLoop 會直接讀 battle.playerCanvasH 設 battle.bgPixelsPerMeter。
+ */
+window.getPixelsPerMeter = function(mode, screenH){
+  const H = (typeof screenH === 'number' && screenH > 0) ? screenH : 500;
+  if(mode === 'boss') return H * 0.4519 * CHAR_HEIGHT_FACTOR_BATTLE / PLAYER_HEIGHT_M;
+  if(mode === 'explore') return H * CHAR_HEIGHT_FACTOR / PLAYER_HEIGHT_M;
+  if(mode === 'garden') return 56 / PLAYER_HEIGHT_M;
+  return H * CHAR_HEIGHT_FACTOR / PLAYER_HEIGHT_M;
+};

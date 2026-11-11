@@ -100,16 +100,6 @@ function _resolveSingleAttack(atk, tgt, opts){
 
 const FOOT_RANGE_SHORT = 20;
 
-function _hexToRgba(hex, a){
-  if(!hex) return 'rgba(255,255,255,' + a + ')';
-  if(hex.indexOf('rgb') === 0) return hex.replace(')', ', ' + a + ')').replace('rgb(', 'rgba(');
-  const h = hex.replace('#','');
-  const r = parseInt(h.substring(0,2),16);
-  const g = parseInt(h.substring(2,4),16);
-  const b = parseInt(h.substring(4,6),16);
-  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
-}
-
 function _rangeOfWeaponDef(wd){
   if(!wd) return FOOT_RANGE_DEFAULT;
   if(wd.slot === 'melee') return 0.75;
@@ -1344,10 +1334,14 @@ function _firePassenger(a, t, now, w){
   a._magazine.inMag--;
   const am = { id: a._magazine.ammoId, rarity: a._magazine.ammoRarity, def: a._magazine.def };
 
+  /* rev-fix-passenger-anim-dur: 时长从 GAME_ANIMS.fire_primary 计算，改 fps/帧数时自动跟随，
+   * 避免 v314 引入的「载员 busy 静止」因动画缩短而误判。 */
   const _perfNow = performance.now();
   const _wallNow = Date.now();
+  const _fpAnimDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.fire_primary) ? GAME_ANIMS.fire_primary : null;
+  const _fpDur = _fpAnimDef ? Math.round(_fpAnimDef.frameCount / _fpAnimDef.fps * 1000) : 250;
   a._fireAnimStart = _perfNow;
-  a._fireAnimUntil = _perfNow + 250;
+  a._fireAnimUntil = _perfNow + _fpDur;
   if(a.srv){ a.srv._standStart = _wallNow; a.srv._standUntil = _wallNow + 150; }
 
   /* rev-fix-fire-chain-unify: 改用 _getFireChainMode */
@@ -1949,9 +1943,11 @@ function _passengerThrowGrenade(a, t, gDef, gRar, now, gid){
     }
   });
   const _wallNow = Date.now();
+  const _ptAnimDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.fire_primary) ? GAME_ANIMS.fire_primary : null;
+  const _ptDur = _ptAnimDef ? Math.round(_ptAnimDef.frameCount / _ptAnimDef.fps * 1000) : 400;
   a._fireAnimStart = performance.now();
-  a._fireAnimUntil = performance.now() + 400;
-  if(a.srv){ a.srv._standStart = _wallNow; a.srv._standUntil = _wallNow + 400; }
+  a._fireAnimUntil = performance.now() + _ptDur;
+  if(a.srv){ a.srv._standStart = _wallNow; a.srv._standUntil = _wallNow + _ptDur; }
 }
 
 function _enemyThrowGrenade(e, p, now){
@@ -2072,12 +2068,6 @@ function _tickBullets(dt){
         window._lastBullet = b;
         try { b._onHit(); } catch(err){ console.error(err); }
         window._lastBullet = null;
-      }
-      if(b.isGrenade){
-        const _W = c.playerCanvas ? c.playerCanvas.width : 400;
-        const _H = c.playerCanvas ? c.playerCanvas.height : 500;
-        const _radDup = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : (_W * 0.08);
-        _spawnExplosionSmoke(c, b.tx * _W, b.ty * _H, _radDup);
       }
       }
       if(b.t > 2 || b.hit){

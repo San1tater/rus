@@ -202,13 +202,6 @@ const VEHICLE_WEAPON_STATS = {
   'atgm_9m113': { dmg: 1200, penMM: 600 }
 };
 
-/* 需求整理六：HE 濺射 full/max 半徑 */
-const VEHICLE_HE_SPLASH = {
-  '2a28_he':  { full: 15, max: 30 },
-  '2a70_he':  { full: 25, max: 50 },
-  '2a46_he':  { full: 30, max: 60 }
-};
-
 /* 載具裝甲 RHA（mm） */
 const VEHICLE_ARMOR_RHA = {
   btr80:{hullFront:20,turretFront:10,side:7,rear:7},
@@ -263,13 +256,6 @@ const VEHICLE_MAIN_AMMO_POOL = {
   '2a46m1': [{id:'3bm42',name:'3BM42 穿甲',type:'ap'},{id:'3of26',name:'3OF26 高爆',type:'he'},{id:'3bk29',name:'3BK29 破甲',type:'heat'}],
   '2a70':   [{id:'3uof17',name:'3UOF17 高爆',type:'he'}],
   '2a28':   [{id:'pg15v',name:'PG-15V 破甲',type:'heat'},{id:'og15v',name:'OG-15V 高爆',type:'he'}]
-};
-
-/* 彈鏈預設 */
-const VEHICLE_BELT_PRESETS = {
-  '穿燃':{name:'穿燃',desc:'穿甲燃燒彈鏈',img:'ap'},
-  '高爆':{name:'高爆',desc:'高爆彈鏈',img:'he'},
-  '混合':{name:'混合',desc:'穿甲 / 高爆交替',img:'mix'}
 };
 
 function _buildLoadoutFallback(vid){

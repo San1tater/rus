@@ -1409,6 +1409,8 @@ function drawBullet(b){
       try {
         var _ovs = document.querySelectorAll('#raid-overlay');
         for(var _oi = 0; _oi < _ovs.length; _oi++){ try{ _ovs[_oi].remove(); }catch(_e){} }
+        var _bbs = document.querySelectorAll('#raid-enemy-bubbles');
+        for(var _bi = 0; _bi < _bbs.length; _bi++){ try{ _bbs[_bi].remove(); }catch(_e){} }
       } catch(e){ console.warn('[endBattle remove ov]', e); }
       try {
         const sim = { log: logEntries, guards: guardUnits, enemies: enemyUnits, win: win, rounds: 1, brokenPlots: brokenPlots.slice(), initialEnemyCount: _initialEnemyCount };
@@ -1416,8 +1418,7 @@ function drawBullet(b){
       } catch(e){ console.warn('[raid apply]', e); }
       try { _gardenActiveTab = 'log'; } catch(e){}
       try { if(typeof renderGardenTabs === 'function') renderGardenTabs(); } catch(e){}
-      try { if(typeof renderGardenContent === 'function') renderGardenContent(); } catch(e){}
-      try { if(typeof renderGardenGrid === 'function') renderGardenGrid(); } catch(e){}
+      /* rev-fix-raid-double-render: renderGardenContent/Grid 已由 _gardenRaidApplyResult 内部调用，此处不重复 */
       try { if(typeof _gardenStartActorLoop === 'function') _gardenStartActorLoop(); } catch(e){ console.warn('[start actor loop]', e); }
       try { if(typeof _gardenStartActorCanvasLoop === 'function') _gardenStartActorCanvasLoop(); } catch(e){ console.warn('[start actor canvas]', e); }
       setTimeout(function(){

@@ -68,8 +68,8 @@ function _applyVehicleSplash(sp, mainTarget, baseDmg, ratioMult, wid, usedAmmoId
   const c = window._combat;
   const ex = window._explore;
   if(!c || !ex || !sp || !mainTarget) return;
-  const impactRelWorldX = mainTarget.worldX;
-  const impactAbsWorldX = ex.worldX + impactRelWorldX;
+  /* rev-fix-splash-worldx: mainTarget.worldX 已是绝对世界坐标，不再叠加 ex.worldX */
+  const impactAbsWorldX = mainTarget.worldX;
   const maxDmg = baseDmg * sp.splashRatio * (ratioMult || 1.0);
   const targets = [];
   for(let i = 0; i < c.enemies.length; i++){
@@ -96,9 +96,7 @@ function _applyVehicleSplash(sp, mainTarget, baseDmg, ratioMult, wid, usedAmmoId
   }
   for(let ti = 0; ti < targets.length; ti++){
     const t = targets[ti];
-    let dist;
-    if(t.type === 'current') dist = Math.abs(t.enemy.worldX - impactRelWorldX);
-    else dist = Math.abs(t.enemy.worldX - impactAbsWorldX);
+    const dist = Math.abs(t.enemy.worldX - impactAbsWorldX);
     if(dist >= sp.maxR) continue;
     const tt = dist / sp.maxR;
     const falloff = 1 - tt * tt;
@@ -113,8 +111,7 @@ function _applyVehicleSplash(sp, mainTarget, baseDmg, ratioMult, wid, usedAmmoId
     t.enemy.hp = proxy.hp;
     if(t.enemy.armor !== undefined) t.enemy.armor = proxy.armor;
     const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
-    const rel = (t.type === 'current') ? t.enemy.worldX : (t.enemy.worldX - ex.worldX);
-    _vehicleCombatFloat(rel, '-' + shown, res.hpLost > 0 ? 'enemy' : 'armor');
+    _vehicleCombatFloat(t.enemy.worldX, '-' + shown, res.hpLost > 0 ? 'enemy' : 'armor');
     if(t.enemy.hp <= 0){
       _onBTRKillTarget(t.enemy, wid, c, usedAmmoId);
       if(t.type === 'event' && t.event && t.event.content){
@@ -299,134 +296,31 @@ function _getVehicleAmmoStats(wid, ammoId){
   return null;
 }
 
-function _isHEAmmo(wid, ammoId){
-  if(ammoId === '3of26' || ammoId === '3uof17' || ammoId === 'og15v') return true;
-  if(wid === '2a72' || wid === '2a42'){
-    const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-    const vid = g ? g.currentVehicle : 'btr80';
-    const a = state.vehicleAmmo && state.vehicleAmmo[vid] && state.vehicleAmmo[vid][wid];
-    return !!(a && a.preset === '高爆');
-  }
-  return false;
-}
-
-function _getSplashRatio(dist, wid, ammoId){
-  let splashDef = null;
-  if(ammoId && VEHICLE_HE_SPLASH[ammoId]) splashDef = VEHICLE_HE_SPLASH[ammoId];
-  if(!splashDef){
-    if(wid === '2a28') splashDef = VEHICLE_HE_SPLASH['2a28_he'];
-    else if(wid === '2a70') splashDef = VEHICLE_HE_SPLASH['2a70_he'];
-    else if(wid === '2a46' || wid === '2a46m1') splashDef = VEHICLE_HE_SPLASH['2a46_he'];
-  }
-  if(!splashDef) return 0;
-  if(dist <= splashDef.full) return 1.0;
-  if(dist >= splashDef.max) return 0;
-  return (splashDef.max - dist) / (splashDef.max - splashDef.full);
-}
-
-function _vehicleCombatFloat(relWorldX, text, cls){
+/* rev-fix-vehicle-float-unify: 与探索模式 _float 同构——按目标相对玩家的世界距离换算屏幕 x，
+ * 载具战 screenRightWorld 约 2 m，敌人 300–500 m 外 → clamp 到 0.95（右边缘）。
+ * 参数 absWorldX 统一为「绝对世界坐标」，函数内部自行减玩家 worldX 得相对值。 */
+function _vehicleCombatFloat(absWorldX, text, cls){
   var c = window._combat;
   if(!c) return;
   var fxEl = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
   var W = fxEl ? fxEl.clientWidth : 400;
   var H = fxEl ? fxEl.clientHeight : 500;
   var _b = window._lastBullet;
-  var _sparkX = EXPLORE_HERO_X_RATIO * W;
+  var _p = c.allies[0];
+  var _rel = (typeof absWorldX === 'number' && _p) ? (absWorldX - _p.worldX) : 0;
+  var _sxN;
+  if(c.sm && c.sm.screenRightWorld > 0){
+    _sxN = EXPLORE_HERO_X_RATIO + (_rel / c.sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
+    _sxN = Math.max(0.05, Math.min(0.95, _sxN));
+  } else {
+    _sxN = 0.95;
+  }
+  var _sparkX = _sxN * W;
   var _sparkY = (_b && typeof _b.ty === 'number') ? _b.ty * H : H * 0.6;
   if(cls !== 'miss' && cls !== 'heal' && text && String(text).indexOf('-') === 0){
     if(typeof _spawnHitSpark === 'function') _spawnHitSpark(c, _sparkX, _sparkY, cls === 'crit');
   }
-  c.floats.push({ text: text, cls: cls || '', age: 0, x: EXPLORE_HERO_X_RATIO, y: 0.15 });
-}
-
-function _applyHESplash(wid, mainTarget, baseDmg, isCrit, penMM, ammoId){
-  const c = window._combat;
-  const ex = window._explore;
-  if(!c || !ex) return;
-
-  const impactRelWorldX = mainTarget ? mainTarget.worldX : 0;
-  const impactAbsWorldX = ex.worldX + impactRelWorldX;
-
-  const targets = [];
-
-  for(let i = 0; i < c.enemies.length; i++){
-    if(c.enemies[i] === mainTarget) continue;
-    if(c.enemies[i].hp <= 0) continue;
-    targets.push({ enemy: c.enemies[i], type: 'current' });
-  }
-
-  for(let ni = 0; ni < ex.nodes.length; ni++){
-    const node = ex.nodes[ni];
-    for(let ei = 0; ei < node.events.length; ei++){
-      const ev = node.events[ei];
-      if(ev.cleared) continue;
-      if(ev.type !== 'combat') continue;
-      if(!ev.content) continue;
-      for(let j = 0; j < ev.content.length; j++){
-        const en = ev.content[j];
-        if(en.hp <= 0) continue;
-        let dup = false;
-        for(let k = 0; k < c.enemies.length; k++){
-          if(c.enemies[k] === en){ dup = true; break; }
-        }
-        if(dup) continue;
-        targets.push({ enemy: en, type: 'event', event: ev });
-      }
-    }
-  }
-
-  for(let ti = 0; ti < targets.length; ti++){
-    const t = targets[ti];
-    let dist;
-    if(t.type === 'current'){
-      dist = Math.abs(t.enemy.worldX - impactRelWorldX);
-    } else {
-      dist = Math.abs(t.enemy.worldX - impactAbsWorldX);
-    }
-    const ratio = _getSplashRatio(dist, wid, ammoId);
-    if(ratio <= 0) continue;
-
-    const splashDmg = Math.max(1, Math.round(baseDmg * ratio));
-
-    const proxy = { hp: t.enemy.hp, armor: t.enemy.armor || 0 };
-    const res = applyDamage(proxy, splashDmg, penMM || 0, { isHE: true });
-    t.enemy.hp = proxy.hp;
-    if(t.enemy.armor !== undefined) t.enemy.armor = proxy.armor;
-
-    const rel = (t.type === 'current') ? t.enemy.worldX : (t.enemy.worldX - ex.worldX);
-    _vehicleCombatFloat(rel, '-' + res.hpLost, 'enemy');
-
-    if(t.enemy.hp <= 0){
-      const eName = (typeof ENEMIES !== 'undefined' && ENEMIES[t.enemy.eid]) ? ENEMIES[t.enemy.eid].name : t.enemy.eid;
-      if(typeof pushLog === 'function'){
-        (function(){var _vidH140=(state.garage&&state.garage.currentVehicle)||'btr80';var _wn=(typeof window._vehicleWeaponDisplayName==='function')?window._vehicleWeaponDisplayName(wid,_vidH140):({ '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' }[wid]||(wid?wid.toUpperCase():'未知武器'));var _af={'3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','3uof17':'3UOF17 高爆','pg15v':'PG-15V 破甲','og15v':'OG-15V 高爆'}[ammoId];var _fm=_af?('（'+_af+'）'):(ammoId==='atgm'?'（反坦克導彈）':(ammoId?'（'+ammoId+'）':''));pushLog('<span class="run">'+_wn+_fm+'</span> 濺射擊殺 <b class="r-'+(t.enemy.rarity||'一般')+'">'+eName+'</b>', [], 'explore');})();
-      }
-      if(typeof _grantBTRCrewExp === 'function') _grantBTRCrewExp(3);
-      /* [v195c D] 車戰濺射擊殺：每敵人 3 玩家經驗 + 事件清空時 roll 信物。 */
-      if(typeof addExp === 'function') addExp(3);
-      if(typeof window._settleVehicleEventIfCleared === 'function') window._settleVehicleEventIfCleared(t.enemy);
-      if(t.type === 'event' && t.event && t.event.content){
-        t.event.content = t.event.content.filter(function(x){ return x !== t.enemy; });
-        if(!t.event.content.length) t.event.cleared = true;
-      }
-      if(window.BTRSupport && typeof window.BTRSupport.killCount === 'number'){
-        window.BTRSupport.killCount = (window.BTRSupport.killCount || 0) + 1;
-        if(!window.BTRSupport.kills) window.BTRSupport.kills = {};
-        window.BTRSupport.kills[t.enemy.eid] = (window.BTRSupport.kills[t.enemy.eid] || 0) + 1;
-        if(!window.BTRSupport.weaponKills) window.BTRSupport.weaponKills = {};
-        var _killKey = wid + (ammoId ? ':' + ammoId : '');
-        window.BTRSupport.weaponKills[_killKey] = (window.BTRSupport.weaponKills[_killKey] || 0) + 1;
-        if(typeof rollEnemyLoot === 'function'){
-          const loot = rollEnemyLoot(t.enemy);
-          if(!window.BTRSupport.loot) window.BTRSupport.loot = [];
-          for(let li = 0; li < loot.length; li++){
-            invAdd(loot[li].id, loot[li].rarity, loot[li].count);
-            window.BTRSupport.loot.push(loot[li]);
-          }
-        }
-      }
-    }
-  }
+  c.floats.push({ text: text, cls: cls || '', age: 0, x: _sxN, y: 0.12 });
 }
 
 window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
@@ -530,7 +424,6 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   }
   if(!stats) return false;
 
-  const isHE = _isHEAmmo(wid, _usedAmmoId) && (wid === '2a46' || wid === '2a46m1' || wid === '2a70' || wid === '2a28');
   const baseDmg = Math.round(stats.dmg * _LEG_MULT);
   const penMM = stats.penMM || 0;
 
@@ -782,6 +675,8 @@ function _vCalcPassengerArmor(p){
 window._vHitVehicle = function(veh, dmg, penMM, ammoId, attackerName, weaponName, weaponRarity, attackerRarity){
   const vid = veh.vehicleId;
   const d = _vEnsureDamage(vid);
+  /* rev-fix-veh-float-abs: 浮字统一用载具绝对世界坐标（v316 契约），避免 clamp 到屏幕左边缘 */
+  const _vehWX = (veh && typeof veh.worldX === 'number') ? veh.worldX : 0;
   if(attackerName || weaponName){
     var _atkRar = attackerRarity || '一般';
     var _atkNameRaw = attackerName || '???';
@@ -797,7 +692,7 @@ window._vHitVehicle = function(veh, dmg, penMM, ammoId, attackerName, weaponName
   const _diff = penMM - armorMM;
   if(_diff <= 0){
     if(typeof _vehicleCombatFloat === 'function'){
-      _vehicleCombatFloat(0, _diff === 0 ? '磨穿' : '跳彈', 'armor');
+      _vehicleCombatFloat(_vehWX, _diff === 0 ? '磨穿' : '跳彈', 'armor');
     }
     return { penetrated: false, damage: 0 };
   }
@@ -808,7 +703,7 @@ const key = _vPickInternalKey(vid);
 
   if(key === 'ammoRack'){
     d.ammoRackDamage += dmg;
-    _vehicleCombatFloat(0, '彈藥架 -' + Math.round(dmg), 'crit');
+    _vehicleCombatFloat(_vehWX, '彈藥架 -' + Math.round(dmg), 'crit');
     if(d.ammoRackDamage >= 600){
       _detonate(vid, veh);
       return { penetrated: true, detonated: true, damage: dmg };
@@ -844,7 +739,7 @@ const key = _vPickInternalKey(vid);
       } else {
         d.members[tgt.r] = 0;
       }
-      _vehicleCombatFloat(0, '乘員 -' + Math.round(dmg * 1.5), 'crit');
+      _vehicleCombatFloat(_vehWX, '乘員 -' + Math.round(dmg * 1.5), 'crit');
       if(tgt.r === 'driver' && d.members.driver <= 0){
         const _drvId = state.station && state.station.crew ? state.station.crew.driver : null;
         const _drvSrv = _drvId ? (state.servants || []).find(function(s){ return s.id === _drvId; }) : null;
@@ -902,7 +797,7 @@ const key = _vPickInternalKey(vid);
       state.player.hp = _tgt.hp;
       state.player.armor = _tgt.armor;
       d.members.player = _tgt.hp > 0 ? 1 : 0;
-      _vehicleCombatFloat(0, '玩家 -' + Math.round(dmg * 1.5), 'crit');
+      _vehicleCombatFloat(_vehWX, '玩家 -' + Math.round(dmg * 1.5), 'crit');
       if(state.player.hp <= 0){
         state.player.hp = 0;
         state.player.deadUntil = Date.now() + 60000;
@@ -934,7 +829,7 @@ const key = _vPickInternalKey(vid);
         }
       });
       tgt.srv.hp = _t2.hp;
-      _vehicleCombatFloat(0, '載員 -' + Math.round(_res2.hpLost), 'crit');
+      _vehicleCombatFloat(_vehWX, '載員 -' + Math.round(_res2.hpLost), 'crit');
       if(tgt.srv.hp <= 0){
         tgt.srv.hp = 0;
         tgt.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
@@ -957,7 +852,7 @@ const key = _vPickInternalKey(vid);
 
   const _prevPartVal = d.parts[key] || 0;
   d.parts[key] = Math.max(0, (d.parts[key] || 0) - dmg);
-  _vehicleCombatFloat(0, '-' + Math.round(dmg), '');
+  _vehicleCombatFloat(_vehWX, '-' + Math.round(dmg), '');
   if(key === 'engine' && d.parts.engine <= 0){
     if(_prevPartVal > 0){
       if(typeof pushLog === 'function'){
@@ -1000,7 +895,7 @@ const key = _vPickInternalKey(vid);
     const _widHit = _weaponIds[Math.floor(Math.random() * _weaponIds.length)];
     const _wPrev = d.weapons[_widHit].hp;
     d.weapons[_widHit].hp = Math.max(0, _wPrev - dmg);
-    _vehicleCombatFloat(0, '-' + Math.round(dmg), '');
+    _vehicleCombatFloat(_vehWX, '-' + Math.round(dmg), '');
     if(d.weapons[_widHit].hp <= 0 && _wPrev > 0){
       d.repairUntil = Date.now() + 4 * 3600 * 1000;
       if(typeof pushLog === 'function'){

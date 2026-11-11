@@ -334,6 +334,15 @@ function cropStageImgHtml(cropId, stage, size){
 function bossIcon(id){const _map={factory_king_ii:"factory_king",lab_queen_ii:"lab_queen",road_tyrant_ii:"road_tyrant",swamp_hydra_ii:"swamp_hydra",core_omega_ii:"core_omega"};const _rid=_map[id]||id;const _tint=(id.indexOf("_ii")>=0)?" boss-ii-tint":"";const _p="icons/bosses/"+_rid+".png";return `<img src="${_p}${assetSuffix(_p)}" alt="" class="${_tint}">`;}
 function buildingIcon(id){const _p="icons/buildings/"+id+".png";return `<img src="${_p}${assetSuffix(_p)}" alt="">`;}
 
+/* rev-fix-fmt-item-span: 正式定义，不再依赖 25-boot 底部兜底。
+ * 所有 fmtItemSpan(...) 调用方（pushLog、_gardenLog、_gardenRaidLogBattle 等）都期望它一直存在。 */
+function fmtItemSpan(id, r, c){
+  var d = (typeof itemDef === 'function') ? itemDef(id) : null;
+  var nm = d ? d.name : id;
+  var rc = (typeof rarityClass === 'function') ? rarityClass(r) : ('r-' + r);
+  return '<span class="' + rc + ' itm" data-iid="' + id + '" data-irar="' + r + '">' + nm + '*' + c + '</span>';
+}
+
 async function _probeGitHubTree(){
   try {
     var owner = GH_OWNER, repo = GH_REPO;

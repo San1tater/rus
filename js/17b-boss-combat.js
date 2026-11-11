@@ -1,9 +1,6 @@
 
 'use strict';
 
-var HYDRA_HEAD_IDS = ['head_1','head_2','head_3','head_4','head_5','head_6','head_7'];
-var HYDRA_NECK_MAP = { neck_1:'head_1', neck_2:'head_2', neck_3:'head_3', neck_4:'head_4', neck_5:'head_5', neck_6:'head_6', neck_7:'head_7' };
-
 function defaultAimPartForBoss(bossId){
   const def = BOSS_LAYERS[bossId];
   if(!def) return null;
@@ -516,31 +513,15 @@ function updateBullets(dt){
       var _fxEl = document.getElementById('battle-fx');
       var _W = _fxEl ? _fxEl.clientWidth : 400;
       var _H = _fxEl ? _fxEl.clientHeight : 500;
-      var _sm = (battle && battle.sm) ? battle.sm : null;
       if(b.isGrenade){
-        var _radG = (_sm && _sm.bgPixelsPerMeter) ? (8 * _sm.bgPixelsPerMeter) : (_W * 0.15);
-        if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(battle, b.tx * _W, b.ty * _H, (battle.sm && battle.sm.bgPixelsPerMeter) ? (4.5 * battle.sm.bgPixelsPerMeter) : (_W * 0.08));
+        var _ppm = (typeof battle.bgPixelsPerMeter === 'number' && battle.bgPixelsPerMeter > 0)
+          ? battle.bgPixelsPerMeter
+          : ((_H > 0 ? _H : 500) * 0.4519 * CHAR_HEIGHT_FACTOR_BATTLE / PLAYER_HEIGHT_M);
+        var _radG = 4.5 * _ppm;
+        if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(battle, b.tx * _W, b.ty * _H, _radG);
       }
       battle.bullets.splice(i, 1);
       if(b._onHit) { window._lastBullet = b; try { b._onHit(); } catch(err){ console.error(err); } window._lastBullet = null; }
-      continue;
-      
-      if(b.enemy){
-        const dodge = clamp(0.15 + state.player.level * 0.005, 0, 0.5);
-        if(Math.random() > dodge){
-          const target = { hp: battle.playerHp, armor: battle.playerArmor };
-          const res = applyDamage(target, b.dmg, b.penMM || 0, {
-            armorProvider: function(part){
-              return (typeof getPlayerArmorMMForPart === 'function') ? getPlayerArmorMMForPart(part) : 0;
-            }
-          });
-          battle.playerHp = target.hp;
-          battle.playerArmor = target.armor;
-          spawnHitFx(battle.px, battle.py, '-' + (res.hpLost + res.armorLost), res.hpLost > 0 ? 'enemy' : 'armor');
-          if(battle.playerHp <= 0){ endBattle(false); return; }
-        }
-      }
-      battle.bullets.splice(i, 1);
       continue;
     }
   }

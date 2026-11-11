@@ -132,14 +132,9 @@ function _consumeAmmoByValue(targetValue){
   return remaining <= 0.01;
 }
 
+/* rev-fix-ammoeq-dup: 与 05-data-vehicles.js 的 vcAmmoEquivTotal 语义完全一致，改为 alias */
 function _garageAmmoEquiv(){
-  let eq = 0;
-  for(const k in state.inventory){
-    const p = k.split('@');
-    if(!AMMO[p[0]]) continue;
-    eq += (state.inventory[k] || 0) * (RARITY_MULT[p[1]] || 1);
-  }
-  return eq;
+  return (typeof vcAmmoEquivTotal === 'function') ? vcAmmoEquivTotal() : 0;
 }
 window._garageAmmoEquiv = _garageAmmoEquiv;
 
@@ -910,23 +905,14 @@ function _garageShowTechDetail(vid){
   const sw = bd.querySelector('#m-switch');
   if(sw) sw.onclick = function(){ g.currentVehicle = vid; save(); _garageShowTechDetail(vid); _refreshGaragePage(); };
 
+  /* rev-fix-garage-dead-cancel: body 只生成 data-mode="start"，'cancel' 分支不可达，已删 */
   const rs = bd.querySelector('#m-research');
-  if(rs){
-    const mode = rs.getAttribute('data-mode');
-    if(mode === 'start'){
-      rs.onclick = function(){
-        _garageStartResearch(vid);
-        _garageShowTechDetail(vid);
-        _refreshGaragePage();
-      };
-    } else if(mode === 'cancel'){
-      rs.onclick = function(){
-        g.researchTarget = null;
-        if(typeof save === 'function') save();
-        _garageShowTechDetail(vid);
-        _refreshGaragePage();
-      };
-    }
+  if(rs && rs.getAttribute('data-mode') === 'start'){
+    rs.onclick = function(){
+      _garageStartResearch(vid);
+      _garageShowTechDetail(vid);
+      _refreshGaragePage();
+    };
   }
 
   const buy = bd.querySelector('#m-buy');

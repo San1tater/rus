@@ -698,7 +698,8 @@ function updateFighterPos(){
   const dmgBar = document.getElementById('dmg-bar');
   if(dmgBar){
     const totalHp = battle.bossMaxHp + battle.bossMaxArmor;
-    dmgBar.style.width = Math.min(100, (battle.damageDealt / totalHp) * 100) + '%';
+    const _curCurHp = battle.bossHp + battle.bossArmor;
+    dmgBar.style.width = Math.max(0, Math.min(100, (1 - _curCurHp / totalHp) * 100)) + '%';
   }
   const dmgHd = document.querySelector('.damage-header');
   if(dmgHd){ dmgHd.querySelector('.num').textContent = Math.round(battle.damageDealt); }

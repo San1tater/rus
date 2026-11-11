@@ -127,10 +127,6 @@ function openControlCenter(){
   ft.querySelector('#m-close-cc').onclick = closeModal;
 }
 
-function openMerchant(){
-  openModal({title:'商人', body:'<div class="empty-hint">商人系統開發中，敬請期待。</div>'});
-}
-
 function openPreference(){
   const p = state.preferences;
   let body = '';
@@ -264,7 +260,7 @@ function renderBaseStats(){
   const genMult = 1 + genLv * 0.2;
   const radioLv = getBuildingLv('radio');
   if(radioLv > 0){
-    const mh = Math.round(12 * genMult * 5.5  * Math.max(1,Math.round(1+radioLv*0.3)));
+    const mh = Math.round(12 * genMult * 5.5 * radioLv);
     rows.push({ key: 'radio', label: '無線電', value: '+' + mh + '/h' });
   }
   const armoryLv = getBuildingLv('armory');
@@ -590,8 +586,6 @@ function onBuildCell(i){
   if(i===0){openControlCenter();return;}
   const slot=state.base.slots[i];
   if(slot){
-    if(slot.id==='merchant'){ openMerchant(); return; }
-    if(slot.id==='garden'){ openGarden(); return; }
     if(slot.id==='garage'){ if(typeof _openGarageInfoModal === 'function') _openGarageInfoModal(i); return; }
     if(slot.id==='station'){ if(typeof openStationPage === 'function') openStationPage(); return; }
     const b=BUILDINGS[slot.id];

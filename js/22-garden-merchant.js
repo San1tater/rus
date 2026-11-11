@@ -182,7 +182,6 @@ function _gardenMerchantPoolFill(poolKey, target){
   return true;
 }
 
-function _gardenMerchantCropValuePoolFill(target){ return _gardenMerchantPoolFill('cropValuePool', target); }
 function _gardenMerchantFoodPoolFill(target){ return _gardenMerchantPoolFill('foodPool', target); }
 
 /* ===== 產線日誌輔助 ===== */
@@ -416,14 +415,23 @@ function _gardenMerchantTick(){
 }
 
 /* ===== 食物統計 ===== */
-function _gardenFoodConsumePerHour(){
-  const g = _gardenMerchantInit();
-  const m = g.merchant;
+/* rev-fix-food-ui: 实际每小时消耗 = FOOD_COST_BASE × RARITY_FOOD_MULT（与 _gardenDoOneMeal 一致），
+ * 不再乘 60。旧版按「每分钟 3」推 180/h，比实际 20/h 大 9 倍。 */
+function _gardenServantFoodConsumePerHour(){
   let total = 0;
   for(const s of (state.servants || [])){
     if(!s.assignedPlots || !s.assignedPlots.length) continue;
-    total += (FOOD_COST_PER_HOUR[s.foodPolicy || 'normal'] || 0) * 60;
+    const _base = FOOD_COST_BASE[s.foodPolicy || 'normal'] || 0;
+    const _mult = RARITY_FOOD_MULT[s.rarity] || 1;
+    total += Math.round(_base * _mult * 10) / 10;
   }
+  return total;
+}
+
+function _gardenFoodConsumePerHour(){
+  const g = _gardenMerchantInit();
+  const m = g.merchant;
+  let total = _gardenServantFoodConsumePerHour();
   if(m.throwLv > 0){
     const _t = MERCHANT_THROW_TABLE[m.throwLv];
     if(_t && _t.legend && _t.foodCost) total += _t.foodCost * 12;
@@ -440,12 +448,7 @@ function _gardenFoodStats(){
   const m = g.merchant;
   let food = Number(g.food);
   if(!isFinite(food)) food = 0;
-  let consume = 0;
-  const servants = state.servants || [];
-  for(const s of servants){
-    if(!s.assignedPlots || !s.assignedPlots.length) continue;
-    consume += (FOOD_COST_PER_HOUR[s.foodPolicy || 'normal'] || 0) * 60;
-  }
+  let consume = _gardenServantFoodConsumePerHour();
   let lineConsume = 0;
   if(m.throwLv > 0){
     const _t = MERCHANT_THROW_TABLE[m.throwLv];

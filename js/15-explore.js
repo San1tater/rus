@@ -22,18 +22,6 @@ window._explore = {
 
 const RADIO_COOLDOWN_MS = 1 * 60 * 1000;
 
-/* ===== getActiveRegions：舊 09-base.js 遺漏，補在此處確保 15-explore 執行時已定義 ===== */
-window.getActiveRegions = function(){
-  const l = state.preferences.regions.filter(function(r){
-    return REGIONS[r] && (!REGIONS[r].needUnlock || state.unlockedRegions.includes(r));
-  });
-  if(l.length) return l;
-  for(const k in REGIONS){
-    if(!REGIONS[k].needUnlock || state.unlockedRegions.includes(k)) return [k];
-  }
-  return ['廢棄工廠'];
-};
-
 function _fallbackEnemy(){
   return {
     eid: 'raider', rarity: '一般', hp: 45, maxHp: 45, armor: 0, maxArmor: 0, armorLevel: 3,
@@ -127,6 +115,27 @@ function _getPlayerWalkSpeed(){
   const _extra = Math.max(0, _w - _free);
   return 1.4 / (1 + _extra * _pen);
 }
+
+/* rev-fix-position: 从 25-boot.js 移入。 */
+window._calcSpeedDisplay = function(){
+  var b = window.BTRSupport;
+  if(b && b.active){
+    var ph = b.phase;
+    if(ph === 'arrive' || ph === 'sink' || ph === 'center' || ph === 'support' || ph === 'lift' || ph === 'exit'){
+      var g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
+      var vid = g ? g.currentVehicle : 'btr80';
+      var s = 80;
+      if(typeof VEHICLES !== 'undefined' && VEHICLES[vid] && VEHICLES[vid].speedRoad) s = VEHICLES[vid].speedRoad;
+      if(typeof hasCrewTalent === 'function' && hasCrewTalent('driver', 'driver_instinct')) s *= 1.10;
+      return s / 3.6;
+    }
+  }
+  var w = (typeof getTotalWeight === 'function') ? getTotalWeight() : 0;
+  var _free = (typeof WEIGHT_FREE_KG !== 'undefined') ? WEIGHT_FREE_KG : 20;
+  var _pen = (typeof WEIGHT_PENALTY_PER_KG !== 'undefined') ? WEIGHT_PENALTY_PER_KG : 0.05;
+  var _extra = Math.max(0, w - _free);
+  return 1.4 / (1 + _extra * _pen);
+};
 
 function _getVSpd(vid){
   let s = 80;
@@ -1207,7 +1216,15 @@ function _tickAlliesPositions(now){
        - 敌人在后方超射程 → 不追（视为没发现，走 following 逻辑）
        - following：载员略超前玩家（_dxF181d < 0）→ 不后退，保持原位 */
     let _handled = false;
-    if(_nearest){
+    /* rev-fix-allies-busy-stationary: 换弹 / 射击动画期间，载员相对世界静止。
+       动画结束（_reloadEnd / _fireAnimUntil 过期）后，再进入 advancing / chasing / waiting / following。
+       注意：_mode 仍设 'firing'，让 _autoFireFoot 的载员分支继续处理射击（_firePassenger 内部
+       会用 _reloadEnd 自拦截换弹，连射逻辑用 _fireAnimUntil 正常推进）。 */
+    const _busyA = (a._reloadEnd && a._reloadEnd > now) || (a._fireAnimUntil && a._fireAnimUntil > now);
+    if(_busyA){
+      a._mode = 'firing';
+      _handled = true;
+    } else if(_nearest){
       const _r = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(a.weapon.def) : 15;
       if(_nearestDist <= _r){
         a._mode = 'firing';
@@ -1822,8 +1839,18 @@ function _radioShowConfirm(){
     if(typeof _radioTryConsume !== 'function') return;
     if(!_radioTryConsume()) return;
     closeModal();
-    if(typeof window._radioBTRTrigger === 'function'){
-      window._radioBTRTrigger();
+    if(typeof window._radioBTRTrigger !== 'function'){
+      state.radioUses = (state.radioUses || 0) + 1;
+      state.radioCooldownUntil = 0;
+      if(typeof save === 'function') save();
+      return;
+    }
+    /* rev-fix-radio-refund: 触发失败退还次数与 cooldown（_radioGetStatus 下次返回 ready）*/
+    const ok = window._radioBTRTrigger();
+    if(ok === false){
+      state.radioUses = (state.radioUses || 0) + 1;
+      state.radioCooldownUntil = 0;
+      if(typeof save === 'function') save();
     }
   };
   const _p37repairBtn = bd.querySelector('#_p37_repair');
@@ -1947,7 +1974,6 @@ window._exploreSetVehicleMode = function(on){
   else if(window._explore.mode !== 'combat' && window._explore.mode !== 'dead') window._explore.mode = 'walk';
 };
 window._exploreEvacuatePassengers = _evac;
-window._exploreEnterLootWindow = function(){};
 
 window.preloadExploreBackgrounds = preloadExploreBackgrounds;
 window._radioEnsureInit = _radioEnsureInit;

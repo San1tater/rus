@@ -808,8 +808,8 @@ const BTRSupport = {
 
   fx: {
     smoke: [], tracers: [],
-    spawnJetOne(x, y, weaponId){ return; },
-    spawnSpreadOne(x, y, weaponId){ return; },
+    /* rev-fix-no-stub: spawnJetOne / spawnSpreadOne 真实实现在文件末尾赋值（依赖 _vsMakeSmokeJet
+     * 等后续定义的函数）。此处不再放 stub——BTRSupport.start() 必然在文件加载完成后才调用。 */
     spawnMG(x, y, layerOrder){
       const _base = this.targetW || 300;
       this.smoke.push({
@@ -987,13 +987,22 @@ const BTRSupport = {
       const _realH = (typeof VEHICLE_REAL_HEIGHTS !== 'undefined' && VEHICLE_REAL_HEIGHTS[this.vehicleId]) || 2.5;
       this.targetH = h * 0.6735 * (_realH / 1.7);
       this.targetW = this.targetH * (ann.imageSize.w / ann.imageSize.h);
+      /* rev-fix-door-inline: door 位置统一在此计算——fusion 优先，回退 upper/lower/hatch。 */
       const playerCenterX = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
       let _doorCenterRatio = 0.48;
       if(ann.doors){
+        let _doorList = [];
+        if(ann.doors.fusion && ann.doors.fusion.length) _doorList = ann.doors.fusion;
+        else {
+          if(ann.doors.upper) _doorList = _doorList.concat(ann.doors.upper);
+          if(ann.doors.lower) _doorList = _doorList.concat(ann.doors.lower);
+          if(ann.doors.hatch) _doorList = _doorList.concat(ann.doors.hatch);
+        }
         let _sumX = 0, _sumN = 0;
-        if(ann.doors.upper){ for(const _d of ann.doors.upper){ if(_d.polygon){ for(const _p of _d.polygon){ _sumX += _p.x; _sumN++; } } } }
-        if(ann.doors.lower){ for(const _d of ann.doors.lower){ if(_d.polygon){ for(const _p of _d.polygon){ _sumX += _p.x; _sumN++; } } } }
-        if(ann.doors.hatch){ for(const _d of ann.doors.hatch){ if(_d.polygon){ for(const _p of _d.polygon){ _sumX += _p.x; _sumN++; } } } }
+        for(const _d of _doorList){
+          if(!_d.polygon) continue;
+          for(const _p of _d.polygon){ _sumX += _p.x; _sumN++; }
+        }
         if(_sumN > 0) _doorCenterRatio = _sumX / _sumN;
       }
       this.doorOffsetRatio = _doorCenterRatio;
@@ -1140,17 +1149,6 @@ const BTRSupport = {
       this.muzzles[i].nextFireAt = Infinity;
     }
     if(window._explore){ window._explore._currentSpeed = 0; }
-  },
-
-  enterFastLeave(){
-    if(this.phase === 'wreck' || this.phase === 'wreckPause' || this.phase === 'lift' || this.phase === 'exit' || this.phase === 'leave') return;
-    const acc = BTR_TIMELINE.enterDur + BTR_TIMELINE.arriveDur + BTR_TIMELINE.sinkDur + BTR_TIMELINE.centerDur + BTR_TIMELINE.supportDur;
-    this.startTime = performance.now() - acc * 1000;
-    this.phase = 'support';
-    this.phaseT = 0;
-    for(let i = 0; i < this.muzzles.length; i++){
-      this.muzzles[i].nextFireAt = Infinity;
-    }
   },
 
   enterFastLeave(){
@@ -2173,40 +2171,3 @@ if(!document.getElementById('detonateStyle')){
 }
 
 
-/* 补丁 v12: 车门对齐（原 _extDoorPatched，11-vehicle.js 末尾遗漏） */
-(function(){
-  if (window._extDoorPatchedV12) return;
-  window._extDoorPatchedV12 = true;
-  function _apply(){
-    if (!window.BTRSupport) { setTimeout(_apply, 100); return; }
-    if (window.BTRSupport._extDoorPatchedV12) return;
-    window.BTRSupport._extDoorPatchedV12 = true;
-    var _origSetup = window.BTRSupport._setupCanvas;
-    window.BTRSupport._setupCanvas = function(){
-      _origSetup.call(this);
-      var ann = (window.VEHICLE_ANNOTATIONS || {})[this.vehicleId];
-      if (!ann || !ann.doors) return;
-      var doors = [];
-      if (ann.doors.fusion && ann.doors.fusion.length) doors = ann.doors.fusion;
-      else {
-        if (ann.doors.upper) doors = doors.concat(ann.doors.upper);
-        if (ann.doors.lower) doors = doors.concat(ann.doors.lower);
-        if (ann.doors.hatch) doors = doors.concat(ann.doors.hatch);
-      }
-      if (!doors.length) return;
-      var sx = 0, sn = 0;
-      for (var i = 0; i < doors.length; i++) {
-        var d = doors[i];
-        if (!d.polygon) continue;
-        for (var j = 0; j < d.polygon.length; j++) { sx += d.polygon[j].x; sn++; }
-      }
-      if (sn === 0) return;
-      var r = sx / sn;
-      var w = this.width;
-      var pcx = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
-      this.doorOffsetRatio = r;
-      this.doorX = (pcx - r * this.targetW) / w;
-    };
-  }
-  _apply();
-})();

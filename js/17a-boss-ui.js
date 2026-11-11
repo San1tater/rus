@@ -11,26 +11,12 @@ function _cleanBossFxCanvases(){
   });
 }
 
-const BATTLE_ONESHOT_ANIMS = ['fire_primary','fire_secondary','attack_melee','reload','switch_secondary','switch_melee','hurt'];
-
 function stopBattleMovement(){
   if(!battle) return;
   battle.moveDir = 0;
   const stick = document.getElementById('stick');
   if(stick){ stick.style.left = '50%'; stick.style.top = '50%'; stick.style.transform = 'translate(-50%,-50%)'; }
   if(typeof battle._joystickCancel === 'function') battle._joystickCancel();
-}
-
-function interruptReload(){
-  if(!battle || !battle.reloading) return false;
-  battle._reloadToken = (battle._reloadToken || 0) + 1;
-  battle.reloading = false;
-  if(typeof battleHeroAnim !== 'undefined' && battleHeroAnim.name === 'reload'){
-    battleHeroAnim.name = 'idle';
-    battleHeroAnim.frame = 0;
-  }
-  if(typeof refreshBattleControlsLive === 'function') refreshBattleControlsLive();
-  return true;
 }
 
 function interruptHeal(){
@@ -768,8 +754,11 @@ function renderBattleScene(z1){
   const rLeft = b.px * 100;
   const rRight = Math.min(1, (b.px + (b.playerWeaponRange || 0.5))) * 100;
   const rWidth = rRight - rLeft;
+  /* rev-fix-boss-dmgbar: dmgBar 显示「当前血条已掉比例」，II Boss 回血后进度条回退；
+   * 文字「對 Boss 傷害」仍是累计 damageDealt，互不冲突。 */
   const totalHp = b.bossMaxHp + b.bossMaxArmor;
-  const dealtPct = Math.min(100, (b.damageDealt / totalHp) * 100);
+  const _curCurHp = b.bossHp + b.bossArmor;
+  const dealtPct = Math.max(0, Math.min(100, (1 - _curCurHp / totalHp) * 100));
 
   z1.innerHTML = '<div class="battle-scene"><div class="battle-bg" style="background-image:url(\'' + getBossBgPath(b.bossId) + '\')"></div><div class="range-indicator" id="range-indicator" style="left:' + rLeft + '%;width:' + rWidth + '%"></div><div class="damage-header"><div>對 Boss 傷害 <span class="num">' + Math.round(b.damageDealt) + '</span> / ' + totalHp + '</div><div class="bar"><div class="fill" id="dmg-bar" style="width:' + dealtPct + '%"></div></div></div><div class="fighter boss-f" id="fighter-boss" style="left:' + (b.bx * 100) + '%;top:' + (b.by * 100) + '%"><div class="hpbar-wrap' + ((b.shieldMaxHp > 0 && !b.shieldBroken) ? ' has-shield' : '') + '" id="boss-hpbar-wrap"><div class="nm">' + b.bossName + ((b.bossId.indexOf('_ii') >= 0 && b.bossName.indexOf('II') === -1) ? ' II' : '') + '</div>' + ((b.shieldMaxHp > 0 && !b.shieldBroken) ? '<div class="shield-bar-wrap" id="shield-bar-wrap"><div class="bar"><div class="fill" id="boss-shield" style="width:' + (b.shieldHp / b.shieldMaxHp * 100) + '%"></div></div></div>' : '') + '<div class="bar ap"><div class="fill" id="boss-ap" style="width:' + (b.bossArmor / b.bossMaxArmor * 100) + '%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:' + (b.bossHp / b.bossMaxHp * 100) + '%"></div></div></div><div class="sprite" id="boss-sprite">' + (BOSS_LAYERS[b.bossId] ? '<canvas id="boss-battle-canvas"></canvas>' : bossIcon(b.bossId)) + '</div></div><div class="fighter hero-f" id="fighter-hero" style="left:' + (b.px * 100) + '%;top:' + (b.py * 100) + '%"><div class="hpbar-wrap"><div class="nm">玩家</div><div class="bar ap"><div class="fill" id="hero-ap" style="width:' + (b.playerArmor / b.playerMaxArmor * 100) + '%"></div></div><div class="bar hp"><div class="fill" id="hero-hp" style="width:' + (b.playerHp / b.playerMaxHp * 100) + '%"></div></div></div><div class="sprite" id="hero-sprite"><canvas id="hero-battle-canvas"></canvas></div></div><div class="head-bars" id="head-bars"></div><div id="battle-fx"></div></div>';
 
@@ -1540,6 +1529,7 @@ function battleLoop(now){
       battle.playerCanvasW = H * 0.8423;
       battle.playerSpriteW = H * 0.3370;
       battle.playerSpriteH = H * 0.4519;
+      battle.bgPixelsPerMeter = battle.playerCanvasH * CHAR_HEIGHT_FACTOR_BATTLE / PLAYER_HEIGHT_M;
       const playerFootPx = battle.playerCanvasH * 0.95;
       battle.py = clamp(groundY - playerFootPx / H, 0, 1);
       {
@@ -1655,65 +1645,6 @@ function battleLoop(now){
   }
   if(typeof updateBullets === 'function') updateBullets(dt);
   
-  /* [v217] 瞄準點小型爆炸特效渲染 */
-  if(battle && battle.aimHitFx && battle.aimHitFx.length){
-    const _fxLayer = document.getElementById('battle-fx');
-    if(_fxLayer){
-      let _ahCvs = document.getElementById('boss-aimhit-canvas');
-      if(!_ahCvs){
-        _ahCvs = document.createElement('canvas');
-        _ahCvs.id = 'boss-aimhit-canvas';
-        _ahCvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:9;';
-        _fxLayer.appendChild(_ahCvs);
-      }
-      if(_ahCvs.width !== _fxLayer.clientWidth || _ahCvs.height !== _fxLayer.clientHeight){
-        _ahCvs.width = _fxLayer.clientWidth;
-        _ahCvs.height = _fxLayer.clientHeight;
-      }
-      const _ahCtx = _ahCvs.getContext('2d');
-      _ahCtx.clearRect(0, 0, _ahCvs.width, _ahCvs.height);
-      const _ahNow = performance.now();
-      const AIM_HIT_DUR = 250;
-      for(let _i = battle.aimHitFx.length - 1; _i >= 0; _i--){
-        const f = battle.aimHitFx[_i];
-        const age = _ahNow - f.startTime;
-        if(age >= AIM_HIT_DUR){ battle.aimHitFx.splice(_i, 1); continue; }
-        const t = age / AIM_HIT_DUR;
-        const fade = 1 - t;
-        const cx = f.x * _ahCvs.width;
-        const cy = f.y * _ahCvs.height;
-        _ahCtx.save();
-        // 中心小光斑（前 40% 出現）
-        if(t < 0.4){
-          const coreR = (f.crit ? 12 : 9) * fade;
-          const g = _ahCtx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-          g.addColorStop(0, f.crit ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,220,0.9)');
-          g.addColorStop(0.4, f.crit ? 'rgba(255,80,30,0.6)' : 'rgba(255,200,80,0.5)');
-          g.addColorStop(1, 'rgba(255,150,50,0)');
-          _ahCtx.fillStyle = g;
-          _ahCtx.beginPath();
-          _ahCtx.arc(cx, cy, coreR, 0, Math.PI * 2);
-          _ahCtx.fill();
-        }
-        // 火花粒子
-        if(f.particles){
-          _ahCtx.globalAlpha = fade * (f.crit ? 1 : 0.85);
-          _ahCtx.fillStyle = f.crit ? '#ff5030' : '#ffd680';
-          for(let _pi = 0; _pi < f.particles.length; _pi++){
-            const p = f.particles[_pi];
-            const px = cx + p.dx * t;
-            const py = cy + p.dy * t;
-            const pr = p.r * (1 - t * 0.5);
-            _ahCtx.beginPath();
-            _ahCtx.arc(px, py, pr, 0, Math.PI * 2);
-            _ahCtx.fill();
-          }
-        }
-        _ahCtx.restore();
-      }
-    }
-  }
-
   /* [v211-fix] Boss戰渲染全局煙火 */
   if(window.MuzzleFX) {
     window.MuzzleFX.update(dt);

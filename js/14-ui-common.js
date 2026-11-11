@@ -583,9 +583,8 @@ function openLogHistory(){
 
 /* ============== 控制中心 / 偏好 ============== */
 
-/* ===== 補丁：renderEquipZone（舊 03-boss-render.js 遺漏，14-ui-common 未收錄） ===== */
-if(typeof renderEquipZone === 'undefined'){
-  window.renderEquipZone = function(z2){
+/* rev-fix-position: renderEquipZone 是唯一实现，去掉 if(typeof) 包裹 */
+window.renderEquipZone = function(z2){
     if(!z2) return;
 
     /* 電台按鈕每秒倒數（只在探索頁生效） */
@@ -753,4 +752,4 @@ if(typeof renderEquipZone === 'undefined'){
       });
     }
   };
-}
+

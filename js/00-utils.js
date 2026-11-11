@@ -74,4 +74,15 @@ window.canEngage = function(attackerRange, targetOrR, dist){
   else R = window.getEntityDetectableR(targetOrR);
   return dist <= R && dist <= attackerRange;
 };
+
+/* rev-fix-position: 从 16-combat.js 移入。纯函数，无依赖，供 16（_renderTracers）与 23（防御战 tracer）共用。 */
+window._hexToRgba = function(hex, a){
+  if(!hex) return 'rgba(255,255,255,' + a + ')';
+  if(hex.indexOf('rgb') === 0) return hex.replace(')', ', ' + a + ')').replace('rgb(', 'rgba(');
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16);
+  const g = parseInt(h.substring(2,4),16);
+  const b = parseInt(h.substring(4,6),16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+};
 })();

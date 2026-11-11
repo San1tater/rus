@@ -4541,7 +4541,8 @@ function _removeFromStation(srvId){
 /* === _gardenStorageRotCheck（作物腐爛 → 堆肥/種子；種子 48h 過期） === */
 
 /* [Patch] 補全缺失的僕人與天賦系統 */
-window.grantRandomServant = function(){
+/* rev-fix-no-forward: 统一为单一函数声明（顶层声明自动挂 window，外部 window.grantRandomServant() 仍可用）*/
+function grantRandomServant(){
   const allTypes = Object.keys(SERVANT_TYPES);
   const types = allTypes.filter(function(t){
     if(t === 'foreman') return _gardenHasPlotType('shed');
@@ -4564,8 +4565,7 @@ window.grantRandomServant = function(){
   state.servants = state.servants || [];
   state.servants.push(srv);
   return srv;
-};
-function grantRandomServant(){ return window.grantRandomServant(); }
+}
 
 function _gardenServantLeaveCheck(silent){
   const now = Date.now();
@@ -4600,8 +4600,7 @@ function _gardenServantLeaveCheck(silent){
   return { count: leaving.length, seeds: seedReward, mats: matReward };
 }
 
-window.getServantTalents = function(srv){ return srv && Array.isArray(srv.talents) ? srv.talents : []; };
-function getServantTalents(srv){ return window.getServantTalents(srv); }
+function getServantTalents(srv){ return srv && Array.isArray(srv.talents) ? srv.talents : []; }
 function awakenTalent(srv){
   if(!srv || !Array.isArray(srv.talents) || typeof TALENT_DEFS === 'undefined') return null;
   if(Math.random() >= TALENT_AWAKEN_RATE) return null;
