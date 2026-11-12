@@ -750,17 +750,14 @@ function _renderPass(now){
       /* rev-fix-force-run-priority: 追赶中优先播 run，避免单帧速度波动导致 walk/run 闪烁 */
       _animO = 'run';
     } else {
+      /* rev-fix-anim-nospeed: 世界定位有变化 → walk；无变化 → idle。
+       * run 完全由 _forceRunAnim（追赶/撤退）决定，不再用帧间速度判定——
+       * 帧率波动会导致 _worldDelta228 / dtS > 2.0 误判 run，下一帧回 walk → 闪烁。 */
       const _curWX228 = (typeof it.worldX === 'number') ? it.worldX : ex.worldX;
       const _prevWX228 = it._renderPrevWX;
       const _worldMoved228 = (_prevWX228 != null) && Math.abs(_curWX228 - _prevWX228) > 0.0001;
       it._renderPrevWX = _curWX228;
-      if(_worldMoved228){
-        const _worldDelta228 = Math.abs(_curWX228 - _prevWX228);
-        const _speedMs228 = _worldDelta228 / Math.max(0.001, dtS);
-        _animO = (_speedMs228 > 2.0) ? 'run' : 'walk';
-      } else {
-        _animO = 'idle';
-      }
+      _animO = _worldMoved228 ? 'walk' : 'idle';
     }
 
     /* 動作動畫（受傷/裝彈/開火）優先於移動動畫 */
@@ -1556,13 +1553,10 @@ function _tick(now){
           _itNC._standingWait = false;
           _itNC._forceRunAnim = true;
         } else {
-          /* 战位 ±0.5m 内，以 1.4 m/s 同步，不吸附 */
-          const _diffWXNC = ex.worldX - _itNC.worldX;
-          if(Math.abs(_diffWXNC) > 0.0001){
-            const _syncStepNC = 1.4 * _dtNC;
-            const _stepNC = Math.min(Math.abs(_diffWXNC), _syncStepNC);
-            _itNC.worldX += Math.sign(_diffWXNC) * _stepNC;
-          }
+          /* rev-fix-notick-sync-v4: 中间区间直接用 _delta（玩家本帧位移），载员每帧位移与玩家完全相同。
+           * 旧版 1.4 * _dtNC 与 _delta = _currentSpeed * dt 在浮点误差下略小，载员逐帧累积落后
+           * 至 -0.5m 触发追赶 → run，追上 → walk，循环闪烁。 */
+          _itNC.worldX += _delta;
           _itNC._standingWait = false;
           _itNC._forceRunAnim = false;
         }
