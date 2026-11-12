@@ -905,6 +905,17 @@ const BTRSupport = {
     if(!VEHICLE_ANNOTATIONS[this.vehicleId]) this.vehicleId = 'btr80';
     if(typeof VEHICLES !== 'undefined' && VEHICLES[this.vehicleId] && VEHICLES[this.vehicleId].supportDuration) BTR_TIMELINE.supportDur = VEHICLES[this.vehicleId].supportDuration;
     else BTR_TIMELINE.supportDur = 30;
+
+    /* rev-fix-station-snapshot: 支援開啟時凍結車站與彈藥狀態 */
+    try {
+      this._snap = JSON.parse(JSON.stringify(state.station || { crew:{}, passengers:[] }));
+    } catch(e){ this._snap = { crew:{}, passengers:[] }; }
+    try {
+      if(state.vehicleAmmo && state.vehicleAmmo[this.vehicleId]){
+        this._ammoSnap = {}; this._ammoSnap[this.vehicleId] = JSON.parse(JSON.stringify(state.vehicleAmmo[this.vehicleId]));
+      } else { this._ammoSnap = null; }
+    } catch(e){ this._ammoSnap = null; }
+
     this.active = true;
     this.startTime = performance.now();
     this.phase = 'enter';
@@ -1136,6 +1147,8 @@ const BTRSupport = {
   },
 
   enterWreckMode(){
+    /* rev-fix-wreck-offset: wreck 模式玩家已下车，playerXOffset 归 0，避免 wreck 结束时 12px 跳变 */
+    this.playerXOffset = 0;
     if(this.phase === 'wreck' || this.phase === 'wreckPause') return;
     this.phase = 'wreckPause';
     this.wreckPauseStart = performance.now();
@@ -1298,6 +1311,12 @@ const BTRSupport = {
   },
 
   _fireMuzzle(m, now){
+    /* rev-fix-weapon-usable: 炮塔卡死 / 武器 HP 歸零時該炮不能開火 */
+    const _g0 = (typeof _garageInitState === 'function') ? _garageInitState() : null;
+    const _vid0 = _g0 ? _g0.currentVehicle : 'btr80';
+    if(typeof window._isVehicleWeaponUsable === 'function' && !window._isVehicleWeaponUsable(m.weaponId, _vid0)){
+      m.nextFireAt = now + 500; m._preselectedTarget = null; return;
+    }
     /* rev-fix-magazine: 換彈結束後補滿下一箱 */
     if(m.magazine && m.magazine.current <= 0){
       m.magazine.current = m.magazine.capacity;
@@ -1310,7 +1329,8 @@ const BTRSupport = {
     }
     const _g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
     const _vid = _g ? _g.currentVehicle : 'btr80';
-    const _ammo = state.vehicleAmmo && state.vehicleAmmo[_vid] && state.vehicleAmmo[_vid][m.weaponId];
+    const _liveAmmoFM = window._getLiveVehicleAmmo(_vid);
+    const _ammo = _liveAmmoFM && _liveAmmoFM[m.weaponId];
     if(!_ammo || _ammo.current <= 0){
       m.shotsLeft = m.profile.burst;
       m._preselectedTarget = null;
@@ -1329,7 +1349,7 @@ const BTRSupport = {
       return;
     }
     if(!_fired && _inBurst){
-      const _amX = state.vehicleAmmo[_vid][m.weaponId];
+      const _amX = _liveAmmoFM && _liveAmmoFM[m.weaponId];
       if(_amX){
         if(_amX.breakdown){
           for(const _bkX in _amX.breakdown){
@@ -1815,6 +1835,28 @@ const BTRSupport = {
   },
 
   _cleanup(){
+    /* rev-fix-station-snapshot: 寫回彈藥消耗（不覆蓋配置）與載員 ammoBox 計數 */
+    try {
+      if(this._ammoSnap && this._ammoSnap[this.vehicleId] && state.vehicleAmmo && state.vehicleAmmo[this.vehicleId]){
+        const src = this._ammoSnap[this.vehicleId], dst = state.vehicleAmmo[this.vehicleId];
+        for(const wid in src){
+          if(!dst[wid]) dst[wid] = {};
+          if(typeof src[wid].current === 'number') dst[wid].current = src[wid].current;
+          if(src[wid].breakdown && dst[wid].breakdown){
+            for(const k in src[wid].breakdown) dst[wid].breakdown[k] = src[wid].breakdown[k];
+          }
+        }
+      }
+      if(this._snap && state.station && Array.isArray(state.station.passengers) && Array.isArray(this._snap.passengers)){
+        for(let i = 0; i < this._snap.passengers.length && i < state.station.passengers.length; i++){
+          const sp = this._snap.passengers[i], stp = state.station.passengers[i];
+          if(!sp || !stp || sp.srvId !== stp.srvId) continue;
+          if(sp.ammoPouch && stp.ammoPouch) stp.ammoPouch.count = sp.ammoPouch.count;
+          if(sp.ammoBox   && stp.ammoBox)   stp.ammoBox.count   = sp.ammoBox.count;
+        }
+      }
+    } catch(e){ console.warn('[cleanup sync]', e); }
+    this._snap = null; this._ammoSnap = null;
     try {
       if(window._combat && window._combat.active && window._combat.sceneType === 'vehicle'){
         const cb = window._combat.onResolve;

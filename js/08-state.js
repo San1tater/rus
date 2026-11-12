@@ -1127,6 +1127,32 @@ function notify(msg, type){ /* disabled */ }
 // ===== 建築 tick / 製造 / 離線建築結算（rev-fix-position: 从 25-boot.js 移入） =====
 window.buildingTick = function(){
   var now = Date.now();
+  /* rev-fix-auto-recover: 載員重傷 / 載具維修到期後自動恢復滿血。
+   * 之前只清 injuredUntil / repairUntil 時間戳，不清 hp / parts，導致永久 0 HP。 */
+  if(typeof state !== 'undefined' && state.servants){
+    for(var _si = 0; _si < state.servants.length; _si++){
+      var _srv = state.servants[_si];
+      if(_srv.injuredUntil && _srv.injuredUntil <= now && (_srv.hp <= 0 || _srv._injuredDown)){
+        _srv.hp = (typeof servantMaxHp === 'function') ? servantMaxHp(_srv) : 100;
+        _srv._injuredDown = false;
+        _srv.injuredUntil = 0;
+      }
+    }
+  }
+  if(typeof state !== 'undefined' && state.vehicleDamage){
+    for(var _vid in state.vehicleDamage){
+      var _d = state.vehicleDamage[_vid];
+      if(_d.repairUntil && _d.repairUntil <= now && (_d.destroyed || _d.disabled || (_d.parts && _d.parts.engine <= 0))){
+        _d.repairUntil = 0;
+        _d.destroyed = false;
+        _d.disabled = false;
+        _d.parts = { engine: 800, tracks: 1000, turret: 400 };
+        if(_d.weapons){ for(var _wid in _d.weapons) _d.weapons[_wid].hp = _d.weapons[_wid].max; }
+        _d.members = { driver: 1, gunner: 1, commander: 1, player: 1 };
+        _d.ammoRackDamage = 0;
+      }
+    }
+  }
   var genLv = getBuildingLv("generator");
   var genMult = 1 + genLv * 0.2;
   var radioLv = getBuildingLv("radio");

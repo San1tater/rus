@@ -250,7 +250,21 @@ const LEGEND_THROW_POOL = ["f1","rgd5","rgo","rgn","vog17","vog25"];
 const ALL_ITEMS={};
 Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS,SEEDS,CROPS);
 function itemDef(id){return ALL_ITEMS[id]||null;}
-function resolveIconId(id){if(!id) return '';if(id.startsWith('named_')){const parts=id.split('_');if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];}return id;}
+function resolveIconId(id){
+  if(!id) return '';
+  if(id.startsWith('named_')){
+    const parts=id.split('_');
+    if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];
+  }
+  /* rev-fix-ammo-icon-redirect: AMMO id → 口徑圖標名（去掉 .png）。
+   * 載員帶 ammo_handler 天賦可裝備彈藥箱，primaryWeapon 為 AMMO id，
+   * 渲染需走口徑圖標（76239.png 而非 7.62_ma.png），避免 404。 */
+  if(typeof AMMO !== 'undefined' && AMMO[id] && AMMO[id].cal){
+    const f = AMMO_ICON_BY_CAL[AMMO[id].cal];
+    if(f) return f.replace(/\.png$/i, '');
+  }
+  return id;
+}
 
 /* [v250] 按檔案版本：查 _ASSET_VERSIONS[path]；無參返回空（走瀏覽器 10 分鐘快取） */
 function assetSuffix(path){

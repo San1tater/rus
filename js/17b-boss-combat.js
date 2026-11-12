@@ -302,7 +302,7 @@ function tryHitPlayer(dmg, pen){
   if(!battle || !battle.active) return;
   const dodge = clamp(0.15 + state.player.level * 0.005, 0, 0.5);
   if(Math.random() < dodge){
-    spawnHitFx(battle.px, battle.py, 'MISS', 'armor');
+    spawnHitFx('player', 0, 'MISS', 'armor');
     return;
   }
   let finalDmg = dmg;
@@ -325,8 +325,7 @@ function tryHitPlayer(dmg, pen){
   const _hh=document.getElementById('hero-hp'),_ha=document.getElementById('hero-ap');
   if(_hh)_hh.style.width=Math.max(0,battle.playerHp/battle.playerMaxHp*100)+'%';
   if(_ha)_ha.style.width=Math.max(0,battle.playerArmor/battle.playerMaxArmor*100)+'%';
-  spawnHitFx(battle.px, battle.py, isCrit ? '-'+Math.round(finalDmg)+'!' : '-'+Math.round(finalDmg), isCrit ? 'crit' : (res.hpLost > 0 ? 'enemy' : 'armor'));
-  /* rev-fix-heal-btn-refresh: 受傷後刷新按鈕狀態 */
+  spawnHitFx('player', 0, isCrit ? '-'+Math.round(finalDmg)+'!' : '-'+Math.round(finalDmg), isCrit ? 'crit' : (res.hpLost > 0 ? 'enemy' : 'armor'), battle.px, battle.py);
   if(typeof refreshBattleControlsLive === 'function') refreshBattleControlsLive();
   if(battle.playerHp <= 0){
     endBattle(false);
@@ -343,7 +342,7 @@ function doBossMeleeSwipe(){
   setTimeout(function(){
     if(!battle || !battle.active) return;
     if(getPlayerRightBoundaryN() < battle.bx - 0.30){
-      spawnHitFx(battle.bx, battle.by, 'MISS', 'armor');
+      spawnHitFx('boss', 0, 'MISS', 'armor');
       return;
     }
     tryHitPlayer(battle.bossDmg * (battle.bossDmgMult || 1), battle.bossPenMM || 0);
@@ -355,7 +354,7 @@ function applyBossSkillDamage(sk){
   if(!battle || !battle.active) return;
   if(sk.projectile && typeof spawnBossProjectile === 'function') spawnBossProjectile(sk);
   if(getPlayerRightBoundaryN() < battle.bx - sk.range){
-    spawnHitFx(battle.px, battle.py, 'MISS', 'armor');
+    spawnHitFx('player', 0, 'MISS', 'armor');
     return;
   }
   const _skillScale = (battle.bossDmg || 25) / 25;
@@ -368,9 +367,11 @@ function applyBossSkillDamage(sk){
 }
 
 /* ============== 玩家打 Boss ============== */
-function applyBossDamage(dmg, isCrit, penMM, isThrowable){
+function applyBossDamage(dmg, isCrit, penMM, isThrowable, skipHitFx){
   if(!battle) return;
   battle.engaged = true;
+  /* rev-fix-aim-pos: applyBossDamage 内取当前瞄准点作为火花位置 */
+  const _aimPos = (typeof getAimTargetPos === 'function') ? getAimTargetPos() : { x: battle.bx, y: battle.by };
 
   if(isBossType(battle.bossId, 'hydra') && battle.heads){
     applyHydraDamage(dmg, isCrit, penMM, isThrowable);
@@ -383,7 +384,7 @@ function applyBossDamage(dmg, isCrit, penMM, isThrowable){
     const _shieldDmg = Math.max(1, Math.round(dmg * _shieldScale));
     battle.shieldHp = Math.max(0, battle.shieldHp - _shieldDmg);
     battle.damageDealt += _shieldDmg;
-    spawnHitFx(battle.bx, battle.by, '-' + _shieldDmg + (isCrit ? '!' : ''), isCrit ? 'crit' : 'armor');
+    if(!skipHitFx) spawnHitFx('boss', 0, '-' + _shieldDmg + (isCrit ? '!' : ''), ((_shieldDmg > 0) ? (isCrit ? 'crit' : '') : 'armor'), _aimPos.x, _aimPos.y);
     const shEl = document.getElementById('boss-shield');
     if(shEl) shEl.style.width = Math.max(0, battle.shieldHp / battle.shieldMaxHp * 100) + '%';
     if(battle.shieldHp <= 0 && typeof breakBossShield === 'function') breakBossShield();
@@ -394,7 +395,7 @@ function applyBossDamage(dmg, isCrit, penMM, isThrowable){
     const _dmg = Math.round(dmg);
     battle.bossHp = Math.max(0, battle.bossHp - _dmg);
     battle.damageDealt += _dmg;
-    spawnHitFx(battle.bx, battle.by, '-' + _dmg + (isCrit ? '!' : ''), isCrit ? 'crit' : 'weak');
+    if(!skipHitFx) spawnHitFx('boss', 0, '-' + _dmg + (isCrit ? '!' : ''), isCrit ? 'crit' : 'weak', _aimPos.x, _aimPos.y);
     if(!battle.bossRetreat){
       const hpPct = _dmg / Math.max(1, battle.bossMaxHp);
       const retreatDist = Math.min(0.20, hpPct * 8);
@@ -421,7 +422,7 @@ function applyBossDamage(dmg, isCrit, penMM, isThrowable){
   battle.damageDealt += (res.hpLost + res.armorLost);
 
   const shownDmg = res.hpLost > 0 ? res.hpLost : res.armorLost;
-  spawnHitFx(battle.bx, battle.by, '-' + Math.round(shownDmg) + (isCrit ? '!' : ''), isCrit ? 'crit' : (res.hpLost > 0 ? (isWeak ? 'weak' : '') : 'armor'));
+  if(!skipHitFx) spawnHitFx('boss', 0, '-' + Math.round(shownDmg) + (isCrit ? '!' : ''), (res.hpLost > 0 ? (isCrit ? 'crit' : (_isWeak ? 'weak' : '')) : 'armor'), _aimPos.x, _aimPos.y);
 
   if(res.hpLost > 0 && !battle.bossRetreat && !isBossType(battle.bossId, 'hydra')){
     const hpPct = res.hpLost / Math.max(1, battle.bossMaxHp);
@@ -447,7 +448,7 @@ function applyHydraDamage(dmg, isCrit, penMM, isThrowable){
     });
     battle.bossArmor = proxy.armor;
     battle.damageDealt += r.armorLost;
-    spawnHitFx(battle.bx, battle.by, '-' + r.armorLost + (isCrit ? '!' : ''), isCrit ? 'crit' : 'armor');
+    spawnHitFx('boss', 0, '-' + r.armorLost + (isCrit ? '!' : ''), ((r.armorLost > 0) ? (isCrit ? 'crit' : '') : 'armor'), battle.bx, battle.by);
     const apEl = document.getElementById('boss-ap');
     if(apEl) apEl.style.width = Math.max(0, battle.bossArmor / battle.bossMaxArmor * 100) + '%';
     return;
@@ -466,7 +467,7 @@ function applyHydraDamage(dmg, isCrit, penMM, isThrowable){
     head.hp = Math.max(0, head.hp - share);
     battle.damageDealt += share;
     const pos = (typeof getHeadScreenPos === 'function') ? getHeadScreenPos(headId) : null;
-    if(pos) spawnHitFx(pos.x, pos.y, '-' + share + (isCrit ? '!' : ''), isCrit ? 'crit' : 'weak');
+    if(pos) spawnHitFx('boss', 0, '-' + share + (isCrit ? '!' : ''), isCrit ? 'crit' : 'weak', pos.x, pos.y);
     if(head.hp <= 0){
       head.alive = false;
       if(typeof playHeadBreakFx === 'function') playHeadBreakFx(headId);

@@ -320,34 +320,12 @@ function _getRaidMuzzleWorld(u, scale){
   if(!u || !u.equipped || !u.weaponSlot) return null;
   const wpId = u.equipped[u.weaponSlot];
   if(!wpId) return null;
-  const cfg = getWeaponCfg(u.weaponSlot, wpId);
-  if(!cfg || !cfg.trim) return null;
-  const mz = WEAPON_MUZZLE[resolveIconId(wpId)];
+  /* 委託通用槍口函數，跟隨 u.animName / u.animFrame */
+  const mz = window.getCharWeaponMuzzleLocal(u.weaponSlot, wpId, u.animName, u.animFrame);
   if(!mz) return null;
-  const L = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
-  if(!L) return null;
-
-  const B = { x: 30, y: 30, w: 340, h: 460 };
-  const anim = GAME_ANIMS[u.animName] || GAME_ANIMS.idle;
-  if(!anim) return null;
-  const fi = ((u.animFrame % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  const key = (anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0, dx:0, dy:0};
-
-  const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-  const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-  const w = B.w * L.w;
-  const h = B.h * L.h;
-  const anchorX = cx + w * (cfg.ox || 0);
-  const anchorY = cy + h * (cfg.oy || 0);
-
-  const baseW = cfg.trim.w * (cfg.scale || 1);
-  const baseH = cfg.trim.h * (cfg.scale || 1);
-  const mzlX = anchorX + (mz.x / cfg.trim.w) * baseW;
-  const mzlY = anchorY - baseH / 2 + (mz.y / cfg.trim.h) * baseH;
-
   return {
-    x: u.x + scale * (mzlX - 200),
-    y: u.y + scale * (mzlY - 515)
+    x: u.x + scale * (mz.x - 200),
+    y: u.y + scale * (mz.y - 515)
   };
 }
 
@@ -1106,7 +1084,8 @@ function drawBullet(b){
       b.fromU.dmgDone = (b.fromU.dmgDone || 0) + shown;
       if(b.fromU.isGuard && b.fromU.srv) servantAddExp(b.fromU.srv, 2);
       if(typeof _spawnHitSpark === 'function'){
-        _spawnHitSpark(raidOwner, toU.x, toU.y - CHAR_PX * 0.5, r.crit);
+        /* rev-fix-spark-color-v2: 颜色规则集中在 _spawnHitSpark，只传 cls（击穿 '' / 未击穿 'armor'） */
+        _spawnHitSpark(raidOwner, toU.x, toU.y - CHAR_PX * 0.5, r.crit, r.hpLost > 0 ? '' : 'armor');
       }
       /* rev-fix-anim-state-unified: 受伤时长从 GAME_ANIMS 计算，同时设两套时间戳 */
       const _hurtAnimDef = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.hurt) ? GAME_ANIMS.hurt : null;

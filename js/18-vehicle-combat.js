@@ -1,6 +1,50 @@
 
 'use strict';
 
+/* rev-fix-station-snapshot: 支援中讀快照，外部修改（車站/車庫）不影響當前戰鬥 */
+window._getLiveStation = function(){
+  const b = window.BTRSupport;
+  if(b && b.active && b._snap) return b._snap;
+  return state.station || { crew:{}, passengers:[] };
+};
+window._getLiveVehicleAmmo = function(vid){
+  const b = window.BTRSupport;
+  if(b && b.active && b._ammoSnap && b._ammoSnap[vid]) return b._ammoSnap[vid];
+  return state.vehicleAmmo && state.vehicleAmmo[vid];
+};
+/* rev-fix-turret-wids-module: 炮塔武器表 —— 唯一真相源，_isVehicleWeaponUsable 与 _vHitVehicle 共用 */
+const TURRET_WEAPONS_BY_VID = {
+  btr80:  { kpvt:1, pkt:1 },
+  btr80a: { '2a72':1, pkt:1 },
+  btr82:  { kpvt:1, pkt:1 },
+  btr82a: { '2a72':1, pkt:1 },
+  btr90:  { '2a42':1, pkt:1 },
+  bmp1:   { '2a28':1, pkt:1 },
+  bmp1m:  { '2a72':1, pkt:1 },
+  bmp2:   { '2a42':1, pkt:1 },
+  bmp3:   { '2a70':1, '2a72':1, pkt:1 },
+  bmd4:   { '2a70':1, '2a72':1, pkt:1 },
+  t80:    { '2a46':1, pkt:1 },
+  t80b:   { '2a46':1, pkt:1 },
+  t80bv:  { '2a46':1, pkt:1 },
+  t80u:   { '2a46m1':1, pkt:1 },
+  t80uk:  { '2a46m1':1, pkt:1 },
+  t80um:  { '2a46m1':1, pkt:1 }
+};
+
+/* rev-fix-weapon-usable: 單武器可用性（武器 HP + 炮塔卡死 + 車組全滅 + 彈藥） */
+window._isVehicleWeaponUsable = function(wid, vid){
+  if(!wid || !vid) return false;
+  const dmg = state.vehicleDamage && state.vehicleDamage[vid];
+  if(!dmg) return true;
+  if(dmg.destroyed) return false;
+  if(dmg.weapons && dmg.weapons[wid] && dmg.weapons[wid].hp <= 0) return false;
+  const turretW = TURRET_WEAPONS_BY_VID[vid] || {};
+  if(turretW[wid] && dmg.parts && dmg.parts.turret <= 0) return false;
+  if(dmg.members && dmg.members.gunner <= 0 && dmg.members.commander <= 0) return false;
+  return true;
+};
+
 const _VEHICLE_PART_PROB = [
   { key: 'hullFront',   w: 30 },
   { key: 'side',        w: 25 },
@@ -134,24 +178,6 @@ window._vehicleWeaponsDead = function(){
   const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
   if(!ld || !Object.keys(ld).length) return true;
 
-  const TURRET_WEAPONS_BY_VID = {
-    btr80:  { kpvt:1, pkt:1 },
-    btr80a: { '2a72':1, pkt:1 },
-    btr82:  { kpvt:1, pkt:1 },
-    btr82a: { '2a72':1, pkt:1 },
-    btr90:  { '2a42':1, pkt:1 },
-    bmp1:   { '2a28':1, pkt:1 },
-    bmp1m:  { '2a72':1, pkt:1 },
-    bmp2:   { '2a42':1, pkt:1 },
-    bmp3:   { '2a70':1, '2a72':1, pkt:1 },
-    bmd4:   { '2a70':1, '2a72':1, pkt:1 },
-    t80:    { '2a46':1, pkt:1 },
-    t80b:   { '2a46':1, pkt:1 },
-    t80bv:  { '2a46':1, pkt:1 },
-    t80u:   { '2a46m1':1, pkt:1 },
-    t80uk:  { '2a46m1':1, pkt:1 },
-    t80um:  { '2a46m1':1, pkt:1 }
-  };
   const turretWeapons = TURRET_WEAPONS_BY_VID[vid] || {};
   const turretDead = dmg.parts && dmg.parts.turret <= 0;
   const ammoState = state.vehicleAmmo && state.vehicleAmmo[vid];
@@ -271,21 +297,24 @@ function _getVehicleAmmoStats(wid, ammoId){
   if(wid === 'kpvt'){
     const _gK = (typeof _garageInitState === 'function') ? _garageInitState() : null;
     const _vidK = _gK ? _gK.currentVehicle : 'btr80';
-    const _aK = state.vehicleAmmo && state.vehicleAmmo[_vidK] && state.vehicleAmmo[_vidK][wid];
+    const _liveAK = (typeof window._getLiveVehicleAmmo === 'function') ? window._getLiveVehicleAmmo(_vidK) : (state.vehicleAmmo && state.vehicleAmmo[_vidK]);
+    const _aK = _liveAK && _liveAK[wid];
     if(_aK && _aK.preset === '高爆') return VEHICLE_WEAPON_STATS['kpvt_mdz'];
     return VEHICLE_WEAPON_STATS.kpvt;
   }
   if(wid === 'nsvt'){
     const _gN = (typeof _garageInitState === 'function') ? _garageInitState() : null;
     const _vidN = _gN ? _gN.currentVehicle : 'btr80';
-    const _aN = state.vehicleAmmo && state.vehicleAmmo[_vidN] && state.vehicleAmmo[_vidN][wid];
+    const _liveAN = (typeof window._getLiveVehicleAmmo === 'function') ? window._getLiveVehicleAmmo(_vidN) : (state.vehicleAmmo && state.vehicleAmmo[_vidN]);
+    const _aN = _liveAN && _liveAN[wid];
     if(_aN && _aN.preset === '高爆') return VEHICLE_WEAPON_STATS['nsvt_md'];
     return VEHICLE_WEAPON_STATS.nsvt;
   }
   if(wid === '2a72' || wid === '2a42'){
     const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
     const vid = g ? g.currentVehicle : 'btr80';
-    const a = state.vehicleAmmo && state.vehicleAmmo[vid] && state.vehicleAmmo[vid][wid];
+    const _liveA2A = (typeof window._getLiveVehicleAmmo === 'function') ? window._getLiveVehicleAmmo(vid) : (state.vehicleAmmo && state.vehicleAmmo[vid]);
+    const a = _liveA2A && _liveA2A[wid];
     const preset = (a && a.preset) || '穿燃';
     if(preset === '高爆') return VEHICLE_WEAPON_STATS['30mm_hef'];
     return VEHICLE_WEAPON_STATS['30mm_ap'];
@@ -308,17 +337,23 @@ function _vehicleCombatFloat(absWorldX, text, cls){
   var fxEl = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
   var W = fxEl ? fxEl.clientWidth : 400;
   var H = fxEl ? fxEl.clientHeight : 500;
+  var _px = c.allies[0] ? c.allies[0].worldX : 0;
+  var _relWX = (typeof absWorldX === 'number') ? (absWorldX - _px) : 0;
+  var _sm = c.sm || {};
+  var _srw = _sm.screenRightWorld || 2;
+  var sxRaw = EXPLORE_HERO_X_RATIO + (_relWX / _srw) * (1 - EXPLORE_HERO_X_RATIO);
+
+  /* 火花：不 clamp，屏幕外不画 */
   var _b = window._lastBullet;
-  /* rev-fix-spark-v288: 恢复 v288 设计——
-   * 火花 x 固定 0.25*W（玩家/载具位置，不跟随敌人炮口或弹道起点）
-   * 火花 y 用 _b.ty*H（跟随弹道终点的垂直位置，反映敌人从哪个高度命中）
-   * 浮字 x 固定 0.25，y=0.12 */
-  var _sparkX = EXPLORE_HERO_X_RATIO * W;
-  var _sparkY = (_b && typeof _b.ty === 'number') ? _b.ty * H : H * 0.6;
-  if(cls !== 'miss' && cls !== 'heal' && text && String(text).indexOf('-') === 0){
-    if(typeof _spawnHitSpark === 'function') _spawnHitSpark(c, _sparkX, _sparkY, cls === 'crit');
+  var sparkYN = 0.6;
+  if(_b && typeof _b.ty === 'number' && !_b.isGrenade){ sparkYN = _b.ty; }
+  if(cls !== 'miss' && cls !== 'heal' && typeof _spawnHitSpark === 'function'){
+    _spawnHitSpark(c, sxRaw * W, sparkYN * H, cls === 'crit', cls);
   }
-  c.floats.push({ text: text, cls: cls || '', age: 0, x: EXPLORE_HERO_X_RATIO, y: 0.12 });
+
+  /* 飘字：clamp x，y=0.12（与步战 _float 完全一致） */
+  var _floatX = Math.max(0.05, Math.min(0.95, sxRaw));
+  c.floats.push({ text: text, cls: cls || '', age: 0, x: _floatX, y: 0.12 });
 }
 
 window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
@@ -326,7 +361,9 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   if(!c || !c.active || c.resolved || c.sceneType !== 'vehicle') return false;
   const p = c.allies[0];
   if(!p || !p.isVehicle) return false;
-  /* rev-fix-weapon-hp-fire: 該武器 HP 歸零 → 不可開火 */
+  /* rev-fix-weapon-usable: 炮塔卡死 / 武器 HP 歸零時該炮不能開火 */
+  if(typeof window._isVehicleWeaponUsable === 'function' && !window._isVehicleWeaponUsable(wid, p.vehicleId)) return false;
+  /* rev-fix-weapon-hp-fire: 保留舊檢查（防禦性） */
   const _vd = state.vehicleDamage && state.vehicleDamage[p.vehicleId];
   if(_vd && _vd.weapons && _vd.weapons[wid] && _vd.weapons[wid].hp <= 0) return false;
 
@@ -354,7 +391,8 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
     if(syncGroup && window._btrSyncTargets) window._btrSyncTargets[syncGroup] = target;
   }
 
-  const _ammoObj = state.vehicleAmmo && state.vehicleAmmo[p.vehicleId] && state.vehicleAmmo[p.vehicleId][wid];
+  const _liveAmmoObj = (typeof window._getLiveVehicleAmmo === 'function') ? window._getLiveVehicleAmmo(p.vehicleId) : (state.vehicleAmmo && state.vehicleAmmo[p.vehicleId]);
+  const _ammoObj = _liveAmmoObj && _liveAmmoObj[wid];
   let _usedAmmoId = null;
 
   if(_ammoObj && _ammoObj.breakdown){
@@ -385,7 +423,8 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   }
 
   const g = (function(){
-    const cr = state.station && state.station.crew;
+    const _liveSt = window._getLiveStation();
+    const cr = _liveSt && _liveSt.crew;
     if(!cr || !cr.gunner) return null;
     for(let i = 0; i < state.servants.length; i++){
       if(state.servants[i].id === cr.gunner) return state.servants[i];
@@ -601,7 +640,7 @@ function _vEnsureDamage(vid){
   }
   /* v140: members 只存存活標記（1/0），從實時 servant.hp / state.player.hp 同步 */
   if(!d.members || typeof d.members !== 'object') d.members = { driver: 1, gunner: 1, commander: 1, player: 1 };
-  const _crewS = state.station && state.station.crew;
+  const _crewS = window._getLiveStation().crew || null;
   if(_crewS){
     for(const _roleS of ['driver', 'gunner', 'commander']){
       const _sidS = _crewS[_roleS];
@@ -722,7 +761,7 @@ const key = _vPickInternalKey(vid);
     if(d.members.gunner > 0) pool.push({ t: 'crew', r: 'gunner' });
     if(d.members.commander > 0) pool.push({ t: 'crew', r: 'commander' });
     if(d.members.player > 0) pool.push({ t: 'player' });
-    const _st = state.station;
+    const _st = window._getLiveStation();
     const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
     if(_cap > 0 && _st && _st.passengers){
       for(let i = 0; i < _st.passengers.length && i < _cap; i++){
@@ -736,7 +775,7 @@ const key = _vPickInternalKey(vid);
 
     if(tgt.t === 'crew'){
       /* v140: 扣實際 servant.hp，members 只存 1/0 */
-      const _crewSidX = state.station && state.station.crew ? state.station.crew[tgt.r] : null;
+      const _crewSidX = _st && _st.crew ? _st.crew[tgt.r] : null;
       const _crewSrvX = _crewSidX ? (state.servants || []).find(function(s){ return s.id === _crewSidX; }) : null;
       if(_crewSrvX){
         _crewSrvX.hp = Math.max(0, (_crewSrvX.hp || 0) - dmg * 1.5);
@@ -746,7 +785,7 @@ const key = _vPickInternalKey(vid);
       }
       _vehicleCombatFloat(_vehWX, '乘員 -' + Math.round(dmg * 1.5), 'crit');
       if(tgt.r === 'driver' && d.members.driver <= 0){
-        const _drvId = state.station && state.station.crew ? state.station.crew.driver : null;
+        const _drvId = _st && _st.crew ? _st.crew.driver : null;
         const _drvSrv = _drvId ? (state.servants || []).find(function(s){ return s.id === _drvId; }) : null;
         const _drvRar = _drvSrv ? (_drvSrv.rarity || '一般') : '一般';
         const _drvCls = (typeof rarityClass === 'function') ? rarityClass(_drvRar) : '';
@@ -764,7 +803,7 @@ const key = _vPickInternalKey(vid);
         _forceLeave(vid, veh, 'driver_dead');
       }
       if(tgt.r === 'gunner' && d.members.gunner <= 0){
-        const _gnrId = state.station && state.station.crew ? state.station.crew.gunner : null;
+        const _gnrId = _st && _st.crew ? _st.crew.gunner : null;
         const _gnrSrv = _gnrId ? (state.servants || []).find(function(s){ return s.id === _gnrId; }) : null;
         const _gnrRar = _gnrSrv ? (_gnrSrv.rarity || '一般') : '一般';
         const _gnrCls = (typeof rarityClass === 'function') ? rarityClass(_gnrRar) : '';
@@ -780,7 +819,7 @@ const key = _vPickInternalKey(vid);
         if(_gnrSrv){ _gnrSrv.hp = 0; _gnrSrv.injuredUntil = Date.now() + 4 * 3600 * 1000; _gnrSrv._injuredDown = true; }
       }
       if(tgt.r === 'commander' && d.members.commander <= 0){
-        const _cmdId = state.station && state.station.crew ? state.station.crew.commander : null;
+        const _cmdId = _st && _st.crew ? _st.crew.commander : null;
         const _cmdSrv = _cmdId ? (state.servants || []).find(function(s){ return s.id === _cmdId; }) : null;
         const _cmdRar = _cmdSrv ? (_cmdSrv.rarity || '一般') : '一般';
         const _cmdCls = (typeof rarityClass === 'function') ? rarityClass(_cmdRar) : '';
@@ -982,7 +1021,8 @@ function _detonate(vid, veh){
   }
 
   const _now = Date.now();
-  const _crew = state.station && state.station.crew;
+  const _liveStDet = window._getLiveStation();
+  const _crew = _liveStDet && _liveStDet.crew;
   if(_crew){
     for(const role of ['commander', 'gunner', 'driver']){
       const sid = _crew[role];
@@ -992,7 +1032,7 @@ function _detonate(vid, veh){
     }
   }
   const _combatRef = window._combat;
-  const _passengers = state.station && state.station.passengers;
+  const _passengers = _liveStDet && _liveStDet.passengers;
   if(_combatRef && Array.isArray(_combatRef.allies) && _combatRef.allies.length){
     for(const a of _combatRef.allies){
       if(a.isPassenger && a.srv){
@@ -1283,6 +1323,9 @@ function _writeVehicleDestroyedLog(reason, vid){
 }
 
 function _openVehicleDestroyedDetail(log){
+  /* rev-fix-vd-redesign: 去表格化，改用 logline 风格（一行一属性）。
+   * 原版用 detail-title r-傳奇（金色不合适）+ 多个 stat-line（左标签右值），
+   * 视觉上像表格，与游戏其他 modal（BTR 支援报告、战斗日志）不一致。 */
   if(!log || !log.vehicleDestroyed) return;
   const d = log.vehicleDestroyed;
   const vid = d.vehicleId;
@@ -1290,44 +1333,31 @@ function _openVehicleDestroyedDetail(log){
   const reasonMap = { detonated: '彈藥架殉爆', hull_destroyed: '車體擊毀' };
   const reason = reasonMap[d.reason] || d.reason;
   let body = '';
-  body += '<div class="detail-title r-傳奇">💥 ' + vehName + ' 擊毀</div>';
-  body += '<div class="detail-sub">' + reason + '</div>';
+  body += '<div class="detail-title">💥 ' + vehName + ' · ' + reason + '</div>';
+  body += '<div class="divider"></div>';
   if(d.lastHit){
-    body += '<div class="divider"></div>';
-    body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:4px">致命一擊</div>';
     const partName = { hullFront: '車體正面', side: '側面', rear: '後面', turretFront: '炮塔正面', turretSide: '炮塔側面' }[d.lastHit.part] || d.lastHit.part;
     const internalName = { ammoRack: '彈藥架', crew: '乘員', engine: '引擎', tracks: '履帶/輪組', gun: '炮管', turret: '炮塔' }[d.lastHit.internal] || d.lastHit.internal;
-    body += '<div class="stat-line"><span class="k">部位</span><span class="v">' + partName + '</span></div>';
-    body += '<div class="stat-line"><span class="k">內部</span><span class="v">' + internalName + '</span></div>';
-    body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + Math.round(d.lastHit.dmg) + '</span></div>';
+    body += '<div class="logline" style="padding:6px 0">致命一擊：<span style="color:#e8a33d">' + partName + '</span> → <span style="color:#e05252">' + internalName + '</span>，造成 <span style="color:#e8a33d;font-weight:bold">' + Math.round(d.lastHit.dmg) + '</span> 傷害</div>';
   }
   if(d.brokenParts && d.brokenParts.length){
-    body += '<div class="divider"></div>';
-    body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:4px">損壞部件</div>';
     const partLabel = { engine: '引擎', tracks: '履帶/輪組', gun: '炮管', turret: '炮塔' };
-    for(let i = 0; i < d.brokenParts.length; i++){
-      body += '<div class="stat-line"><span class="k">' + (partLabel[d.brokenParts[i]] || d.brokenParts[i]) + '</span><span class="v" style="color:#e05252">損壞</span></div>';
-    }
+    body += '<div class="logline" style="padding:6px 0;color:#e05252">損壞部件：' + d.brokenParts.map(function(p){ return partLabel[p] || p; }).join(' · ') + '</div>';
   }
   if(d.deadMembers && d.deadMembers.length){
-    body += '<div class="divider"></div>';
-    body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:4px">陣亡成員</div>';
     const memberLabel = { driver: '駕駛', gunner: '炮手', commander: '車長', player: '玩家' };
-    for(let i = 0; i < d.deadMembers.length; i++){
-      const _mk = d.deadMembers[i];
-      const _lbl = _mk.indexOf('passenger_') === 0 ? ('載員 ' + _mk.replace('passenger_', '#')) : (memberLabel[_mk] || _mk);
-      body += '<div class="stat-line"><span class="k">' + _lbl + '</span><span class="v" style="color:#e05252">陣亡</span></div>';
-    }
+    body += '<div class="logline" style="padding:6px 0;color:#e05252">陣亡成員：' + d.deadMembers.map(function(m){
+      if(m.indexOf('passenger_') === 0) return '載員 ' + m.replace('passenger_', '#');
+      return memberLabel[m] || m;
+    }).join(' · ') + '</div>';
   }
   if(d.ammoRackDamage > 0){
-    body += '<div class="divider"></div>';
-    body += '<div class="stat-line"><span class="k">彈藥架累計傷害</span><span class="v">' + Math.round(d.ammoRackDamage) + '</span></div>';
+    body += '<div class="logline" style="padding:6px 0;color:#7a6f60">彈藥架累計傷害：<span style="color:#e8a33d">' + Math.round(d.ammoRackDamage) + '</span></div>';
   }
   if(d.repairUntil > 0){
     let remainH = Math.round((d.repairUntil - Date.now()) / 3600000 * 10) / 10;
     if(remainH < 0) remainH = 0;
-    body += '<div class="divider"></div>';
-    body += '<div class="stat-line"><span class="k">維修時長</span><span class="v">' + remainH + ' 小時</span></div>';
+    body += '<div class="logline" style="padding:6px 0;color:#7a6f60">維修時長：<span style="color:#e8a33d">' + remainH + ' 小時</span></div>';
   }
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
@@ -1436,10 +1466,11 @@ window._forceEndVehicleCombat = function(){
 };
 
 function _grantBTRCrewExp(exp){
-  if(!state.station || !state.station.crew) return;
+  const _liveStGrant = window._getLiveStation();
+  if(!_liveStGrant || !_liveStGrant.crew) return;
   const members = [];
   for(const r of ['commander', 'gunner', 'driver']){
-    const sid = state.station.crew[r];
+    const sid = _liveStGrant.crew[r];
     if(!sid) continue;
     const srv = (state.servants || []).find(function(s){ return s.id === sid; });
     if(srv) members.push(srv);

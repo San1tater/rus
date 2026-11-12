@@ -352,7 +352,8 @@ function _disembark(){
     ex._lastRotateAt = 0;
     return;
   }
-  const st = state.station;
+  /* rev-fix-disembark-snapshot: 支援中讀快照，車站修改不影響當前乘組/載員 */
+  const st = window._getLiveStation();
   if(!st || !Array.isArray(st.passengers)){
     /* rev-fix-disembark-cap0: station 数据异常，清空 passengersFollowing 防御性兜底。
      * 原逻辑保留 _retreatingList 会全部 _retreating=true 残留 → worldX 冻结。 */
@@ -559,16 +560,25 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
         units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
       }
     }
-    if(wps && eq[wps] && typeof getWeaponCfg === 'function'){
-      const cfg = getWeaponCfg(wps, eq[wps]);
-      if(cfg){
-        const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
-        if(layerDef){
-          const img = getHeroImg('icons/items/' + resolveIconId(eq[wps]) + '.png');
-          units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
+if(wps && eq[wps]){
+      if(typeof AMMO !== 'undefined' && AMMO[eq[wps]]){
+        /* rev-fix-ammo-box-corpse: 彈藥手屍體畫 ammo_pack 而非子彈圖標 */
+        const _faC = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
+        if(_faC){
+          const _imgC = getHeroImg('icons/garden/ammo_pack.png');
+          units.push({ z: _faC.z - 0.5, kind:'eq', layerId: 'front_arm', ox: 1 - _faC.pivot.x, oy: -_faC.pivot.y, scale: 0.3, rotation: 0, img: _imgC, _fitMax: true });
+        }
+      } else if(typeof getWeaponCfg === 'function'){
+        const cfg = getWeaponCfg(wps, eq[wps]);
+        if(cfg){
+          const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
+          if(layerDef){
+            const img = getHeroImg('icons/items/' + resolveIconId(eq[wps]) + '.png');
+            units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
+          }
         }
       }
-    }
+}
     units.sort(function(a,b){ return a.z - b.z; });
     for(const u of units){
       if(u.kind === 'layer') drawBodyLayer(ctx, u.layer, B, anim, 0);
@@ -675,7 +685,14 @@ function _renderPass(now){
                若用 _followStep 追，会因 screenX 落后于 _targetScreenX178
                而持续步进 → 视觉上「fire_primary 动画 + 向某方向滑行」。 */
         const _worldMovedG2b = Math.abs(_a2.worldX - (_a2._lastWorldX != null ? _a2._lastWorldX : _a2.worldX)) > 0.0001;
-        s._renderForceMoving = _worldMovedG2b;
+        /* rev-fix-render-moving-1: worldX 变化 OR screenX 变化都算移动。
+         * screenX 用 _followStep 平滑追 targetScreenX，追赶完成后 worldX 已停但 screenX 还在滑行，
+         * 那几帧 worldX 不变 → 原逻辑 idle → sprite 平移。 */
+        const _curSX1 = s.screenX;
+        const _prevSX1 = s._renderPrevSX;
+        const _screenMoved1 = (_prevSX1 != null) && Math.abs(_curSX1 - _prevSX1) > 0.0003;
+        s._renderPrevSX = _curSX1;
+        s._renderForceMoving = _worldMovedG2b || _screenMoved1;
         /* [v182b H3] firing/waiting 也用 _followStep 平滑步进，不用瞬間吸附。
            原代码 firing 时 s.screenX = _targetScreenX178 是瞬間吸附——
            _updatePT 每 10 秒 rotate targetX（0.35/0.15/-0.12 循環）或載員死傷時
@@ -714,7 +731,13 @@ function _renderPass(now){
       const _diff_f = _targetScreenX_f - s.screenX;
       if(Math.abs(_diff_f) <= _followStep) s.screenX = _targetScreenX_f;
       else s.screenX += Math.sign(_diff_f) * _followStep;
-      s._renderForceMoving = Math.abs(_a2_f.worldX - (_a2_f._lastWorldX != null ? _a2_f._lastWorldX : _a2_f.worldX)) > 0.0001;
+      /* rev-fix-render-moving-2: following 分支同样加 screenX 判定 */
+      const _curSX2 = s.screenX;
+      const _prevSX2 = s._renderPrevSX;
+      const _screenMoved2 = (_prevSX2 != null) && Math.abs(_curSX2 - _prevSX2) > 0.0003;
+      s._renderPrevSX = _curSX2;
+      const _worldMoved2 = Math.abs(_a2_f.worldX - (_a2_f._lastWorldX != null ? _a2_f._lastWorldX : _a2_f.worldX)) > 0.0001;
+      s._renderForceMoving = _worldMoved2 || _screenMoved2;
     } else {
       /* [v236] 無戰鬥 ally 時，用 _followStep 平滑過渡，避免吸附 */
       const _relWX = (typeof s.worldX === 'number' ? s.worldX : ex.worldX) - ex.worldX;
@@ -1224,6 +1247,15 @@ function _tickAlliesPositions(now){
     if(a.hp <= 0){ a._lastWorldX = a.worldX; continue; }
     if(a._retreating){ a._lastWorldX = a.worldX; continue; }
     if(!a.weapon || !a.weapon.def){ a._lastWorldX = a.worldX; continue; }
+    /* rev-fix-ah-retreat: 弹药手，场上无幸存载员使用其弹药 → 主动撤退 */
+    if(typeof _isAmmoHandler === 'function' && _isAmmoHandler(a)){
+      const _ahrR = (typeof _getAmmoHandlerRange === 'function') ? _getAmmoHandlerRange(a, c) : null;
+      if(_ahrR === null){
+        if(typeof _retreatPassenger === 'function') _retreatPassenger(a, c);
+        a._lastWorldX = a.worldX;
+        continue;
+      }
+    }
     /* [v181 G1] 记录更新前位置，供 _renderPass 判本帧实际位移 */
     a._lastWorldX = a.worldX;
     let _nearest = null, _nearestDist = Infinity;
@@ -1248,9 +1280,31 @@ function _tickAlliesPositions(now){
     const _busyA = (a._reloadEnd && a._reloadEnd > now) || (a._fireAnimUntil && a._fireAnimUntil > now);
     if(_busyA){
       a._mode = 'firing';
+      /* rev-fix-busy-follow-fix: 换弹/射击期间，worldX 是否跟随玩家取决于「射程内有无可交战敌人」。
+       * 有敌人 → firing 站定，worldX 冻结（否则边射击边平移）。
+       * 无敌人 → following，worldX 跟随玩家（否则玩家走开载员原地发呆）。 */
+      const _rBusy = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(a.weapon.def) : 15;
+      const _hasTargetBusy = (_nearest != null) && (_nearestDist <= _rBusy);
+      if(_hasTargetBusy){
+        /* 站定开火，worldX 冻结 */
+        a._lastExWXForBusy = ex.worldX;
+      } else {
+        /* 无可交战敌人，跟随玩家 */
+        if(typeof a._lastExWXForBusy !== 'number') a._lastExWXForBusy = ex.worldX;
+        const _exDeltaB = ex.worldX - a._lastExWXForBusy;
+        if(Math.abs(_exDeltaB) < 2){ a.worldX += _exDeltaB; }
+        a._lastExWXForBusy = ex.worldX;
+      }
       _handled = true;
     } else if(_nearest){
-      const _r = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(a.weapon.def) : 15;
+      /* rev-fix-ah-range: 弹药手射程 = 场上幸存使用者最大射程（撤退检查已确保有使用者）；普通载员 = 自身武器射程。 */
+      let _r;
+      if(typeof _isAmmoHandler === 'function' && _isAmmoHandler(a)){
+        const _ahrF = (typeof _getAmmoHandlerRange === 'function') ? _getAmmoHandlerRange(a, c) : null;
+        _r = _ahrF !== null ? _ahrF : 15;
+      } else {
+        _r = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(a.weapon.def) : 15;
+      }
       if(_nearestDist <= _r){
         a._mode = 'firing';
         _handled = true;

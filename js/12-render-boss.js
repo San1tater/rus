@@ -509,6 +509,7 @@ function pickAimPartFromClick(canvasX, canvasY){
   const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
   const world = resolveBossWorld(def, anim, fi);
   const sorted = def.layers.slice().sort((a,b)=>b.z - a.z);
+  /* 1. 精确矩形命中（原逻辑） */
   for(const L of sorted){
     const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0,dx:0,dy:0};
     const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
@@ -527,7 +528,26 @@ function pickAimPartFromClick(canvasX, canvasY){
       return L.id;
     }
   }
-  return null;
+  /* rev-fix-boss-aim-fallback: 点击落在图层间隙/透明区时，返回离点击位置最近的 layer。
+   * 权重：torso/body/core/abdomen 优先（常见瞄点），eye_/mouth_ 降权（装饰性），其余中性。 */
+  let nearestId = null, nearestScore = Infinity;
+  for(const L of sorted){
+    const wp = world[L.id];
+    if(!wp) continue;
+    const dx = canvasX - wp.wx;
+    const dy = canvasY - wp.wy;
+    const d2 = dx * dx + dy * dy;
+    let _w = 1.0;
+    if(L.id === 'torso' || L.id === 'body' || L.id === 'core' || L.id === 'abdomen') _w = 0.55;
+    else if(L.id === 'head') _w = 0.8;
+    else if(/^eye_|^mouth_/.test(L.id)) _w = 1.8;
+    const _score = d2 * _w;
+    if(_score < nearestScore){
+      nearestScore = _score;
+      nearestId = L.id;
+    }
+  }
+  return nearestId;
 }
 
 function getAimTargetPos(){
@@ -707,14 +727,51 @@ function updateFighterPos(){
 }
 
 /* ============== 命中 / 特效 ============== */
-function spawnHitFx(x, y, txt, cls){
+function spawnHitFx(x, y, txt, cls, sparkX, sparkY){
   const layer = document.getElementById('battle-fx');
   if(!layer) return;
+  let _nx = x, _ny = y;
+  const _isNamebar = (x === 'boss' || x === 'player');
+  if(_isNamebar){
+    const _sel = (x === 'boss') ? '.fighter.boss-f' : '.fighter.hero-f';
+    const _fighter = document.querySelector(_sel);
+    const _hpbar = _fighter ? _fighter.querySelector('.hpbar-wrap') : null;
+    _nx = (x === 'boss') ? 0.75 : 0.15;
+    _ny = 0.2;
+    if(_hpbar){
+      const _fr = layer.getBoundingClientRect();
+      const _hr = _hpbar.getBoundingClientRect();
+      if(_fr.width && _fr.height && _hr.width){
+        _nx = Math.max(0.02, Math.min(0.98, (_hr.left - _fr.left + _hr.width / 2) / _fr.width));
+        _ny = Math.max(0.02, (_hr.top - _fr.top - 24) / _fr.height);
+      }
+    }
+  }
+  /* rev-fix-hitfx-spark-v2: 火花 —— MISS/治疗跳过；sparkX/sparkY 显式提供时用它们；
+   * 否则数字坐标（'boss'/'player'）不画火花。cls 必须完整传给 _spawnHitSpark（第 5 参数） */
+  const _isMiss = (String(txt).toUpperCase() === 'MISS');
+  if(!_isMiss && cls !== 'miss' && cls !== 'heal' && typeof window._spawnHitSpark === 'function'){
+    let _sx = null, _sy = null;
+    if(typeof sparkX === 'number' && typeof sparkY === 'number'){
+      _sx = sparkX; _sy = sparkY;
+    } else if(typeof x === 'number' && typeof y === 'number'){
+      _sx = x; _sy = y;
+    }
+    if(_sx !== null && _sy !== null){
+      const _w = layer.clientWidth || 400, _h = layer.clientHeight || 500;
+      let _owner = null;
+      try { _owner = (typeof battle !== 'undefined' && battle) ? battle : null; } catch(e){}
+      if(_owner){
+        /* 关键：cls 作为第 5 参数完整传入 */
+        window._spawnHitSpark(_owner, _sx * _w, _sy * _h, cls === 'crit', cls);
+      }
+    }
+  }
   const e = document.createElement('div');
   e.className = 'hit-fx' + (cls ? ' ' + cls : '');
   e.textContent = txt;
-  e.style.left = (x * 100) + '%';
-  e.style.top = (y * 100) + '%';
+  e.style.left = (_nx * 100) + '%';
+  e.style.top = (_ny * 100) + '%';
   layer.appendChild(e);
   setTimeout(()=>e.remove(), 1100);
 }

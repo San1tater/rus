@@ -111,6 +111,20 @@ function _tryDrawArmorAtLayer(ctx, armorId, lw, lh, px, py){
 
 function _tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
   if(_isMeleeWeapon(weaponId)) return false;
+  /* rev-fix-ammo-handler-render: 弹药手尸体绘制弹药箱图标 */
+  if(typeof AMMO !== 'undefined' && AMMO[weaponId]){
+    var _aImg = (typeof getHeroImg === 'function') ? getHeroImg('icons/garden/ammo_pack.png') : null;
+    if(_aImg && _aImg.complete && _aImg.naturalWidth){
+      var _aSz = lw * 0.8;
+      ctx.save();
+      ctx.translate(px + lw * 0.2, py + lh * 0.2);
+      ctx.scale(-1, 1);
+      ctx.drawImage(_aImg, -_aSz/2, -_aSz/2, _aSz, _aSz);
+      ctx.restore();
+      return true;
+    }
+    return false;
+  }
   if(typeof WEAPON_LAYOUT === 'undefined') return false;
   var baseId = resolveIconId(weaponId);
   var layout = WEAPON_LAYOUT[baseId] || HERO_VISIBLE_EQ.primary;

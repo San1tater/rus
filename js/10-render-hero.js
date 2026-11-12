@@ -297,6 +297,72 @@ function computeWeaponCharLayout(cfg){
   return { anchorX, anchorY, rightX, baseW, isTrimMode };
 }
 
+/* rev-fix-weapon-muzzle-common: 武器 muzzle 在原圖座標系（400×500）的位置 —— 唯一計算入口
+ * 探索 / Boss / 後院三處共用，各調用方自行做 canvas 座標系轉換。
+ * 完整考慮三層旋轉：L.rot（靜態）+ key.rot（動畫幀）+ cfg.rotation（武器自身）
+ * 返回值：{ x, y } 相對 400×500 原圖左上角的像素坐標；若 weaponId 無效返回 null */
+window.getCharWeaponMuzzleLocal = function(weaponSlot, weaponId, animName, frameIdx){
+  if(!weaponSlot || !weaponId) return null;
+  if(typeof getWeaponCfg !== 'function') return null;
+  const cfg = getWeaponCfg(weaponSlot, weaponId);
+  if(!cfg) return null;
+  const L = (typeof GAME_LAYERS !== 'undefined') ? GAME_LAYERS.find(function(l){ return l.id === cfg.layer; }) : null;
+  if(!L) return null;
+
+  const anim = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS[animName || 'idle']) || null;
+  const fc = anim ? anim.frameCount : 1;
+  const fi = anim ? (((frameIdx || 0) % fc) + fc) % fc : 0;
+  const key = (anim && anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || { rot:0, dx:0, dy:0 };
+
+  const B = { x: 30, y: 30, w: 340, h: 460 };
+  const w = B.w * L.w;
+  const h = B.h * L.h;
+  const cx = B.x + B.w * (L.x + (key.dx || 0) * 0.01);
+  const cy = B.y + B.h * (L.y + (key.dy || 0) * 0.01);
+
+  const hasTrim = !!(cfg.trim && cfg.trim.w > 0 && cfg.trim.h > 0);
+  let localX, localY;
+
+  if(hasTrim){
+    const _wid = (typeof resolveIconId === 'function') ? resolveIconId(weaponId) : weaponId;
+    const mz = (typeof WEAPON_MUZZLE !== 'undefined') ? WEAPON_MUZZLE[_wid] : null;
+    const baseW = cfg.trim.w * (cfg.scale || 1.0);
+    const baseH = cfg.trim.h * (cfg.scale || 1.0);
+    if(mz){
+      /* muzzle 在武器未旋轉坐標系（相對旋轉中心 = 圖片左邊緣中點）的偏移 */
+      let mxRaw = (mz.x / cfg.trim.w) * baseW;
+      let myRaw = -baseH / 2 + (mz.y / cfg.trim.h) * baseH;
+      /* 武器自身 rotation（drawEqLayer 裡 rotate(cfg.rotation) 繞武器中心） */
+      if(cfg.rotation){
+        const r = cfg.rotation * Math.PI / 180;
+        const cR = Math.cos(r), sR = Math.sin(r);
+        const nx = mxRaw * cR - myRaw * sR;
+        const ny = mxRaw * sR + myRaw * cR;
+        mxRaw = nx; myRaw = ny;
+      }
+      localX = w * (cfg.ox || 0) + mxRaw;
+      localY = h * (cfg.oy || 0) + myRaw;
+    } else {
+      /* 無 muzzle 定義 → 武器右邊緣中點（與原探索/Boss 行為一致） */
+      localX = w * (cfg.ox || 0) + baseW;
+      localY = h * (cfg.oy || 0);
+    }
+  } else {
+    /* 無 trim → 武器中心 */
+    const baseW2 = 400 * (cfg.scale || 0.3);
+    localX = w * (cfg.ox || 0) + baseW2 / 2;
+    localY = h * (cfg.oy || 0);
+  }
+
+  /* 應用 L.rot + key.rot（與 drawEqLayer 完全一致） */
+  const rot = ((L.rot || 0) + (key.rot || 0)) * Math.PI / 180;
+  const cK = Math.cos(rot), sK = Math.sin(rot);
+  const rOffX = localX * cK - localY * sK;
+  const rOffY = localX * sK + localY * cK;
+
+  return { x: cx + rOffX, y: cy + rOffY };
+};
+
 const heroImgCache = new Map();
 function getHeroImg(src){
   if(!src) return null;
@@ -440,10 +506,15 @@ function updateHeroAnim(now){
   const isFire = heroAnim.name === 'fire_primary' || heroAnim.name === 'fire_secondary' || heroAnim.name === 'attack_melee';
   /* rev-fix-anim-start: fire 動畫基於 animStart 計算幀，確保每發都從 0 開始且正常更新 */
   if(isFire && typeof heroAnim.animStart === 'number'){
-    /* rev-fix-anim-loop: 射擊期間持續循環 01230123，不鎖死在最後一幀 */
+    /* rev-fix-throw-full-anim: 單輪播完停在最後一幀，不循環；下一發 _playFire/_playMeleeFire 重設 animStart */
     const interval = 1000 / a.fps;
     const elapsed = Math.max(0, now - heroAnim.animStart);
-    heroAnim.frame = Math.floor(elapsed / interval) % a.frameCount;
+    const totalDur = (a.frameCount / a.fps) * 1000;
+    if(elapsed >= totalDur){
+      heroAnim.frame = a.frameCount - 1;
+    } else {
+      heroAnim.frame = Math.floor(elapsed / interval);
+    }
     return;
   }
   const interval = 1000 / a.fps;
@@ -506,10 +577,9 @@ function getTopCfg(id){
 }
 
 function getExploreWeaponRightEdge(canvasW, canvasH){
-  const ORIG_CHAR_H = 386;
   const ORIG_FOOT_X = 200;
   const ORIG_FOOT_Y = 515;
-  const scale = (canvasH * CHAR_HEIGHT_FACTOR) / ORIG_CHAR_H;
+  const scale = (canvasH * CHAR_HEIGHT_FACTOR) / 386;
   const groundY = canvasH * 0.95;
   const centerX = canvasW * EXPLORE_HERO_X_RATIO;
 
@@ -521,27 +591,12 @@ function getExploreWeaponRightEdge(canvasW, canvasH){
   else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
 
   if(!wpSlot || !wpId) return { x: centerX, y: groundY };
-  const cfg = getWeaponCfg(wpSlot, wpId);
-  if(!cfg) return { x: centerX, y: groundY };
-  const layout = computeWeaponCharLayout(cfg);
-  if(!layout) return { x: centerX, y: groundY };
-
-  const _wid = resolveIconId(wpId);
-  const _wm = (typeof WEAPON_MUZZLE !== 'undefined' && WEAPON_MUZZLE[_wid]) ? WEAPON_MUZZLE[_wid] : null;
-  const _tr = cfg.trim;
-  if(_wm && _tr && _tr.w > 0 && _tr.h > 0 && layout.isTrimMode){
-    const _baseW = layout.baseW;
-    const _baseH = _tr.h * (cfg.scale || 1.0);
-    const _mzLocalX = layout.anchorX + (_wm.x / _tr.w) * _baseW;
-    const _mzLocalY = layout.anchorY - _baseH / 2 + (_wm.y / _tr.h) * _baseH;
-    return {
-      x: centerX + scale * (_mzLocalX - ORIG_FOOT_X),
-      y: groundY + scale * (_mzLocalY - ORIG_FOOT_Y)
-    };
-  }
+  /* 委託通用槍口函數，跟隨 heroAnim 當前幀 */
+  const mz = window.getCharWeaponMuzzleLocal(wpSlot, wpId, heroAnim.name, heroAnim.frame);
+  if(!mz) return { x: centerX, y: groundY };
   return {
-    x: centerX + scale * (layout.rightX - ORIG_FOOT_X),
-    y: groundY + scale * (layout.anchorY - ORIG_FOOT_Y)
+    x: centerX + scale * (mz.x - ORIG_FOOT_X),
+    y: groundY + scale * (mz.y - ORIG_FOOT_Y)
   };
 }
 
@@ -552,10 +607,9 @@ function getPlayerMuzzlePos(){
   const spriteW = (typeof battle !== 'undefined' && battle && battle.playerCanvasW) ? battle.playerCanvasW : 220;
   const spriteH = (typeof battle !== 'undefined' && battle && battle.playerCanvasH) ? battle.playerCanvasH : BATTLE_HERO_SPRITE_H;
 
-  const ORIG_CHAR_H = 386;
   const ORIG_FOOT_X = 200;
   const ORIG_FOOT_Y = 515;
-  const scale = (spriteH * CHAR_HEIGHT_FACTOR_BATTLE) / ORIG_CHAR_H;
+  const scale = (spriteH * CHAR_HEIGHT_FACTOR_BATTLE) / 386;
   const groundY_local = spriteH * 0.95;
   const centerX_local = spriteW / 2;
 
@@ -570,23 +624,30 @@ function getPlayerMuzzlePos(){
   let localY = groundY_local - spriteH * 0.4;
 
   if(wpSlot && wpId){
-    const cfg = getWeaponCfg(wpSlot, wpId);
-    if(cfg){
-      const layout = computeWeaponCharLayout(cfg);
-      if(layout){
-        const _wid = resolveIconId(wpId);
-        const _wm = (typeof WEAPON_MUZZLE !== 'undefined' && WEAPON_MUZZLE[_wid]) ? WEAPON_MUZZLE[_wid] : null;
-        const _tr = cfg.trim;
-        if(_wm && _tr && _tr.w > 0 && _tr.h > 0 && layout.isTrimMode){
-          const _baseW = layout.baseW;
-          const _baseH = _tr.h * (cfg.scale || 1.0);
-          const _mzLocalX = layout.anchorX + (_wm.x / _tr.w) * _baseW;
-          const _mzLocalY = layout.anchorY - _baseH / 2 + (_wm.y / _tr.h) * _baseH;
-          localX = centerX_local + scale * (_mzLocalX - ORIG_FOOT_X);
-          localY = groundY_local + scale * (_mzLocalY - ORIG_FOOT_Y);
-        } else {
-          localX = centerX_local + scale * (layout.rightX - ORIG_FOOT_X);
-          localY = groundY_local + scale * (layout.anchorY - ORIG_FOOT_Y);
+    if(typeof AMMO !== 'undefined' && AMMO[wpId]){
+      /* rev-fix-ammo-box-center: 彈藥箱中心點對齊前側手右上角 */
+      const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
+      if(_fa){
+        const _img = getHeroImg('icons/garden/ammo_pack.png');
+        units.push({
+          z: _fa.z - 0.5,
+          kind: 'eq',
+          layerId: 'front_arm',
+          ox: 1 - _fa.pivot.x,
+          oy: -_fa.pivot.y,
+          scale: 0.3,
+          rotation: 0,
+          img: _img,
+          _fitMax: true
+        });
+      }
+    } else {
+      const cfg = getWeaponCfg(wpSlot, wpId);
+      if(cfg){
+        const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
+        if(layerDef){
+          const img = getHeroImg(`icons/items/${resolveIconId(wpId)}.png`);
+          units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
         }
       }
     }
@@ -782,7 +843,9 @@ function renderExploreHeroCanvas(){
   ctx.clearRect(0, 0, w, h);
   const btr = window.BTRSupport;
   const clipH = (btr && btr.active) ? btr.playerClipH : 1.0;
-  const offsetX = (btr && btr.active) ? btr.playerXOffset : 0;
+  /* rev-fix-wreck-render-offset: wreck 阶段玩家已下车，offset 强制 0，兜底防 12px 跳变。 */
+  const _isWreckPhaseRO = !!(btr && btr.active && (btr.phase === 'wreck' || btr.phase === 'wreckPause'));
+  const offsetX = (btr && btr.active && !_isWreckPhaseRO) ? btr.playerXOffset : 0;
   if(clipH > 0.001){
     if(clipH < 1.0){
       ctx.save();
@@ -1049,7 +1112,25 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
   else if(equipped.primary){ wpS = 'primary'; wpI = equipped.primary; }
   else if(equipped.secondary){ wpS = 'secondary'; wpI = equipped.secondary; }
   else if(equipped.melee){ wpS = 'melee'; wpI = equipped.melee; }
-  if(wpS && wpI && !_isMeleeWeapon(wpI)){
+  if(wpS && wpI && typeof AMMO !== 'undefined' && AMMO[wpI]){
+    /* rev-fix-ammo-handler-render: 弹药手（主武器栏是弹药箱）绘制弹药箱图标，而非子弹图标 */
+    var _aLayer = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
+    if(_aLayer){
+      var _aImg = getHeroImg('icons/garden/ammo_pack.png');
+/* rev-fix-ammo-box-raid: 彈藥箱中心點對齊前側手右上角 */
+      units.push({
+        z: _aLayer.z - 0.5,
+        kind: 'eq',
+        layerId: 'front_arm',
+        ox: 1 - _aLayer.pivot.x,
+        oy: -_aLayer.pivot.y,
+        scale: 0.3,
+        rotation: 0,
+        img: _aImg,
+        _fitMax: true
+      });
+    }
+  } else if(wpS && wpI && !_isMeleeWeapon(wpI)){
     var cW = getWeaponCfg(wpS, wpI);
     if(cW){
       var lW = GAME_LAYERS.find(function(l){ return l.id === cW.layer; });
