@@ -528,26 +528,9 @@ function pickAimPartFromClick(canvasX, canvasY){
       return L.id;
     }
   }
-  /* rev-fix-boss-aim-fallback: 点击落在图层间隙/透明区时，返回离点击位置最近的 layer。
-   * 权重：torso/body/core/abdomen 优先（常见瞄点），eye_/mouth_ 降权（装饰性），其余中性。 */
-  let nearestId = null, nearestScore = Infinity;
-  for(const L of sorted){
-    const wp = world[L.id];
-    if(!wp) continue;
-    const dx = canvasX - wp.wx;
-    const dy = canvasY - wp.wy;
-    const d2 = dx * dx + dy * dy;
-    let _w = 1.0;
-    if(L.id === 'torso' || L.id === 'body' || L.id === 'core' || L.id === 'abdomen') _w = 0.55;
-    else if(L.id === 'head') _w = 0.8;
-    else if(/^eye_|^mouth_/.test(L.id)) _w = 1.8;
-    const _score = d2 * _w;
-    if(_score < nearestScore){
-      nearestScore = _score;
-      nearestId = L.id;
-    }
-  }
-  return nearestId;
+/* rev-fix-boss-aim-no-fallback: 点击不在任何 layer 矩形内 → 返回 null，不建立瞄准点。
+   * 原先的 fallback 到最近 layer 会导致点 Boss 空白处误打某个部位。 */
+  return null;
 }
 
 function getAimTargetPos(){

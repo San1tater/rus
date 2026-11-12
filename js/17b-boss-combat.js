@@ -384,7 +384,7 @@ function applyBossDamage(dmg, isCrit, penMM, isThrowable, skipHitFx){
     const _shieldDmg = Math.max(1, Math.round(dmg * _shieldScale));
     battle.shieldHp = Math.max(0, battle.shieldHp - _shieldDmg);
     battle.damageDealt += _shieldDmg;
-    if(!skipHitFx) spawnHitFx('boss', 0, '-' + _shieldDmg + (isCrit ? '!' : ''), ((_shieldDmg > 0) ? (isCrit ? 'crit' : '') : 'armor'), _aimPos.x, _aimPos.y);
+    if(!skipHitFx) spawnHitFx('boss', 0, '-' + _shieldDmg + (isCrit ? '!' : ''), 'armor', _aimPos.x, _aimPos.y); /* rev-fix-boss-shield-spark */
     const shEl = document.getElementById('boss-shield');
     if(shEl) shEl.style.width = Math.max(0, battle.shieldHp / battle.shieldMaxHp * 100) + '%';
     if(battle.shieldHp <= 0 && typeof breakBossShield === 'function') breakBossShield();
@@ -448,7 +448,7 @@ function applyHydraDamage(dmg, isCrit, penMM, isThrowable){
     });
     battle.bossArmor = proxy.armor;
     battle.damageDealt += r.armorLost;
-    spawnHitFx('boss', 0, '-' + r.armorLost + (isCrit ? '!' : ''), ((r.armorLost > 0) ? (isCrit ? 'crit' : '') : 'armor'), battle.bx, battle.by);
+    spawnHitFx('boss', 0, '-' + r.armorLost + (isCrit ? '!' : ''), 'armor', battle.bx, battle.by); /* rev-fix-hydra-shield-spark */
     const apEl = document.getElementById('boss-ap');
     if(apEl) apEl.style.width = Math.max(0, battle.bossArmor / battle.bossMaxArmor * 100) + '%';
     return;

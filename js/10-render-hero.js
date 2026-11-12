@@ -624,34 +624,15 @@ function getPlayerMuzzlePos(){
   let localY = groundY_local - spriteH * 0.4;
 
   if(wpSlot && wpId){
-    if(typeof AMMO !== 'undefined' && AMMO[wpId]){
-      /* rev-fix-ammo-box-center: 彈藥箱中心點對齊前側手右上角 */
-      const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
-      if(_fa){
-        const _img = getHeroImg('icons/garden/ammo_pack.png');
-        units.push({
-          z: _fa.z - 0.5,
-          kind: 'eq',
-          layerId: 'front_arm',
-          ox: 1 - _fa.pivot.x,
-          oy: -_fa.pivot.y,
-          scale: 0.3,
-          rotation: 0,
-          img: _img,
-          _fitMax: true
-        });
-      }
-    } else {
-      const cfg = getWeaponCfg(wpSlot, wpId);
-      if(cfg){
-        const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
-        if(layerDef){
-          const img = getHeroImg(`icons/items/${resolveIconId(wpId)}.png`);
-          units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
-        }
-      }
+    /* 委託通用槍口函數，跟隨 battleHeroAnim 當前幀 */
+    const _amName = (typeof battleHeroAnim !== 'undefined') ? battleHeroAnim.name : 'idle';
+    const _amFrame = (typeof battleHeroAnim !== 'undefined') ? battleHeroAnim.frame : 0;
+    const mz = window.getCharWeaponMuzzleLocal(wpSlot, wpId, _amName, _amFrame);
+    if(mz){
+      localX = centerX_local + scale * (mz.x - ORIG_FOOT_X);
+      localY = groundY_local + scale * (mz.y - ORIG_FOOT_Y);
     }
-  }
+  } /* rev-fix-restore-muzzle */
   const px = (typeof battle !== 'undefined' && battle) ? battle.px : 0.15;
   const py = (typeof battle !== 'undefined' && battle) ? battle.py : 0.75;
   return {
@@ -790,13 +771,21 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
   else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
   else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
 
-  if(wpSlot && wpId){
-    const cfg = getWeaponCfg(wpSlot, wpId);
-    if(cfg){
-      const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
-      if(layerDef){
-        const img = getHeroImg(`icons/items/${resolveIconId(wpId)}.png`);
-        units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
+  if(wpSlot && wpId){ /* rev-fix-ammo-box-block */
+    if(typeof AMMO !== 'undefined' && AMMO[wpId]){
+      const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
+      if(_fa){
+        const _img = getHeroImg('icons/garden/ammo_pack.png');
+        units.push({ z: _fa.z - 0.5, kind:'eq', layerId: 'front_arm', ox: 1 - _fa.pivot.x, oy: -_fa.pivot.y, scale: 0.3, rotation: 0, img: _img, _fitMax: true });
+      }
+    } else {
+      const cfg = getWeaponCfg(wpSlot, wpId);
+      if(cfg){
+        const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
+        if(layerDef){
+          const img = getHeroImg(`icons/items/${resolveIconId(wpId)}.png`);
+          units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
+        }
       }
     }
   }
