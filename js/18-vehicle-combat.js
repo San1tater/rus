@@ -48,18 +48,18 @@ const _VEHICLE_CRIT_MULT = (typeof calcCritMult === 'function') ? calcCritMult('
  */
 /* rev-fix-splash-v2 */
 const VEHICLE_SPLASH = {
-  '3of26':    { blastPen: 45, maxR: 60, splashRatio: 0.50 },
-  '3uof17':    { blastPen: 35, maxR: 50, splashRatio: 0.50 },
-  'og15v': { blastPen: 25, maxR: 30, splashRatio: 0.40 },
-  '3bk29':    { blastPen: 18, maxR: 25, splashRatio: 0.35 },
-  'pg15v':   { blastPen: 12, maxR: 20, splashRatio: 0.35 },
-  'atgm':     { blastPen: 22, maxR: 22, splashRatio: 0.35 },
-  '30mm_hef': { blastPen: 10, maxR: 10, splashRatio: 0.20 }
+  '3of26':    { blastPen: 30, maxR: 22, splashRatio: 0.50 },
+  '3uof17':   { blastPen: 25, maxR: 18, splashRatio: 0.50 },
+  'og15v':    { blastPen: 20, maxR: 14, splashRatio: 0.40 },
+  '3bk29':    { blastPen: 18, maxR: 12, splashRatio: 0.35 },
+  'pg15v':    { blastPen: 12, maxR: 9,  splashRatio: 0.35 },
+  '9m14':     { blastPen: 16, maxR: 11, splashRatio: 0.35 },
+  '9m113':    { blastPen: 16, maxR: 11, splashRatio: 0.35 },
+  '30mm_hef': { blastPen: 4,  maxR: 5,  splashRatio: 0.20 }
 };
 
 function _getVehicleSplashParams(wid, usedAmmoId, mixIsHE, preset){
   if(usedAmmoId && VEHICLE_SPLASH[usedAmmoId]) return VEHICLE_SPLASH[usedAmmoId];
-  if(wid === 'atgm') return VEHICLE_SPLASH['atgm'];
   if((wid === '2a42' || wid === '2a72') && (mixIsHE === true || preset === '高爆')) return VEHICLE_SPLASH['30mm_hef'];
   return null;
 }
@@ -291,7 +291,10 @@ function _getVehicleAmmoStats(wid, ammoId){
     return VEHICLE_WEAPON_STATS['30mm_ap'];
   }
   if(wid === 'atgm'){
-    return VEHICLE_WEAPON_STATS['atgm_9m113'];
+    if(ammoId && typeof VEHICLE_ATGM_AMMO !== 'undefined' && VEHICLE_ATGM_AMMO[ammoId]){
+      return { dmg: VEHICLE_ATGM_AMMO[ammoId].dmg, penMM: VEHICLE_ATGM_AMMO[ammoId].penMM };
+    }
+    return null;
   }
   return null;
 }
@@ -371,6 +374,10 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
     }
   } else if(_ammoObj){
     _ammoObj.current = Math.max(0, (_ammoObj.current || 0) - 1);
+    if(wid === 'atgm'){
+      const _ldA = (typeof _getLoadout === 'function') ? _getLoadout(p.vehicleId) : null;
+      _usedAmmoId = (_ldA && _ldA.atgm && _ldA.atgm.ammoId) ? _ldA.atgm.ammoId : '9m113';
+    }
   }
 
   if(_preselectedDead) {
@@ -429,6 +436,7 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
 
   const _distM = Math.abs(target.worldX - p.worldX);
   let _spd = 800;
+  /* 按载具区分的 ATGM 速度（9M14=120 / 9M113=200）*/
   if(_usedAmmoId && typeof VEHICLE_AMMO_SPEED_MS !== 'undefined' && VEHICLE_AMMO_SPEED_MS[_usedAmmoId]) _spd = VEHICLE_AMMO_SPEED_MS[_usedAmmoId];
   else if(typeof VEHICLE_AMMO_SPEED_MS !== 'undefined' && VEHICLE_AMMO_SPEED_MS[wid]) _spd = VEHICLE_AMMO_SPEED_MS[wid];
   
@@ -556,8 +564,9 @@ const VEHICLE_WEAPON_NAMES = { '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a7
 /* rev140: ATGM 依車型取專屬名稱（9M113 競賽 / 9M14 嬰兒 等） */
 window._vehicleWeaponDisplayName = function(wid, vid){
   if(wid === 'atgm'){
-    const v = (typeof VEHICLES !== 'undefined' && VEHICLES[vid]) ? VEHICLES[vid] : null;
-    if(v && v.weaponSpecial && v.weaponSpecial !== '無') return v.weaponSpecial;
+    const _ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
+    const _ammoId = (_ld && _ld.atgm && _ld.atgm.ammoId) ? _ld.atgm.ammoId : null;
+    if(_ammoId && typeof VEHICLE_ATGM_AMMO !== 'undefined' && VEHICLE_ATGM_AMMO[_ammoId]) return VEHICLE_ATGM_AMMO[_ammoId].name;
     return 'ATGM';
   }
   return (typeof VEHICLE_WEAPON_NAMES !== 'undefined' && VEHICLE_WEAPON_NAMES[wid]) || wid;
@@ -623,6 +632,7 @@ function _vGetEraBonus(vid, isHeat){
 
 function _vIsHeatAmmo(ammoId){
   if(typeof HEAT_AMMO_IDS !== 'undefined' && HEAT_AMMO_IDS.has(ammoId)) return true;
+  if(ammoId === '9m14' || ammoId === '9m113') return true;
   if(ammoId === 'atgm' || ammoId === '3bk29' || ammoId === '3ubk10' || ammoId === 'pg-15v') return true;
   return false;
 }

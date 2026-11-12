@@ -140,10 +140,10 @@ const VEHICLE_LOADOUT = {
   btr80a:{'2a72':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250}},
   btr82:{kpvt:{belts:10,perBelt:50},pkt:{belts:8,perBelt:250}},
   btr82a:{'2a72':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250}},
-  btr90:{'2a42':{belts:4,perBelt:100},pkt:{belts:6,perBelt:250},atgm:{rounds:2}},
-  bmp1:{'2a28':{rounds:40},pkt:{belts:8,perBelt:250},atgm:{rounds:1}},
+  btr90:{'2a42':{belts:4,perBelt:100},pkt:{belts:6,perBelt:250},atgm:{rounds:2,ammoId:'9m113'}},
+  bmp1:{'2a28':{rounds:40},pkt:{belts:8,perBelt:250},atgm:{rounds:1,ammoId:'9m14'}},
   bmp1m:{'2a72':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250}},
-  bmp2:{'2a42':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250},atgm:{rounds:3}},
+  bmp2:{'2a42':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250},atgm:{rounds:3,ammoId:'9m113'}},
   bmp3:{'2a70':{rounds:40},'2a72':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250}},
   bmd4:{'2a70':{rounds:40},'2a72':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250}},
   t80:{'2a46':{rounds:40},pkt:{belts:4,perBelt:250},nsvt:{belts:3,perBelt:100}},
@@ -154,7 +154,7 @@ const VEHICLE_LOADOUT = {
   t80um:{'2a46m1':{rounds:40},pkt:{belts:4,perBelt:250},nsvt:{belts:3,perBelt:100}}
 };
 
-const VEHICLE_BELT_COST = { pkt:375, nsvt:300, kpvt:250, '2a42':1000, '2a72':800, '2a28':40, '2a70':80, '2a46':150, '2a46m1':150, atgm:400 };
+const VEHICLE_BELT_COST = { pkt:375, nsvt:300, kpvt:250, '2a42':1000, '2a72':800, '2a28':40, '2a70':80, '2a46':150, '2a46m1':150, '9m14':400, '9m113':400 };
 const VEHICLE_BELT_ROUNDS = { pkt:250, nsvt:100, kpvt:50, '2a42':100, '2a72':100 };
 
 const CARRIER_CAPACITY = {
@@ -176,64 +176,68 @@ const VEHICLE_RANGE_M = {
 
 /* 需求整理三：載具武器傷害 + penMM */
 const VEHICLE_WEAPON_STATS = {
-  /* 機槍 */
-  pkt:       { dmg: 61,   penMM: 20 },
-  pkt_t46m:  { dmg: 50,   penMM: 20 },
-  nsvt:      { dmg: 110,  penMM: 32 },
-  nsvt_md:   { dmg: 150,  penMM: 6 },
-  kpvt:      { dmg: 160,  penMM: 45 },
-  kpvt_mdz:  { dmg: 220,  penMM: 8 },
+  /* 机枪 */
+  pkt:       { dmg: 61,   penMM: 16 },
+  pkt_t46m:  { dmg: 50,   penMM: 16 },
+  nsvt:      { dmg: 110,  penMM: 20 },
+  nsvt_md:   { dmg: 150,  penMM: 3 },
+  kpvt:      { dmg: 160,  penMM: 32 },
+  kpvt_mdz:  { dmg: 220,  penMM: 4 },
   /* 30mm */
-  '30mm_ap':   { dmg: 450, penMM: 50 },
-  '30mm_apds': { dmg: 450, penMM: 80 },
-  '30mm_hef':  { dmg: 350, penMM: 10 },
+  '30mm_ap':   { dmg: 450, penMM: 40 },
+  '30mm_apds': { dmg: 450, penMM: 65 },
+  '30mm_hef':  { dmg: 350, penMM: 4 },
   /* 2A28 73mm */
   '2a28_heat': { dmg: 400, penMM: 300 },
-  '2a28_he':   { dmg: 500, penMM: 25 },
+  '2a28_he':   { dmg: 500, penMM: 20 },
   /* 2A70 100mm */
   '2a70_heat': { dmg: 600, penMM: 500 },
   '2a70_he':   { dmg: 700, penMM: 25 },
   /* 2A46 125mm */
-  '2a46_apfsds': { dmg: 800,  penMM: 600 },
+  '2a46_apfsds': { dmg: 800,  penMM: 470 },
   '2a46_heat':   { dmg: 700,  penMM: 650 },
   '2a46_he':     { dmg: 1000, penMM: 30 },
-  /* ATGM */
-  'atgm_9m14':  { dmg: 1000, penMM: 400 },
-  'atgm_9m113': { dmg: 1200, penMM: 600 }
 };
 
 /* 載具裝甲 RHA（mm） */
 const VEHICLE_ARMOR_RHA = {
-  btr80:{hullFront:20,turretFront:10,side:7,rear:7},
-  btr80a:{hullFront:20,turretFront:23,side:10,rear:7},
-  btr82:{hullFront:20,turretFront:23,side:10,rear:7},
-  btr82a:{hullFront:20,turretFront:23,side:10,rear:7},
-  btr90:{hullFront:30,turretFront:30,side:15,rear:10},
-  bmp1:{hullFront:40,turretFront:31,side:18,rear:16},
-  bmp1m:{hullFront:40,turretFront:31,side:18,rear:16},
-  bmp2:{hullFront:26,turretFront:33,side:20,rear:16},
-  bmp3:{hullFront:36,turretFront:50,side:25,rear:20},
-  bmd4:{hullFront:50,turretFront:40,side:20,rear:20},
-  t80:{hullFront:450,turretFront:500,side:80,rear:60},
-  t80b:{hullFront:500,turretFront:550,side:80,rear:60},
-  t80bv:{hullFront:500,turretFront:550,side:80,rear:60,era:1},
-  t80u:{hullFront:600,turretFront:700,side:80,rear:60,era:2},
-  t80uk:{hullFront:600,turretFront:700,side:80,rear:60,era:2},
-  t80um:{hullFront:600,turretFront:700,side:80,rear:60,era:2}
+  btr80:{hullFront:20,turretFront:12,side:12,rear:10},
+  btr80a:{hullFront:20,turretFront:14,side:12,rear:10},
+  btr82:{hullFront:22,turretFront:15,side:13,rear:11},
+  btr82a:{hullFront:22,turretFront:15,side:13,rear:11},
+  btr90:{hullFront:33,turretFront:35,side:16,rear:12},
+  bmp1:{hullFront:28,turretFront:32,side:20,rear:16},
+  bmp1m:{hullFront:28,turretFront:34,side:20,rear:16},
+  bmp2:{hullFront:28,turretFront:32,side:20,rear:16},
+  bmp3:{hullFront:70,turretFront:65,side:40,rear:22},
+  bmd4:{hullFront:25,turretFront:38,side:18,rear:14},
+  t80:{hullFront:380,turretFront:410,side:80,rear:45},
+  t80b:{hullFront:430,turretFront:480,side:80,rear:45},
+  t80bv:{hullFront:480,turretFront:520,side:80,rear:45,era:1},
+  t80u:{hullFront:550,turretFront:675,side:80,rear:45,era:2},
+  t80uk:{hullFront:550,turretFront:675,side:80,rear:45,era:2},
+  t80um:{hullFront:570,turretFront:690,side:80,rear:45,era:2}
 };
 
 /* 載具基礎命中率（百分比） */
+/* rev-fix-atgm-ammo: 導彈彈藥表（與 VEHICLE_MAIN_AMMO_POOL 平級）*/
+const VEHICLE_ATGM_AMMO = {
+  '9m14':  { name:'9M14 嬰兒',  dmg:1000, penMM:400, speed:120 },
+  '9m113': { name:'9M113 競賽', dmg:1200, penMM:600, speed:200 }
+};
+
 /* [v206] 載具武器真實彈速（m/s） */
 const VEHICLE_AMMO_SPEED_MS = {
   // 主炮
   '3bm42': 1700, '3of26': 850, '3bk29': 915,
-  '3uof17': 750,
-  'pg15v': 665, 'og15v': 700,
-  // 機炮與機槍
+  '3uof17': 250,
+  'pg15v': 665, 'og15v': 290,
+  // 机炮与机枪
   '2a42': 960, '2a72': 960,
+  '30mm_ap': 960, '30mm_apds': 1120, '30mm_hef': 960,
   'kpvt': 1000, 'nsvt': 845, 'pkt': 825,
-  // 導彈
-  'atgm': 280
+  // 导弹（默认值；载具专属速度见 VEHICLE_ATGM_SPEED）
+  '9m14': 120, '9m113': 200
 };
 
 const VEHICLE_BASE_HR = {
@@ -344,7 +348,9 @@ function vcEstimateCallCost(v){
   for(var wid in lo){
     var c=lo[wid];
     var per=VEHICLE_BELT_ROUNDS[wid]||1;
-    var unit=VEHICLE_BELT_COST[wid]||0;
+    var unit;
+    if(wid === 'atgm' && c.ammoId){ unit = VEHICLE_BELT_COST[c.ammoId] || 0; }
+    else { unit = VEHICLE_BELT_COST[wid] || 0; }
     var a=state.vehicleAmmo&&state.vehicleAmmo[v]&&state.vehicleAmmo[v][wid];
     var fr;
     if(c.belts){ fr=c.belts*c.perBelt; }

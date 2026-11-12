@@ -76,7 +76,7 @@ const TALENT_DEFS = {
   ammo_handler: {kind:'passenger',name:'彈藥手',desc:'主武器欄可放彈藥箱'}
 };
 
-const ARMOR_LEVEL_TO_MM = {1:2, 2:5, 3:8, 4:12, 5:18, 6:25, 7:30};
+const ARMOR_LEVEL_TO_MM = {1:2, 2:4, 3:6, 4:9, 5:12, 6:17, 7:22};
 
 function armorMMToLevel(mm){
   if(mm == null || !isFinite(mm) || mm <= 0) return 0;
