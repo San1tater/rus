@@ -228,7 +228,9 @@ function openSlotPicker(slot, returnFn){
     for(const it of list){
       const _ac = (it.def.armor != null && it.def.level) ? _armorClassWithSub(it.def) : '';
       const _acHtml = _ac ? ' <span class="armor-class">' + _ac + '</span>' : '';
-      body += '<div class="item-row" data-iid="' + it.id + '" data-irar="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div><div class="sub">' + (it.def.type || slot) + ' · ' + it.rarity + '</div></div><div class="cnt">*' + it.count + '</div></div>';
+      /* rev-fix-slotpicker-weight: 顯示重量，與車站載員配置統一 */
+      const _wP14 = (typeof getItemWeight === 'function') ? getItemWeight(it.id, it.rarity).toFixed(1) + 'kg' : '';
+      body += '<div class="item-row" data-iid="' + it.id + '" data-irar="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div><div class="sub">' + (it.def.type || slot) + ' · ' + it.rarity + (_wP14 ? ' · ' + _wP14 : '') + '</div></div><div class="cnt">*' + it.count + '</div></div>';
     }
   }
   const _slotPickerOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;

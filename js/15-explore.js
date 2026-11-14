@@ -108,12 +108,21 @@ function _ensureES(region, ri){
   return ex;
 }
 
+/* rev-fix-speed-unify: 速度計算底層共用 */
+window._walkSpeedMs = function(w){
+  var _free = (typeof WEIGHT_FREE_KG !== 'undefined') ? WEIGHT_FREE_KG : 20;
+  var _pen = (typeof WEIGHT_PENALTY_PER_KG !== 'undefined') ? WEIGHT_PENALTY_PER_KG : 0.05;
+  return 1.4 / (1 + Math.max(0, (w || 0) - _free) * _pen);
+};
+window._vehicleSpeedKmh = function(vid){
+  var s = 80;
+  if(typeof VEHICLES !== 'undefined' && VEHICLES[vid] && VEHICLES[vid].speedRoad) s = VEHICLES[vid].speedRoad;
+  if(typeof hasCrewTalent === 'function' && hasCrewTalent('driver', 'driver_instinct')) s *= 1.10;
+  return s;
+};
 function _getPlayerWalkSpeed(){
   const _w = (typeof getTotalWeight === 'function') ? getTotalWeight() : 0;
-  const _free = (typeof WEIGHT_FREE_KG !== 'undefined') ? WEIGHT_FREE_KG : 20;
-  const _pen = (typeof WEIGHT_PENALTY_PER_KG !== 'undefined') ? WEIGHT_PENALTY_PER_KG : 0.05;
-  const _extra = Math.max(0, _w - _free);
-  return 1.4 / (1 + _extra * _pen);
+  return window._walkSpeedMs(_w);
 }
 
 /* rev-fix-position: 从 25-boot.js 移入。 */
@@ -124,24 +133,15 @@ window._calcSpeedDisplay = function(){
     if(ph === 'arrive' || ph === 'sink' || ph === 'center' || ph === 'support' || ph === 'lift' || ph === 'exit'){
       var g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
       var vid = g ? g.currentVehicle : 'btr80';
-      var s = 80;
-      if(typeof VEHICLES !== 'undefined' && VEHICLES[vid] && VEHICLES[vid].speedRoad) s = VEHICLES[vid].speedRoad;
-      if(typeof hasCrewTalent === 'function' && hasCrewTalent('driver', 'driver_instinct')) s *= 1.10;
-      return s / 3.6;
+      return window._vehicleSpeedKmh(vid) / 3.6;
     }
   }
   var w = (typeof getTotalWeight === 'function') ? getTotalWeight() : 0;
-  var _free = (typeof WEIGHT_FREE_KG !== 'undefined') ? WEIGHT_FREE_KG : 20;
-  var _pen = (typeof WEIGHT_PENALTY_PER_KG !== 'undefined') ? WEIGHT_PENALTY_PER_KG : 0.05;
-  var _extra = Math.max(0, w - _free);
-  return 1.4 / (1 + _extra * _pen);
-};
+  return window._walkSpeedMs(w);
+};;
 
 function _getVSpd(vid){
-  let s = 80;
-  if(typeof VEHICLES !== 'undefined' && VEHICLES[vid] && VEHICLES[vid].speedRoad) s = VEHICLES[vid].speedRoad;
-  if(typeof hasCrewTalent === 'function' && hasCrewTalent('driver', 'driver_instinct')) s *= 1.10;
-  return s / 3.6;
+  return window._vehicleSpeedKmh(vid) / 3.6;
 }
 
 function _computeTS(now){
@@ -459,7 +459,7 @@ function _cleanPC(){
   }
 }
 
-function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
+function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride, fallProgress){
   const cw = fxH * 1.2;
   const chh = fxH;
   let cvs = fx._pc[key];
@@ -519,10 +519,15 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride){
     ctx.clip();
   }
   if(animN === 'dead'){
+    /* rev-fix-passenger-death-rotate: fallProgress 0→1 渐进倒下。
+     * 站立时脚底 (cw/2, chh*0.96)；完全倒地时尸体水平中心对齐 cw/2，脚底在 (cw/2 - 193*sc, chh*0.95)。
+     * X 偏移按 sin(角度) 插值，让身体在水平方向的重心自然跟随。 */
+    const _fp = Math.min(1, (typeof fallProgress === 'number') ? fallProgress : 1);
+    const _rot = _fp * Math.PI / 2;
+    const _sinR = Math.sin(_rot);
     ctx.save();
-    /* [v245] X 保留原始 offset 避免头部裁切，Y 对齐 chh * 0.95 */
-    ctx.translate(cw / 2 - 193 * sc, chh * 0.95);
-    ctx.rotate(Math.PI / 2);
+    ctx.translate(cw / 2 - 193 * sc * _sinR, chh * 0.96 + (chh * 0.95 - chh * 0.96) * _fp);
+    ctx.rotate(_rot);
     ctx.scale(sc, sc);
     ctx.translate(-200, -515);
     const anim = GAME_ANIMS.dead;
@@ -649,6 +654,17 @@ function _renderPass(now){
   for(let k = 0; k < list.length; k++){
     const s = list[k];
     s._renderForceMoving = null;
+    /* rev-fix-allies-flag-mode-sync: 交战中按 _mode 每帧校正 _forceRunAnim / _standingWait。
+     * 根因：_forceRunAnim 只在 _tick 的无战斗分支更新。c.active=true 时该分支跳过，
+     * 进战斗前若为 chasing 则残留 true → 后续 _mode 变 following/waiting/firing 时
+     * worldX 不再前进，但 _renderPass 仍命中 _forceRunAnim=true → 原地播 run。
+     * 交战中按 _mode 校正：chasing→run；waiting/firing→站定；其他→非 run。
+     * 无战斗时不校正（由 _tick 无战斗分支维护）。 */
+    if(_inCombat && s.srv && _alliesBySrvId[s.srv.id]){
+      const _aModeS = _alliesBySrvId[s.srv.id]._mode;
+      s._forceRunAnim = (_aModeS === 'chasing');
+      s._standingWait = (_aModeS === 'waiting' || _aModeS === 'firing');
+    }
     /* [v185 H23] 撤退载员：0.3 * dtS + _worldStep（原始值）。
        v182d H11 我改成 1.5 * dtS 是误判——用户没抱怨速度慢，
        「换弹时冻结」是 _tick healing 分支 return 导致 _renderPass 不跑，
@@ -757,9 +773,13 @@ function _renderPass(now){
     if(it.screenX > 1.3 || it.screenX < -0.6) continue;
     const _isDown = _checkDown(it);
     if(_isDown){
-      _drawP(fx, 'p' + d, it.screenX * fxW, fxH, it, false, now, 'dead', null);
+      /* rev-fix-passenger-death-track: 首次进入倒地记录 _deathStart，350ms 内 fallProgress 0→1 */
+      if(!it._deathStart) it._deathStart = now;
+      const _fpD = Math.min(1, (now - it._deathStart) / 350);
+      _drawP(fx, 'p' + d, it.screenX * fxW, fxH, it, false, now, 'dead', null, _fpD);
       continue;
     }
+    if(it._deathStart){ it._deathStart = null; }
     let _animO = null;
     let _legO = null;
     let _animStartOverride = null;
@@ -845,10 +865,29 @@ function _renderPass(now){
 }
 
 /* ============== 屍體 ============== */
+/* rev-fix-corpse-layer: 尸体独立成层，z-index 14，直接挂 #zone1。
+ * 原实现在 #explore-fx（z-index 7）内，尸体虽然自身 z-index 13，
+ * 但整个 fx stacking context 只有 7，低于 #combat-overlay-top（12），
+ * 战斗结束时会被残留子弹/曳光/载员气泡盖住。 */
+function _getCorpseLayer(){
+  const z1 = document.getElementById('zone1');
+  if(!z1) return null;
+  let layer = document.getElementById('explore-corpses-layer');
+  if(!layer){
+    layer = document.createElement('div');
+    layer.id = 'explore-corpses-layer';
+    layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:14;overflow:hidden;';
+    z1.appendChild(layer);
+  }
+  return layer;
+}
+window._getCorpseLayer = _getCorpseLayer;
+
 function _startCorpses(enemies, enemyWX, ev){
   const ex = window._explore;
   const fx = document.getElementById('explore-fx');
-  if(!fx || !enemies) return;
+  const layer = _getCorpseLayer();
+  if(!fx || !layer || !enemies) return;
   for(let i = 0; i < enemies.length; i++){
     /* [v182 G14a] 已渲染过的 enemy 跳过，避免载具击杀路径 + 步战胜利路径重复生成。
        重复生成会导致同一事件出现两份 corpse，且视觉上「装备变化」。 */
@@ -857,10 +896,10 @@ function _startCorpses(enemies, enemyWX, ev){
     if(!r) continue;
     enemies[i]._corpseRendered = true;
     const w = document.createElement('div');
-    w.style.cssText = 'position:absolute;bottom:0;z-index:13;pointer-events:none;will-change:left;width:' + r.drawW + 'px;height:' + r.drawH + 'px;';
+    w.style.cssText = 'position:absolute;bottom:0;pointer-events:none;will-change:left;width:' + r.drawW + 'px;height:' + r.drawH + 'px;';
     r.canvas.style.cssText = 'width:100%;height:100%;display:block;';
     w.appendChild(r.canvas);
-    fx.appendChild(w);
+    layer.appendChild(w);
     /* [v181 G4] corpse 关联它来自的 event，供逐事件拾取 */
     ex.corpses.push({ wrap: w, drawW: r.drawW, drawH: r.drawH, worldX: ex.worldX + (enemyWX[i] || 0), ev: ev });
   }
@@ -1035,6 +1074,22 @@ function _startCombat(ev, first){
         _src: _p0.ammoBox
       });
     }
+  /* rev-fix-ammo-handler-supply: 彈藥手主武器欄彈藥箱進公共池，供同口徑隊友消耗 */
+  for(let _pi1 = 0; _pi1 < fw.length; _pi1++){
+    const _p1 = fw[_pi1].p;
+    if(!_p1.primaryWeapon || typeof AMMO === 'undefined' || !AMMO[_p1.primaryWeapon]) continue;
+    if(!(_p1.primaryWeaponBoxCount > 0)) continue;
+    const _adef2 = AMMO[_p1.primaryWeapon];
+    if(!_adef2 || !_adef2.cal) continue;
+    _publicPool.push({
+      cal: _adef2.cal,
+      id: _p1.primaryWeapon,
+      rarity: _p1.primaryWeaponRarity || '一般',
+      count: _p1.primaryWeaponBoxCount,
+      _isAmmoHandlerBox: true,
+      _ownerP: _p1
+    });
+  }
     for(let fi = 0; fi < fw.length; fi++){
       const f2 = fw[fi], srv = f2.srv, p = f2.p;
       if(srv.injuredUntil && Date.now() < srv.injuredUntil) continue;
@@ -1207,7 +1262,7 @@ function _startCombat(ev, first){
     if(!isV){
       state.player.armor = state.player.maxArmor;
     }
-    if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'dead'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now(); }
+    if(typeof window._playHeroDeath === 'function') window._playHeroDeath(); /* rev-fix-resolve-death */
     if(typeof pushLog === 'function'){
       /* rev-fix-player-killer-onResolve: 顯示被誰擊倒 */
       var _pk = ex._pendingPlayerKiller;
@@ -1365,42 +1420,52 @@ function _tick(now){
   if(typeof _cleanupDeadEvents === 'function') _cleanupDeadEvents();
   /* 治療期間完全停止，不執行任何移動/載員邏輯 */
   if(ex.mode === 'healing'){
-    ex._currentSpeed = 0;
-    /* 若治療期間被殘留彈幕擊中，重置治療時間（不額外消耗醫療品） */
+    /* rev-fix-heal-interrupt-by-hurt: 受擊打斷治療，立刻退出 healing 模式 */
     if(window._combat && window._combat._hurtUntil && now < window._combat._hurtUntil){
-      ex._healCdUntil = now + 2000;
-    }
-    if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'heal_melee'){
-      heroAnim.name = 'heal_melee';
-      heroAnim.frame = 0;
-      heroAnim.lastUpdate = now;
-      heroAnim.forcedEnd = now + 2100;
-      heroAnim.eqSlot = '__hidden__';
-      heroAnim.animStart = null;
-    }
-    if(now >= ex._healCdUntil){
       ex.mode = 'walk';
       ex._healCdUntil = 0;
       if(typeof heroAnim !== 'undefined'){
-        heroAnim.name = 'walk';
+        heroAnim.name = 'hurt';
         heroAnim.frame = 0;
         heroAnim.lastUpdate = now;
         heroAnim.eqSlot = null;
-        heroAnim.forcedEnd = 0;
-        heroAnim.animStart = null;
         heroAnim.healItem = null;
+        heroAnim.forcedEnd = window._combat._hurtUntil;
+        heroAnim.animStart = null;
       }
+      /* 不 return，fallthrough 到下方正常移動/戰鬥邏輯 */
+    } else {
+      ex._currentSpeed = 0;
+      if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'heal_melee'){
+        heroAnim.name = 'heal_melee';
+        heroAnim.frame = 0;
+        heroAnim.lastUpdate = now;
+        heroAnim.forcedEnd = now + 2100;
+        heroAnim.eqSlot = '__hidden__';
+        heroAnim.animStart = null;
+      }
+      if(now >= ex._healCdUntil){
+        ex.mode = 'walk';
+        ex._healCdUntil = 0;
+        if(typeof heroAnim !== 'undefined'){
+          heroAnim.name = 'walk';
+          heroAnim.frame = 0;
+          heroAnim.lastUpdate = now;
+          heroAnim.eqSlot = null;
+          heroAnim.forcedEnd = 0;
+          heroAnim.animStart = null;
+          heroAnim.healItem = null;
+        }
+      }
+      /* [v187 H34] healing 时仍跑 _tickAlliesPositions + _renderPass（载员 screenX 正常更新） */
+      if(window._combat && window._combat.active && window._combat.sceneType === 'foot'){
+        _tickAlliesPositions(now);
+      }
+      if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
+      _updateBgTransform();
+      _updateCorpsesLayout();
+      return;
     }
-    /* [v187 H34] 合并 v182c H4 / v184b H18b / v186 H31 三重重复调用。
-       healing 时仍跑 _tickAlliesPositions + _renderPass（载员 screenX 正常更新）。
-       ts 仍强制 0（玩家治疗时背景不滚），但载员自身状态机正常。 */
-    if(window._combat && window._combat.active && window._combat.sceneType === 'foot'){
-      _tickAlliesPositions(now);
-    }
-    if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
-    _updateBgTransform();
-    _updateCorpsesLayout();
-    return;
   }
 
   const b = window.BTRSupport;
@@ -1437,11 +1502,8 @@ function _tick(now){
   if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
 
   if(ex.mode === 'dead'){
-    if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'dead'){
-      heroAnim.name = 'dead';
-      heroAnim.frame = 0;
-      heroAnim.lastUpdate = performance.now();
-    }
+    /* rev-fix-tick-hero-death: 统一走 _playHeroDeath（含 _deathStart 记录） */
+    if(typeof window._playHeroDeath === 'function') window._playHeroDeath();
     const _deadUntilMs = (state.player && state.player.deadUntil) ? state.player.deadUntil : 0;
     const _deadRemain = _deadUntilMs - Date.now();
     if(_deadRemain > 0){
@@ -1454,7 +1516,7 @@ function _tick(now){
     ex.deadUntil = 0;
     if(state.player){ state.player.deadUntil = 0; state.player.hp = state.player.maxHp; state.player.armor = state.player.maxArmor; }
     if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
-    if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'walk'; heroAnim.frame = 0; }
+    if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'walk'; heroAnim.frame = 0; heroAnim._deathStart = null; }
     /* [v201] 徹底清理殘留狀態，強制復活 */
     window._combatActive = false;
     window._combat = null;
@@ -1754,6 +1816,9 @@ function _startMap(region, ri){
         try { ex.corpses[_ci].wrap.remove(); } catch(e){}
       }
       ex.corpses = [];
+      /* rev-fix-corpse-layer-cleanup: 清空层内残留 DOM */
+      const _cl = document.getElementById('explore-corpses-layer');
+      if(_cl) _cl.innerHTML = '';
       ex._lootingUntil = 0;
       ex._corpseLootTriggered = false;
     }
@@ -1896,18 +1961,15 @@ function _radioShowConfirm(){
   const repairCost = { metal: 50, gears: 20, screws: 20 };
   const canRepair = repairing && (typeof _gardenMerchantCanPay === 'function' ? _gardenMerchantCanPay(repairCost) : false);
   const _hasInjured = (crewInjuredSrv.length + _injuredPass.length) > 0;
-  const _healer = (function(){
-    const hl = ['ifak','salewa','surv12','ai2'];
-    for(let hk = 0; hk < hl.length; hk++){
-      for(let ik in state.inventory){
-        if(ik.indexOf(hl[hk] + '@') === 0 && state.inventory[ik] > 0){
-          return { id: ik.split('@')[0], rarity: ik.split('@')[1] };
-        }
-      }
+  const _hasAnyMed = (function(){
+    for(const _mk in state.inventory){
+      const _mp = _mk.split('@');
+      if(!CONSUMABLES[_mp[0]] || !CONSUMABLES[_mp[0]].heal) continue;
+      if(state.inventory[_mk] > 0) return true;
     }
-    return null;
+    return false;
   })();
-  const _canHeal = _hasInjured && !!_healer;
+  const _canHeal = _hasInjured && _hasAnyMed;
   body += '<div style="display:flex;gap:6px;margin:8px 0">';
   body += '<button class="btn" id="_p37_repair" ' + (canRepair ? '' : 'disabled') + ' style="flex:1;padding:8px;font-size:12px">維修</button>';
   body += '<button class="btn" id="_p37_heal" ' + (_canHeal ? '' : 'disabled') + ' style="flex:1;padding:8px;font-size:12px">治療</button>';
@@ -1959,13 +2021,12 @@ function _radioShowConfirm(){
   const _p37healBtn = bd.querySelector('#_p37_heal');
   if(_p37healBtn) _p37healBtn.onclick = function(){
     if(!_canHeal) return;
-    invRemove(_healer.id, _healer.rarity, 1);
     const _allInjured = crewInjuredSrv.concat(_injuredPass);
     for(let i = 0; i < _allInjured.length; i++){
       const s = _allInjured[i];
-      s.injuredUntil = 0;
-      s.hp = (typeof servantMaxHp === 'function') ? servantMaxHp(s) : 100;
-      s._injuredDown = false;
+      if(typeof _stHealServantByValue === 'function'){
+        _stHealServantByValue(s, (typeof servantMaxHp === 'function') ? servantMaxHp(s) : 100);
+      }
     }
     save();
     closeModal();

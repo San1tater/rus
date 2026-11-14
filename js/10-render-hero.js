@@ -24,26 +24,32 @@ const GAME_ANIMS = {
       front_arm: Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
     }
   },
+  /* rev-fix-walk-bobbing: 走路/奔跑的垂直起伏改平滑正弦取樣（週期 4 幀），
+     原 i%2?A:B 每幀交替會造成高頻抖動（10fps 每秒 5 次、16fps 每秒 8 次），對眼睛不友善。
+     幅度保持原設計：walk 0~-0.5、run -0.5~-1.5 */
   walk: {
     frameCount: 8, fps: 10, loop: true, showEq: 'primary',
     keys: {
-      head:      Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
-      face:      Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
-      torso:     Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
-      back_arm:  Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
-      front_arm: Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:i%2?-0.5:0})),
+      head:      Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
+      face:      Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
+      torso:     Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
+      back_arm:  Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
+      front_arm: Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
       right_leg: [-18,-9,0,9,18,9,0,-9].map(r=>({rot:r,dx:0,dy:0})),
       left_leg:  [18,9,0,-9,-18,-9,0,9].map(r=>({rot:r,dx:0,dy:0})),
     }
   },
+  /* rev-fix-run-bobbing-v2: 跑步起伏加大幅度 + 不對稱曲線
+     真實跑步：觸地瞬間快速下落（衝擊）、蹬地後緩慢上升（騰空）
+     每步 4 幀：1 幀下落 1.6 + 3 幀上升 1.6，幅度 1.6（原 1.0） */
   run: {
     frameCount: 8, fps: 16, loop: true, showEq: 'primary',
     keys: {
-      head:      Array(8).fill(0).map((_,i)=>({rot:-3,dx:0,dy:i%2?-1.5:-0.5})),
-      face:      Array(8).fill(0).map((_,i)=>({rot:-3,dx:0,dy:i%2?-1.5:-0.5})),
-      torso:     Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:i%2?-1.5:-0.5})),
-      back_arm:  Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:i%2?-1.5:-0.5})),
-      front_arm: Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:i%2?-1.5:-0.5})),
+      head:      Array(8).fill(0).map((_,i)=>({rot:-3,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
+      face:      Array(8).fill(0).map((_,i)=>({rot:-3,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
+      torso:     Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
+      back_arm:  Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
+      front_arm: Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
       right_leg: [-42,-22,0,22,42,22,0,-22].map(r=>({rot:r,dx:0,dy:0})),
       left_leg:  [42,22,0,-22,-42,-22,0,22].map(r=>({rot:r,dx:0,dy:0})),
     }
@@ -490,6 +496,19 @@ window.preloadStaticAssets = preloadStaticAssets;
 const heroAnim = { name:'walk', frame:0, lastUpdate:0, forcedEnd:0, eqSlot:null };
 const battleHeroAnim = { name:'idle', frame:0, lastUpdate:0, forcedEnd:0 };
 
+/* rev-fix-hero-death-anim: 玩家倒地动画统一入口。记录 _deathStart 供渲染端计算 fallProgress。
+ * 幂等：已在 dead 状态则不动，避免重生后立刻死亡时误重置。 */
+window._playHeroDeath = function(){
+  if(typeof heroAnim === 'undefined') return;
+  if(heroAnim.name === 'dead') return;
+  heroAnim.name = 'dead';
+  heroAnim.frame = 0;
+  heroAnim.lastUpdate = performance.now();
+  heroAnim._deathStart = performance.now();
+  heroAnim.eqSlot = null;
+  heroAnim.healItem = null;
+};
+
 function computeAnimFrame(animName, startAt, now){
   const a = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const interval = 1000 / a.fps;
@@ -714,7 +733,7 @@ function drawEqLayer(ctx, u, B, anim, fi){
   ctx.restore();
 }
 
-function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio, legOverride, healItemId){
+function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio, legOverride, healItemId, fallProgress){
   const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
   const factor = charHFactor || CHAR_HEIGHT_FACTOR;
@@ -732,7 +751,11 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
 
   ctx.save();
   ctx.translate(centerX, groundY);
-  if(animName === 'dead'){ ctx.rotate(Math.PI / 2); }
+  /* rev-fix-hero-death-rotate: dead 用 fallProgress 渐进旋转 0→90°，无过渡时默认 1（完全倒地） */
+  if(animName === 'dead'){
+    const _fp = Math.min(1, (typeof fallProgress === 'number') ? fallProgress : 1);
+    ctx.rotate(_fp * Math.PI / 2);
+  }
   ctx.scale(scale, scale);
   ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
 
@@ -848,7 +871,12 @@ function renderExploreHeroCanvas(){
        eqSlot='__hidden__' 残留，导致武器一直不显示。 */
     const _eqSlotH19 = (heroAnim.name === 'heal_melee') ? (heroAnim.eqSlot || null) : null;
     const _healItemH19 = (heroAnim.name === 'heal_melee') ? (heroAnim.healItem || null) : null;
-    drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, _eqSlotH19, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO + offsetX, null, _healItemH19);
+    /* rev-fix-hero-death-progress: dead 状态基于 _deathStart 计算倒地进度 0→1（350ms） */
+    let _fallProgressH = 1;
+    if(heroAnim.name === 'dead' && heroAnim._deathStart){
+      _fallProgressH = Math.min(1, (performance.now() - heroAnim._deathStart) / 350);
+    }
+    drawBlockHero(ctx, w, h, heroAnim.name, heroAnim.frame, _eqSlotH19, CHAR_HEIGHT_FACTOR, EXPLORE_HERO_X_RATIO + offsetX, null, _healItemH19, _fallProgressH);
     if(clipH < 1.0) ctx.restore();
   }
 }

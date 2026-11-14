@@ -326,6 +326,14 @@ function tryHitPlayer(dmg, pen){
   if(_hh)_hh.style.width=Math.max(0,battle.playerHp/battle.playerMaxHp*100)+'%';
   if(_ha)_ha.style.width=Math.max(0,battle.playerArmor/battle.playerMaxArmor*100)+'%';
   spawnHitFx('player', 0, isCrit ? '-'+Math.round(finalDmg)+'!' : '-'+Math.round(finalDmg), isCrit ? 'crit' : (res.hpLost > 0 ? 'enemy' : 'armor'), battle.px, battle.py);
+  /* rev-fix-boss-hurt-anim: 只設 _hurtUntil，動畫由 battleLoop 的 _wantAnim 統一決定 */
+  if(typeof battle !== 'undefined' && battle){
+    const _hurtAnim = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.hurt) ? GAME_ANIMS.hurt : null;
+    const _hurtDur = _hurtAnim ? Math.round(_hurtAnim.frameCount / _hurtAnim.fps * 1000) : 500;
+    if(!battle._hurtUntil || performance.now() >= battle._hurtUntil){
+      battle._hurtUntil = performance.now() + _hurtDur;
+    }
+  }
   if(typeof refreshBattleControlsLive === 'function') refreshBattleControlsLive();
   if(battle.playerHp <= 0){
     endBattle(false);
@@ -367,7 +375,7 @@ function applyBossSkillDamage(sk){
 }
 
 /* ============== 玩家打 Boss ============== */
-function applyBossDamage(dmg, isCrit, penMM, isThrowable, skipHitFx){
+function applyBossDamage(dmg, isCrit, penMM, isThrowable, skipHitFx, forceNonWeak){
   if(!battle) return;
   battle.engaged = true;
   /* rev-fix-aim-pos: applyBossDamage 内取当前瞄准点作为火花位置 */
@@ -410,7 +418,7 @@ function applyBossDamage(dmg, isCrit, penMM, isThrowable, skipHitFx){
   const bossArmorLevel = BOSSES[battle.bossId] ? (BOSSES[battle.bossId].armorLevel || 0) : 0;
   const bossArmorMM = ARMOR_LEVEL_TO_MM[bossArmorLevel] || 0;
 
-  const _isWeak = (typeof isWeakPointHit === 'function' && isWeakPointHit());
+  const _isWeak = !forceNonWeak && (typeof isWeakPointHit === 'function' && isWeakPointHit());
   const _armorMMForHit = _isWeak ? 0 : bossArmorMM;
 
   const target = { hp: battle.bossHp, armor: battle.bossArmor };

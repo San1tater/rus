@@ -430,6 +430,33 @@ function _sanitizeState(){
     }
   }
 
+  /* rev-fix-sanitize-garage: 清理 garage 中無效 vid */
+  if(state.garage && typeof state.garage === 'object'){
+    if(Array.isArray(state.garage.ownedVehicles)){
+      const _ovB = state.garage.ownedVehicles.length;
+      state.garage.ownedVehicles = state.garage.ownedVehicles.filter(function(vid){
+        return (typeof VEHICLES !== 'undefined') && !!VEHICLES[vid];
+      });
+      if(state.garage.ownedVehicles.length < _ovB) removed.push('garage.ownedVehicles:'+(_ovB-state.garage.ownedVehicles.length));
+      if((typeof VEHICLES !== 'undefined') && VEHICLES.btr80 && state.garage.ownedVehicles.indexOf('btr80') < 0){
+        state.garage.ownedVehicles.unshift('btr80'); removed.push('garage.ownedVehicles:restore_btr80');
+      }
+    }
+    if(state.garage.vehicleExp){
+      for(const _v in state.garage.vehicleExp){
+        if((typeof VEHICLES === 'undefined') || !VEHICLES[_v]){ delete state.garage.vehicleExp[_v]; removed.push('garage.vehicleExp:'+_v); }
+      }
+    }
+    if(state.garage.researchProgress){
+      for(const _v in state.garage.researchProgress){
+        if((typeof VEHICLES === 'undefined') || !VEHICLES[_v]){ delete state.garage.researchProgress[_v]; removed.push('garage.researchProgress:'+_v); }
+      }
+    }
+    if(state.garage.researchTarget && ((typeof VEHICLES === 'undefined') || !VEHICLES[state.garage.researchTarget])){
+      removed.push('garage.researchTarget:'+state.garage.researchTarget); state.garage.researchTarget = null;
+    }
+  }
+
   if(removed.length > 0 || fixed.length > 0){
     console.warn('[sanitize] removed=' + removed.length + ' fixed=' + fixed.length);
     if(removed.length > 0) console.warn('[sanitize] removed:', removed.slice(0, 30));
@@ -1312,4 +1339,92 @@ function _offlineBuildingSettle(now, baseTime){
   }
   processCrafting();
   return { radioCount, armoryCount };
+}
+
+/* rev-fix-med-position: _stConsumeLowestMed 移至通用库存层 */
+function _stConsumeLowestMed(){
+  const _rl = ['破舊','一般','庫存','精品','傳奇','具名'];
+  for(let ri = 0; ri < _rl.length; ri++){
+    for(const k in state.inventory){
+      const p = k.split('@');
+      if(p[1] !== _rl[ri]) continue;
+      if(state.inventory[k] <= 0) continue;
+      const c = CONSUMABLES[p[0]];
+      if(!c || !c.heal) continue;
+      invRemove(p[0], p[1], 1);
+      return { id: p[0], rarity: p[1] };
+    }
+  }
+  return null;
+}
+
+/* rev-fix-heal-by-value: 用載員自己的 maxHp 算 healPct 部分
+ * 玩家自身治療仍用 calcConsumableHeal（玩家 maxHp），此函數專治載員 */
+function _calcConsumableHealForServant(item, medbayLv, srvMaxHp){
+  if(!item || !item.id) return 0;
+  const c = CONSUMABLES[item.id];
+  if(!c) return 0;
+  const rarityMult = RARITY_MULT[item.rarity] || 1;
+  const base = (c.heal || 0) + (c.healPct || 0) * (srvMaxHp || 100);
+  const medbayMult = 1 + (medbayLv || 0) * 0.03;
+  return Math.round(base * rarityMult * medbayMult);
+}
+
+/* rev-fix-heal-by-value: 庫存消耗品的估算總治療值（用於 UI 判斷「能否治癒」）
+ * avgMaxHp 由調用方傳入（傷員平均 maxHp），估算更準 */
+function _stTotalMedValue(avgMaxHp){
+  const _medbayLv = (typeof getBuildingLv === 'function') ? getBuildingLv('medbay') : 0;
+  const _mh = (typeof avgMaxHp === 'number' && avgMaxHp > 0) ? avgMaxHp : 100;
+  let total = 0;
+  for(const k in state.inventory){
+    const p = k.split('@');
+    if(!CONSUMABLES[p[0]] || !CONSUMABLES[p[0]].heal) continue;
+    if(state.inventory[k] <= 0) continue;
+    total += _calcConsumableHealForServant({ id: p[0], rarity: p[1] }, _medbayLv, _mh) * state.inventory[k];
+  }
+  return total;
+}
+
+/* rev-fix-heal-by-value: 按等值醫療值消耗消耗品，從最低稀有度 + 同稀有度字母序開始
+ * 返回 { healed: 實際恢復 HP, used: [{id, rarity}, ...] } */
+function _stHealServantByValue(srv, targetHp){
+  if(!srv) return { healed: 0, used: [] };
+  const _medbayLv = (typeof getBuildingLv === 'function') ? getBuildingLv('medbay') : 0;
+  const _maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
+  const _curHp = (typeof srv.hp === 'number') ? srv.hp : _maxHp;
+  const _targetHp = (typeof targetHp === 'number') ? Math.min(targetHp, _maxHp) : _maxHp;
+  let _needHp = _targetHp - _curHp;
+  srv.injuredUntil = 0;
+  srv._injuredDown = false;
+  if(_needHp <= 0) return { healed: 0, used: [] };
+  const order = ['破舊','一般','庫存','精品','傳奇','具名'];
+  const used = [];
+  let healed = 0;
+  while(_needHp > 0.01){
+    let picked = null;
+    for(const r of order){
+      const cands = [];
+      for(const k in state.inventory){
+        const p = k.split('@');
+        if(p[1] !== r) continue;
+        if(state.inventory[k] <= 0) continue;
+        const c = CONSUMABLES[p[0]];
+        if(!c || !c.heal) continue;
+        cands.push({ id: p[0], rarity: p[1], name: c.name || p[0] });
+      }
+      if(!cands.length) continue;
+      cands.sort(function(a, b){ return (a.name || '').localeCompare(b.name || '', 'zh-Hant'); });
+      picked = cands[0];
+      break;
+    }
+    if(!picked) break;
+    invRemove(picked.id, picked.rarity, 1);
+    const _heal = _calcConsumableHealForServant({ id: picked.id, rarity: picked.rarity }, _medbayLv, _maxHp);
+    if(_heal <= 0) continue;
+    healed += _heal;
+    _needHp -= _heal;
+    used.push(picked);
+  }
+  srv.hp = Math.min(_targetHp, _curHp + healed);
+  return { healed: Math.min(healed, _targetHp - _curHp), used: used };
 }

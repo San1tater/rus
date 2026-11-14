@@ -218,11 +218,13 @@ function _isAssignedToCompost(srv){
 }
 
 
-function _gardenCompostFindTask(a, srv){
+function _gardenCompostFindTask(srv, t, actor){
+  if(!srv) return null;
   const effMax = servantEffectiveMaxStamina(srv);
   if(effMax < 1) return null;
   const stam = srv.stamina || 0;
-  if(a._hasCompost){
+  const _has = actor && actor._hasCompost;
+  if(_has){
     const plots = _gardenGetPlots();
     const total = plots.length;
     const start = state.garden.compostNextIdx || 0;
@@ -231,14 +233,14 @@ function _gardenCompostFindTask(a, srv){
       const p = plots[idx];
       if(!p || p.broken || !_isSoilType(p.type)) continue;
       if(p.fertilized) continue;
-      if(stam < 120){ a._hasCompost = false; return null; }
-      if((state.garden.compostValue || 0) < 8){ a._hasCompost = false; return null; }
+      if(stam < 120){ if(actor) actor._hasCompost = false; return null; }
+      if((state.garden.compostValue || 0) < 8){ if(actor) actor._hasCompost = false; return null; }
       return { type: "fertilize", plotIdx: idx };
     }
-    a._hasCompost = false;
+    if(actor) actor._hasCompost = false;
     return null;
   }
-  if(stam < 100) return null;
+  if(stam < 220) return null;
   if((state.garden.compostValue || 0) < 8) return null;
   return { type: "fetch_compost", plotIdx: -1 };
 }
@@ -378,68 +380,7 @@ function _gardenDistilleryTick(t){
 }
 
 
-function _gardenDistilleryFindTask(a, srv){
-  if(!srv) return null;
-  const plots = _gardenGetPlots();
-  const idx = (a.assignedPlots || [])[0];
-  if(idx == null) return null;
-  const plot = plots[idx];
-  if(!plot || plot.type !== 'distillery') return null;
-  const now = Date.now();
-  const lastAt = plot.lastDistillAt || 0;
-  if(now - lastAt < DISTILL_PERIOD_MS) return null;
-  if((srv.stamina || 0) < DISTILL_STAMINA) return null;
-  const crop = _findCropForDistill(plot);
-  if(!crop) return null;
-  return { type: 'distill', plotIdx: idx, cropId: crop.cropId, rarity: crop.rarity };
-}
-
-
-function _gardenDistilleryExecute(a, srv, task){
-  const plots = _gardenGetPlots();
-  const plot = plots[task.plotIdx];
-  if(!plot || plot.type !== 'distillery') return;
-  if(gardenStorageCount(task.cropId, task.rarity) < DISTILL_COST) return;
-  gardenStorageRemove(task.cropId, task.rarity, DISTILL_COST);
-  gardenStorageAdd('liquor', task.rarity, 1);
-  srv.stamina = Math.max(0, (srv.stamina || 0) - DISTILL_STAMINA);
-  plot.lastDistillAt = Date.now();
-  const _cropName = (typeof CROPS !== 'undefined' && CROPS[task.cropId]) ? CROPS[task.cropId].name : task.cropId;
-  _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 蒸餾 ' + fmtItemSpan(task.cropId, task.rarity, DISTILL_COST) + ' 獲得 <span class="r-' + task.rarity + ' itm" data-iid="liquor" data-irar="' + task.rarity + '">私酒*1</span>', 'distill');
-  save();
-  renderGardenGrid();
-  renderGardenContent();
-}
-
-
-function _offlineDistillFindTask(srv, t){
-  const plots = _gardenGetPlots();
-  const idx = (srv.assignedPlots || [])[0];
-  if(idx == null) return null;
-  const plot = plots[idx];
-  if(!plot || plot.type !== 'distillery') return null;
-  if(t - (plot.lastDistillAt || 0) < DISTILL_PERIOD_MS) return null;
-  if((srv.stamina || 0) < DISTILL_STAMINA) return null;
-  const crop = _findCropForDistill(plot);
-  if(!crop) return null;
-  return { type: 'distill', plotIdx: idx, cropId: crop.cropId, rarity: crop.rarity };
-}
-
-
-function _offlineDoDistill(srv, task, t){
-  const plots = _gardenGetPlots();
-  const plot = plots[task.plotIdx];
-  if(!plot || plot.type !== 'distillery') return { ok: false };
-  if(gardenStorageCount(task.cropId, task.rarity) < DISTILL_COST) return { ok: false };
-  gardenStorageRemove(task.cropId, task.rarity, DISTILL_COST);
-  gardenStorageAdd('liquor', task.rarity, 1);
-  srv.stamina = Math.max(0, (srv.stamina || 0) - DISTILL_STAMINA);
-  plot.lastDistillAt = t;
-  return { ok: true, distill: true };
-}
-
-
-function _openDistilleryCropPicker(plotIdx, onSelect){
+/* DELETED: rev-fix-del-dist-find *//* DELETED: rev-fix-del-dist-exec *//* DELETED: rev-fix-del-offline-dist-find *//* DELETED: rev-fix-del-offline-dist-do */function _openDistilleryCropPicker(plotIdx, onSelect){
   const plots = _gardenGetPlots();
   const plot = plots[plotIdx];
   if(!plot || plot.type !== 'distillery') return;
@@ -1074,34 +1015,7 @@ function _gardenTowerDemolish(idx){
 }
 
 
-function _isServantInStation(srvId){
-  if(!state.station) return false;
-  const c = state.station.crew || {};
-  if(c.commander === srvId || c.gunner === srvId || c.driver === srvId) return true;
-  if(Array.isArray(state.station.passengers)){
-    for(let i = 0; i < state.station.passengers.length; i++){
-      if(state.station.passengers[i] && state.station.passengers[i].srvId === srvId) return true;
-    }
-  }
-  return false;
-}
-
-function _removeFromStation(srvId){
-  if(!state.station) return;
-  const c = state.station.crew;
-  if(c){
-    for(const r of ['commander', 'gunner', 'driver']){
-      if(c[r] === srvId) c[r] = null;
-    }
-  }
-  if(Array.isArray(state.station.passengers)){
-    state.station.passengers = state.station.passengers.filter(function(p){
-      return !(p && p.srvId === srvId);
-    });
-  }
-}
-
-/* === _isServantWorking（renderGardenServants 排序依賴） === */
+/* DELETED: rev-fix-del-srv-in-stn *//* DELETED: rev-fix-del-rm-from-stn *//* === _isServantWorking（renderGardenServants 排序依賴） === */
 /* === gardenHarvest（玩家手動收穫） === */
 /* === _refreshServantListNow（指派/撤回/改名後實時刷新僕人列表） === */
 /* === _gardenFoodTtlMs（冰箱加成：24h → 48h） === */

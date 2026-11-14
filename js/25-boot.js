@@ -436,13 +436,28 @@ function _offlineExploreSettle(now, baseTime){
       if(_mainCal && typeof pickAmmoByPreferenceOrOrder === 'function'){
         _ammoRef = pickAmmoByPreferenceOrOrder(_mainCal, 'explore');
       }
+      /* rev-fix-offline-ammo-ratio: 先算彈藥覆蓋率，不足時戰力打折 + 近戰補足 */
+      var _needAmmo = Math.ceil(n * 5);
+      var _haveAmmo = _ammoRef ? _ammoRef.count : 0;
+      var _ammoRatio = (_needAmmo > 0) ? Math.min(1, _haveAmmo / _needAmmo) : 1;
       var _eventPlayerScore = _staticScore;
+      var _mDef = null, _mMult = 1;
+      if(state.player.equipped.melee){
+        _mDef = itemDef(state.player.equipped.melee);
+        if(_mDef){
+          var _mRar = state.player.equippedRarity.melee || '一般';
+          _mMult = RARITY_MULT[_mRar] || 1;
+        }
+      }
       if(_ammoRef && _ammoRef.def){
         var _aM = RARITY_MULT[_ammoRef.rarity] || 1;
-        _eventPlayerScore += _ammoRef.def.dmg * _aM * 2 + (_ammoRef.def.penMM || 0) * 5;
-      } else if(state.player.equipped.melee){
-        var _mDef = itemDef(state.player.equipped.melee);
-        if(_mDef) _eventPlayerScore += (_mDef.dmg || 25) * 2;
+        var _remoteScore = _ammoRef.def.dmg * _aM * 2 + (_ammoRef.def.penMM || 0) * 5;
+        _eventPlayerScore += _remoteScore * _ammoRatio;
+        if(_ammoRatio < 1 && _mDef){
+          _eventPlayerScore += (_mDef.dmg || 25) * _mMult * 2 * (1 - _ammoRatio);
+        }
+      } else if(_mDef){
+        _eventPlayerScore += (_mDef.dmg || 25) * _mMult * 2;
       }
       var winRate = _eventPlayerScore / (_eventPlayerScore + _avgEnemyScore);
       winRate *= Math.pow(0.85, eventEnemies.length - 1);
@@ -451,11 +466,9 @@ function _offlineExploreSettle(now, baseTime){
       if(winRate > 0.95) winRate = 0.95;
       if(Math.random() < winRate){
         wins++;
-        /* rev-fix-offline-ammo: 扣除彈藥 */
+        /* rev-fix-offline-ammo-ratio: 按實際持有扣彈（不足時不超過持有量） */
         if(_ammoRef){
-          var _need = Math.ceil(n * 5);
-          var _take = Math.min(_need, _ammoRef.count);
-          if(_take > 0) invRemove(_ammoRef.id, _ammoRef.rarity, _take);
+          if(_haveAmmo > 0) invRemove(_ammoRef.id, _ammoRef.rarity, Math.min(_haveAmmo, _needAmmo));
         }
         /* rev-fix-offline-servant: 2% 掉僕人（與在線一致） */
         if(Math.random() < 0.02 && typeof grantRandomServant === 'function'){

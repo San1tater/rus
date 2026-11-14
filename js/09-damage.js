@@ -131,3 +131,18 @@ function applyDamage(target, rawDmg, penetration, armorOpts){
   }
   return result;
 }
+
+/* rev-fix-armor-provider-unify: 統一按單位類型選部位護甲 */
+window._armorProviderFor = function(tgt){
+  if(!tgt) return function(){ return 0; };
+  if(tgt.isGuard){
+    return function(part){
+      if(part === 'head' || part === 'face'){ const h = tgt.equipped && tgt.equipped.head; return h ? armorMMForSlot(h, part) : 0; }
+      if(part === 'top'){ const t = tgt.equipped && tgt.equipped.top; return t ? armorMMForSlot(t, 'top') : 0; }
+      return 0;
+    };
+  }
+  if(tgt.isPlayer) return function(part){ return (typeof getPlayerArmorMMForPart === 'function') ? getPlayerArmorMMForPart(part) : 0; };
+  if(tgt.isPassenger) return function(part){ return (typeof getPassengerArmorMMForPart === 'function') ? getPassengerArmorMMForPart(tgt, part) : 0; };
+  return function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(tgt, part) : 0; };
+};

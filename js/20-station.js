@@ -582,16 +582,21 @@ function _stHealAllCrew(vid){
     if(typeof notify === 'function') notify('沒有需要治療的成員', 'warn');
     return;
   }
-  let _totalMed = 0;
-  for(const k in state.inventory){
-    const p = k.split('@');
-    const c = CONSUMABLES[p[0]];
-    if(!c || !c.heal) continue;
-    if(state.inventory[k] > 0) _totalMed += state.inventory[k];
+  /* rev-fix-heal-all-by-value: 按總缺失 HP 和庫存醫療值判斷 */
+  let _totalMissingHp = 0;
+  let _totalMaxHp = 0;
+  for(const srv of _allInjured){
+    const _maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
+    const _curHp = (typeof srv.hp === 'number') ? srv.hp : _maxHp;
+    _totalMissingHp += Math.max(0, _maxHp - _curHp);
+    _totalMaxHp += _maxHp;
   }
+  const _avgMaxHp = _allInjured.length > 0 ? (_totalMaxHp / _allInjured.length) : 100;
+  const _totalMedValue = _stTotalMedValue(_avgMaxHp);
+  const _canHeal = _totalMedValue >= _totalMissingHp;
   let body = '<div class="detail-sub">需要治療 ' + _allInjured.length + ' 名成員</div>';
-  body += '<div class="stat-line"><span class="k">醫療品需求</span><span class="v">' + _allInjured.length + ' 個</span></div>';
-  body += '<div class="stat-line"><span class="k">當前庫存</span><span class="v" style="color:' + (_totalMed >= _allInjured.length ? '#4caf50' : '#e05252') + '">' + _totalMed + ' 個</span></div>';
+  body += '<div class="stat-line"><span class="k">總缺失 HP</span><span class="v">' + Math.round(_totalMissingHp) + '</span></div>';
+  body += '<div class="stat-line"><span class="k">庫存醫療值</span><span class="v" style="color:' + (_canHeal ? '#4caf50' : '#e05252') + '">' + Math.round(_totalMedValue) + '</span></div>';
   body += '<div class="divider"></div>';
   body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:6px">名單</div>';
   for(const name of _injuredNames){
@@ -599,18 +604,14 @@ function _stHealAllCrew(vid){
   }
   const ft = document.createElement('div');
   ft.className = 'modal-ft';
-  ft.innerHTML = '<button class="btn primary" id="st-heal-all-ok" ' + (_totalMed >= _allInjured.length ? '' : 'disabled') + '>確認治療</button>';
+  ft.innerHTML = '<button class="btn primary" id="st-heal-all-ok" ' + (_canHeal ? '' : 'disabled') + '>確認治療</button>';
   const bd = openModal({ title: '一鍵治療', body: body, footer: ft });
   const ok = ft.querySelector('#st-heal-all-ok');
   if(ok) ok.onclick = function(){
     let _healed = 0;
     for(const srv of _allInjured){
-      const _med = _stConsumeLowestMed();
-      if(!_med) break;
-      srv.injuredUntil = 0;
-      srv._injuredDown = false;
-      srv.hp = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
-      _healed++;
+      const r = _stHealServantByValue(srv, (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100);
+      if(r.used.length > 0) _healed++;
     }
     save();
     closeModal();
@@ -831,10 +832,8 @@ function _stCrewDetail(role, srvId){
   const ha = bd.querySelector('.st-pd-heal-area');
   if(ha) ha.onclick = function(){
     if(hp >= maxHp){ if(typeof notify === 'function') notify('已滿血', 'warn'); return; }
-    const _m = _stConsumeLowestMed();
-    if(!_m){ if(typeof notify === 'function') notify('沒有醫療品', 'warn'); return; }
-    srv.injuredUntil = 0;
-    srv.hp = maxHp;
+    const _r = _stHealServantByValue(srv, maxHp);
+    if(_r.used.length === 0){ if(typeof notify === 'function') notify('沒有醫療品', 'warn'); return; }
     save();
     closeModal();
     _stRefresh();
@@ -1049,10 +1048,8 @@ function _stDetail(idx){
   const ha = bd.querySelector('.st-pd-heal-area');
   if(ha) ha.onclick = function(){
     if(hp >= maxHp){ if(typeof notify === 'function') notify('已滿血', 'warn'); return; }
-    const _m = _stConsumeLowestMed();
-    if(!_m){ if(typeof notify === 'function') notify('沒有醫療品', 'warn'); return; }
-    srv.injuredUntil = 0;
-    srv.hp = maxHp;
+    const _r = _stHealServantByValue(srv, maxHp);
+    if(_r.used.length === 0){ if(typeof notify === 'function') notify('沒有醫療品', 'warn'); return; }
     save();
     closeModal();
     _stRefresh();
@@ -1529,5 +1526,26 @@ function _stSwapPassenger(idx){
         }
       };
     })(els[k]);
+  }
+}
+
+/* rev-fix-station-op-position: 从 21d 前移 */
+function _isServantInStation(srvId){
+  if(!state.station) return false;
+  const c = state.station.crew || {};
+  if(c.commander === srvId || c.gunner === srvId || c.driver === srvId) return true;
+  if(Array.isArray(state.station.passengers)){
+    for(let i = 0; i < state.station.passengers.length; i++){
+      if(state.station.passengers[i] && state.station.passengers[i].srvId === srvId) return true;
+    }
+  }
+  return false;
+}
+function _removeFromStation(srvId){
+  if(!state.station) return;
+  const c = state.station.crew;
+  if(c){ for(const r of ['commander','gunner','driver']){ if(c[r] === srvId) c[r] = null; } }
+  if(Array.isArray(state.station.passengers)){
+    state.station.passengers = state.station.passengers.filter(function(p){ return !(p && p.srvId === srvId); });
   }
 }

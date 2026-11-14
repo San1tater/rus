@@ -12,6 +12,132 @@ var _gardenActors = window._gardenActors = [];
 var _gardenActorTimer = window._gardenActorTimer = null;
 
 
+function _gardenFarmFindTask(srv, t, actor){
+  if(!srv) return null;
+  if(typeof _isAssignedToCompost === 'function' && _isAssignedToCompost(srv)){
+    return _gardenCompostFindTask(srv, t, actor);
+  }
+  if(typeof _isAssignedToDistillery === 'function' && _isAssignedToDistillery(srv)){
+    return null;
+  }
+  const plots = _gardenGetPlots();
+  for(const idx of (srv.assignedPlots || [])){
+    const plot = plots[idx];
+    if(!plot || plot.broken || !_isSoilType(plot.type) || !plot.crop) continue;
+    const c = plot.crop;
+    const seed = SEEDS[c.seedId];
+    if(!seed) continue;
+    if(c.cleanupUntil && c.cleanupUntil > t) continue;
+    const rottenAt = c.matureAt + seed.rotMs;
+    if(t >= rottenAt) return { type: 'cleanup', plotIdx: idx };
+  }
+  const _harvest = [];
+  for(const idx of (srv.assignedPlots || [])){
+    const plot = plots[idx];
+    if(!plot || plot.broken || !_isSoilType(plot.type) || !plot.crop) continue;
+    const c = plot.crop;
+    const seed = SEEDS[c.seedId];
+    if(!seed) continue;
+    if(t < c.matureAt) continue;
+    const rottenAt = c.matureAt + seed.rotMs;
+    if(t >= rottenAt) continue;
+    _harvest.push({ idx, rottenAt });
+  }
+  _harvest.sort(function(x, y){ return x.rottenAt - y.rottenAt; });
+  if(_harvest.length) return { type: 'harvest', plotIdx: _harvest[0].idx };
+  const autoPlant = srv.autoPlant || 'off';
+  if(autoPlant !== 'off'){
+    for(const idx of (srv.assignedPlots || [])){
+      const plot = plots[idx];
+      if(!plot || plot.broken || !_isSoilType(plot.type) || plot.crop) continue;
+      if(autoPlant === 'follow' && plot.lastSeed && plot.lastRarity && SEEDS[plot.lastSeed] && gardenStorageCount(plot.lastSeed, plot.lastRarity) > 0){
+        return { type: 'plant', plotIdx: idx, seedId: plot.lastSeed, rarity: plot.lastRarity };
+      } else if(autoPlant === 'any'){
+        const si = _gardenFindSeedToPlant('any');
+        if(si) return { type: 'plant', plotIdx: idx, seedId: si.id, rarity: si.rarity };
+      }
+    }
+  }
+  return null;
+}
+
+function _gardenFarmExecute(srv, task, t, actor, isOffline){
+  const plots = _gardenGetPlots();
+  const _log = isOffline ? function(){} : (typeof _gardenLog === 'function' ? _gardenLog : function(){});
+  const _srvLbl = '<span class="r-' + srv.rarity + '">' + (typeof servantLabel === 'function' ? servantLabel(srv) : srv.id) + '</span>';
+  if(task.type === 'fetch_compost'){
+    srv.stamina = Math.max(0, (srv.stamina || 0) - 100);
+    if(actor) actor._hasCompost = true;
+    _log(_srvLbl + ' 取堆肥', 'compost');
+    return { ok: true, fetchCompost: true };
+  }
+  if(task.type === 'fertilize'){
+    const _p = plots[task.plotIdx];
+    if(!_p || _p.fertilized) return { ok: false };
+    if((state.garden.compostValue || 0) < 8) return { ok: false };
+    if((srv.stamina || 0) < 120) return { ok: false };
+    state.garden.compostValue -= 8;
+    srv.stamina = Math.max(0, srv.stamina - 120);
+    _p.fertilized = true;
+    _p.fertExpireAt = t + 45 * 60 * 1000;
+    state.garden.compostNextIdx = (task.plotIdx + 1) % plots.length;
+    if(actor) actor._hasCompost = false;
+    _log(_srvLbl + ' 施肥 ' + plotCoordName(task.plotIdx), 'fertilize');
+    return { ok: true, fertilize: true };
+  }
+  const plot = plots[task.plotIdx];
+  if(!plot || plot.broken) return { ok: false };
+  if(task.type === 'cleanup'){
+    if(!plot.crop) return { ok: false };
+    const c = plot.crop;
+    const seed = SEEDS[c.seedId];
+    if(!seed) return { ok: false };
+    const _cropDef = CROPS[seed.cropId];
+    const _info = _cropDef ? ('<span class="r-' + c.rarity + '">' + _cropDef.name + '（' + c.rarity + '）</span>') : '作物';
+    plot.crop = null;
+    servantAddExp(srv, 3);
+    _log(_srvLbl + ' 清理腐爛作物（' + plotCoordName(task.plotIdx) + ' · ' + _info + '）', 'clean');
+    return { ok: true, clean: true };
+  }
+  if(task.type === 'harvest'){
+    if(!plot.crop) return { ok: false };
+    const c = plot.crop;
+    const seed = SEEDS[c.seedId];
+    if(!seed) return { ok: false };
+    if(t < c.matureAt) return { ok: false };
+    const rottenAt = c.matureAt + seed.rotMs;
+    if(t >= rottenAt) return { ok: false };
+    const mult = RARITY_MULT[c.rarity] || 1;
+    const _fB = 1 + ((srv.lv || 1) - 1) * 0.05;
+    const _foB = 1 + gardenGetForemanBonus();
+    const _jitter = isOffline ? 1 : (0.8 + Math.random() * 0.4);
+    let count = Math.max(1, Math.round(seed.baseYield * mult * _fB * _foB * _jitter));
+    if(plot.fertilized && t < (plot.fertExpireAt || 0)){ count = Math.round(count * 1.3); }
+    const _sbH = _getSoilBonus(plot.type);
+    count = Math.max(1, Math.round(count * (1 + _sbH.yield)));
+    plot.fertilized = false; plot.fertExpireAt = 0;
+    gardenStorageAdd(seed.cropId, c.rarity, count);
+    plot.crop = null;
+    servantAddExp(srv, 5);
+    const cropDef = CROPS[seed.cropId];
+    _log(_srvLbl + ' 收穫 ' + (cropDef ? fmtItemSpan(seed.cropId, c.rarity, count) : ('<span class="r-' + c.rarity + '">作物×' + count + '</span>')), 'harvest');
+    return { ok: true, harvest: true, cropKey: seed.cropId + '@' + c.rarity, cropCount: count };
+  }
+  if(task.type === 'plant'){
+    if(plot.crop) return { ok: false };
+    if(!gardenStorageRemove(task.seedId, task.rarity, 1)) return { ok: false };
+    const seed = SEEDS[task.seedId];
+    if(!seed) return { ok: false };
+    const _sbP = _getSoilBonus(plot.type);
+    const growMs = Math.max(1000, Math.round(seed.growMs * (1 - _sbP.grow)));
+    plot.crop = { seedId: task.seedId, rarity: task.rarity, plantedAt: t, matureAt: t + growMs, cleanupUntil: 0 };
+    plot.lastSeed = task.seedId; plot.lastRarity = task.rarity;
+    servantAddExp(srv, 2);
+    _log(_srvLbl + ' 種植 ' + fmtItemSpan(task.seedId, task.rarity, 1), 'plant');
+    return { ok: true, plant: true };
+  }
+  return { ok: false };
+}
 function servantAddExp(srv, n){
   if(!srv || srv.lv >= SERVANT_MAX_LV) return;
   srv.exp = (srv.exp || 0) + n;
@@ -120,69 +246,7 @@ function _gardenFindSeedToPlant(setting){
 }
 
 
-function _gardenFarmerFindTask(a, srv){
-  if(!srv) return null;
-  if(typeof _isAssignedToCompost === 'function' && _isAssignedToCompost(srv)){
-    return _gardenCompostFindTask(a, srv);
-  }
-  if(typeof _isAssignedToDistillery === 'function' && _isAssignedToDistillery(srv)){
-    return null;
-  }
-  const plots = _gardenGetPlots();
-  const now = Date.now();
-  for(const idx of a.assignedPlots){
-    const plot = plots[idx];
-    if(!plot || plot.broken || !_isSoilType(plot.type) || !plot.crop) continue;
-    const c = plot.crop;
-    const seed = SEEDS[c.seedId];
-    if(!seed) continue;
-        if(c.cleanupUntil && c.cleanupUntil > now) continue;
-    const rottenAt = c.matureAt + seed.rotMs;
-    if(now >= rottenAt){
-      return { type: 'cleanup', plotIdx: idx };
-    }
-  }
-  const _harvestCands = [];
-  for(const idx of a.assignedPlots){
-    const plot = plots[idx];
-    if(!plot || plot.broken || !_isSoilType(plot.type) || !plot.crop) continue;
-    const c = plot.crop;
-    const seed = SEEDS[c.seedId];
-    if(!seed) continue;
-    if(now < c.matureAt) continue;
-    const rottenAt = c.matureAt + seed.rotMs;
-    if(now >= rottenAt) continue;
-    _harvestCands.push({ idx: idx, rottenAt: rottenAt });
-  }
-  _harvestCands.sort(function(x, y){ return x.rottenAt - y.rottenAt; });
-  if(_harvestCands.length){
-    return { type: 'harvest', plotIdx: _harvestCands[0].idx };
-  }
-  const autoPlant = srv.autoPlant || 'off';
-  if(autoPlant !== 'off'){
-    for(const idx of a.assignedPlots){
-      const plot = plots[idx];
-      if(!plot || plot.broken || !_isSoilType(plot.type)) continue;
-      if(plot.crop) continue;
-      if(autoPlant === 'follow'){
-        if(plot.lastSeed && plot.lastRarity && SEEDS[plot.lastSeed]){
-          if(gardenStorageCount(plot.lastSeed, plot.lastRarity) > 0){
-            return { type: 'plant', plotIdx: idx, seedId: plot.lastSeed, rarity: plot.lastRarity };
-          }
-        }
-      } else if(autoPlant === 'any'){
-        const seedInfo = _gardenFindSeedToPlant('any');
-        if(seedInfo){
-          return { type: 'plant', plotIdx: idx, seedId: seedInfo.id, rarity: seedInfo.rarity };
-        }
-      }
-    }
-  }
-  return null;
-}
-
-
-function _gardenActorAssignTask(a, task, grid, wrapRect, now){
+/* DELETED: rev-fix-del-farmer-find */function _gardenActorAssignTask(a, task, grid, wrapRect, now){
   let _targetIdx = task.plotIdx;
   if(task.type === 'fetch_compost'){
     const _pts = _gardenGetPlots();
@@ -226,99 +290,7 @@ function _gardenActorAssignTask(a, task, grid, wrapRect, now){
 }
 
 
-function _gardenActorExecuteTask(a){
-  const plots = _gardenGetPlots();
-  const srv = (state.servants || []).find(function(s){ return s.id === a.id; });
-  if(!srv) return;
-  if(a.task.type === 'fetch_compost'){
-    srv.stamina = Math.max(0, (srv.stamina || 0) - 100);
-    a._hasCompost = true;
-    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 取堆肥', 'compost');
-    save();
-    renderGardenGrid();
-    renderGardenContent();
-    return;
-  }
-  if(a.task.type === 'fertilize'){
-    const _idx = a.task.plotIdx;
-    const _p = plots[_idx];
-    if(!_p) return;
-    if(_p.fertilized) return;
-    if((state.garden.compostValue || 0) < 8) return;
-    if((srv.stamina || 0) < 120) return;
-    state.garden.compostValue -= 8;
-    srv.stamina = Math.max(0, srv.stamina - 120);
-    _p.fertilized = true;
-    _p.fertExpireAt = Date.now() + 45 * 60 * 1000;
-    state.garden.compostNextIdx = (_idx + 1) % plots.length;
-    a._hasCompost = false;
-    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 施肥 ' + plotCoordName(_idx), 'fertilize');
-    save();
-    renderGardenGrid();
-    renderGardenContent();
-    return;
-  }
-  const plot = plots[a.task.plotIdx];
-  if(!plot || plot.broken) return;
-  if(a.task.type === 'harvest'){
-    if(!plot.crop) return;
-    const c = plot.crop;
-    const seed = SEEDS[c.seedId];
-    if(!seed) return;
-    const now = Date.now();
-    if(now < c.matureAt) return;
-    const rottenAt = c.matureAt + seed.rotMs;
-    if(now >= rottenAt) return;
-    const mult = RARITY_MULT[c.rarity] || 1;
-    const _farmerBonus = 1 + ((srv.lv || 1) - 1) * 0.05;
-    const _foremanBonus = 1 + gardenGetForemanBonus();
-    let count = Math.max(1, Math.round(seed.baseYield * mult * _farmerBonus * _foremanBonus * (0.8 + Math.random() * 0.4)));
-    if(plot.fertilized && now < (plot.fertExpireAt || 0)){ count = Math.round(count * 1.3); }
-    const _sbH = _getSoilBonus(plot.type);
-    count = Math.max(1, Math.round(count * (1 + _sbH.yield)));
-    plot.fertilized = false;
-    plot.fertExpireAt = 0;
-    gardenStorageAdd(seed.cropId, c.rarity, count);
-    plot.crop = null;
-    const cropDef = CROPS[seed.cropId];
-    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 收穫 ' + (cropDef ? fmtItemSpan(seed.cropId, c.rarity, count) : ('<span class="r-' + c.rarity + '">作物×' + count + '</span>')), 'harvest');
-    servantAddExp(srv, 5);
-  } else if(a.task.type === 'cleanup'){
-    if(!plot.crop) return;
-    plot.crop = null;
-    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 清理腐爛作物', 'clean');
-    servantAddExp(srv, 3);
-  } else if(a.task.type === 'plant'){
-    if(plot.crop) return;
-    const seedId = a.task.seedId;
-    const rarity = a.task.rarity;
-    if(!seedId) return;
-    if(!gardenStorageRemove(seedId, rarity, 1)) return;
-    const seed = SEEDS[seedId];
-    if(!seed) return;
-    const now = Date.now();
-    const _sbP = _getSoilBonus(plot.type);
-    const _growMs = Math.max(1000, Math.round(seed.growMs * (1 - _sbP.grow)));
-    plot.crop = { seedId: seedId, rarity: rarity, plantedAt: now, matureAt: now + _growMs, cleanupUntil: 0 };
-    plot.lastSeed = seedId;
-    plot.lastRarity = rarity;
-    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 種植 ' + fmtItemSpan(seedId, rarity, 1), 'plant');
-    servantAddExp(srv, 2);
-  }
-  srv.stamina = Math.max(0, (srv.stamina || 0) - GARDEN_STAMINA_PER_WORK);
-  if(srv.stamina <= 0){
-    srv.stamina = 0;
-    srv.resting = false;
-    const def = SERVANT_TYPES[srv.type] || {name:'僕人'};
-    _gardenLog(def.name + ' 體力耗盡', 'tired');
-  }
-  save();
-  renderGardenGrid();
-  renderGardenContent();
-}
-
-
-function _gardenActorTick(){
+/* DELETED: rev-fix-del-exec */function _gardenActorTick(){
   const p = document.getElementById('garden-page');
   if(!p || !p.classList.contains('on')) return;
   if(!window._raidLiveActive && _gardenActors.length){
@@ -621,7 +593,17 @@ if(a.stamina <= 0){
             a.state = 'idle';
             a.idleUntil = now + 400 + Math.random() * 600;
           } else {
-            _gardenActorExecuteTask(a);
+            const _srvW = a._srv;
+            const _rW = _srvW ? _gardenFarmExecute(_srvW, a.task, Date.now(), a, false) : { ok: false };
+            if(_rW.ok && _srvW){
+              _srvW.stamina = Math.max(0, (_srvW.stamina || 0) - GARDEN_STAMINA_PER_WORK);
+              if(_srvW.stamina <= 0){
+                _srvW.stamina = 0; _srvW.resting = false;
+                const _def = SERVANT_TYPES[_srvW.type] || { name: '僕人' };
+                _gardenLog(_def.name + ' 體力耗盡', 'tired');
+              }
+            }
+            save(); renderGardenGrid(); renderGardenContent();
             a.task = null;
             a.state = 'idle';
             a.idleUntil = now + 600 + Math.random() * 1000;
@@ -676,7 +658,7 @@ if(a.stamina <= 0){
       }
     }
     if(a.type === 'farmer'){
-      const task = _gardenFarmerFindTask(a, a._srv);
+      const task = _gardenFarmFindTask(a._srv, Date.now(), a);
       if(task){
         const _bp = _gardenGetPlots()[task.plotIdx];
         if(_bp && _bp.broken){ a.idleUntil = now + 800; continue; }
@@ -1044,161 +1026,7 @@ function _gardenDoOneMeal(g){
 }
 
 
-function _offlineCompostFindTask(srv, t, actor){
-  const effMax = servantEffectiveMaxStamina(srv);
-  if(effMax < 1) return null;
-  const stam = srv.stamina || 0;
-  const _has = actor && actor._hasCompost;
-  if(_has){
-    const plots = _gardenGetPlots();
-    const total = plots.length;
-    const start = state.garden.compostNextIdx || 0;
-    for(let i = 0; i < total; i++){
-      const idx = (start + i) % total;
-      const p = plots[idx];
-      if(!p || p.broken || p.type !== 'soil') continue;
-      if(p.fertilized) continue;
-      if(stam < 120){ if(actor) actor._hasCompost = false; return null; }
-      if((state.garden.compostValue || 0) < 8){ if(actor) actor._hasCompost = false; return null; }
-      return { type: 'fertilize', plotIdx: idx };
-    }
-    if(actor) actor._hasCompost = false;
-    return null;
-  }
-  if(stam < 220) return null;
-  if((state.garden.compostValue || 0) < 8) return null;
-  return { type: 'fetch_compost', plotIdx: -1 };
-}
-
-
-function _offlineFindFarmerTask(srv, t, actor){
-  if(typeof _isAssignedToCompost === 'function' && _isAssignedToCompost(srv)){
-    return _offlineCompostFindTask(srv, t, actor);
-  }
-  const plots = _gardenGetPlots();
-  const cleanCands = [];
-  for(const idx of (srv.assignedPlots || [])){
-    const plot = plots[idx];
-    if(!plot || plot.broken || !_isSoilType(plot.type) || !plot.crop) continue;
-    const c = plot.crop;
-    const seed = SEEDS[c.seedId];
-    if(!seed) continue;
-    const rottenAt = c.matureAt + seed.rotMs;
-    if(t >= rottenAt) cleanCands.push(idx);
-  }
-  if(cleanCands.length) return { type: 'cleanup', plotIdx: cleanCands[0] };
-  const harvestCands = [];
-  for(const idx of (srv.assignedPlots || [])){
-    const plot = plots[idx];
-    if(!plot || plot.broken || !_isSoilType(plot.type) || !plot.crop) continue;
-    const c = plot.crop;
-    const seed = SEEDS[c.seedId];
-    if(!seed) continue;
-    if(t < c.matureAt) continue;
-    const rottenAt = c.matureAt + seed.rotMs;
-    if(t >= rottenAt) continue;
-    harvestCands.push({ idx: idx, rottenAt: rottenAt });
-  }
-  harvestCands.sort(function(a, b){ return a.rottenAt - b.rottenAt; });
-  if(harvestCands.length) return { type: 'harvest', plotIdx: harvestCands[0].idx };
-  const autoPlant = srv.autoPlant || 'off';
-  if(autoPlant !== 'off'){
-    for(const idx of (srv.assignedPlots || [])){
-      const plot = plots[idx];
-      if(!plot || plot.broken || !_isSoilType(plot.type)) continue;
-      if(plot.crop) continue;
-      if(autoPlant === 'follow' && plot.lastSeed && plot.lastRarity && SEEDS[plot.lastSeed]){
-        if(gardenStorageCount(plot.lastSeed, plot.lastRarity) > 0){
-          return { type: 'plant', plotIdx: idx, seedId: plot.lastSeed, rarity: plot.lastRarity };
-        }
-      } else if(autoPlant === 'any'){
-        const seedInfo = _gardenFindSeedToPlant('any');
-        if(seedInfo){
-          return { type: 'plant', plotIdx: idx, seedId: seedInfo.id, rarity: seedInfo.rarity };
-        }
-      }
-    }
-  }
-  return null;
-}
-
-
-function _offlineDoFarmerTask(srv, task, t, actor){
-  const plots = _gardenGetPlots();
-  if(task.type === 'fetch_compost'){
-    srv.stamina = Math.max(0, (srv.stamina || 0) - 100);
-    if(actor) actor._hasCompost = true;
-    return { ok: true, fetchCompost: true };
-  }
-  if(task.type === 'fertilize'){
-    const _idx = task.plotIdx;
-    const _p = plots[_idx];
-    if(!_p || _p.broken) return { ok: false };
-    if(_p.fertilized) return { ok: false };
-    if((state.garden.compostValue || 0) < 8) return { ok: false };
-    if((srv.stamina || 0) < 120) return { ok: false };
-    state.garden.compostValue -= 8;
-    srv.stamina = Math.max(0, srv.stamina - 120);
-    _p.fertilized = true;
-    _p.fertExpireAt = t + 45 * 60 * 1000;
-    state.garden.compostNextIdx = (_idx + 1) % plots.length;
-    if(actor) actor._hasCompost = false;
-    return { ok: true, fertilize: true };
-  }
-  const plot = plots[task.plotIdx];
-  if(!plot || plot.broken) return { ok: false };
-  if(task.type === 'cleanup'){
-    if(!plot.crop) return { ok: false };
-    plot.crop = null;
-    return { ok: true, clean: true };
-  }
-  if(task.type === 'harvest'){
-    if(!plot.crop) return { ok: false };
-    const c = plot.crop;
-    const seed = SEEDS[c.seedId];
-    if(!seed) return { ok: false };
-    if(t < c.matureAt) return { ok: false };
-    const rottenAt = c.matureAt + seed.rotMs;
-    if(t >= rottenAt) return { ok: false };
-    const mult = RARITY_MULT[c.rarity] || 1;
-    const _fB = 1 + ((srv.lv || 1) - 1) * 0.05;
-    const _foB = 1 + gardenGetForemanBonus();
-    let count = Math.max(1, Math.round(seed.baseYield * mult * _fB * _foB));
-    if(plot.fertilized && t < (plot.fertExpireAt || 0)){ count = Math.round(count * 1.3); }
-    const _sbH2 = _getSoilBonus(plot.type);
-    count = Math.max(1, Math.round(count * (1 + _sbH2.yield)));
-    plot.fertilized = false;
-    plot.fertExpireAt = 0;
-    gardenStorageAdd(seed.cropId, c.rarity, count);
-    plot.crop = null;
-    servantAddExp(srv, 5);
-    return { ok: true, harvest: true, cropKey: seed.cropId + '@' + c.rarity, cropCount: count };
-  }
-  if(task.type === 'plant'){
-    if(plot.crop) return { ok: false };
-    if(!gardenStorageRemove(task.seedId, task.rarity, 1)) return { ok: false };
-    const seed = SEEDS[task.seedId];
-    if(!seed) return { ok: false };
-    const _sbP2 = _getSoilBonus(plot.type);
-    let growMs = Math.max(1000, Math.round(seed.growMs * (1 - _sbP2.grow)));
-    if(state.garden && typeof state.garden.compostAccelSec === 'number' && state.garden.compostAccelSec > 0){
-      const maxUse = Math.min(state.garden.compostAccelSec, (growMs / 1000) * 0.5);
-      if(maxUse > 0){
-        growMs = Math.max(1000, Math.round(growMs - maxUse * 1000));
-        state.garden.compostAccelSec -= maxUse;
-      }
-    }
-    plot.crop = { seedId: task.seedId, rarity: task.rarity, plantedAt: t, matureAt: t + growMs, cleanupUntil: 0 };
-    plot.lastSeed = task.seedId;
-    plot.lastRarity = task.rarity;
-    servantAddExp(srv, 2);
-    return { ok: true, plant: true };
-  }
-  return { ok: false };
-}
-
-
-function _gardenOfflineSettle(now, baseTime){
+/* DELETED: rev-fix-del-offline-compost *//* DELETED: rev-fix-del-offline-farmer *//* DELETED: rev-fix-del-offline-do */function _gardenOfflineSettle(now, baseTime){
   window._gardenOfflineSettleRunning = true;
   try {
   const g = _gardenMerchantInit();
@@ -1313,7 +1141,7 @@ function _gardenOfflineSettle(now, baseTime){
       for(const id in actorMap){
         const a = actorMap[id];
         if(a.task && cursor >= a.taskEnd){
-          const r = _offlineDoFarmerTask(a.srv, a.task, cursor, a);
+          const r = _gardenFarmExecute(a.srv, a.task, cursor, a, true);
           if(r.ok){
             if(r.harvest){ totalHarvest++; if(r.cropKey) cropsOut[r.cropKey] = (cropsOut[r.cropKey] || 0) + (r.cropCount || 1); }
             if(r.plant) totalPlant++;
@@ -1342,7 +1170,7 @@ function _gardenOfflineSettle(now, baseTime){
           }
         }
         if(a.stamina < 5) continue;
-        const task = _offlineFindFarmerTask(a.srv, cursor, a);
+        const task = _gardenFarmFindTask(a.srv, cursor, a);
         if(task){
           const _bp2 = _gardenGetPlots()[task.plotIdx];
           if(!(_bp2 && _bp2.broken)){ a.task = task; a.taskEnd = cursor + WORK_MS; }
@@ -1471,9 +1299,9 @@ function _gardenFarmBackgroundTick(now){
       }
     }
     if((srv.stamina || 0) < 5) continue;
-    const task = _offlineFindFarmerTask(srv, now);
+    const task = _gardenFarmFindTask(srv, now, null);
     if(!task) continue;
-    const r = _offlineDoFarmerTask(srv, task, now);
+    const r = _gardenFarmExecute(srv, task, now, null, true);
     if(r.ok){
       srv.stamina = Math.max(0, (srv.stamina || 0) - 5);
       acted++;

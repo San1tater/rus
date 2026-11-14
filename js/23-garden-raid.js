@@ -103,9 +103,30 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
   }
   function guardsAlive(){ return guardUnits.some(function(u){ return u.alive; }); }
   function enemiesAlive(){ return enemyUnits.some(function(u){ return u.alive; }); }
+  /* rev-fix-offline-fire-chain: 復用在線 _getFireChainMode 的 _chainShots 狀態機 */
+  let _simTime = 0;
+  const SIM_SHOT_INTERVAL_MS = 100;
   function executeShot(fromU, toU, isEnemy){
     if(!toU.alive) return;
-    const hit = Math.random() * 100 < (fromU.isGuard ? fromU.hitRate : 75);
+    if(_simTime - (fromU._chainLast || 0) > 600) fromU._chainShots = 0;
+    fromU._chainShots = (fromU._chainShots || 0) + 1;
+    fromU._chainLast = _simTime;
+    const _cn = fromU._chainShots;
+    let _chainMode;
+    if(_cn <= 1) _chainMode = '點射';
+    else if(_cn <= 3) _chainMode = '短點射';
+    else if(_cn <= 7) _chainMode = '長點射';
+    else _chainMode = '掃射';
+    let _hrVal;
+    if(fromU.isGuard){
+      const _scopeB = (fromU.weaponDef && fromU.weaponDef.scopeBonus) || 0;
+      _hrVal = (typeof servantHitRate === 'function') ? servantHitRate(fromU.srv, _chainMode, _scopeB) : fromU.hitRate;
+    } else {
+      const _modeMult = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[_chainMode]) || 1.0;
+      _hrVal = 55 * _modeMult;
+    }
+    _simTime += SIM_SHOT_INTERVAL_MS;
+    const hit = Math.random() * 100 < _hrVal;
     if(!hit) return;
     /* rev-fix-attack-unify: 統一結算 */
     let atkInfo;
@@ -132,7 +153,7 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
     const shown = r.totalShown;
     fromU.dmgDone = (fromU.dmgDone || 0) + shown;
     if(fromU.isGuard && fromU.srv) servantAddExp(fromU.srv, 2);
-    if(fromU.isGuard && fromU.ammoId && shown === 0) fromU._stopFire = true;
+    /* rev-fix-offline-dead-code-removed: 移除 _stopFire 死標記（無讀取點） */
     if(toU.hp <= 0) toU.alive = false;
   }
   let round = 0;
@@ -355,8 +376,14 @@ function _gardenRaidApplyResult(sim, region){
   if(!sim.win){
     if(sim.brokenPlots === undefined){
     const plots = _gardenGetPlots();
-    let n = 1;
-    if(sim.guards.filter(function(g){ return g.alive; }).length === 0) n = 3;
+    /* rev-fix-offline-broken-count: 與在線「活敵數決定破壞程度」對齊 */
+    const _aliveEnemiesP11 = (sim.enemies ? sim.enemies.filter(function(e){ return e.alive; }).length : 0);
+    let n;
+    if(sim.guards.filter(function(g){ return g.alive; }).length === 0){
+      n = Math.max(1, Math.min(_aliveEnemiesP11 || 1, 3));
+    } else {
+      n = 1;
+    }
     const candidates = [];
     for(let i = 0; i < 20; i++){
       const p = plots[i];
@@ -804,17 +831,6 @@ function _gardenRaidShowBattle(guards, enemies, region){
         _raidDrawEnemy(ctx, u.x + ox, u.y, SCALE, u.animName, u.animFrame, u.id);
       }
       ctx.restore();
-      if(u.alive && u.state === 'combat'){
-        const barW = 34, barH = 4;
-        const bx = u.x - barW / 2;
-        const by = u.y - CHAR_PX - 8;
-        ctx.fillStyle = 'rgba(0,0,0,.75)';
-        ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
-        ctx.fillStyle = '#1a1010';
-        ctx.fillRect(bx, by, barW, barH);
-        ctx.fillStyle = u.isGuard ? '#4caf50' : '#e05252';
-        ctx.fillRect(bx, by, barW * Math.max(0, u.hp / u.maxHp), barH);
-      }
     }
 
 function drawBullet(b){
@@ -922,8 +938,12 @@ function drawBullet(b){
         });
       }
 
-      // [v210] 統一調用全局煙火模塊
-      if(window.MuzzleFX) window.MuzzleFX.spawn(sx, sy, fromU.isGuard ? 1.0 : 0.9, isEnemy, 'raid');
+      // [v210] 統一調用全局煙火模塊（rev-fix-muzzle-scale-unify：按武器類型）
+      {
+        const _wDefP12 = fromU.isGuard ? fromU.weaponDef : ((fromU.weaponId && typeof WEAPONS !== 'undefined') ? WEAPONS[fromU.weaponId] : null);
+        const _wTypeP12 = _wDefP12 ? _wDefP12.type : null;
+        if(window.MuzzleFX) window.MuzzleFX.spawn(sx, sy, _wTypeP12 === '機槍' ? 1.2 : 1.0, isEnemy, 'raid');
+      }
     
 
       const wAnim = (fromU.weaponSlot === 'secondary') ? 'fire_secondary' : 'fire_primary';
@@ -950,34 +970,24 @@ function drawBullet(b){
       e._fireAnimName = 'fire_primary';
       e._fireAnimStart = now;
       e._fireAnimUntil = now + _fpDurR;
+      const _rpgDurMs = 400;
       bullets.push({
-        sx: sx, sy: sy, tx: tx, ty: ty, x: sx, y: sy, t: 0, speed: 1.2,
+        sx: sx, sy: sy, tx: tx, ty: ty, x: sx, y: sy, t: 0,
+        startTime: performance.now(), duration: _rpgDurMs,
         hit: hit, isEnemy: true, big: true, missile: true,
         fromU: e, toU: target, rarity: _rar,
         _onHit: function(){
           if(!hit || !target.alive) return;
-          const _cr = (typeof calcCritRate === 'function') ? calcCritRate(_rar, _rar) : 0.1;
           const _cm = (typeof calcCritMult === 'function') ? calcCritMult(_rar, _rar) : 1.5;
-          const crit = Math.random() < _cr;
+          const r = _resolveSingleAttack({
+            ammoId: null, ammoRarity: _rar, weaponRarity: _rar,
+            penMM: _penMM, fallbackDmg: _baseDmg
+          }, target);
+          target.hp = Math.max(0, target.hp - r.hpLost);
+          target.armor = Math.max(0, (target.armor || 0) - r.armorLost);
+          const crit = r.crit;
           const dmg = Math.round(_baseDmg * (crit ? _cm : 1));
-          /* 主目標 */
-          const proxy = { hp: target.hp, armor: target.armor || 0 };
-          const res = applyDamage(proxy, dmg, _penMM, {
-            armorProvider: function(part){
-              if(part === 'head' || part === 'face'){
-                const h = target.equipped && target.equipped.head;
-                return h ? armorMMForSlot(h, part) : 0;
-              }
-              if(part === 'top'){
-                const t2 = target.equipped && target.equipped.top;
-                return t2 ? armorMMForSlot(t2, 'top') : 0;
-              }
-              return 0;
-            }
-          });
-          target.hp = Math.max(0, target.hp - res.hpLost);
-          target.armor = Math.max(0, (target.armor || 0) - res.armorLost);
-          const shown = res.hpLost > 0 ? res.hpLost : res.armorLost;
+          const shown = r.totalShown;
           damageTexts.push({ x: target.x, y: target.y - CHAR_PX - 18, text: '-' + shown + (crit ? '!' : ''), crit: crit, isEnemy: true, startTime: Date.now() });
           target.hurtUntil = Date.now() + 180;
           target.animName = 'hurt'; target.animFrame = 0;
@@ -1031,6 +1041,15 @@ function drawBullet(b){
         }
       });
     }
+      if(window._raidTracers){
+        window._raidTracers.push({
+          sx: sx, sy: sy, tx: tx, ty: ty,
+          born: performance.now(), dur: _rpgDurMs,
+          color: (typeof window._rarityBulletColor === 'function') ? window._rarityBulletColor(_rar) : '#ff6060',
+          hit: hit
+        });
+      }
+      if(window.MuzzleFX) window.MuzzleFX.spawn(sx, sy, 1.2, true, 'raid');
 
     function updateBullets(dt){
       const nowMs = performance.now();

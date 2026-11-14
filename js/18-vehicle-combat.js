@@ -32,13 +32,21 @@ const TURRET_WEAPONS_BY_VID = {
   t80um:  { '2a46m1':1, pkt:1 }
 };
 
+window._isWeaponHpAlive = function(vid, wid){
+  const dmg = state.vehicleDamage && state.vehicleDamage[vid];
+  if(!dmg || !dmg.weapons) return true;
+  const w = dmg.weapons[wid];
+  if(!w) return true;
+  return w.hp > 0;
+};
+
 /* rev-fix-weapon-usable: 單武器可用性（武器 HP + 炮塔卡死 + 車組全滅 + 彈藥） */
 window._isVehicleWeaponUsable = function(wid, vid){
   if(!wid || !vid) return false;
   const dmg = state.vehicleDamage && state.vehicleDamage[vid];
   if(!dmg) return true;
   if(dmg.destroyed) return false;
-  if(dmg.weapons && dmg.weapons[wid] && dmg.weapons[wid].hp <= 0) return false;
+  if(!window._isWeaponHpAlive(vid, wid)) return false;
   const turretW = TURRET_WEAPONS_BY_VID[vid] || {};
   if(turretW[wid] && dmg.parts && dmg.parts.turret <= 0) return false;
   if(dmg.members && dmg.members.gunner <= 0 && dmg.members.commander <= 0) return false;
@@ -184,7 +192,7 @@ window._vehicleWeaponsDead = function(){
 
   for(const wid in ld){
     /* 武器 HP 歸零 → 不可用 */
-    if(dmg.weapons && dmg.weapons[wid] && dmg.weapons[wid].hp <= 0) continue;
+    if(!window._isWeaponHpAlive(vid, wid)) continue;
     /* 炮塔卡死 → 炮塔內武器不可用 */
     if(turretWeapons[wid] && turretDead) continue;
     /* 彈藥判定 */
@@ -580,14 +588,15 @@ function _onBTRKillTarget(target, wid, c, usedAmmoId){
   try {
     if(window._explore && typeof window._renderEnemyCorpseCanvas === 'function'){
       var fx = document.getElementById('explore-fx');
-      if(fx){
+      var layer = (typeof window._getCorpseLayer === 'function') ? window._getCorpseLayer() : null;
+      if(fx && layer){
         var rc = window._renderEnemyCorpseCanvas(target, fx.clientHeight);
         if(rc){
           var wEl = document.createElement('div');
-          wEl.style.cssText = 'position:absolute;bottom:0;z-index:13;pointer-events:none;will-change:left;width:' + rc.drawW + 'px;height:' + rc.drawH + 'px;';
+          wEl.style.cssText = 'position:absolute;bottom:0;pointer-events:none;will-change:left;width:' + rc.drawW + 'px;height:' + rc.drawH + 'px;';
           rc.canvas.style.cssText = 'width:100%;height:100%;display:block;';
           wEl.appendChild(rc.canvas);
-          fx.appendChild(wEl);
+          layer.appendChild(wEl);
           var _playerX = (c && c.allies && c.allies[0]) ? c.allies[0].worldX : 0;
           /* [v182 G14b] 标记已渲染，避免步战胜利时 onVictoryStart 重复生成 corpse */
           target._corpseRendered = true;
@@ -664,9 +673,9 @@ function _vGetArmor(vid, partKey){
 function _vGetEraBonus(vid, isHeat){
   const a = VEHICLE_ARMOR_RHA[vid];
   if(!a || !a.era) return 0;
-  if(a.era === 1) return isHeat ? 250 : 30;
-  if(a.era === 2) return isHeat ? 400 : 120;
-  return 0;
+  const b = (typeof ERA_BONUS !== 'undefined') ? ERA_BONUS[a.era] : null;
+  if(!b) return 0;
+  return isHeat ? (b.heat || 0) : (b.ke || 0);
 }
 
 function _vIsHeatAmmo(ammoId){
@@ -931,7 +940,7 @@ const key = _vPickInternalKey(vid);
   if(key === 'gun'){
     const _weaponIds = [];
     for(const _wid in d.weapons){
-      if(d.weapons[_wid] && d.weapons[_wid].hp > 0) _weaponIds.push(_wid);
+      if(d.weapons[_wid] && window._isWeaponHpAlive(vid, _wid)) _weaponIds.push(_wid);
     }
     if(_weaponIds.length === 0){
       return { penetrated: true, part: part.key, internal: '武器', damage: 0 };
@@ -1056,7 +1065,7 @@ function _detonate(vid, veh){
   state.player.deadUntil = _now + 60000;
   const _ex = window._explore;
   if(_ex){ _ex.mode = 'dead'; _ex.deadUntil = performance.now() + 60000; _ex._currentSpeed = 0; _ex.combatEvent = null; }
-  if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'dead'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now(); }
+  if(typeof window._playHeroDeath === 'function') window._playHeroDeath(); /* rev-fix-detonate-death */
 
   if(state.vehicleAmmo && state.vehicleAmmo[vid]){
     for(const wid in state.vehicleAmmo[vid]) state.vehicleAmmo[vid][wid].current = 0;
@@ -1152,7 +1161,7 @@ function _resolveVehicleLeave(reason){
     c.onResolve = null;
     if(typeof window._combatCleanup === 'function') window._combatCleanup();
     if(reason === 'player_dead'){
-      if(typeof heroAnim !== 'undefined'){ heroAnim.name = 'dead'; heroAnim.frame = 0; heroAnim.lastUpdate = performance.now(); }
+      if(typeof window._playHeroDeath === 'function') window._playHeroDeath(); /* rev-fix-veh-death */
       const _ex = window._explore;
       if(_ex){ _ex.mode = 'dead'; _ex.deadUntil = performance.now() + 60000; _ex.combatEvent = null; }
       state.player.deadUntil = Date.now() + 60000;
@@ -1264,25 +1273,30 @@ function _resolveVehicleLeave(reason){
        引擎/履帶/駕駛員陣亡走 enterWreckMode → 本分支 → 3.5s 後 _finishWreck
        → _cleanup 因 sceneType 已改 foot 而 cb 不跑 → 需在此手動清。
        同時清後方事件避免下車時 isV=false 把身後 225m 事件全激活造成刷臉。 */
-    if(window._explore && window._explore.nodes){
-      for(const _node178 of window._explore.nodes){
-        for(const _ev178 of _node178.events){
-          if(_ev178.cleared) continue;
-          if(_ev178.type !== 'combat') continue;
-          if(_ev178.worldX <= _exWX) _ev178.cleared = true;
-        }
-      }
-    }
-    if(window._explore){
-      window._explore.mode = 'walk';
-      window._explore.combatEvent = null;
-      window._explore._pendingLootEvents = null;
-    }
+    if(typeof window._clearRearCombatEvents === 'function') window._clearRearCombatEvents(_exWX);
+    if(typeof window._resetExploreAfterCombat === 'function') window._resetExploreAfterCombat();
     if(typeof pushLog === 'function') pushLog('<span class="pl">玩家</span> 下車繼續作戰', [], 'explore');
   }
 }
 
 window._resolveVehicleLeave = _resolveVehicleLeave;
+/* rev-fix-vehicle-leave-modularize */
+window._clearRearCombatEvents = function(exWorldX){
+  if(!window._explore || !window._explore.nodes) return;
+  for(const _node of window._explore.nodes){
+    for(const _ev of _node.events){
+      if(_ev.cleared) continue;
+      if(_ev.type !== 'combat') continue;
+      if(_ev.worldX <= exWorldX) _ev.cleared = true;
+    }
+  }
+};
+window._resetExploreAfterCombat = function(){
+  if(!window._explore) return;
+  window._explore.mode = 'walk';
+  window._explore.combatEvent = null;
+  window._explore._pendingLootEvents = null;
+};
 
 function _writeVehicleDestroyedLog(reason, vid){
   const _dmg = state.vehicleDamage && state.vehicleDamage[vid];

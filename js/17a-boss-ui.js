@@ -39,6 +39,70 @@ function _cleanBossFxCanvases(){
   });
 }
 
+/* rev-fix-boss-grenade-arc: 從落點看 Boss 全身/弱點各占多少角度。
+ * 復用 _calcFragmentRatio（2·atan((w/2)/d)/π，上半圓）。落點在地面，僅 x 影響。 */
+function _calcBossArcRatios(bossId, landX){
+  const empty = { bossRatio: 0, weakTotalRatio: 0, weakAngles: {}, weakTotalAngle: 0 };
+  const def = BOSS_LAYERS[bossId];
+  const anims = BOSS_ANIMS[bossId];
+  if(!def || !anims || !anims.idle) return empty;
+  const anim = anims.idle;
+  const world = resolveBossWorld(def, anim, 0);
+  const rawWeak = BOSS_WEAKPOINTS[bossId] || [];
+  const aliveWeak = [];
+  for(const wid of rawWeak){
+    if(isBossType(bossId, 'omega') && typeof battle !== 'undefined' && battle && battle.arms){
+      const arm = battle.arms[wid];
+      if(arm && !arm.alive) continue;
+    }
+    aliveWeak.push(wid);
+  }
+  const _fxEl = document.getElementById('battle-fx');
+  const _W_px = _fxEl ? _fxEl.clientWidth : 400;
+  const _ppm = (battle && battle.bgPixelsPerMeter > 0) ? battle.bgPixelsPerMeter : 100;
+  const _dM = Math.max(0.1, Math.abs(landX - battle.bx) * _W_px / _ppm);
+  const layerBounds = {};
+  let bossMinX = Infinity, bossMaxX = -Infinity;
+  for(const L of def.layers){
+    const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][0]) || { rot:0 };
+    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+    const px = w * L.pivot.x;
+    const wp = world[L.id];
+    if(!wp) continue;
+    const rot = wp.rot * Math.PI / 180;
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    let lMinX = Infinity, lMaxX = -Infinity;
+    for(const c of [[0,0],[w,0]]){
+      const dx = c[0] - px;
+      const rx = dx*cos + wp.wx;
+      if(rx < lMinX) lMinX = rx;
+      if(rx > lMaxX) lMaxX = rx;
+    }
+    layerBounds[L.id] = { minX: lMinX, maxX: lMaxX };
+    if(lMinX < bossMinX) bossMinX = lMinX;
+    if(lMaxX > bossMaxX) bossMaxX = lMaxX;
+  }
+  if(!isFinite(bossMinX)) return empty;
+  const _sp = document.getElementById('boss-sprite');
+  const _sW = _sp ? _sp.clientWidth : 280;
+  const _sH = _sp ? _sp.clientHeight : 280;
+  const _tf = getBossCanvasTransform(def, bossId, _sW, _sH);
+  const _canvasToM = _tf.sx / _ppm;
+  const W_boss_m = (bossMaxX - bossMinX) * _canvasToM;
+  const bossRatio = window._calcFragmentRatio(W_boss_m, _dM);
+  let weakTotalAngle = 0;
+  const weakAngles = {};
+  for(const wid of aliveWeak){
+    const lb = layerBounds[wid];
+    if(!lb) continue;
+    const w_m = (lb.maxX - lb.minX) * _canvasToM;
+    const angle = 2 * Math.atan((w_m / 2) / _dM);
+    weakAngles[wid] = angle;
+    weakTotalAngle += angle;
+  }
+  const weakTotalRatio = Math.min(1, weakTotalAngle / Math.PI);
+  return { bossRatio, weakTotalRatio, weakAngles, weakTotalAngle };
+}
 function stopBattleMovement(){
   if(!battle) return;
   battle.moveDir = 0;
@@ -1263,16 +1327,7 @@ function playerShoot(){
     }
   }
 
-  const _now = performance.now();
-  if(_now - (battle.lastShotTime || 0) > (battle.chainResetMs || 600)){ battle.chainShots = 0; }
-  battle.chainShots = (battle.chainShots || 0) + 1;
-  battle.lastShotTime = _now;
-  const _n = battle.chainShots;
-  let _effectiveMode;
-  if(_n === 1) _effectiveMode = '點射';
-  else if(_n <= 3) _effectiveMode = '短點射';
-  else if(_n <= 7) _effectiveMode = '長點射';
-  else _effectiveMode = '掃射';
+  const _effectiveMode = (typeof _getFireChainMode === 'function') ? _getFireChainMode(battle) : (battle.fireMode || '點射');
 
   const isWeak = isWeakPointHit();
 
@@ -1365,9 +1420,28 @@ function playerShoot(){
       const _hitRate = getHitRate(def.type, battle.fireMode) + 10;
       const _pdB = 0.6 + clamp(Math.floor(state.proficiency[def.type] || 0) / MAX_PROF_LEVEL, 0, 1) * 0.9;
       const _frags = def.fragments;
+      const _aimForArc = (typeof getAimTargetPos === 'function') ? getAimTargetPos() : { x: battle.bx, y: 0.5 };
+      const _arcA = _calcBossArcRatios(battle.bossId, _aimForArc.x);
       let _effFrags;
       if(def.allFragmentsOnSingle){ _effFrags = _frags; }
-      else { _effFrags = Math.round(_frags * 0.25); }
+      else { _effFrags = Math.max(0, Math.round(_frags * _arcA.bossRatio)); }
+      const _fragsWeak = Math.min(_effFrags, Math.max(0, Math.round(_frags * _arcA.weakTotalRatio)));
+      const _weakPerLayer = {};
+      if(_fragsWeak > 0 && _arcA.weakTotalAngle > 0){
+        let _sumA = 0;
+        for(const _wid in _arcA.weakAngles){
+          _weakPerLayer[_wid] = Math.round(_fragsWeak * _arcA.weakAngles[_wid] / _arcA.weakTotalAngle);
+          _sumA += _weakPerLayer[_wid];
+        }
+        const _diffA = _fragsWeak - _sumA;
+        if(_diffA !== 0){
+          let _mwA = null, _maA = 0;
+          for(const _wid in _arcA.weakAngles){ if(_arcA.weakAngles[_wid] > _maA){ _maA = _arcA.weakAngles[_wid]; _mwA = _wid; } }
+          if(_mwA) _weakPerLayer[_mwA] += _diffA;
+        }
+      }
+      const _weakQueue = [];
+      for(const _wid in _weakPerLayer){ for(let _k = 0; _k < _weakPerLayer[_wid]; _k++) _weakQueue.push(_wid); }
       const _pieceBaseDmg = (def.fragmentDamage || def.dmg || 0) * (RARITY_MULT[w.rarity] || 1) * _pdB;
       const _critRate = calcCritRate(w.rarity, '一般');
       const _critMult = calcCritMult(w.rarity, '一般');
@@ -1399,14 +1473,15 @@ function playerShoot(){
           _d = Math.max(1, _d);
           _fragHits++;
           _fragTotalDmg += _d;
-          if(_isWeak){
+          if(_fi < _weakQueue.length){
+            const _layerId = _weakQueue[_fi];
             _battleRef.engaged = true;
             _battleRef.bossHp = Math.max(0, _battleRef.bossHp - _d);
             _battleRef.damageDealt += _d;
-            if(isBossType(_battleRef.bossId, 'omega') && _battleRef.arms) damageOmegaArm(_battleRef.aimPart, _d);
+            if(isBossType(_battleRef.bossId, 'omega') && _battleRef.arms) damageOmegaArm(_layerId, _d);
             if(_battleRef.bossHp <= 0){ endBattle(true); return; }
           } else {
-            applyBossDamage(_d, _isCrit, def.penMM || 0, true, true);
+            applyBossDamage(_d, _isCrit, def.penMM || 0, true, true, true);
             if(_battleRef.bossHp <= 0) return;
           }
         }
@@ -1607,22 +1682,24 @@ function battleLoop(now){
 
   {
     let _wantAnim;
-    if(battle.consuming){
-      _wantAnim = 'heal_melee';
-    } else if(battle.reloading){
+    /* rev-fix-boss-anim-priority: 攻擊流程整體 > 受擊 > 治療 > 移動 > idle
+       攻擊流程內部相對順序保持：reloading → firing → switch保持 → attack_melee保持 */
+    if(battle.reloading){
       _wantAnim = 'reload';
     } else if(battle.firing){
       if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
       else if(battle.weaponSlot === 'melee' || battle.weaponSlot === 'throwable') _wantAnim = 'attack_melee';
       else _wantAnim = 'fire_primary';
-    } else if(canMove && hasMoveInput){
-      _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
     } else if((battleHeroAnim.name === 'switch_secondary' || battleHeroAnim.name === 'switch_melee') && battleHeroAnim.forcedEnd > now){
       _wantAnim = battleHeroAnim.name;
-    } else if(battleHeroAnim.name === 'hurt' && battleHeroAnim.forcedEnd > now){
-      _wantAnim = 'hurt';
     } else if(battleHeroAnim.name === 'attack_melee' && battleHeroAnim.forcedEnd > now){
       _wantAnim = 'attack_melee';
+    } else if(battle._hurtUntil && now < battle._hurtUntil){
+      _wantAnim = 'hurt';
+    } else if(battle.consuming){
+      _wantAnim = 'heal_melee';
+    } else if(canMove && hasMoveInput){
+      _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
     } else {
       _wantAnim = 'idle';
     }
@@ -1761,8 +1838,7 @@ function startBossBattle(bid){
     aimPart: defaultAimPartForBoss(bid), lastManualClick: 0,
     players: [{ id: 'local', isLocal: true }], lastH: 0, aimHitFx: [],
     healDisabledUntil: 0, healTimer: null,
-    autoHealing: false, chainShots: 0, lastShotTime: 0,
-    chainResetMs: 600, shotLockUntil: 0
+    autoHealing: false, shotLockUntil: 0
   };
 
   if(isBossType(bid, 'hydra')) initHydraHeads();
