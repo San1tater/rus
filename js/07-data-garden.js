@@ -19,12 +19,18 @@ function servantMaxHp(srv){
   const base = 1 + 0.10883;
   return Math.round(100 * Math.pow(base, (srv.lv || 1) - 1));
 }
-function servantHitRate(srv, mode, scopeBonus){
+function servantHitRate(srv, mode, scopeBonus, scope){
   if(!srv) return 5;
   const base = 10;
   const p = (srv.lv || 1) - 1;
   const acc = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[mode]) ? MODE_ACCURACY[mode] : 1;
-  return Math.max(5, Math.min(75, Math.round((base + p) * acc + (scopeBonus || 0))));
+  /* rev-fix-scope-mode-penalty-servant: 載員同步連射懲罰 */
+  let modeMult = acc;
+  if(scope && typeof SCOPE_MODE_PENALTY !== 'undefined' && SCOPE_MODE_PENALTY[scope]){
+    const pen = SCOPE_MODE_PENALTY[scope][mode];
+    if(typeof pen === 'number') modeMult *= pen;
+  }
+  return Math.max(5, Math.min(75, Math.round((base + p) * modeMult + (scopeBonus || 0))));
 }
 function servantCritRate(wRarity, aRarity){
   /* rev-fix-servant-crit-delegate: 調用統一函數，與玩家一致 */

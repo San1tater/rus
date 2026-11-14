@@ -91,6 +91,11 @@ function generateEnemyInstance(e,t){
   var rpgPenMM = 0;
   var rpgDmg = 0;
 
+  /* rev-fix-enemy-melee-all: 所有敵人（含 rocket_gunner）都配近戰武器 */
+  var _meleeId = pick(['6kh2','6kh5','kukri']);
+  var _meleeDef = WEAPONS[_meleeId];
+  var melee = _meleeDef ? { id: _meleeId, rarity: '一般' } : null;
+
   if(e === 'rocket_gunner'){
     hasRPG = true;
     rpgAmmo = 1;
@@ -103,32 +108,39 @@ function generateEnemyInstance(e,t){
     if(wd){
       var ai = getAmmoByRarity(wd.cal, rarity) || getDefaultAmmo(wd.cal);
       primaryWeapon = {
-        id: w, rarity: rarity, ammoId: ai, ammoCount: rndInt(30,60),
+        id: w, rarity: rarity, ammoId: ai,
+        ammoInMag: wd.mag, magsLeft: 2, magSize: wd.mag,
         dmg: _getAmmoDmg(ai), penMM: _getAmmoPenMM(ai)
       };
     }
   } else {
     var w2 = pickEnemyWeapon(e, rarity, t);
     var wd2 = WEAPONS[w2];
+    /* rev-fix-enemy-3mags: 枪上 1 个弹匣 + 身上 2 个 */
     if(wd2){
+      var _magSize2 = wd2.mag;
       var ai2 = getAmmoByRarity(wd2.cal, rarity) || getDefaultAmmo(wd2.cal);
       if(wd2.slot === 'secondary'){
         secondaryWeapon = {
-          id: w2, rarity: rarity, ammoId: ai2, ammoCount: rndInt(30,60),
+          id: w2, rarity: rarity, ammoId: ai2,
+          ammoInMag: _magSize2, magsLeft: 2, magSize: _magSize2,
           dmg: _getAmmoDmg(ai2), penMM: _getAmmoPenMM(ai2)
         };
       } else {
         primaryWeapon = {
-          id: w2, rarity: rarity, ammoId: ai2, ammoCount: rndInt(30,60),
+          id: w2, rarity: rarity, ammoId: ai2,
+          ammoInMag: _magSize2, magsLeft: 2, magSize: _magSize2,
           dmg: _getAmmoDmg(ai2), penMM: _getAmmoPenMM(ai2)
         };
         if(Math.random() < 0.4){
           var pi = pick(PISTOL_POOL);
           var pd = WEAPONS[pi];
           if(pd){
+            var _magSizeP = pd.mag;
             var pai = getAmmoByRarity(pd.cal, rarity) || getDefaultAmmo(pd.cal);
             secondaryWeapon = {
-              id: pi, rarity: rarity, ammoId: pai, ammoCount: rndInt(30,60),
+              id: pi, rarity: rarity, ammoId: pai,
+              ammoInMag: _magSizeP, magsLeft: 2, magSize: _magSizeP,
               dmg: _getAmmoDmg(pai), penMM: _getAmmoPenMM(pai)
             };
           }
@@ -151,6 +163,7 @@ function generateEnemyInstance(e,t){
     armorLevel: armorLevel,
     primaryWeapon: primaryWeapon,
     secondaryWeapon: secondaryWeapon,
+    melee: melee,
     grenade: grenade,
     hasRPG: hasRPG,
     rpgAmmo: rpgAmmo,

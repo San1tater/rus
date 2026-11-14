@@ -17,6 +17,8 @@ const RARITY_BG = {'破舊':'#4a2e1a','一般':'#3a3a3a','庫存':'#1e4a1e','精
 
 const MODE_ACCURACY = {'點射':1.6,'短點射':1.25,'長點射':1.0,'掃射':0.65,'近戰':1.0,'投擲':1.0};
 const MAX_PROF_LEVEL = 50;
+/* rev-fix-building-lv-cap: 所有建築等級上限 */
+const BUILDING_LV_MAX = 50;
 const MAX_PROF_RAW = 999999;
 const MELEE_DURATION = 2;
 

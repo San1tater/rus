@@ -166,19 +166,19 @@ GAME_ANIMS.heal_melee.loop = true;
 const WEAPON_LAYOUT = {
   '6kh2':     { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:5,y:19,w:117,h:28} },
   '6kh5':     { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:5,y:19,w:117,h:28} },
-  '9a91':     { scale:1, ox:0.05, oy:-0.2, rotation:0, trim:{x:0,y:28,w:215,h:79} },
-  'ak103':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:16,y:18,w:287,h:91} },
-  'ak104':    { scale:1, ox:0.25, oy:-0.15, rotation:0, trim:{x:12,y:22,w:232,h:83} },
-  'ak105':    { scale:1, ox:0.25, oy:-0.15, rotation:0, trim:{x:12,y:21,w:232,h:84} },
-  'ak12':     { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:18,w:288,h:92} },
-  'ak74':     { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:17,w:288,h:93} },
-  'ak74m':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:16,y:18,w:287,h:91} },
-  'ak74n':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:17,w:288,h:93} },
-  'akm':      { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:15,w:287,h:97} },
-  'akmn':     { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:15,w:288,h:97} },
-  'akms':     { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:16,w:288,h:94} },
-  'aks74u':   { scale:1, ox:0.25, oy:-0.2, rotation:0, trim:{x:19,y:28,w:194,h:85} },
-  'aks74un':  { scale:1, ox:0.25, oy:-0.2, rotation:0, trim:{x:19,y:28,w:194,h:85} },
+  '9a91':     { scale:1, ox:0, oy:-0.2, rotation:0, trim:{x:10,y:22,w:232,h:84} },
+  'ak103':    { scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:16,y:18,w:287,h:91} },
+  'ak104':    { scale:1, ox:0.2, oy:-0.15, rotation:0, trim:{x:12,y:22,w:232,h:83} },
+  'ak105':    { scale:1, ox:0.2, oy:-0.15, rotation:0, trim:{x:12,y:21,w:232,h:84} },
+  'ak12':     { scale:1, ox:0.15, oy:-0.21, rotation:0, trim:{x:15,y:18,w:288,h:92} },
+  'ak74':     { scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:15,y:17,w:288,h:93} },
+  'ak74m':    { scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:16,y:18,w:287,h:91} },
+  'ak74n':    { scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:15,y:17,w:288,h:93} },
+  'akm':      { scale:1, ox:0.1, oy:-0.15, rotation:0, trim:{x:15,y:15,w:287,h:97} },
+  'akmn':     { scale:1, ox:0.1, oy:-0.15, rotation:0, trim:{x:15,y:15,w:288,h:97} },
+  'akms':     { scale:1, ox:0.1, oy:-0.15, rotation:0, trim:{x:15,y:16,w:288,h:94} },
+  'aks74u':   { scale:1, ox:0.15, oy:-0.2, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'aks74un':  { scale:1, ox:0.15, oy:-0.2, rotation:0, trim:{x:12,y:15,w:232,h:97} },
   'aps':      { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:19,y:0,w:89,h:64} },
   'ash12':    { scale:1, ox:-0.1, oy:-0.51, rotation:0, trim:{x:15,y:17,w:229,h:93} },
   'asval':    { scale:1, ox:0.01, oy:-0.090232, rotation:0, trim:{x:11,y:15,w:299,h:85} },
@@ -189,26 +189,216 @@ const WEAPON_LAYOUT = {
   'mp153':    { scale:1, ox:0.05, oy:0, rotation:-6, trim:{x:13,y:0,w:290,h:62} },
   'mp155':    { scale:1, ox:0.154468, oy:-0.038305, rotation:-6, trim:{x:18,y:1,w:344,h:60} },
   'mp443':    { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:26,y:0,w:75,h:61} },
+  '9a91_x_c_x':{ scale:1, ox:0, oy:-0.675543, rotation:0, trim:{x:10,y:3,w:232,h:121} },
+  '9a91_x_l_x':{ scale:1, ox:0, oy:-0.566848, rotation:0, trim:{x:10,y:7,w:232,h:113} },
+  'ak103_75_c_g':{ scale:1, ox:0.15, oy:-0.571196, rotation:0, trim:{x:16,y:9,w:287,h:109} },
+  'ak103_75_c_x':{ scale:1, ox:0.15, oy:-0.571196, rotation:0, trim:{x:16,y:9,w:287,h:109} },
+  'ak103_75_l_g':{ scale:1, ox:0.15, oy:-0.4625, rotation:0, trim:{x:16,y:13,w:287,h:101} },
+  'ak103_75_l_x':{ scale:1, ox:0.15, oy:-0.4625, rotation:0, trim:{x:16,y:13,w:287,h:101} },
+  'ak103_75_x_g':{ scale:1, ox:0.15, oy:-0.231522, rotation:0, trim:{x:16,y:22,w:287,h:84} },
+  'ak103_75_x_x':{ scale:1, ox:0.15, oy:-0.231522, rotation:0, trim:{x:16,y:22,w:287,h:84} },
+  'ak103_x_c_g':{ scale:1, ox:0.142647, oy:-0.4625, rotation:0, trim:{x:15,y:7,w:288,h:113} },
+  'ak103_x_c_x':{ scale:1, ox:0.142647, oy:-0.4625, rotation:0, trim:{x:15,y:7,w:288,h:113} },
+  'ak103_x_l_g':{ scale:1, ox:0.15, oy:-0.367391, rotation:0, trim:{x:16,y:10,w:287,h:107} },
+  'ak103_x_l_x':{ scale:1, ox:0.15, oy:-0.367391, rotation:0, trim:{x:16,y:10,w:287,h:107} },
+  'ak103_x_x_g':{ scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:16,y:18,w:287,h:91} },
+  'ak104_75_c_g':{ scale:1, ox:0.2, oy:-0.557609, rotation:0, trim:{x:12,y:14,w:232,h:99} },
+  'ak104_75_c_x':{ scale:1, ox:0.2, oy:-0.557609, rotation:0, trim:{x:12,y:14,w:232,h:99} },
+  'ak104_75_l_g':{ scale:1, ox:0.2, oy:-0.435326, rotation:0, trim:{x:12,y:17,w:232,h:93} },
+  'ak104_75_l_x':{ scale:1, ox:0.2, oy:-0.435326, rotation:0, trim:{x:12,y:17,w:232,h:93} },
+  'ak104_75_x_g':{ scale:1, ox:0.2, oy:-0.245109, rotation:0, trim:{x:12,y:26,w:232,h:75} },
+  'ak104_75_x_x':{ scale:1, ox:0.2, oy:-0.245109, rotation:0, trim:{x:12,y:26,w:232,h:75} },
+  'ak104_x_c_g':{ scale:1, ox:0.2, oy:-0.421739, rotation:0, trim:{x:12,y:11,w:232,h:105} },
+  'ak104_x_c_x':{ scale:1, ox:0.2, oy:-0.421739, rotation:0, trim:{x:12,y:11,w:232,h:105} },
+  'ak104_x_l_g':{ scale:1, ox:0.2, oy:-0.408152, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'ak104_x_l_x':{ scale:1, ox:0.2, oy:-0.408152, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'ak104_x_x_g':{ scale:1, ox:0.2, oy:-0.15, rotation:0, trim:{x:12,y:22,w:232,h:83} },
+  'ak105_60_c_g':{ scale:1, ox:0.2, oy:-0.380978, rotation:0, trim:{x:12,y:8,w:232,h:110} },
+  'ak105_60_c_x':{ scale:1, ox:0.2, oy:-0.380978, rotation:0, trim:{x:12,y:8,w:232,h:110} },
+  'ak105_60_l_g':{ scale:1, ox:0.2, oy:-0.245109, rotation:0, trim:{x:12,y:11,w:232,h:104} },
+  'ak105_60_l_x':{ scale:1, ox:0.2, oy:-0.245109, rotation:0, trim:{x:12,y:11,w:232,h:104} },
+  'ak105_60_x_g':{ scale:1, ox:0.2, oy:-0.109239, rotation:0, trim:{x:12,y:19,w:232,h:89} },
+  'ak105_60_x_x':{ scale:1, ox:0.2, oy:-0.109239, rotation:0, trim:{x:12,y:19,w:232,h:89} },
+  'ak105_95_c_g':{ scale:1, ox:0.2, oy:-0.394565, rotation:0, trim:{x:12,y:11,w:232,h:105} },
+  'ak105_95_c_x':{ scale:1, ox:0.2, oy:-0.394565, rotation:0, trim:{x:12,y:11,w:232,h:105} },
+  'ak105_95_l_g':{ scale:1, ox:0.2, oy:-0.380978, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'ak105_95_l_x':{ scale:1, ox:0.2, oy:-0.380978, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'ak105_95_x_g':{ scale:1, ox:0.2, oy:-0.136413, rotation:0, trim:{x:12,y:22,w:232,h:82} },
+  'ak105_95_x_x':{ scale:1, ox:0.2, oy:-0.136413, rotation:0, trim:{x:12,y:22,w:232,h:82} },
+  'ak105_x_c_g':{ scale:1, ox:0.2, oy:-0.408152, rotation:0, trim:{x:12,y:11,w:232,h:105} },
+  'ak105_x_c_x':{ scale:1, ox:0.2, oy:-0.408152, rotation:0, trim:{x:12,y:11,w:232,h:105} },
+  'ak105_x_l_g':{ scale:1, ox:0.2, oy:-0.340217, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'ak105_x_l_x':{ scale:1, ox:0.2, oy:-0.340217, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'ak105_x_x_g':{ scale:1, ox:0.2, oy:-0.15, rotation:0, trim:{x:12,y:21,w:232,h:84} },
+  'ak12_60_c_g':{ scale:1, ox:0.194118, oy:-0.305109, rotation:0, trim:{x:17,y:3,w:282,h:121} },
+  'ak12_60_c_x':{ scale:1, ox:0.194118, oy:-0.305109, rotation:0, trim:{x:17,y:3,w:282,h:121} },
+  'ak12_60_l_g':{ scale:1, ox:0.15, oy:-0.291522, rotation:0, trim:{x:15,y:3,w:288,h:121} },
+  'ak12_60_l_x':{ scale:1, ox:0.15, oy:-0.291522, rotation:0, trim:{x:15,y:3,w:288,h:121} },
+  'ak12_60_x_g':{ scale:1, ox:0.15, oy:-0.087717, rotation:0, trim:{x:15,y:11,w:288,h:104} },
+  'ak12_60_x_x':{ scale:1, ox:0.15, oy:-0.087717, rotation:0, trim:{x:15,y:11,w:288,h:104} },
+  'ak12_95_c_g':{ scale:1, ox:0.15, oy:-0.400217, rotation:0, trim:{x:15,y:5,w:288,h:116} },
+  'ak12_95_c_x':{ scale:1, ox:0.15, oy:-0.400217, rotation:0, trim:{x:15,y:5,w:288,h:116} },
+  'ak12_95_l_g':{ scale:1, ox:0.157353, oy:-0.38663, rotation:0, trim:{x:15,y:7,w:287,h:113} },
+  'ak12_95_l_x':{ scale:1, ox:0.157353, oy:-0.38663, rotation:0, trim:{x:15,y:7,w:287,h:113} },
+  'ak12_95_x_g':{ scale:1, ox:0.157353, oy:-0.142065, rotation:0, trim:{x:15,y:15,w:287,h:97} },
+  'ak12_95_x_x':{ scale:1, ox:0.157353, oy:-0.142065, rotation:0, trim:{x:15,y:15,w:287,h:97} },
+  'ak12_x_c_g':{ scale:1, ox:0.157353, oy:-0.454565, rotation:0, trim:{x:15,y:7,w:287,h:113} },
+  'ak12_x_c_x':{ scale:1, ox:0.157353, oy:-0.454565, rotation:0, trim:{x:15,y:7,w:287,h:113} },
+  'ak12_x_l_g':{ scale:1, ox:0.15, oy:-0.400217, rotation:0, trim:{x:15,y:7,w:288,h:113} },
+  'ak12_x_l_x':{ scale:1, ox:0.15, oy:-0.400217, rotation:0, trim:{x:15,y:7,w:288,h:113} },
+  'ak12_x_x_g':{ scale:1, ox:0.15, oy:-0.182826, rotation:0, trim:{x:15,y:17,w:288,h:93} },
+  'ak74_60_x_g':{ scale:1, ox:0.15, oy:-0.082065, rotation:0, trim:{x:15,y:14,w:288,h:98} },
+  'ak74_60_x_x':{ scale:1, ox:0.15, oy:-0.082065, rotation:0, trim:{x:15,y:14,w:288,h:98} },
+  'ak74_95_x_g':{ scale:1, ox:0.15, oy:-0.177174, rotation:0, trim:{x:15,y:17,w:288,h:92} },
+  'ak74_95_x_x':{ scale:1, ox:0.15, oy:-0.177174, rotation:0, trim:{x:15,y:17,w:288,h:92} },
+  'ak74_x_c_g':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:15,y:5,w:288,h:117} },
+  'ak74_x_c_x':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:15,y:5,w:288,h:117} },
+  'ak74_x_l_g':{ scale:1, ox:0.15, oy:-0.367391, rotation:0, trim:{x:15,y:9,w:288,h:109} },
+  'ak74_x_l_x':{ scale:1, ox:0.15, oy:-0.367391, rotation:0, trim:{x:15,y:9,w:288,h:109} },
+  'ak74_x_x_g':{ scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:15,y:17,w:288,h:93} },
+  'ak74m_60_c_g':{ scale:1, ox:0.15, oy:-0.380978, rotation:0, trim:{x:16,y:3,w:287,h:121} },
+  'ak74m_60_c_x':{ scale:1, ox:0.15, oy:-0.380978, rotation:0, trim:{x:16,y:3,w:287,h:121} },
+  'ak74m_60_l_g':{ scale:1, ox:0.142647, oy:-0.272283, rotation:0, trim:{x:15,y:7,w:288,h:113} },
+  'ak74m_60_l_x':{ scale:1, ox:0.142647, oy:-0.272283, rotation:0, trim:{x:15,y:7,w:288,h:113} },
+  'ak74m_60_x_g':{ scale:1, ox:0.142647, oy:-0.068478, rotation:0, trim:{x:15,y:15,w:288,h:97} },
+  'ak74m_60_x_x':{ scale:1, ox:0.142647, oy:-0.068478, rotation:0, trim:{x:15,y:15,w:288,h:97} },
+  'ak74m_95_c_g':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:16,y:7,w:287,h:113} },
+  'ak74m_95_c_x':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:16,y:7,w:287,h:113} },
+  'ak74m_95_l_g':{ scale:1, ox:0.15, oy:-0.380978, rotation:0, trim:{x:16,y:11,w:287,h:105} },
+  'ak74m_95_l_x':{ scale:1, ox:0.15, oy:-0.380978, rotation:0, trim:{x:16,y:11,w:287,h:105} },
+  'ak74m_95_x_g':{ scale:1, ox:0.142647, oy:-0.163587, rotation:0, trim:{x:15,y:19,w:288,h:89} },
+  'ak74m_95_x_x':{ scale:1, ox:0.142647, oy:-0.163587, rotation:0, trim:{x:15,y:19,w:288,h:89} },
+  'ak74m_x_c_g':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:16,y:5,w:287,h:116} },
+  'ak74m_x_c_x':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:16,y:5,w:287,h:116} },
+  'ak74m_x_l_g':{ scale:1, ox:0.15, oy:-0.353804, rotation:0, trim:{x:16,y:9,w:287,h:109} },
+  'ak74m_x_l_x':{ scale:1, ox:0.15, oy:-0.353804, rotation:0, trim:{x:16,y:9,w:287,h:109} },
+  'ak74m_x_x_g':{ scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:16,y:18,w:287,h:91} },
+  'ak74n_60_c_g':{ scale:1, ox:0.179412, oy:-0.394565, rotation:0, trim:{x:17,y:3,w:284,h:121} },
+  'ak74n_60_c_x':{ scale:1, ox:0.179412, oy:-0.394565, rotation:0, trim:{x:17,y:3,w:284,h:121} },
+  'ak74n_60_l_g':{ scale:1, ox:0.15, oy:-0.299457, rotation:0, trim:{x:15,y:6,w:288,h:114} },
+  'ak74n_60_l_x':{ scale:1, ox:0.15, oy:-0.299457, rotation:0, trim:{x:15,y:6,w:288,h:114} },
+  'ak74n_60_x_g':{ scale:1, ox:0.15, oy:-0.082065, rotation:0, trim:{x:15,y:14,w:288,h:98} },
+  'ak74n_60_x_x':{ scale:1, ox:0.15, oy:-0.082065, rotation:0, trim:{x:15,y:14,w:288,h:98} },
+  'ak74n_95_c_g':{ scale:1, ox:0.15, oy:-0.489674, rotation:0, trim:{x:15,y:5,w:288,h:116} },
+  'ak74n_95_c_x':{ scale:1, ox:0.15, oy:-0.489674, rotation:0, trim:{x:15,y:5,w:288,h:116} },
+  'ak74n_95_l_g':{ scale:1, ox:0.15, oy:-0.394565, rotation:0, trim:{x:15,y:9,w:288,h:108} },
+  'ak74n_95_l_x':{ scale:1, ox:0.15, oy:-0.394565, rotation:0, trim:{x:15,y:9,w:288,h:108} },
+  'ak74n_95_x_g':{ scale:1, ox:0.15, oy:-0.177174, rotation:0, trim:{x:15,y:17,w:288,h:92} },
+  'ak74n_95_x_x':{ scale:1, ox:0.15, oy:-0.177174, rotation:0, trim:{x:15,y:17,w:288,h:92} },
+  'ak74n_x_x_g':{ scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:15,y:17,w:288,h:93} },
+  'akm_75_x_g':{ scale:1, ox:0.1, oy:-0.217935, rotation:0, trim:{x:15,y:18,w:287,h:90} },
+  'akm_75_x_x':{ scale:1, ox:0.1, oy:-0.217935, rotation:0, trim:{x:15,y:18,w:287,h:90} },
+  'akm_x_x_g':{ scale:1, ox:0.1, oy:-0.15, rotation:0, trim:{x:15,y:15,w:287,h:97} },
+  'akmn_75_c_g':{ scale:1, ox:0.107353, oy:-0.584783, rotation:0, trim:{x:15,y:5,w:287,h:117} },
+  'akmn_75_c_x':{ scale:1, ox:0.107353, oy:-0.584783, rotation:0, trim:{x:15,y:5,w:287,h:117} },
+  'akmn_75_l_g':{ scale:1, ox:0.107353, oy:-0.476087, rotation:0, trim:{x:15,y:9,w:287,h:109} },
+  'akmn_75_l_x':{ scale:1, ox:0.107353, oy:-0.476087, rotation:0, trim:{x:15,y:9,w:287,h:109} },
+  'akmn_75_x_g':{ scale:1, ox:0.107353, oy:-0.217935, rotation:0, trim:{x:15,y:18,w:287,h:90} },
+  'akmn_75_x_x':{ scale:1, ox:0.107353, oy:-0.217935, rotation:0, trim:{x:15,y:18,w:287,h:90} },
+  'akmn_x_c_g':{ scale:1, ox:0.173529, oy:-0.489674, rotation:0, trim:{x:19,y:3,w:278,h:121} },
+  'akmn_x_c_x':{ scale:1, ox:0.173529, oy:-0.489674, rotation:0, trim:{x:19,y:3,w:278,h:121} },
+  'akmn_x_l_g':{ scale:1, ox:0.114706, oy:-0.353804, rotation:0, trim:{x:15,y:5,w:286,h:117} },
+  'akmn_x_l_x':{ scale:1, ox:0.114706, oy:-0.353804, rotation:0, trim:{x:15,y:5,w:286,h:117} },
+  'akmn_x_x_g':{ scale:1, ox:0.107353, oy:-0.15, rotation:0, trim:{x:15,y:15,w:287,h:97} },
+  'akms_75_x_g':{ scale:1, ox:0.114706, oy:-0.190761, rotation:0, trim:{x:15,y:19,w:286,h:89} },
+  'akms_75_x_x':{ scale:1, ox:0.114706, oy:-0.190761, rotation:0, trim:{x:15,y:19,w:286,h:89} },
+  'akms_x_x_g':{ scale:1, ox:0.107353, oy:-0.136413, rotation:0, trim:{x:15,y:16,w:287,h:94} },
+  'aks74u_60_x_g':{ scale:1, ox:0.15, oy:-0.132065, rotation:0, trim:{x:12,y:12,w:232,h:102} },
+  'aks74u_60_x_x':{ scale:1, ox:0.15, oy:-0.132065, rotation:0, trim:{x:12,y:12,w:232,h:102} },
+  'aks74u_95_x_g':{ scale:1, ox:0.15, oy:-0.254348, rotation:0, trim:{x:12,y:15,w:232,h:96} },
+  'aks74u_95_x_x':{ scale:1, ox:0.15, oy:-0.254348, rotation:0, trim:{x:12,y:15,w:232,h:96} },
+  'aks74u_x_x_g':{ scale:1, ox:0.15, oy:-0.2, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'aks74un_60_c_g':{ scale:1, ox:0.223529, oy:-0.458152, rotation:0, trim:{x:17,y:3,w:222,h:121} },
+  'aks74un_60_c_x':{ scale:1, ox:0.223529, oy:-0.458152, rotation:0, trim:{x:17,y:3,w:222,h:121} },
+  'aks74un_60_x_g':{ scale:1, ox:0.15, oy:-0.132065, rotation:0, trim:{x:12,y:12,w:232,h:102} },
+  'aks74un_60_x_x':{ scale:1, ox:0.15, oy:-0.132065, rotation:0, trim:{x:12,y:12,w:232,h:102} },
+  'aks74un_95_c_g':{ scale:1, ox:0.15, oy:-0.498913, rotation:0, trim:{x:12,y:5,w:232,h:117} },
+  'aks74un_95_c_x':{ scale:1, ox:0.15, oy:-0.498913, rotation:0, trim:{x:12,y:5,w:232,h:117} },
+  'aks74un_95_x_g':{ scale:1, ox:0.15, oy:-0.254348, rotation:0, trim:{x:12,y:15,w:232,h:96} },
+  'aks74un_95_x_x':{ scale:1, ox:0.15, oy:-0.254348, rotation:0, trim:{x:12,y:15,w:232,h:96} },
+  'aks74un_x_c_g':{ scale:1, ox:0.15, oy:-0.498913, rotation:0, trim:{x:12,y:3,w:232,h:121} },
+  'aks74un_x_c_x':{ scale:1, ox:0.15, oy:-0.498913, rotation:0, trim:{x:12,y:3,w:232,h:121} },
+  'aks74un_x_x_g':{ scale:1, ox:0.15, oy:-0.2, rotation:0, trim:{x:12,y:15,w:232,h:97} },
+  'ash12_20_c_g':{ scale:1, ox:0.127941, oy:-0.482826, rotation:0, trim:{x:30,y:3,w:198,h:121} },
+  'ash12_20_c_x':{ scale:1, ox:0.127941, oy:-0.482826, rotation:0, trim:{x:30,y:3,w:198,h:121} },
+  'ash12_20_l_g':{ scale:1, ox:0.120588, oy:-0.442065, rotation:0, trim:{x:29,y:3,w:199,h:121} },
+  'ash12_20_l_x':{ scale:1, ox:0.120588, oy:-0.442065, rotation:0, trim:{x:29,y:3,w:199,h:121} },
+  'ash12_20_x_g':{ scale:1, ox:-0.1, oy:-0.143152, rotation:0, trim:{x:15,y:3,w:229,h:121} },
+  'ash12_20_x_x':{ scale:1, ox:-0.1, oy:-0.143152, rotation:0, trim:{x:15,y:3,w:229,h:121} },
+  'ash12_x_c_g':{ scale:1, ox:-0.1, oy:-0.781739, rotation:0, trim:{x:15,y:7,w:229,h:113} },
+  'ash12_x_c_x':{ scale:1, ox:-0.1, oy:-0.781739, rotation:0, trim:{x:15,y:7,w:229,h:113} },
+  'ash12_x_l_g':{ scale:1, ox:-0.1, oy:-0.740978, rotation:0, trim:{x:15,y:7,w:229,h:113} },
+  'ash12_x_l_x':{ scale:1, ox:-0.1, oy:-0.740978, rotation:0, trim:{x:15,y:7,w:229,h:113} },
+  'ash12_x_x_g':{ scale:1, ox:-0.1, oy:-0.51, rotation:0, trim:{x:15,y:17,w:229,h:93} },
+  'asval_30_c_g':{ scale:1, ox:0.201176, oy:-0.348384, rotation:0, trim:{x:24,y:3,w:273,h:121} },
+  'asval_30_c_x':{ scale:1, ox:0.201176, oy:-0.348384, rotation:0, trim:{x:24,y:3,w:273,h:121} },
+  'asval_30_l_g':{ scale:1, ox:0.105588, oy:-0.239689, rotation:0, trim:{x:17,y:3,w:286,h:121} },
+  'asval_30_l_x':{ scale:1, ox:0.105588, oy:-0.239689, rotation:0, trim:{x:17,y:3,w:286,h:121} },
+  'asval_30_x_g':{ scale:1, ox:0.105588, oy:0.099985, rotation:0, trim:{x:17,y:16,w:286,h:95} },
+  'asval_30_x_x':{ scale:1, ox:0.105588, oy:0.099985, rotation:0, trim:{x:17,y:16,w:286,h:95} },
+  'asval_x_c_g':{ scale:1, ox:0.105588, oy:-0.579362, rotation:0, trim:{x:17,y:9,w:286,h:108} },
+  'asval_x_c_x':{ scale:1, ox:0.105588, oy:-0.579362, rotation:0, trim:{x:17,y:9,w:286,h:108} },
+  'asval_x_l_g':{ scale:1, ox:0.105588, oy:-0.484254, rotation:0, trim:{x:17,y:13,w:286,h:101} },
+  'asval_x_l_x':{ scale:1, ox:0.105588, oy:-0.484254, rotation:0, trim:{x:17,y:13,w:286,h:101} },
+  'asval_x_x_g':{ scale:1, ox:0.105588, oy:-0.171754, rotation:0, trim:{x:17,y:26,w:286,h:75} },
+  'pkm_x_x_g':{ scale:1, ox:0.170588, oy:-0.372283, rotation:0, trim:{x:16,y:49,w:346,h:92} },
+  'pkp_x_c_g':{ scale:1, ox:0.192647, oy:-0.766304, rotation:0, trim:{x:17,y:36,w:345,h:118} },
+  'pkp_x_c_x':{ scale:1, ox:0.192647, oy:-0.766304, rotation:0, trim:{x:17,y:36,w:345,h:118} },
+  'pkp_x_l_g':{ scale:1, ox:0.192647, oy:-0.671196, rotation:0, trim:{x:17,y:39,w:345,h:112} },
+  'pkp_x_l_x':{ scale:1, ox:0.192647, oy:-0.671196, rotation:0, trim:{x:17,y:39,w:345,h:112} },
+  'pkp_x_x_g':{ scale:1, ox:0.192647, oy:-0.440217, rotation:0, trim:{x:17,y:49,w:345,h:92} },
+  'rpdn_x_c_x':{ scale:1, ox:-0.072059, oy:-0.484783, rotation:0, trim:{x:19,y:24,w:365,h:144} },
+  'rpdn_x_l_x':{ scale:1, ox:-0.05, oy:-0.335326, rotation:0, trim:{x:19,y:29,w:362,h:138} },
+  'rpk16_x_c_g':{ scale:1, ox:0.1, oy:-0.430978, rotation:0, trim:{x:15,y:3,w:288,h:121} },
+  'rpk16_x_c_x':{ scale:1, ox:0.1, oy:-0.430978, rotation:0, trim:{x:15,y:3,w:288,h:121} },
+  'rpk16_x_l_g':{ scale:1, ox:0.1, oy:-0.430978, rotation:0, trim:{x:15,y:5,w:288,h:117} },
+  'rpk16_x_l_x':{ scale:1, ox:0.1, oy:-0.430978, rotation:0, trim:{x:15,y:5,w:288,h:117} },
+  'rpk16_x_x_g':{ scale:1, ox:0.1, oy:-0.2, rotation:0, trim:{x:15,y:13,w:288,h:101} },
+  'saiga12_10_c_x':{ scale:1, ox:0.053074, oy:0.1081, rotation:-6, trim:{x:15,y:27,w:284,h:135} },
+  'saiga12_10_x_x':{ scale:1, ox:0.06961, oy:0.42956, rotation:-6, trim:{x:16,y:39,w:283,h:111} },
+  'saiga12_20_c_x':{ scale:1, ox:0.053854, oy:-0.124453, rotation:-6, trim:{x:16,y:5,w:283,h:117} },
+  'saiga12_20_x_x':{ scale:1, ox:0.056149, oy:0.2162, rotation:-6, trim:{x:15,y:17,w:284,h:93} },
+  'saiga12_x_c_x':{ scale:1, ox:0.048474, oy:-0.313629, rotation:-6, trim:{x:16,y:11,w:283,h:105} },
+  'sr3m_x_c_x':{ scale:1.25, ox:0.1, oy:-0.406658, rotation:0, trim:{x:11,y:13,w:172,h:100} },
+  'sr3m_x_l_x':{ scale:1.25, ox:0.1, oy:-0.304755, rotation:0, trim:{x:11,y:17,w:172,h:93} },
+  'sv98_x_l_x':{ scale:1, ox:0.115847, oy:-0.866848, rotation:0, trim:{x:18,y:17,w:344,h:93} },
+  'svd_20_c_x':{ scale:1, ox:0.077353, oy:-0.690217, rotation:0, trim:{x:19,y:14,w:344,h:98} },
+  'svd_20_l_x':{ scale:1, ox:0.077353, oy:-0.567935, rotation:0, trim:{x:19,y:17,w:344,h:93} },
+  'svd_20_x_x':{ scale:1, ox:0.077353, oy:-0.36413, rotation:0, trim:{x:19,y:26,w:344,h:74} },
+  'svd_x_c_x':{ scale:1, ox:0.07, oy:-0.853261, rotation:0, trim:{x:19,y:19,w:345,h:87} },
+  'svd_x_l_x':{ scale:1, ox:0.077353, oy:-0.717391, rotation:0, trim:{x:19,y:24,w:344,h:80} },
+  'vss_20_c_g':{ scale:1, ox:0.02, oy:-0.635326, rotation:0, trim:{x:19,y:11,w:284,h:105} },
+  'vss_20_c_x':{ scale:1, ox:0.02, oy:-0.635326, rotation:0, trim:{x:19,y:11,w:284,h:105} },
+  'vss_20_l_g':{ scale:1, ox:0.02, oy:-0.580978, rotation:0, trim:{x:19,y:13,w:284,h:100} },
+  'vss_20_l_x':{ scale:1, ox:0.02, oy:-0.580978, rotation:0, trim:{x:19,y:13,w:284,h:100} },
+  'vss_20_x_g':{ scale:1, ox:0.02, oy:-0.227717, rotation:0, trim:{x:19,y:27,w:284,h:73} },
+  'vss_20_x_x':{ scale:1, ox:0.02, oy:-0.227717, rotation:0, trim:{x:19,y:27,w:284,h:73} },
+  'vss_30_c_g':{ scale:1, ox:0.071471, oy:-0.404348, rotation:0, trim:{x:22,y:3,w:277,h:121} },
+  'vss_30_c_x':{ scale:1, ox:0.071471, oy:-0.404348, rotation:0, trim:{x:22,y:3,w:277,h:121} },
+  'vss_30_l_g':{ scale:1, ox:0.02, oy:-0.295652, rotation:0, trim:{x:19,y:5,w:284,h:117} },
+  'vss_30_l_x':{ scale:1, ox:0.02, oy:-0.295652, rotation:0, trim:{x:19,y:5,w:284,h:117} },
+  'vss_30_x_g':{ scale:1, ox:0.02, oy:0.030435, rotation:0, trim:{x:19,y:17,w:284,h:93} },
+  'vss_30_x_x':{ scale:1, ox:0.02, oy:0.030435, rotation:0, trim:{x:19,y:17,w:284,h:93} },
+  'vss_x_c_g':{ scale:1, ox:0.02, oy:-0.79837, rotation:0, trim:{x:19,y:11,w:284,h:95} },
+  'vss_x_c_x':{ scale:1, ox:0.02, oy:-0.825543, rotation:0, trim:{x:19,y:11,w:284,h:93} },
+  'vss_x_l_g':{ scale:1, ox:0.02, oy:-0.689674, rotation:0, trim:{x:19,y:15,w:284,h:89} },
+  'vss_x_l_x':{ scale:1, ox:0.02, oy:-0.744022, rotation:0, trim:{x:19,y:15,w:284,h:85} },
+  'vss_x_x_g':{ scale:1, ox:0.02, oy:-0.35, rotation:0, trim:{x:19,y:28,w:284,h:63} },
   'pb':       { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:30,y:0,w:130,h:64} },
   'pkm':      { scale:1, ox:-0.05, oy:-0.25, rotation:0, trim:{x:0,y:42,w:376,h:112} },
   'pkp':      { scale:1, ox:-0.05, oy:-0.25, rotation:0, trim:{x:0,y:42,w:378,h:119} },
   'pm':       { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:27,y:0,w:74,h:64} },
   'pp19':     { scale:1.25, ox:0.3, oy:-0.15, rotation:0, trim:{x:8,y:34,w:149,h:69} },
-  'rgd5':     { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:11,y:3,w:36,h:60} },
-  'rgn':      { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:9,y:0,w:42,h:62} },
-  'rgo':      { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:11,y:1,w:37,h:58} },
-  'rpd':      { scale:1, ox:0, oy:-0.05, rotation:0, trim:{x:33,y:5,w:362,h:122} },
-  'rpdn':     { scale:1, ox:0, oy:-0.05, rotation:0, trim:{x:33,y:5,w:362,h:122} },
+  'rpd':      { scale:1, ox:-0.05, oy:-0.05, rotation:0, trim:{x:33,y:5,w:362,h:122} },
+  'rpdn':     { scale:1, ox:-0.05, oy:-0.05, rotation:0, trim:{x:33,y:5,w:362,h:122} },
   'rpg':      { scale:1, ox:-0.04529, oy:-1.109863, rotation:0, trim:{x:21,y:0,w:210,h:64} },
-  'rpk16':    { scale:1, ox:0.115847, oy:-0.090232, rotation:0, trim:{x:15,y:13,w:288,h:101} },
+  'rpk16':    { scale:1, ox:0.1, oy:-0.2, rotation:0, trim:{x:15,y:13,w:288,h:101} },
   'saiga12':  { scale:1, ox:0.05, oy:0, rotation:-6, trim:{x:15,y:24,w:284,h:78} },
-  'sr3m':     { scale:1.25, ox:0.25, oy:-0.15, rotation:0, trim:{x:9,y:37,w:142,h:67} },
-  'sv98':     { scale:1, ox:0.115847, oy:-0.9, rotation:0, trim:{x:18,y:17,w:344,h:93} },
-  'svd':      { scale:1, ox:0.07, oy:-0.7, rotation:0, trim:{x:19,y:24,w:344,h:80} },
+  'sr3m':     { scale:1.25, ox:0.1, oy:-0.05, rotation:0, trim:{x:11,y:25,w:172,h:76} },
+  'sv98':     { scale:1, ox:0.115847, oy:-0.45, rotation:0, trim:{x:18,y:33,w:344,h:61} },
+  'svd':      { scale:1, ox:0.07, oy:-0.5, rotation:0, trim:{x:19,y:33,w:345,h:61} },
   'toz106':   { scale:1.25, ox:0.15, oy:0, rotation:-6, trim:{x:8,y:10,w:182,h:54} },
-  'vog17':    { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:14,y:3,w:33,h:54} },
-  'vog25':    { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:14,y:3,w:33,h:54} },
-  'vss':      { scale:1, ox:0, oy:-0.75, rotation:0, trim:{x:16,y:1,w:294,h:99} },
+  'vss':      { scale:1, ox:0.02, oy:-0.390761, rotation:0, trim:{x:19,y:28,w:284,h:60} },
 };
 
 const HEAD_ARMOR_LAYOUT = {
@@ -236,7 +426,7 @@ const HEAD_ARMOR_LAYOUT = {
 };
 
 const WEAPON_MUZZLE = {
-  '9a91':     { x: 214, y: 17 },
+  '9a91':     { x: 231, y: 18 },
   'ak103':    { x: 286, y: 19.5 },
   'ak104':    { x: 231, y: 17.5 },
   'ak105':    { x: 231, y: 18.5 },
@@ -247,8 +437,8 @@ const WEAPON_MUZZLE = {
   'akm':      { x: 286, y: 23.5 },
   'akmn':     { x: 287, y: 23.5 },
   'akms':     { x: 287, y: 23 },
-  'aks74u':   { x: 193, y: 20 },
-  'aks74un':  { x: 193, y: 20 },
+  'aks74u':   { x: 231, y: 22.5 },
+  'aks74un':  { x: 231, y: 22.5 },
   'aps':      { x: 88, y: 9.5 },
   'ash12':    { x: 228, y: 34.5 },
   'asval':    { x: 298, y: 17 },
@@ -257,6 +447,201 @@ const WEAPON_MUZZLE = {
   'mp153':    { x: 289, y: 13.5 },
   'mp155':    { x: 343, y: 11.5 },
   'mp443':    { x: 74, y: 8.5 },
+  '9a91_x_c_x':{ x: 231, y: 54 },
+  '9a91_x_l_x':{ x: 231, y: 46 },
+  'ak103_75_c_g':{ x: 286, y: 44 },
+  'ak103_75_c_x':{ x: 286, y: 44 },
+  'ak103_75_l_g':{ x: 286, y: 36 },
+  'ak103_75_l_x':{ x: 286, y: 36 },
+  'ak103_75_x_g':{ x: 286, y: 19 },
+  'ak103_75_x_x':{ x: 286, y: 19 },
+  'ak103_x_c_g':{ x: 287, y: 42 },
+  'ak103_x_c_x':{ x: 287, y: 42 },
+  'ak103_x_l_g':{ x: 286, y: 35.5 },
+  'ak103_x_l_x':{ x: 286, y: 35.5 },
+  'ak103_x_x_g':{ x: 286, y: 19.5 },
+  'ak104_75_c_g':{ x: 231, y: 40.5 },
+  'ak104_75_c_x':{ x: 231, y: 40.5 },
+  'ak104_75_l_g':{ x: 231, y: 33 },
+  'ak104_75_l_x':{ x: 231, y: 33 },
+  'ak104_75_x_g':{ x: 231, y: 17 },
+  'ak104_75_x_x':{ x: 231, y: 17 },
+  'ak104_x_c_g':{ x: 231, y: 38.5 },
+  'ak104_x_c_x':{ x: 231, y: 38.5 },
+  'ak104_x_l_g':{ x: 231, y: 34 },
+  'ak104_x_l_x':{ x: 231, y: 34 },
+  'ak104_x_x_g':{ x: 231, y: 17.5 },
+  'ak105_60_c_g':{ x: 231, y: 40 },
+  'ak105_60_c_x':{ x: 231, y: 40 },
+  'ak105_60_l_g':{ x: 231, y: 32 },
+  'ak105_60_l_x':{ x: 231, y: 32 },
+  'ak105_60_x_g':{ x: 231, y: 19.5 },
+  'ak105_60_x_x':{ x: 231, y: 19.5 },
+  'ak105_95_c_g':{ x: 231, y: 38 },
+  'ak105_95_c_x':{ x: 231, y: 38 },
+  'ak105_95_l_g':{ x: 231, y: 33.5 },
+  'ak105_95_l_x':{ x: 231, y: 33.5 },
+  'ak105_95_x_g':{ x: 231, y: 17 },
+  'ak105_95_x_x':{ x: 231, y: 17 },
+  'ak105_x_c_g':{ x: 231, y: 38.5 },
+  'ak105_x_c_x':{ x: 231, y: 38.5 },
+  'ak105_x_l_g':{ x: 231, y: 32 },
+  'ak105_x_l_x':{ x: 231, y: 32 },
+  'ak105_x_x_g':{ x: 231, y: 18.5 },
+  'ak12_60_c_g':{ x: 281, y: 40.5 },
+  'ak12_60_c_x':{ x: 281, y: 40.5 },
+  'ak12_60_l_g':{ x: 287, y: 40 },
+  'ak12_60_l_x':{ x: 287, y: 40 },
+  'ak12_60_x_g':{ x: 287, y: 24 },
+  'ak12_60_x_x':{ x: 287, y: 24 },
+  'ak12_95_c_g':{ x: 287, y: 41.5 },
+  'ak12_95_c_x':{ x: 287, y: 41.5 },
+  'ak12_95_l_g':{ x: 286, y: 39.5 },
+  'ak12_95_l_x':{ x: 286, y: 39.5 },
+  'ak12_95_x_g':{ x: 286, y: 22.5 },
+  'ak12_95_x_x':{ x: 286, y: 22.5 },
+  'ak12_x_c_g':{ x: 286, y: 42 },
+  'ak12_x_c_x':{ x: 286, y: 42 },
+  'ak12_x_l_g':{ x: 287, y: 40 },
+  'ak12_x_l_x':{ x: 287, y: 40 },
+  'ak12_x_x_g':{ x: 287, y: 22 },
+  'ak74_60_x_g':{ x: 287, y: 20 },
+  'ak74_60_x_x':{ x: 287, y: 20 },
+  'ak74_95_x_g':{ x: 287, y: 20.5 },
+  'ak74_95_x_x':{ x: 287, y: 20.5 },
+  'ak74_x_c_g':{ x: 287, y: 44 },
+  'ak74_x_c_x':{ x: 287, y: 44 },
+  'ak74_x_l_g':{ x: 287, y: 36 },
+  'ak74_x_l_x':{ x: 287, y: 36 },
+  'ak74_x_x_g':{ x: 287, y: 20 },
+  'ak74m_60_c_g':{ x: 286, y: 43 },
+  'ak74m_60_c_x':{ x: 286, y: 43 },
+  'ak74m_60_l_g':{ x: 287, y: 35 },
+  'ak74m_60_l_x':{ x: 287, y: 35 },
+  'ak74m_60_x_g':{ x: 287, y: 19.5 },
+  'ak74m_60_x_x':{ x: 287, y: 19.5 },
+  'ak74m_95_c_g':{ x: 286, y: 42.5 },
+  'ak74m_95_c_x':{ x: 286, y: 42.5 },
+  'ak74m_95_l_g':{ x: 286, y: 35 },
+  'ak74m_95_l_x':{ x: 286, y: 35 },
+  'ak74m_95_x_g':{ x: 287, y: 19 },
+  'ak74m_95_x_x':{ x: 287, y: 19 },
+  'ak74m_x_c_g':{ x: 286, y: 44 },
+  'ak74m_x_c_x':{ x: 286, y: 44 },
+  'ak74m_x_l_g':{ x: 286, y: 36 },
+  'ak74m_x_l_x':{ x: 286, y: 36 },
+  'ak74m_x_x_g':{ x: 286, y: 19.5 },
+  'ak74n_60_c_g':{ x: 283, y: 43 },
+  'ak74n_60_c_x':{ x: 283, y: 43 },
+  'ak74n_60_l_g':{ x: 287, y: 36 },
+  'ak74n_60_l_x':{ x: 287, y: 36 },
+  'ak74n_60_x_g':{ x: 287, y: 20 },
+  'ak74n_60_x_x':{ x: 287, y: 20 },
+  'ak74n_95_c_g':{ x: 287, y: 44 },
+  'ak74n_95_c_x':{ x: 287, y: 44 },
+  'ak74n_95_l_g':{ x: 287, y: 36.5 },
+  'ak74n_95_l_x':{ x: 287, y: 36.5 },
+  'ak74n_95_x_g':{ x: 287, y: 20.5 },
+  'ak74n_95_x_x':{ x: 287, y: 20.5 },
+  'ak74n_x_x_g':{ x: 287, y: 20 },
+  'akm_75_x_g':{ x: 286, y: 22.5 },
+  'akm_75_x_x':{ x: 286, y: 22.5 },
+  'akm_x_x_g':{ x: 286, y: 23.5 },
+  'akmn_75_c_g':{ x: 286, y: 49.5 },
+  'akmn_75_c_x':{ x: 286, y: 49.5 },
+  'akmn_75_l_g':{ x: 286, y: 41.5 },
+  'akmn_75_l_x':{ x: 286, y: 41.5 },
+  'akmn_75_x_g':{ x: 286, y: 22.5 },
+  'akmn_75_x_x':{ x: 286, y: 22.5 },
+  'akmn_x_c_g':{ x: 277, y: 48 },
+  'akmn_x_c_x':{ x: 277, y: 48 },
+  'akmn_x_l_g':{ x: 285, y: 41 },
+  'akmn_x_l_x':{ x: 285, y: 41 },
+  'akmn_x_x_g':{ x: 286, y: 23.5 },
+  'akms_75_x_g':{ x: 285, y: 22 },
+  'akms_75_x_x':{ x: 285, y: 22 },
+  'akms_x_x_g':{ x: 286, y: 22.5 },
+  'aks74u_60_x_g':{ x: 231, y: 22.5 },
+  'aks74u_60_x_x':{ x: 231, y: 22.5 },
+  'aks74u_95_x_g':{ x: 231, y: 24 },
+  'aks74u_95_x_x':{ x: 231, y: 24 },
+  'aks74u_x_x_g':{ x: 231, y: 22.5 },
+  'aks74un_60_c_g':{ x: 221, y: 44 },
+  'aks74un_60_c_x':{ x: 221, y: 44 },
+  'aks74un_60_x_g':{ x: 231, y: 22.5 },
+  'aks74un_60_x_x':{ x: 231, y: 22.5 },
+  'aks74un_95_c_g':{ x: 231, y: 43.5 },
+  'aks74un_95_c_x':{ x: 231, y: 43.5 },
+  'aks74un_95_x_g':{ x: 231, y: 24 },
+  'aks74un_95_x_x':{ x: 231, y: 24 },
+  'aks74un_x_c_g':{ x: 231, y: 45.5 },
+  'aks74un_x_c_x':{ x: 231, y: 45.5 },
+  'aks74un_x_x_g':{ x: 231, y: 22.5 },
+  'ash12_20_c_g':{ x: 197, y: 47.5 },
+  'ash12_20_c_x':{ x: 197, y: 47.5 },
+  'ash12_20_l_g':{ x: 198, y: 46 },
+  'ash12_20_l_x':{ x: 198, y: 46 },
+  'ash12_20_x_g':{ x: 228, y: 35 },
+  'ash12_20_x_x':{ x: 228, y: 35 },
+  'ash12_x_c_g':{ x: 228, y: 54.5 },
+  'ash12_x_c_x':{ x: 228, y: 54.5 },
+  'ash12_x_l_g':{ x: 228, y: 53 },
+  'ash12_x_l_x':{ x: 228, y: 53 },
+  'ash12_x_x_g':{ x: 228, y: 34.5 },
+  'asval_30_c_g':{ x: 272, y: 44.5 },
+  'asval_30_c_x':{ x: 272, y: 44.5 },
+  'asval_30_l_g':{ x: 285, y: 40.5 },
+  'asval_30_l_x':{ x: 285, y: 40.5 },
+  'asval_30_x_g':{ x: 285, y: 15 },
+  'asval_30_x_x':{ x: 285, y: 15 },
+  'asval_x_c_g':{ x: 285, y: 46.5 },
+  'asval_x_c_x':{ x: 285, y: 46.5 },
+  'asval_x_l_g':{ x: 285, y: 39.5 },
+  'asval_x_l_x':{ x: 285, y: 39.5 },
+  'asval_x_x_g':{ x: 285, y: 15 },
+  'pkm_x_x_g':{ x: 345, y: 23.5 },
+  'pkp_x_c_g':{ x: 344, y: 47.5 },
+  'pkp_x_c_x':{ x: 344, y: 47.5 },
+  'pkp_x_l_g':{ x: 344, y: 41 },
+  'pkp_x_l_x':{ x: 344, y: 41 },
+  'pkp_x_x_g':{ x: 344, y: 22.5 },
+  'rpdn_x_c_x':{ x: 364, y: 53 },
+  'rpdn_x_l_x':{ x: 361, y: 44.5 },
+  'rpk16_x_c_g':{ x: 287, y: 43 },
+  'rpk16_x_c_x':{ x: 287, y: 43 },
+  'rpk16_x_l_g':{ x: 287, y: 41 },
+  'rpk16_x_l_x':{ x: 287, y: 41 },
+  'rpk16_x_x_g':{ x: 287, y: 24.5 },
+  'saiga12_10_c_x':{ x: 283, y: 42.5 },
+  'saiga12_10_x_x':{ x: 282, y: 18.5 },
+  'saiga12_20_c_x':{ x: 282, y: 42 },
+  'saiga12_20_x_x':{ x: 283, y: 17.5 },
+  'saiga12_x_c_x':{ x: 282, y: 43 },
+  'sr3m_x_c_x':{ x: 171, y: 37.5 },
+  'sr3m_x_l_x':{ x: 171, y: 31 },
+  'sv98_x_l_x':{ x: 343, y: 41 },
+  'svd_20_c_x':{ x: 343, y: 42 },
+  'svd_20_l_x':{ x: 343, y: 35 },
+  'svd_20_x_x':{ x: 343, y: 18 },
+  'svd_x_c_x':{ x: 344, y: 42.5 },
+  'svd_x_l_x':{ x: 343, y: 34 },
+  'vss_20_c_g':{ x: 283, y: 45 },
+  'vss_20_c_x':{ x: 283, y: 45 },
+  'vss_20_l_g':{ x: 283, y: 40.5 },
+  'vss_20_l_x':{ x: 283, y: 40.5 },
+  'vss_20_x_g':{ x: 283, y: 14 },
+  'vss_20_x_x':{ x: 283, y: 14 },
+  'vss_30_c_g':{ x: 276, y: 44.5 },
+  'vss_30_c_x':{ x: 276, y: 44.5 },
+  'vss_30_l_g':{ x: 283, y: 38.5 },
+  'vss_30_l_x':{ x: 283, y: 38.5 },
+  'vss_30_x_g':{ x: 283, y: 14.5 },
+  'vss_30_x_x':{ x: 283, y: 14.5 },
+  'vss_x_c_g':{ x: 283, y: 46 },
+  'vss_x_c_x':{ x: 283, y: 46 },
+  'vss_x_l_g':{ x: 283, y: 39 },
+  'vss_x_l_x':{ x: 283, y: 39 },
+  'vss_x_x_g':{ x: 283, y: 13.5 },
   'pb':       { x: 129, y: 11 },
   'pkm':      { x: 375, y: 29 },
   'pkp':      { x: 377, y: 29 },
@@ -264,15 +649,44 @@ const WEAPON_MUZZLE = {
   'pp19':     { x: 148, y: 13.5 },
   'rpd':      { x: 361, y: 26 },
   'rpdn':     { x: 361, y: 26 },
-  'rpg':      { x: 209, y: 42.5 },
   'rpk16':    { x: 287, y: 24.5 },
   'saiga12':  { x: 283, y: 18 },
-  'sr3m':     { x: 141, y: 13.5 },
-  'sv98':     { x: 343, y: 41 },
-  'svd':      { x: 343, y: 34 },
+  'sr3m':     { x: 171, y: 15 },
+  'sv98':     { x: 343, y: 11.5 },
+  'svd':      { x: 344, y: 16.5 },
   'toz106':   { x: 181, y: 7 },
-  'vss':      { x: 293, y: 46 },
+  'vss':      { x: 283, y: 13.5 },
 };
+
+/* rev-fix-mod-source: 改裝圖命名（WEAPON_LAYOUT / WEAPON_MUZZLE）為唯一真相源
+ * 掃描 <baseId>_<mag>_<scope>_<grip> 形式的 key，僅提取 mag 段：
+ *   x     → 默認彈匣（不擴容），不加入列表
+ *   <數字> → 擴容彈匣數
+ * 默認彈匣數由 WEAPONS[baseId].mag 定義，getMagOptionsForWeapon 過濾掉小於默認值的項。
+ * 不在改裝圖裡的 mag 值 = 死配置，永遠不會返回。 */
+var _MOD_OPT_CACHE = {};
+function _getModOptionsFromLayout(baseId){
+  if(_MOD_OPT_CACHE[baseId] !== undefined) return _MOD_OPT_CACHE[baseId];
+  var magSet = {};
+  var _empty = { mags: [] };
+  if(typeof WEAPON_LAYOUT === 'undefined'){ _MOD_OPT_CACHE[baseId] = _empty; return _empty; }
+  function _scan(k){
+    if(k.indexOf(baseId + '_') !== 0) return;
+    var rest = k.substring(baseId.length + 1);
+    var parts = rest.split('_');
+    if(parts.length !== 3) return;
+    var magSeg = parts[0];
+    if(magSeg !== 'x' && /^[0-9]+$/.test(magSeg)) magSet[parseInt(magSeg, 10)] = true;
+  }
+  for(var k in WEAPON_LAYOUT) _scan(k);
+  if(typeof WEAPON_MUZZLE !== 'undefined'){
+    for(var k2 in WEAPON_MUZZLE) _scan(k2);
+  }
+  var result = { mags: Object.keys(magSet).map(Number).sort(function(a, b){ return a - b; }) };
+  _MOD_OPT_CACHE[baseId] = result;
+  return result;
+}
+window._getModOptionsFromLayout = _getModOptionsFromLayout;
 
 const HERO_VISIBLE_EQ = {
   head:              { layer:'head',      behind:false, scale:0.34, ox:-0.14926568895119788, oy:-0.5893343612503056, rotation:4 },
@@ -330,8 +744,24 @@ window.getCharWeaponMuzzleLocal = function(weaponSlot, weaponId, animName, frame
   let localX, localY;
 
   if(hasTrim){
-    const _wid = (typeof resolveIconId === 'function') ? resolveIconId(weaponId) : weaponId;
-    const mz = (typeof WEAPON_MUZZLE !== 'undefined') ? WEAPON_MUZZLE[_wid] : null;
+    /* rev-fix-exact-muzzle: 优先查精确 id，再回退 baseId */
+    const _cleanWid = String(weaponId || '').replace(/\.png$/i, '');
+    const _wid = (typeof resolveIconId === 'function') ? resolveIconId(_cleanWid) : _cleanWid;
+    /* rev-fix-muzzle-lookup-norm */
+    let _normWid = _cleanWid;
+    if(isNamedWeaponId(_cleanWid)){
+      const _p = _cleanWid.split('_');
+      if(_p.length === 4){
+        const _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87': 'c', 'PSO-1': 'l', 'PS320': 'l', '1P59': 'l' };
+        const _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
+        const _ns = _sMap[_p[2]] || _p[2];
+        const _ng = _gMap[_p[3]] || _p[3];
+        if(_ns !== _p[2] || _ng !== _p[3]){
+          _normWid = _p[0] + '_' + _p[1] + '_' + _ns + '_' + _ng;
+        }
+      }
+    }
+    const mz = (typeof WEAPON_MUZZLE !== 'undefined') ? (WEAPON_MUZZLE[_normWid] || WEAPON_MUZZLE[_cleanWid] || WEAPON_MUZZLE[_wid]) : null;
     const baseW = cfg.trim.w * (cfg.scale || 1.0);
     const baseH = cfg.trim.h * (cfg.scale || 1.0);
     if(mz){
@@ -427,13 +857,13 @@ function preloadStaticAssets(){
     if(typeof state !== 'undefined' && state.player && state.player.equipped){
       ['primary','secondary','melee'].forEach(function(slot){
         var _id = state.player.equipped[slot];
-        if(_id && _id.indexOf('named_') === 0) getHeroImg(window.getItemIconPath(_id));
+        if(_id && isNamedWeaponId(_id)) getHeroImg(window.getItemIconPath(_id));
       });
     }
     if(typeof state !== 'undefined' && state.stashedWeapons){
       for(var _sk in state.stashedWeapons){
         var _sw = state.stashedWeapons[_sk];
-        if(_sw && _sw.id && _sw.id.indexOf('named_') === 0) getHeroImg(window.getItemIconPath(_sw.id));
+        if(_sw && _sw.id && _sw.isNamedWeaponId(id)) getHeroImg(window.getItemIconPath(_sw.id));
       }
     }
     // 建築
@@ -598,10 +1028,32 @@ function updateBattleHeroAnim(now){
 }
 
 function getWeaponCfg(slot, id){
-  const baseId = resolveIconId(id);
-  const layout = WEAPON_LAYOUT[baseId];
+  const isNamed = (typeof id === 'string' && isNamedWeaponId(id));
+  const _cleanId = String(id || '').replace(/\.png$/i, '');
+  const baseId = resolveIconId(_cleanId);
+  /* rev-fix-layout-lookup-norm: 精确匹配前先规范化 scope/grip 短码 */
+  let _normId = _cleanId;
+  if(isNamed){
+    const _p = _cleanId.split('_');
+    if(_p.length === 4){
+      const _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87': 'c', 'PSO-1': 'l', 'PS320': 'l', '1P59': 'l' };
+      const _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
+      const _ns = _sMap[_p[2]] || _p[2];
+      const _ng = _gMap[_p[3]] || _p[3];
+      if(_ns !== _p[2] || _ng !== _p[3]){
+        _normId = _p[0] + '_' + _p[1] + '_' + _ns + '_' + _ng;
+      }
+    }
+  }
+  const exactLayout = WEAPON_LAYOUT[_normId] || WEAPON_LAYOUT[_cleanId];
+  const layout = exactLayout || WEAPON_LAYOUT[baseId];
   if(layout){
-    return { layer:'front_arm', behind:true, scale:layout.scale, ox:layout.ox, oy:layout.oy, rotation:layout.rotation, trim:layout.trim };
+    return {
+      layer:'front_arm', behind:true,
+      scale:layout.scale, ox:layout.ox, oy:layout.oy, rotation:layout.rotation,
+      trim:layout.trim,
+      isNamed: isNamed && !exactLayout
+    };
   }
   if(slot === 'primary') return HERO_VISIBLE_EQ.primary;
   if(slot === 'melee') return HERO_VISIBLE_EQ.melee;

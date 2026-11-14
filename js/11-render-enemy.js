@@ -126,8 +126,10 @@ function _tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
     return false;
   }
   if(typeof WEAPON_LAYOUT === 'undefined') return false;
-  var baseId = resolveIconId(weaponId);
-  var layout = WEAPON_LAYOUT[baseId] || HERO_VISIBLE_EQ.primary;
+  /* rev-fix-exact-layout-enemy: 优先查精确 id，再回退 baseId */
+  var _cleanWid2 = String(weaponId || '').replace(/\.png$/i, '');
+  var baseId = resolveIconId(_cleanWid2);
+  var layout = WEAPON_LAYOUT[_cleanWid2] || WEAPON_LAYOUT[baseId] || HERO_VISIBLE_EQ.primary;
   if(!layout) return false;
   var img = (typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(weaponId)) : null;
   if(!img || !img.complete || !img.naturalWidth) return false;

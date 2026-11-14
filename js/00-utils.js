@@ -1,3 +1,17 @@
+/* rev-remove-named-prefix-fix: 具名武器 id 无前缀，兼容旧存档 */
+function parseNamedId(id){
+  if(!id) return null;
+  if(typeof WEAPONS === "undefined") return null;
+  var p = id.split("_");
+  if(p.length !== 4 || !WEAPONS[p[0]]) return null;
+  return { baseId: p[0], mag: p[1] === "x" ? null : parseInt(p[1],10), scope: p[2] === "x" ? null : p[2], grip: p[3] === "x" ? null : p[3] };
+}
+function isNamedWeaponId(id){ return parseNamedId(id) !== null; }
+/* rev-fix-slot-label: 全局 slot 名称映射（最早加载，确保所有文件可用） */
+window.slotLabel = function(s){
+  if(!s) return '';
+  return { primary:'主武器', secondary:'副武器', melee:'近戰武器', throwable:'投擲物', head:'頭盔', face:'面罩', top:'護甲', top_armored:'護甲', backpack:'背包', pants:'褲子', shoes:'鞋子' }[s] || s;
+};
 
 /* ═══════════════════════════════════════════════════════════
  * 【術語鎖】本項目所有 *_DETECTABLE_R 一律讀作「該實體的可被發現半徑 R」。

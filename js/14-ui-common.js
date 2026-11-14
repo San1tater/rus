@@ -234,7 +234,7 @@ function openSlotPicker(slot, returnFn){
     }
   }
   const _slotPickerOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
-  const bd = openModal({ title: '選擇 ' + slot + ' 裝備', body: body, onClose: _slotPickerOnClose });
+  const bd = openModal({ title: '選擇 ' + window.slotLabel(slot) + ' 裝備', body: body, onClose: _slotPickerOnClose });
   bd.querySelectorAll('.item-row').forEach(function(row){
     row.onclick = function(){
       const iid = row.dataset.iid, irar = row.dataset.irar;
@@ -273,6 +273,7 @@ function getDisplayStat(id, rarity, key){
   if(key === 'heal' && d.heal != null) return Math.round(d.heal * mult);
   if(key === 'range'){
     if(d.slot === 'melee') return 2;
+    if(typeof d.combatRange === 'number' && d.combatRange > 0) return d.combatRange;
     if(d._shortRange) return (typeof FOOT_RANGE_SHORT === 'number') ? FOOT_RANGE_SHORT : 20;
     return (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[d.type]) || null;
   }

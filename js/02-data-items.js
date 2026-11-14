@@ -186,26 +186,34 @@ const AMMO_ICON_BY_CAL = {
 
 const WEAPON_MOD_RULES={
   aks74u:{mags:[45,60],scopes:[],grips:['RK-1']},aks74un:{mags:[45,60],scopes:['1P87'],grips:['RK-1']},
-  ak74:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},
+  ak74:{mags:[60,95],scopes:[],grips:['RK-1']},
   ak74n:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},ak74m:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},
   akm:{mags:[75],scopes:[],grips:['RK-1']},akms:{mags:[75],scopes:[],grips:['RK-1']},akmn:{mags:[75],scopes:['1P87','PSO-1'],grips:['RK-1']},
   ak103:{mags:[75],scopes:['1P87','PSO-1'],grips:['RK-1']},ak104:{mags:[75],scopes:['1P87','PSO-1'],grips:['RK-1']},
-  ak105:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},ak12:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},
-  asval:{mags:[30],scopes:['PSO-1','1P87'],grips:['RK-1']},'9a91':{mags:[],scopes:['PSO-1'],grips:['RK-1']},sr3m:{mags:[],scopes:['1P87'],grips:['RK-1']},
-  vss:{mags:[20,30],scopes:['PSO-1'],grips:['RK-1']},svd:{mags:[15,20],scopes:['PSO-1'],grips:[]},sv98:{mags:[],scopes:[],grips:[]},
-  rpk16:{mags:[95],scopes:['1P87','PSO-1'],grips:['RK-1']},rpd:{mags:[],scopes:[],grips:['RK-1']},
-  rpdn:{mags:[],scopes:['PSO-1'],grips:['RK-1']},
-  pkm:{mags:[200],scopes:[],grips:['RK-1']},
-  pkp:{mags:[200],scopes:['1P87','PSO-1'],grips:['RK-1']},ash12:{mags:[10,20],scopes:['1P87'],grips:['RK-1']},pp19:{mags:[],scopes:['1P87'],grips:['RK-1']},
-  pm:{mags:[],scopes:[],grips:[]},pb:{mags:[],scopes:[],grips:[]},mp443:{mags:[],scopes:[],grips:[]},aps:{mags:[],scopes:[],grips:[]},saiga12:{mags:[5,8,10,20],scopes:[],grips:[]},
+  ak105:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},ak12:{mags:[60,95],scopes:['1P87','PS320'],grips:['RK-1']},
+  asval:{mags:[30],scopes:['PSO-1','1P87'],grips:['RK-1']},'9a91':{mags:[],scopes:['1P87','PSO-1'],grips:[]},sr3m:{mags:[],scopes:['1P87','PSO-1'],grips:[]},
+  vss:{mags:[20,30],scopes:['1P87','PSO-1'],grips:['RK-1']},svd:{mags:[20],scopes:['1P87','PSO-1'],grips:[]},sv98:{mags:[],scopes:['1P59'],grips:[]},
+  rpk16:{mags:[95],scopes:['1P87','PS320'],grips:['RK-1']},rpd:{mags:[],scopes:[],grips:[]},
+  rpdn:{mags:[],scopes:['1P87','PSO-1'],grips:[]},
+  pkm:{mags:[],scopes:[],grips:['RK-1']},
+  pkp:{mags:[],scopes:['1P87','PSO-1'],grips:['RK-1']},ash12:{mags:[10,20],scopes:['1P87','PS320'],grips:['RK-1']},pp19:{mags:[],scopes:[],grips:[]},
+  pm:{mags:[],scopes:[],grips:[]},pb:{mags:[],scopes:[],grips:[]},mp443:{mags:[],scopes:[],grips:[]},aps:{mags:[],scopes:[],grips:[]},saiga12:{mags:[5,10,20],scopes:['1P87'],grips:[]},
 };
-const SCOPE_BONUS={'1P87':5,'PSO-1':8,'EKP-8-02':4,'PK-06':6,'1P59':12};
+const SCOPE_BONUS = { '1P87': 0, 'PSO-1': 0, 'PS320': 0, 'EKP-8-02': 0, 'PK-06': 0, '1P59': 0 };
 /* rev-workbench: 瞄具距離加成 / 握把命中加成 */
-const SCOPE_RANGE_BONUS = { '1P87': 0.10, 'PSO-1': 0.25 };
-const GRIP_HIT_BONUS = 8;
+const SCOPE_RANGE_BONUS = { '1P87': 0.20, 'PSO-1': 0.50, 'PS320': 0.50, '1P59': 0.80 };
+const GRIP_HIT_BONUS = 6;
+/* rev-fix-scope-mode-penalty: 高倍鏡連射精度懲罰（乘在 MODE_ACCURACY 上） */
+const SCOPE_MODE_PENALTY = {
+  'PSO-1': { '掃射': 0.5, '長點射': 0.75, '短點射': 0.9, '點射': 1.0 },
+  'PS320': { '掃射': 0.5, '長點射': 0.75, '短點射': 0.9, '點射': 1.0 },
+  '1P59':  { '掃射': 0.3, '長點射': 0.6, '短點射': 0.8, '點射': 1.0 }
+};
 const GRIP_NAME = { 'RK-1': 'RK-1 戰術握把' };
+/* rev-fix-grip-map: id 短碼映射（display 用原名，id 用短碼） */
+const GRIP_ID_SHORT = { 'RK-1': 'g' };
 
-const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-02 紅點','PK-06':'PK-06 紅點','1P59':'1P59 Hyperion 高倍鏡'};
+const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','PS320':'PS320 光學','EKP-8-02':'EKP-8-02 紅點','PK-06':'PK-06 紅點','1P59':'1P59 Hyperion 高倍鏡'};
 
 const SEEDS = {
   seed_potato: { name:'馬鈴薯種子', cropId:'crop_potato', growMs:1200000, baseYield:3, rotMs:1800000, autoCleanMs:600000, cleanupMs:5000, img:'seed_potato' },
@@ -257,9 +265,11 @@ Object.assign(ALL_ITEMS,ARMOR,WEAPONS,AMMO,CONSUMABLES,MATERIALS,SEEDS,CROPS);
 function itemDef(id){return ALL_ITEMS[id]||null;}
 function resolveIconId(id){
   if(!id) return '';
-  if(id.startsWith('named_')){
-    const parts=id.split('_');
-    if(parts.length>=2 && WEAPONS[parts[1]]) return parts[1];
+  /* rev-fix-id-suffix: 清理误加的 .png 后缀（导出数据问题） */
+  id = String(id).replace(/\.png$/i, '');
+  if(isNamedWeaponId(id)){
+    const _p = parseNamedId(id);
+    if(_p) return _p.baseId;
   }
   /* rev-fix-ammo-icon-redirect: AMMO id → 口徑圖標名（去掉 .png）。
    * 載員帶 ammo_handler 天賦可裝備彈藥箱，primaryWeapon 為 AMMO id，
@@ -297,7 +307,16 @@ function fmtNum(n){
 }
 
 window.getItemIconPath = function(id){
+  /* rev-fix-iconpath: 具名武器路径 */
+  var _pn_ic = (typeof parseNamedId === "function") ? parseNamedId(id) : null;
+  if(_pn_ic){
+    var _nid_ic = _pn_ic.baseId + "_" + (_pn_ic.mag === null ? "x" : _pn_ic.mag) + "_" + (_pn_ic.scope === null ? "x" : _pn_ic.scope) + "_" + (_pn_ic.grip === null ? "x" : _pn_ic.grip);
+    return "icons/weapons/named/" + _nid_ic + ".png";
+  }
+
   if(!id) return '';
+  /* rev-fix-id-suffix: 清理误加的 .png 后缀 */
+  id = String(id).replace(/\.png$/i, '');
   if(typeof SEEDS !== 'undefined' && SEEDS[id]){
     var _img = SEEDS[id].img || id;
     return 'icons/garden/seeds/' + _img + '.png';
@@ -317,9 +336,23 @@ window.getItemIconPath = function(id){
   if(typeof WEAPONS !== 'undefined' && WEAPONS[id]) return 'icons/weapons/' + id + '.png';
   if(typeof ARMOR !== 'undefined' && ARMOR[id]) return 'icons/armor/' + id + '.png';
   if(typeof CONSUMABLES !== 'undefined' && CONSUMABLES[id]) return 'icons/consumables/' + id + '.png';
-  if(id.indexOf('named_') === 0){
+  if(isNamedWeaponId(id)){
     var parts = id.split('_');
-    if(parts.length >= 2 && WEAPONS[parts[1]]) return 'icons/weapons/named/' + id + '.png';
+    if(parts.length >= 2 && WEAPONS[parts[1]]){
+      /* rev-fix-scope-short: scope → c/l 短碼；grip → g 短碼 */
+      var _scopeShort = { '1P87': 'c', 'PSO-1': 'l', 'PS320': 'l', '1P59': 'l' };
+      var _gripShort = { 'RK-1': 'g' };
+      var _normId = id;
+      if(parts.length === 5){
+        var _base = parts[1], _mag = parts[2], _scope = parts[3], _grip = parts[4];
+        var _newScope = _scopeShort[_scope] || _scope;
+        var _newGrip = _gripShort[_grip] || _grip;
+        if(_newScope !== _scope || _newGrip !== _grip){
+          _normId = _base + '_' + _mag + '_' + _newScope + '_' + _newGrip;
+        }
+      }
+      return 'icons/weapons/named/' + _normId + '.png';
+    }
   }
   return 'icons/items/' + id + '.png';
 };
@@ -475,32 +508,43 @@ function getAmmoByRarity(cal, targetRarity){
 }
 function getMeleeHits(rpm){return Math.max(1,Math.round((rpm||60)*MELEE_DURATION/60));}
 
-function namedWeaponName(baseId,mag,scope){
+function namedWeaponName(baseId,mag,scope,grip){
   const base=WEAPONS[baseId]||ALL_ITEMS[baseId];
   if(!base)return '未知';
   const parts=[base.name];
   if(mag && mag!==base.mag) parts.push(mag);
-  if(scope) parts.push(scope.replace(/-/g,''));
+  if(scope) parts.push(scope);
+  if(grip) parts.push(grip);
   return parts.join('_');
 }
-function getNamedId(baseId,mag,scope){
+/* rev-fix-scope-id-short: 瞄具 id 短码映射（與 getItemIconPath 一致） */
+const SCOPE_ID_SHORT = { '1P87': 'c', 'PSO-1': 'l', 'PS320': 'l', '1P59': 'l' };
+function getNamedId(baseId,mag,scope,grip){
   const base=WEAPONS[baseId];
   const normMag = (mag && base && mag !== base.mag) ? mag : 'x';
-  const normScope = scope || 'x';
-  return `named_${baseId}_${normMag}_${normScope}`;
+  const normScope = scope ? ((typeof SCOPE_ID_SHORT!=='undefined' && SCOPE_ID_SHORT[scope]) || scope) : 'x';
+  const normGrip = grip ? ((typeof GRIP_ID_SHORT!=='undefined' && GRIP_ID_SHORT[grip]) || grip) : 'x';
+  return baseId + '_' + normMag + '_' + normScope + '_' + normGrip;
 }
-function getOrCreateNamedItem(baseId,mag,scope){
-  const id=getNamedId(baseId,mag,scope);
+function getOrCreateNamedItem(baseId,mag,scope,grip){
+  const id=getNamedId(baseId,mag,scope,grip);
   if(!ALL_ITEMS[id]){
     const base=WEAPONS[baseId];
-    const name=namedWeaponName(baseId,mag,scope);
+    const name=namedWeaponName(baseId,mag,scope,grip);
     const effMag=(mag&&mag>base.mag)?mag:base.mag;
-    ALL_ITEMS[id]={name:name,slot:base.slot,type:base.type,cal:base.cal,mag:effMag,modes:base.modes,rpm:base.rpm,range:base.range,named:true,scope:scope||null,scopeBonus:scope?(SCOPE_BONUS[scope]||0):0,baseId:baseId};
+    const baseRange=(typeof WEAPON_COMBAT_RANGE!=='undefined'&&WEAPON_COMBAT_RANGE[base.type])||15;
+    const scopeRangeMult=scope?((typeof SCOPE_RANGE_BONUS!=='undefined'&&SCOPE_RANGE_BONUS[scope])||0):0;
+    const combatRange=Math.round(baseRange*(1+scopeRangeMult)*100)/100;
+    /* rev-fix-grip-hit: 握把命中加成写入 scopeBonus（原代码从未生效） */
+    const scopeHit=(scope&&typeof SCOPE_BONUS!=='undefined')?(SCOPE_BONUS[scope]||0):0;
+    const gripHit=(grip&&typeof GRIP_HIT_BONUS!=='undefined')?GRIP_HIT_BONUS:0;
+    const totalHitBonus=scopeHit+gripHit;
+    ALL_ITEMS[id]={name:name,slot:base.slot,type:base.type,cal:base.cal,mag:effMag,modes:base.modes,rpm:base.rpm,range:base.range,named:true,scope:scope||null,scopeBonus:totalHitBonus,baseId:baseId,grip:grip||null,combatRange:combatRange};
   }
   return id;
 }
 function isProfMaxed(weaponType){return Math.floor(state.proficiency[weaponType]||0)>=MAX_PROF_LEVEL;}
-function calcModCost(baseId,mag,scope){
+function calcModCost(baseId,mag,scope,grip){
   const cost={};
   const baseMag=WEAPONS[baseId].mag;
   if(mag && mag>baseMag){
@@ -514,9 +558,24 @@ function calcModCost(baseId,mag,scope){
     cost.gears=(cost.gears||0)+25;
     cost.screws=(cost.screws||0)+20;
   }
+  /* rev-fix-grip-cost-v2: 握把 RK-1 = 金屬 + 螺絲 + 齒輪 */
+  if(grip){
+    cost.metal=(cost.metal||0)+15;
+    cost.screws=(cost.screws||0)+20;
+    cost.gears=(cost.gears||0)+10;
+  }
   return cost;
 }
-function calcModTime(baseId,mag,scope){
+/* rev-wk-live-wb: 配件加成（與工作台等級無關），供動態計時 */
+function calcModExtra(baseId,mag,scope,grip){
+  const bm = WEAPONS[baseId].mag;
+  let extra = 0;
+  if(mag && mag > bm) extra += 0.05 + (mag-bm) * 0.002;
+  if(scope) extra += 0.10;
+  if(grip) extra += 0.05;
+  return extra;
+}
+function calcModTime(baseId,mag,scope,grip){
   const wbLv = Math.min(50, Math.max(1, getBuildingLv('workbench') || 1));
   const ratio = Math.pow(300/86400, (wbLv-1)/49);
   let baseSec = 86400 * ratio;
@@ -524,6 +583,7 @@ function calcModTime(baseId,mag,scope){
   let extra = 0;
   if(mag && mag > bm) extra += 0.05 + (mag-bm) * 0.002;
   if(scope) extra += 0.10;
+  if(grip) extra += 0.05;
   return Math.round(baseSec * (1 + extra));
 }
 function getMagOptionsForWeapon(weaponId){
@@ -538,12 +598,16 @@ function getMagOptionsForWeapon(weaponId){
   } else if(cal === '7.62' && type === '突擊步槍'){
     candidates = [30, 75];
   } else if(cal === '9x39'){
-    candidates = [20, 30];
+    if(weaponId === '9a91') candidates = [];
+    else candidates = [20, 30];
   } else if(cal === '7.62x54'){
-    if(weaponId === 'svd') candidates = [15, 20];
+    /* rev-fix-mag-options-76254: svd 固定 [20]；pkm/pkp 走 WEAPON_MOD_RULES */
+    if(weaponId === 'svd') candidates = [20];
     else if(weaponId === 'sv98') candidates = [];
-    else if(weaponId === 'pkm' || weaponId === 'pkp') candidates = [200];
-    else candidates = [];
+    else {
+      const rules = WEAPON_MOD_RULES[weaponId];
+      if(rules && rules.mags) candidates = rules.mags.slice();
+    }
   } else {
     const rules = WEAPON_MOD_RULES[weaponId];
     if(rules && rules.mags) candidates = rules.mags.slice();

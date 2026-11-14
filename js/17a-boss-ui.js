@@ -1048,7 +1048,7 @@ function renderBattleControls(z3){
   const _BURST_WHITELIST = ['ak12'];
   const _wid = battle.weapon ? battle.weapon.id : '';
   let _baseId = _wid;
-  if(_wid && _wid.indexOf('named_') === 0){
+  if(_wid && isNamedWeaponId(_wid)){
     const _p = _wid.split('_');
     if(_p.length >= 2) _baseId = _p[1];
   }
@@ -1349,12 +1349,8 @@ function playerShoot(){
     const _spd = (window.AMMO_SPEED_MS && window.AMMO_SPEED_MS[def.cal]) || 800;
     const _duration = Math.max(16, _dist * 100 / _spd * 1000);
 
-    const hitRate = getHitRate(def.type, _effectiveMode, def.scopeBonus || 0);
-    const _pdB = 0.6 + clamp(Math.floor(state.proficiency[def.type] || 0) / MAX_PROF_LEVEL, 0, 1) * 0.9;
-    const baseDmg = Math.round((battle.ammoRef ? AMMO[battle.ammoRef.id].dmg * (RARITY_MULT[battle.ammoRef.rarity] || 1) : 20) * _pdB);
+    const hitRate = getHitRate(def.type, _effectiveMode, def.scopeBonus || 0, def.scope);
     const ammoPenMM = battle.ammoRef ? (AMMO[battle.ammoRef.id].penMM || 0) : 0;
-    const critRate = calcCritRate(w.rarity, battle.ammoRef ? battle.ammoRef.rarity : '一般');
-    const critMult = calcCritMult(w.rarity, battle.ammoRef ? battle.ammoRef.rarity : '一般');
     const pellets = battle.ammoRef ? (AMMO[battle.ammoRef.id].pellets || 1) : 1;
 
     battle.bullets.push({
@@ -1363,9 +1359,15 @@ function playerShoot(){
       _onHit: function(){
         for(let p = 0; p < pellets; p++){
           if(Math.random() * 100 < hitRate){
-            let dmg = baseDmg;
-            let isCrit = false;
-            if(Math.random() < critRate){ dmg = Math.round(dmg * critMult); isCrit = true; }
+            const _d = (typeof _calcAttackDamage === 'function') ? _calcAttackDamage({
+              ammoId: battle.ammoRef ? battle.ammoRef.id : null,
+              ammoRarity: battle.ammoRef ? battle.ammoRef.rarity : '一般',
+              weaponRarity: w.rarity,
+              penMM: ammoPenMM,
+              fallbackDmg: def.dmg || 20
+            }) : { baseDmg: 20, crit: false };
+            let dmg = _d.baseDmg;
+            let isCrit = _d.crit;
             /* [v217] 瞄準點小型爆炸特效 */
             if(!battle.aimHitFx) battle.aimHitFx = [];
             {
@@ -1496,7 +1498,7 @@ function playerShoot(){
       refreshBattleControlsLive();
       return true;
     }
-    const hitRate = getHitRate(def.type, battle.fireMode) + 10;
+    const hitRate = getHitRate(def.type, battle.fireMode, def.scopeBonus || 0, def.scope) + 10;
     const baseDmg = Math.round((def.dmg || 0) * (RARITY_MULT[w.rarity] || 1));
     const critRate = calcCritRate(w.rarity, '一般');
     const critMult = calcCritMult(w.rarity, '一般');

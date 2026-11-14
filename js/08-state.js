@@ -137,6 +137,11 @@ function load(){
     while(state.base.slots.length < 12) state.base.slots.push(null);
     if(state.base.slots.length > 12) state.base.slots.length = 12;
     if(!state.base.slots[0] || state.base.slots[0].id !== 'control') state.base.slots[0] = {id:'control',lv:1};
+    /* rev-fix-building-lv-cap: load 時立即 clamp，避免超 50 的值在 _sanitizeState 前被讀 */
+    for(var _bli = 0; _bli < state.base.slots.length; _bli++){
+      var _bls = state.base.slots[_bli];
+      if(_bls && typeof _bls.lv === 'number' && _bls.lv > 50) _bls.lv = 50;
+    }
 
     if(!state.garden || typeof state.garden !== 'object') state.garden = {plots:new Array(20).fill(null), storage:{}};
     if(!Array.isArray(state.garden.plots)) state.garden.plots = new Array(20).fill(null);
@@ -180,6 +185,41 @@ function load(){
     for(var sk in state.seals){ state.seals[sk] = Math.max(0, parseInt(state.seals[sk] || 0, 10)); }
     if(!state.stats) state.stats = {kills:0, deaths:0, bossKills:0};
 
+    /* rev-fix-named-id-normalize: 统一具名 id 为 baseId_mag_scope_grip 4 段 */
+    (function(){
+      function _normalize(id){
+        if(!id || typeof id !== 'string') return id;
+        /* a. 去掉 named_ 前缀（旧格式 named_xxx → xxx） */
+        if(id.indexOf('named_') === 0) id = id.substring(6);
+        var p = id.split('_');
+        /* b. 5 段且 parts[0] 是 baseId → 之前 _migrateNamed 破坏的，截成 4 段 */
+        if(p.length === 5 && typeof WEAPONS !== 'undefined' && WEAPONS[p[0]]){
+          return p[0] + '_' + p[1] + '_' + p[2] + '_' + p[3];
+        }
+        /* c. 其他不动 */
+        return id;
+      }
+      /* 迁移 inventory */
+      var _ni = {};
+      for(var _k in state.inventory){
+        var _p = _k.split('@');
+        if(_p.length !== 2){ delete state.inventory[_k]; continue; }
+        var _nk = _normalize(_p[0]) + '@' + _p[1];
+        _ni[_nk] = (_ni[_nk] || 0) + state.inventory[_k];
+      }
+      state.inventory = _ni;
+      /* 迁移 equipped */
+      for(var _s in state.player.equipped){
+        if(state.player.equipped[_s]) state.player.equipped[_s] = _normalize(state.player.equipped[_s]);
+      }
+      /* 迁移 ALL_ITEMS */
+      var _toDel = [];
+      for(var _iid in ALL_ITEMS){
+        var _nid = _normalize(_iid);
+        if(_nid !== _iid){ _toDel.push(_iid); if(!ALL_ITEMS[_nid]) ALL_ITEMS[_nid] = ALL_ITEMS[_iid]; }
+      }
+      for(var _di = 0; _di < _toDel.length; _di++) delete ALL_ITEMS[_toDel[_di]];
+    })();
     removeInvalidInventoryItems();
     consolidateInventoryDuplicates();
     _cleanupAmmoRarity();
@@ -187,67 +227,303 @@ function load(){
 
     for(var slot in state.player.equipped){
       var id = state.player.equipped[slot];
-      if(id && !ALL_ITEMS[id] && id.indexOf('named_') !== 0){
+      if(id && !ALL_ITEMS[id] && !isNamedWeaponId(id)){
         state.player.equipped[slot] = null;
         delete state.player.equippedRarity[slot];
       }
     }
 
-    /* rev-workbench: 遷移舊 4 段 ID → 5 段（補 _x） */
-    (function _migrateNamed(){
-      function _fixId(id){
-        if(!id || id.indexOf('named_') !== 0) return id;
-        var parts = id.split('_');
-        if(parts.length === 4){
-          var baseId = parts[1];
-          var mag = parts[2] === 'x' ? null : parseInt(parts[2], 10);
-          var scope = parts[3] === 'x' ? null : parts[3];
-          if(WEAPONS[baseId]) getOrCreateNamedItem(baseId, mag, scope, null);
-          if(ALL_ITEMS[id]) delete ALL_ITEMS[id];
-          return id + '_x';
-        }
-        return id;
-      }
-      var _toDel = [], _toAdd = {};
-      for(var k in state.inventory){
-        var sp = k.split('@');
-        var nid = _fixId(sp[0]);
-        if(nid !== sp[0]){
-          _toDel.push(k);
-          var nk = nid + '@' + sp[1];
-          _toAdd[nk] = (_toAdd[nk] || 0) + state.inventory[k];
-        }
-      }
-      for(var i = 0; i < _toDel.length; i++) delete state.inventory[_toDel[i]];
-      for(var k2 in _toAdd) state.inventory[k2] = (state.inventory[k2] || 0) + _toAdd[k2];
-      for(var slot in state.player.equipped){
-        var eid = state.player.equipped[slot];
-        if(!eid) continue;
-        var neid = _fixId(eid);
-        if(neid !== eid) state.player.equipped[slot] = neid;
-      }
-      if(Array.isArray(state.crafting)){
-        for(var ci = 0; ci < state.crafting.length; ci++){
-          var c = state.crafting[ci];
-          if(c.type === 'mod' && c.modInfo && typeof c.modInfo.grip === 'undefined') c.modInfo.grip = null;
-        }
-      }
-    })();
-
-    var _regen = function(id){
-      if(!id || id.indexOf('named_') !== 0) return;
+        var _regen = function(id){
+      if(!id || !isNamedWeaponId(id)) return;
       var parts = id.split('_');
-      if(parts.length >= 4){
-        var baseId = parts[1];
-        var mag = parts[2] === 'x' ? null : parseInt(parts[2], 10);
-        var scope = parts[3] === 'x' ? null : parts[3];
-        var grip = parts[4] && parts[4] !== 'x' ? parts[4] : null;
-        if(WEAPONS[baseId]) getOrCreateNamedItem(baseId, mag, scope, grip);
+      var _off = (parts.length === 5) ? 1 : 0;
+      if(parts.length < 4) return;
+      var baseId = parts[_off];
+      if(!WEAPONS[baseId]) return;
+      var mag = parts[_off + 1] === 'x' ? null : parseInt(parts[_off + 1], 10);
+      var scopeShort = parts[_off + 2] === 'x' ? null : parts[_off + 2];
+      var gripShort = parts[_off + 3] === 'x' ? null : parts[_off + 3];
+      /* 短码→长名 */
+      var _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87':'c','PSO-1':'l','PS320':'l','1P59':'l' };
+      var _sLongMap = {};
+      for(var _sk in _sMap){ if(!_sLongMap[_sMap[_sk]]) _sLongMap[_sMap[_sk]] = []; _sLongMap[_sMap[_sk]].push(_sk); }
+      var _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1':'g' };
+      var _gLongMap = {};
+      for(var _gk in _gMap){ _gLongMap[_gMap[_gk]] = _gk; }
+      var rules = WEAPON_MOD_RULES[baseId] || {};
+      var validScopes = rules.scopes || [];
+      var scopeLong = null;
+      if(scopeShort){
+        var cands = _sLongMap[scopeShort] || [];
+        for(var ci = 0; ci < cands.length; ci++){
+          if(validScopes.indexOf(cands[ci]) >= 0){ scopeLong = cands[ci]; break; }
+        }
+        if(!scopeLong && cands.length > 0) scopeLong = cands[0];
       }
+      var gripLong = gripShort ? (_gLongMap[gripShort] || gripShort) : null;
+      getOrCreateNamedItem(baseId, mag, scopeLong, gripLong);
     };
     for(var ik in state.inventory) _regen(ik.split('@')[0]);
     for(var sk2 in state.player.equipped) _regen(state.player.equipped[sk2]);
 
+    /* rev-fix-named-migrate-all */
+    (function(){
+      var _seen = {};
+      var _gs = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
+      var _gl = {};
+      for(var _gk in _gs) _gl[_gs[_gk]] = _gk;
+      function _patch(nid){
+        if(_seen[nid]) return;
+        _seen[nid] = 1;
+        var _d = ALL_ITEMS[nid];
+        if(!_d || !_d.named) return;
+        if(typeof _d.combatRange !== 'number' || _d.combatRange <= 0){
+          var _br = (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[_d.type]) || 15;
+          var _sm = _d.scope ? ((typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[_d.scope]) || 0) : 0;
+          _d.combatRange = Math.round(_br * (1 + _sm) * 100) / 100;
+        }
+        if(typeof _d.grip === 'undefined'){
+          var _p = nid.split('_');
+          _d.grip = (_p.length === 5 && _p[4] !== 'x') ? (_gl[_p[4]] || _p[4]) : null;
+        }
+        /* rev-fix-grip-hit-migrate: 修正老具名武器的 scopeBonus（含握把） */
+        var _scopeHit = _d.scope ? ((typeof SCOPE_BONUS !== 'undefined' && SCOPE_BONUS[_d.scope]) || 0) : 0;
+        var _gripHit = _d.grip ? ((typeof GRIP_HIT_BONUS !== 'undefined') ? GRIP_HIT_BONUS : 0) : 0;
+        var _correctHit = _scopeHit + _gripHit;
+        if(typeof _d.scopeBonus !== 'number' || _d.scopeBonus !== _correctHit){
+          _d.scopeBonus = _correctHit;
+        }
+      }
+      for(var _k in state.inventory) _patch(_k.split('@')[0]);
+      for(var _s in state.player.equipped) if(state.player.equipped[_s]) _patch(state.player.equipped[_s]);
+    })();
+    /* rev-fix-named-name-dash: 重算具名武器显示名，保留 - */
+    (function(){
+      var _seen = {};
+      var _gs = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
+      var _gl = {};
+      for(var _gk in _gs) _gl[_gs[_gk]] = _gk;
+      function _recalc(nid){
+        if(_seen[nid]) return;
+        _seen[nid] = 1;
+        var _d = ALL_ITEMS[nid];
+        if(!_d || !_d.named) return;
+        var _p = nid.split('_');
+        var _off = (_p.length === 5) ? 1 : 0;
+        if(_p.length < 4) return;
+        var _baseId = _p[_off];
+        if(!WEAPONS[_baseId]) return;
+        var _mag = _p[_off + 1] === 'x' ? null : parseInt(_p[_off + 1], 10);
+        /* 用 _d.scope / _d.grip（已由 _regen 修复为长名） */
+        _d.name = namedWeaponName(_baseId, _mag, _d.scope, _d.grip);
+      }
+      for(var _k in state.inventory) _recalc(_k.split('@')[0]);
+      for(var _s in state.player.equipped) if(state.player.equipped[_s]) _recalc(state.player.equipped[_s]);
+      for(var _nid in ALL_ITEMS){ if(isNamedWeaponId(_nid)) _recalc(_nid); }
+    })();
+    /* rev-fix-named-id-migrate: 老具名 id scope/grip 短码规范化 */
+    (function(){
+      var _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87': 'c', 'PSO-1': 'l', 'PS320': 'l', '1P59': 'l' };
+      var _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
+      function _normId(oldId){
+        if(!oldId || !isNamedWeaponId(oldId)) return oldId;
+        var p = oldId.split('_');
+        if(p.length !== 5) return oldId;
+        var ns = _sMap[p[3]] || p[3];
+        var ng = _gMap[p[4]] || p[4];
+        if(ns === p[3] && ng === p[4]) return oldId;
+        return p[1] + '_' + p[2] + '_' + ns + '_' + ng;
+      }
+      function _ensureItem(oldId, newId){
+        if(ALL_ITEMS[newId]) return;
+        if(!ALL_ITEMS[oldId]) return;
+        ALL_ITEMS[newId] = Object.assign({}, ALL_ITEMS[oldId]);
+      }
+      var _inventoryMigrated = 0;
+      var _keys = Object.keys(state.inventory);
+      for(var _i = 0; _i < _keys.length; _i++){
+        var k = _keys[_i];
+        var parts = k.split('@');
+        if(parts.length !== 2) continue;
+        var oldId = parts[0];
+        var newId = _normId(oldId);
+        if(newId === oldId) continue;
+        var newKey = newId + '@' + parts[1];
+        _ensureItem(oldId, newId);
+        state.inventory[newKey] = (state.inventory[newKey] || 0) + state.inventory[k];
+        delete state.inventory[k];
+        _inventoryMigrated++;
+      }
+      var _equippedMigrated = 0;
+      for(var _slot in state.player.equipped){
+        var _eid = state.player.equipped[_slot];
+        if(!_eid) continue;
+        var _newEid = _normId(_eid);
+        if(_newEid === _eid) continue;
+        _ensureItem(_eid, _newEid);
+        state.player.equipped[_slot] = _newEid;
+        _equippedMigrated++;
+      }
+      if(_inventoryMigrated > 0 || _equippedMigrated > 0){
+        console.log('[rev-fix-named-id-migrate] 背包 ' + _inventoryMigrated + ' 件，装备 ' + _equippedMigrated + ' 件');
+      }
+    })();
+    /* rev-fix-named-scope-validity: 具名武器 scope 不合法时自动纠正（rpdn PS320 → PSO-1） */
+    (function(){
+      var _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87':'c','PSO-1':'l','PS320':'l','1P59':'l' };
+      var _seen = {};
+      function _fixScope(nid){
+        if(_seen[nid]) return;
+        _seen[nid] = 1;
+        var _d = ALL_ITEMS[nid];
+        if(!_d || !_d.named || !_d.scope) return;
+        var _baseId = _d.baseId;
+        if(!_baseId || !WEAPON_MOD_RULES[_baseId]) return;
+        var _rules = WEAPON_MOD_RULES[_baseId];
+        var _validScopes = _rules.scopes || [];
+        if(_validScopes.indexOf(_d.scope) >= 0) return;
+        /* scope 不合法，从 id 短码反查 */
+        var _p = nid.split('_');
+        var _off = (_p.length === 5) ? 1 : 0;
+        if(_p.length < 4) return;
+        var _short = _p[_off + 2];
+        if(_short === 'x') return;
+        var _oldScope = _d.scope;
+        var _newScope = null;
+        for(var _long in _sMap){
+          if(_sMap[_long] === _short && _validScopes.indexOf(_long) >= 0){ _newScope = _long; break; }
+        }
+        if(!_newScope) return;
+        _d.scope = _newScope;
+        /* 重算 scopeBonus / combatRange / detectBonus */
+        var _scopeHit = (typeof SCOPE_BONUS !== 'undefined' && SCOPE_BONUS[_newScope]) || 0;
+        var _gripHit = _d.grip ? ((typeof GRIP_HIT_BONUS !== 'undefined') ? GRIP_HIT_BONUS : 0) : 0;
+        _d.scopeBonus = _scopeHit + _gripHit;
+        var _baseRange = (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[_d.type]) || 15;
+        var _rangeMult = (typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[_newScope]) || 0;
+        _d.combatRange = Math.round(_baseRange * (1 + _rangeMult) * 100) / 100;
+        _d.detectBonus = (typeof SCOPE_DETECT_BONUS !== 'undefined' && SCOPE_DETECT_BONUS[_newScope]) || 0;
+        console.log('[fix-named-scope]', nid, _oldScope, '→', _newScope);
+      }
+      for(var _k in state.inventory) _fixScope(_k.split('@')[0]);
+      for(var _s in state.player.equipped) if(state.player.equipped[_s]) _fixScope(state.player.equipped[_s]);
+      for(var _nid in ALL_ITEMS){ if(isNamedWeaponId(_nid)) _fixScope(_nid); }
+    })();
+    /* rev-fix-named-name-2: 具名武器 scope 从短码/非法值修正为长名，并重算 name */
+    (function(){
+      var _sShort = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87':'c','PSO-1':'l','PS320':'l','1P59':'l' };
+      var _sLong = {};
+      for(var _sk in _sShort){ if(!_sLong[_sShort[_sk]]) _sLong[_sShort[_sk]] = []; _sLong[_sShort[_sk]].push(_sk); }
+      var _gShort = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1':'g' };
+      var _gLong = {};
+      for(var _gk in _gShort){ _gLong[_gShort[_gk]] = _gk; }
+      var _seen = {};
+      function _resolveScope(baseId, shortOrLong){
+        if(!shortOrLong) return null;
+        var rules = WEAPON_MOD_RULES[baseId] || {};
+        var valid = rules.scopes || [];
+        /* 已经是合法长名 */
+        if(valid.indexOf(shortOrLong) >= 0) return shortOrLong;
+        /* 是短码 → 从 valid 里找映射到该短码的长名 */
+        var candidates = _sLong[shortOrLong] || [];
+        for(var i = 0; i < candidates.length; i++){
+          if(valid.indexOf(candidates[i]) >= 0) return candidates[i];
+        }
+        /* 都不合法，返回 null（视为无瞄具） */
+        return null;
+      }
+      function _fix(nid){
+        if(_seen[nid]) return;
+        _seen[nid] = 1;
+        var d = ALL_ITEMS[nid];
+        if(!d || !d.named) return;
+        var baseId = d.baseId;
+        if(!baseId || !WEAPONS[baseId]) return;
+        var p = nid.split('_');
+        var _off = (p.length === 5) ? 1 : 0;
+        if(p.length < 4) return;
+        var mag = p[_off + 1] === 'x' ? null : parseInt(p[_off + 1], 10);
+        var idScope = p[_off + 2] === 'x' ? null : p[_off + 2];
+        var idGrip = p[_off + 3] === 'x' ? null : (_gLong[p[_off + 3]] || p[_off + 3]);
+        /* 2. d.scope 如果非法，用 id 短码解析 */
+        var oldScope = d.scope;
+        var newScope = _resolveScope(baseId, d.scope);
+        if(!newScope && idScope){
+          newScope = _resolveScope(baseId, idScope);
+        }
+        if(newScope !== oldScope){
+          d.scope = newScope;
+          console.log('[fix-named-name-2]', nid, 'scope:', oldScope, '→', newScope);
+        }
+        /* 3. 修 grip */
+        if(typeof d.grip === 'undefined' || d.grip === null || d.grip === ''){
+          if(idGrip) d.grip = idGrip;
+        }
+        /* 4. 重算 name */
+        var newName = namedWeaponName(baseId, mag, d.scope, d.grip);
+        if(newName !== d.name){
+          console.log('[fix-named-name-2]', nid, 'name:', d.name, '→', newName);
+          d.name = newName;
+        }
+        /* 5. 重算 scopeBonus / combatRange / detectBonus */
+        var sHit = (d.scope && typeof SCOPE_BONUS !== 'undefined' && SCOPE_BONUS[d.scope]) || 0;
+        var gHit = d.grip ? ((typeof GRIP_HIT_BONUS !== 'undefined') ? GRIP_HIT_BONUS : 0) : 0;
+        d.scopeBonus = sHit + gHit;
+        var baseRange = (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[d.type]) || 15;
+        var rMult = (d.scope && typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[d.scope]) || 0;
+        d.combatRange = Math.round(baseRange * (1 + rMult) * 100) / 100;
+        d.detectBonus = (d.scope && typeof SCOPE_DETECT_BONUS !== 'undefined' && SCOPE_DETECT_BONUS[d.scope]) || 0;
+      }
+      for(var _k in state.inventory) _fix(_k.split('@')[0]);
+      for(var _s in state.player.equipped) if(state.player.equipped[_s]) _fix(state.player.equipped[_s]);
+      for(var _nid in ALL_ITEMS){ if(isNamedWeaponId(_nid)) _fix(_nid); }
+    })();
+    /* rev-fix-grip-long-name: d.grip 是短码(g)时反查为长名(RK-1)，并重算 name */
+    (function(){
+      var _gShort = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1':'g' };
+      var _gLongMap = {};
+      for(var _k in _gShort) _gLongMap[_gShort[_k]] = _k;
+      var _seen = {};
+      function _fix(nid){
+        if(_seen[nid]) return; _seen[nid] = 1;
+        var d = ALL_ITEMS[nid];
+        if(!d || !d.named) return;
+        if(!d.grip) return;
+        if(!_gLongMap[d.grip]) return;
+        var oldGrip = d.grip;
+        d.grip = _gLongMap[d.grip];
+        var p = nid.split('_');
+        var _off = (p.length === 5) ? 1 : 0;
+        var mag = (p[_off + 1] === 'x') ? null : parseInt(p[_off + 1], 10);
+        var newName = namedWeaponName(d.baseId, mag, d.scope, d.grip);
+        console.log('[fix-grip]', nid, 'grip:', oldGrip, '→', d.grip, 'name:', d.name, '→', newName);
+        d.name = newName;
+      }
+      for(var _kk in state.inventory) _fix(_kk.split('@')[0]);
+      for(var _s in state.player.equipped) if(state.player.equipped[_s]) _fix(state.player.equipped[_s]);
+      for(var _nid in ALL_ITEMS){ if(isNamedWeaponId(_nid)) _fix(_nid); }
+    })();
+    /* rev-remove-named-prefix-migrate: 去掉旧存档 named_ 前缀 */
+    (function(){
+      function _strip(id){ return (id && id.indexOf("named_") === 0) ? id.substring(6) : id; }
+      var _ni = {};
+      for(var _k in state.inventory){
+        var _p = _k.split("@");
+        var _nk = _strip(_p[0]) + "@" + _p[1];
+        _ni[_nk] = (_ni[_nk] || 0) + state.inventory[_k];
+      }
+      state.inventory = _ni;
+      for(var _s in state.player.equipped){
+        if(state.player.equipped[_s]) state.player.equipped[_s] = _strip(state.player.equipped[_s]);
+      }
+      for(var _iid in ALL_ITEMS){
+        if(_iid.indexOf("named_") === 0){
+          var _nid = _iid.substring(6);
+          ALL_ITEMS[_nid] = ALL_ITEMS[_iid];
+          delete ALL_ITEMS[_iid];
+        }
+      }
+    })();
     _initUnlockedFrom();
 
     /* rev-fix-sanitize-state: 通用存檔自檢 */
@@ -274,9 +550,75 @@ function rarityClass(r){ return 'r-' + r; }
 
 // ===== 背包 =====
 function invKey(id, r){ return id + '@' + r; }
+/* rev-unique-weapon: 同 baseId 主副武器唯一，保留优先级最高的 */
+function _weaponPriority(id, rarity){
+  if(!id) return -1;
+  var d = ALL_ITEMS[id];
+  if(!d) return -1;
+  if(d.slot !== 'primary' && d.slot !== 'secondary') return -1;
+  var r = RARITY_ORDER.indexOf(rarity);
+  if(r < 0) return -1;
+  return r + (d.named ? 0.5 : 0);
+}
+function _weaponBaseId(id){
+  if(!id) return null;
+  var d = ALL_ITEMS[id];
+  if(!d) return null;
+  if(d.slot !== 'primary' && d.slot !== 'secondary') return null;
+  if(d.named) return d.baseId || null;
+  return WEAPONS[id] ? id : null;
+}
+function _salvageWeaponOne(where, key, slot, id, rarity){
+  if(where === 'inv'){ delete state.inventory[key]; }
+  else { state.player.equipped[slot] = null; delete state.player.equippedRarity[slot]; }
+  var _name = ALL_ITEMS[id] ? ALL_ITEMS[id].name : id;
+  var _rc = (typeof rarityClass === 'function') ? rarityClass(rarity) : '';
+  if(typeof salvageToMaterials === 'function') salvageToMaterials(id, rarity, 1);
+  if(typeof pushLog === 'function'){
+    pushLog('<span class="pl">系統</span> 同型號已有更高稀有度武器，<span class="' + _rc + '">' + _name + '</span> 自動分解', [], 'explore');
+  }
+}
+/* true = 新武器應該分解 */
+function _resolveWeaponUniqueness(newId, newRarity){
+  var baseId = _weaponBaseId(newId);
+  if(!baseId) return false;
+  var newPri = _weaponPriority(newId, newRarity);
+  if(newPri < 0) return false;
+  var conflicts = [];
+  for(var k in state.inventory){
+    var p = k.split('@');
+    if(p[0] === newId && p[1] === newRarity) continue;
+    if(_weaponBaseId(p[0]) !== baseId) continue;
+    conflicts.push({where:'inv', key:k, id:p[0], r:p[1], pri:_weaponPriority(p[0], p[1])});
+  }
+  for(var s in state.player.equipped){
+    var eid = state.player.equipped[s];
+    if(!eid) continue;
+    var er = state.player.equippedRarity[s] || '一般';
+    if(eid === newId && er === newRarity) continue;
+    if(_weaponBaseId(eid) !== baseId) continue;
+    conflicts.push({where:'eq', slot:s, id:eid, r:er, pri:_weaponPriority(eid, er)});
+  }
+  if(!conflicts.length) return false;
+  var maxPri = -1;
+  for(var i = 0; i < conflicts.length; i++) if(conflicts[i].pri > maxPri) maxPri = conflicts[i].pri;
+  if(newPri >= maxPri){
+    for(var j = 0; j < conflicts.length; j++){
+      _salvageWeaponOne(conflicts[j].where, conflicts[j].key, conflicts[j].slot, conflicts[j].id, conflicts[j].r);
+    }
+    return false;
+  }
+  return true;
+}
 function invAddRaw(id, r, c){
+  /* rev-fix-uniqueness-call */
+  if(_resolveWeaponUniqueness(id, r)){
+    if(typeof salvageToMaterials === 'function') salvageToMaterials(id, r, c);
+    return;
+  }
+
   if(c <= 0) return;
-  if(!ALL_ITEMS[id] && id.indexOf('named_') !== 0){
+  if(!ALL_ITEMS[id] && !isNamedWeaponId(id)){
     console.warn('[invAddRaw] 非法物品', id);
     return;
   }
@@ -303,7 +645,7 @@ function invList(){
     if(p.length !== 2) continue;
     var id = p[0], r = p[1];
     var def = itemDef(id);
-    if(!def && id.indexOf('named_') !== 0) continue;
+    if(!def && !isNamedWeaponId(id)) continue;
     l.push({id:id, rarity:r, count:state.inventory[k], def:def});
   }
   return l;
@@ -499,6 +841,16 @@ function _sanitizeState(){
     }
   }
 
+  /* rev-fix-building-lv-cap: 建築等級超過 50 一律重置為 50 */
+  if(state.base && Array.isArray(state.base.slots)){
+    for(let _bi = 0; _bi < state.base.slots.length; _bi++){
+      const _bs = state.base.slots[_bi];
+      if(_bs && typeof _bs.lv === 'number' && _bs.lv > 50){
+        fixed.push('base.slots[' + _bi + '].lv=' + _bs.lv + '->50');
+        _bs.lv = 50;
+      }
+    }
+  }
   if(removed.length > 0 || fixed.length > 0){
     console.warn('[sanitize] removed=' + removed.length + ' fixed=' + fixed.length);
     if(removed.length > 0) console.warn('[sanitize] removed:', removed.slice(0, 30));
@@ -523,22 +875,174 @@ function _initUnlockedFrom(){
     if(d2 && d2.slot) state.unlockedEquip[id + '@' + rar] = true;
   }
 }
+function _isNamedWeaponComboValid(id){
+  var _p2 = parseNamedId(id);
+  if(!_p2) return false;
+  var baseId = _p2.baseId;
+  if(!WEAPONS[baseId]) return false;
+  var base = WEAPONS[baseId];
+  var mag = _p2.mag;
+  var scopeRaw = _p2.scope;
+  var gripRaw = _p2.grip;
+
+  /* rev-fix-combo-valid-shortcode: 短码反查长名 */
+  var _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87': 'c', 'PSO-1': 'l', 'PS320': 'l', '1P59': 'l' };
+  var _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
+
+  var scopeCandidates = [];
+  if(scopeRaw){
+    if(_sMap[scopeRaw]){
+      scopeCandidates.push(scopeRaw);
+    } else {
+      for(var _sk in _sMap){ if(_sMap[_sk] === scopeRaw) scopeCandidates.push(_sk); }
+    }
+  }
+  var gripCandidates = [];
+  if(gripRaw){
+    if(_gMap[gripRaw]){
+      gripCandidates.push(gripRaw);
+    } else {
+      for(var _gk in _gMap){ if(_gMap[_gk] === gripRaw) gripCandidates.push(_gk); }
+    }
+  }
+
+  if(mag === null && scopeRaw === null && gripRaw === null) return false;
+
+  var rules = WEAPON_MOD_RULES[baseId] || {};
+  if(mag !== null && mag !== base.mag){
+    if(mag < base.mag) return false;
+    var magOpts = (typeof getMagOptionsForWeapon === 'function') ? getMagOptionsForWeapon(baseId) : [];
+    if(magOpts.indexOf(mag) < 0) return false;
+  }
+  if(scopeCandidates.length > 0){
+    var _sRules = rules.scopes || [];
+    var _sOk = false;
+    for(var _si = 0; _si < scopeCandidates.length; _si++){
+      if(_sRules.indexOf(scopeCandidates[_si]) >= 0){ _sOk = true; break; }
+    }
+    if(!_sOk) return false;
+  }
+  if(gripCandidates.length > 0){
+    var _gRules = rules.grips || [];
+    var _gOk = false;
+    for(var _gi = 0; _gi < gripCandidates.length; _gi++){
+      if(_gRules.indexOf(gripCandidates[_gi]) >= 0){ _gOk = true; break; }
+    }
+    if(!_gOk) return false;
+  }
+  return true;
+}
+/* rev-fix-weapon-source: 武器来源位置抽象 —— 改造流程唯一真相源 */
+function _removeWeaponFromSource(source, rawId){
+  if(!source) return;
+  if(source.type === 'player'){
+    state.player.equipped[source.slot] = null;
+    delete state.player.equippedRarity[source.slot];
+  } else if(source.type === 'passenger'){
+    var p = state.station && state.station.passengers ? state.station.passengers[source.passengerIdx] : null;
+    if(p){
+      if(source.slot === 'primary'){ p.primaryWeapon = null; p.primaryWeaponRarity = ''; p.primaryWeaponBoxCount = 0; }
+      else if(source.slot === 'secondary'){ p.secondaryWeapon = null; p.secondaryWeaponRarity = ''; }
+    }
+  } else if(source.type === 'guard'){
+    var plot = state.garden && state.garden.plots ? state.garden.plots[source.towerIdx] : null;
+    if(plot && plot.towerConfig && plot.towerConfig.eq){
+      plot.towerConfig.eq[source.slot] = null;
+      if(plot.towerConfig.eqRarity) delete plot.towerConfig.eqRarity[source.slot];
+    }
+  } else if(source.type === 'inventory'){
+    /* rev-fix-remove-inventory: 优先用 source.rawKey（含 '@rarity'），回退 rawId */
+    var _key = source.rawKey || rawId;
+    if(_key){
+      var parts = _key.split('@');
+      if(parts.length === 2){
+        invRemove(parts[0], parts[1], 1);
+      }
+    }
+  }
+}
+function _putWeaponToSource(source, namedId){
+  if(!source) return false;
+  if(source.type === "player"){
+    if(state.player.equipped[source.slot]) return false;
+    state.player.equipped[source.slot] = namedId;
+    state.player.equippedRarity[source.slot] = "具名";
+    return true;
+  } else if(source.type === "passenger"){
+    var p = state.station && state.station.passengers ? state.station.passengers[source.passengerIdx] : null;
+    if(!p) return false;
+    if(source.slot === "primary"){
+      if(p.primaryWeapon) return false;
+      p.primaryWeapon = namedId; p.primaryWeaponRarity = "具名"; p.primaryWeaponBoxCount = 0;
+    } else if(source.slot === "secondary"){
+      if(p.secondaryWeapon) return false;
+      p.secondaryWeapon = namedId; p.secondaryWeaponRarity = "具名";
+    } else return false;
+    return true;
+  } else if(source.type === "guard"){
+    var plot = state.garden && state.garden.plots ? state.garden.plots[source.towerIdx] : null;
+    if(!plot || !plot.towerConfig || !plot.towerConfig.eq) return false;
+    if(plot.towerConfig.eq[source.slot]) return false;
+    plot.towerConfig.eq[source.slot] = namedId;
+    if(!plot.towerConfig.eqRarity) plot.towerConfig.eqRarity = {};
+    plot.towerConfig.eqRarity[source.slot] = "具名";
+    return true;
+  }
+  return false;
+}
+/* rev-fix-calc-attack: 伤害计算唯一入口（探索/Boss/后院共用） */
+function _calcAttackDamage(atk){
+  var ammoDef = (atk.ammoId && typeof AMMO !== "undefined" && AMMO[atk.ammoId]) ? AMMO[atk.ammoId] : null;
+  var aRar = atk.ammoRarity || (ammoDef ? ammoDef.rarity : "一般");
+  var wRar = atk.weaponRarity || "一般";
+  var baseDmg;
+  if(ammoDef){
+    baseDmg = Math.round(ammoDef.dmg * (RARITY_MULT[aRar] || 1));
+  } else {
+    baseDmg = atk.fallbackDmg || 10;
+  }
+  var penMM = (atk.penMM != null) ? atk.penMM : ((ammoDef && ammoDef.penMM) || 0);
+  var crit = false;
+  if(!atk.noCrit){
+    var cr = (typeof calcCritRate === "function") ? calcCritRate(wRar, aRar) : 0.1;
+    var cm = (typeof calcCritMult === "function") ? calcCritMult(wRar, aRar) : 1.5;
+    if(Math.random() < cr){ baseDmg = Math.round(baseDmg * cm); crit = true; }
+  }
+  return { baseDmg: baseDmg, crit: crit, aRar: aRar, wRar: wRar, penMM: penMM };
+}
 function removeInvalidInventoryItems(){
   var removed = [];
+  /* 掃背包 */
   for(var k in state.inventory){
     var id = k.split('@')[0];
-    if(id.indexOf('named_') === 0){
-      /* rev-fix-invalid-named: 跨版本 baseId 已删时清理，避免永久残留 */
-      var _np = id.split('_');
-      if(_np.length < 4 || !WEAPONS[_np[1]]){
+    if(isNamedWeaponId(id)){
+      if(!_isNamedWeaponComboValid(id)){
         removed.push({id:id, cnt:state.inventory[k]});
         delete state.inventory[k];
+        if(ALL_ITEMS[id]) delete ALL_ITEMS[id];
       }
       continue;
     }
     if(!ALL_ITEMS[id]){
       removed.push({id:id, cnt:state.inventory[k]});
       delete state.inventory[k];
+    }
+  }
+  /* 掃已裝備槽位 */
+  for(var slot in state.player.equipped){
+    var eqId = state.player.equipped[slot];
+    if(!eqId) continue;
+    if(isNamedWeaponId(eqId) && !_isNamedWeaponComboValid(eqId)){
+      removed.push({id:eqId, cnt:1});
+      state.player.equipped[slot] = null;
+      delete state.player.equippedRarity[slot];
+      if(ALL_ITEMS[eqId]) delete ALL_ITEMS[eqId];
+      continue;
+    }
+    if(!isNamedWeaponId(eqId) && !ALL_ITEMS[eqId]){
+      removed.push({id:eqId, cnt:1});
+      state.player.equipped[slot] = null;
+      delete state.player.equippedRarity[slot];
     }
   }
   return removed;
@@ -565,7 +1069,7 @@ function consolidateInventoryDuplicates(){
   for(var k in state.inventory){
     var parts = k.split('@');
     var id = parts[0], rar = parts[1];
-    if(!id || id.indexOf('named_') === 0) continue;
+    if(!id || isNamedWeaponId(id)) continue;
     var cat = itemCat(id);
     if(cat !== 'weapon' && cat !== 'armor') continue;
     var m = RARITY_MULT[rar] || 1;
@@ -575,7 +1079,7 @@ function consolidateInventoryDuplicates(){
   for(var k2 in state.inventory){
     var p2 = k2.split('@');
     var id2 = p2[0], rar2 = p2[1];
-    if(!id2 || id2.indexOf('named_') === 0) continue;
+    if(!id2 || isNamedWeaponId(id2)) continue;
     if(!_keep[id2]) continue;
     if(k2 === _keep[id2].k) continue;
     _toSalvage.push({id:id2, rar:rar2, cnt:state.inventory[k2], k:k2});
@@ -616,14 +1120,14 @@ function salvageToMaterials(id, rarity, count){
 function invAdd(id, rarity, count){
   if(count <= 0) return;
   if(typeof SEEDS !== 'undefined' && SEEDS[id]){ gardenStorageAdd(id, rarity, count); return; }
-  if(!ALL_ITEMS[id] && id.indexOf('named_') !== 0){
+  if(!ALL_ITEMS[id] && !isNamedWeaponId(id)){
     console.warn('[invAdd] 非法物品', id);
     return;
   }
   var cat = itemCat(id);
 
-  if(cat === 'weapon' && id.indexOf('named_') !== 0 && rarity === '傳奇'){
-    var _pfx = 'named_' + id + '_';
+  if(cat === 'weapon' && !isNamedWeaponId(id) && rarity === '傳奇'){
+    var _pfx = id + '_';
     var _hasNamed = false;
     for(var k in state.inventory){
       var _iid = k.split('@')[0];
@@ -815,7 +1319,7 @@ function addProf(cat, n){
   var m = 1 + tl * 0.02;
   state.proficiency[cat] = Math.min(MAX_PROF_RAW, (state.proficiency[cat] || 0) + n * m);
 }
-function getHitRate(weaponType, mode, scopeBonus){
+function getHitRate(weaponType, mode, scopeBonus, scope){
   var base = 10, p = 0;
   var w = state.player.equipped.primary;
   var s = state.player.equipped.secondary;
@@ -827,7 +1331,13 @@ function getHitRate(weaponType, mode, scopeBonus){
   if(_md && _md.type === weaponType) p += Math.floor(state.proficiency.melee || 0);
   if(_td && _td.type === weaponType) p += Math.floor(state.proficiency.throwable || 0);
   p += Math.floor(state.proficiency[weaponType] || 0);
-  return clamp(Math.round((base + p) * (MODE_ACCURACY[mode] || 1) + (scopeBonus || 0)), 5, 75);
+  /* rev-fix-scope-mode-penalty: 高倍鏡的連射精度懲罰 */
+  var modeMult = MODE_ACCURACY[mode] || 1;
+  if(scope && typeof SCOPE_MODE_PENALTY !== 'undefined' && SCOPE_MODE_PENALTY[scope]){
+    var pen = SCOPE_MODE_PENALTY[scope][mode];
+    if(typeof pen === 'number') modeMult *= pen;
+  }
+  return clamp(Math.round((base + p) * modeMult + (scopeBonus || 0)), 5, 75);
 }
 function calcCritRate(wr, ar){
   /* rev-fix-crit-separate: 暴率只讀武器稀有度（精度）；ar 參數保留以兼容調用點 */
@@ -855,7 +1365,9 @@ function getBuildingLv(id){
     if(s && s.id === id){
       var raw = s.lv || 1;
       var mx = (BUILDINGS[id] && BUILDINGS[id].maxLv) || 999;
-      return Math.min(raw, mx);
+      /* rev-fix-building-lv-cap: 全局上限 50，即使 maxLv 配置錯也不超過 */
+      var cap = (typeof BUILDING_LV_MAX !== 'undefined') ? BUILDING_LV_MAX : 50;
+      return Math.min(raw, mx, cap);
     }
   }
   return 0;
@@ -1194,6 +1706,46 @@ const toastSlotSet = new Set();
 function notify(msg, type){ /* disabled */ }
 
 // ===== 建築 tick / 製造 / 離線建築結算（rev-fix-position: 从 25-boot.js 移入） =====
+window._diagnosePS320 = function(){
+  var scopeMap = { '1P87':'1P87', 'PSO-1':'PSO-1', 'PS320':'PS320', '1P59':'1P59' };
+  var _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : {};
+  var scopeLong = {};
+  for(var sk in _sMap){ scopeLong[_sMap[sk]] = sk; }
+  var result = {};
+  for(var wid in WEAPON_MOD_RULES){
+    var scopes = WEAPON_MOD_RULES[wid].scopes || [];
+    if(scopes.indexOf('PS320') >= 0) result[wid] = scopes;
+  }
+  console.log('=== 含 PS320 瞄具的武器 ===');
+  for(var k in result) console.log('  ' + k + ': ' + JSON.stringify(result[k]));
+  return result;
+};
+window._diagnoseNamedIds = function(){
+  var all = [];
+  Object.keys(state.inventory).forEach(function(k){
+    var id = k.split('@')[0];
+    if(isNamedWeaponId(id)) all.push({ where:'inv', id:id, count:state.inventory[k] });
+  });
+  Object.keys(state.player.equipped).forEach(function(s){
+    var id = state.player.equipped[s];
+    if(id && isNamedWeaponId(id)) all.push({ where:'eq', slot:s, id:id });
+  });
+  var _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87':'c','PSO-1':'l','PS320':'l','1P59':'l' };
+  var _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1':'g' };
+  var _validScopes = ['x']; var _validGrips = ['x'];
+  for(var _sk in _sMap){ if(_validScopes.indexOf(_sMap[_sk]) < 0) _validScopes.push(_sMap[_sk]); }
+  for(var _gk in _gMap){ if(_validGrips.indexOf(_gMap[_gk]) < 0) _validGrips.push(_gMap[_gk]); }
+  var _good = 0, _bad = 0;
+  all.forEach(function(x){
+    var p = x.id.split('_');
+    var valid = p.length === 5 && WEAPONS[p[1]] && (p[2] === 'x' || /^\d+$/.test(p[2])) && _validScopes.indexOf(p[3]) >= 0 && _validGrips.indexOf(p[4]) >= 0;
+    if(valid) _good++; else _bad++;
+    console.log((valid ? '✓' : '✗') + ' ' + x.where + ' ' + x.id + (x.count ? ' ×' + x.count : ''));
+  });
+  console.log('---');
+  console.log('总计：好 ' + _good + ' / 坏 ' + _bad);
+  return { good:_good, bad:_bad, all:all };
+};
 window.buildingTick = function(){
   var now = Date.now();
   /* rev-fix-auto-recover: 載員重傷 / 載具維修到期後自動恢復滿血。
@@ -1278,7 +1830,8 @@ window.buildingTick = function(){
       state.armoryLastTick = aLast + times * aInt;
     }
   }
-  if(typeof processCrafting === "function") processCrafting();
+  /* rev-fix-craft-independent: 优先跑 processCrafting，任何异常不影响 */
+  if(typeof processCrafting === "function"){ try { processCrafting(); } catch(e){ console.warn('[processCrafting]', e); } }
   if(typeof _gardenMealTick === "function"){ try{ _gardenMealTick(now); }catch(e){} }
   if(typeof _gardenFarmBackgroundTick === "function"){ try{ _gardenFarmBackgroundTick(now); }catch(e){} }
   if(typeof _gardenStorageRotCheck === "function"){ try{ _gardenStorageRotCheck(); }catch(e){} }
@@ -1289,25 +1842,23 @@ function processCrafting(){
   const now = Date.now();
   const genLv = (typeof getBuildingLv === 'function') ? getBuildingLv('generator') : 0;
   const sm = 1 + genLv * 0.2;
+  const wbLv = Math.min(50, Math.max(1, (typeof getBuildingLv === 'function' ? getBuildingLv('workbench') : 1) || 1));
+  const wbBaseSec = 86400 * Math.pow(300/86400, (wbLv-1)/49);
   for(let i = state.crafting.length - 1; i >= 0; i--){
     const c = state.crafting[i];
     if(c.type === 'mod'){
-      const t = c.time * 1000 / sm;
+      const _totalSec = (typeof c.extra === 'number') ? (wbBaseSec * (1 + c.extra)) : c.time;
+      const t = _totalSec * 1000 / sm;
       if(now - c.startTime >= t){
         const info = c.modInfo;
         const namedId = getOrCreateNamedItem(info.baseId, info.mag, info.scope, info.grip || null);
-        if(info.fromEquippedSlot){
-          if(!state.player.equipped[info.fromEquippedSlot]){
-            state.player.equipped[info.fromEquippedSlot] = namedId;
-            state.player.equippedRarity[info.fromEquippedSlot] = '具名';
-          } else {
-            invAddRaw(namedId, '具名', 1);
-            pushLog('<span class="pl">系統</span> 改造完成：<b class="r-具名">' + itemDef(namedId).name + '</b> 已放入背包（原槽位已被佔用）。', [], 'explore');
-          }
+        if(info.source && info.source.type !== 'inventory' && _putWeaponToSource(info.source, namedId)){
+          /* 放回原位 */
         } else {
-          /* rev-workbench: 工作台在加入队列时已消耗源武器，避免双删 */
-          if(info.originalId && !info._consumedAtStart) invRemove(info.originalId, info.originalRarity, 1);
           invAddRaw(namedId, '具名', 1);
+          if(info.source && info.source.type !== 'inventory'){
+            pushLog('<span class="pl">系統</span> 改造完成：<b class="r-具名">' + itemDef(namedId).name + '</b> 已放入背包（原位置已被佔用）。', [], 'explore');
+          }
         }
         pushLog('<span class="pl">玩家</span> 完成改造：<b class="r-具名">' + itemDef(namedId).name + '</b>。', [], 'explore');
         state.crafting.splice(i, 1);

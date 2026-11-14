@@ -656,12 +656,15 @@ function onBuildCell(i){
 function renderModQueueHtml(workbenchLv){
   if(!state.crafting||!state.crafting.length)return '';
   const now=Date.now();
-  const genLv=getBuildingLv('generator');const sm=1 + genLv * 0.04;
+  const genLv=getBuildingLv('generator');const sm=1 + genLv * 0.2;
+  const wbLv = Math.min(50, Math.max(1, getBuildingLv('workbench') || 1));
+  const wbBaseSec = 86400 * Math.pow(300/86400, (wbLv-1)/49);
   let html='<div style="font-size:11px;color:#4caf50;font-weight:bold;margin:8px 0 6px">📋 改造隊列（'+state.crafting.filter(c=>c.type==='mod').length+'/'+workbenchLv+'）</div>';
   for(const c of state.crafting){
     if(c.type!=='mod')continue;
     const info=c.modInfo;
-    const total=c.time*1000/sm;
+    const _totalSec = (typeof c.extra === 'number') ? (wbBaseSec * (1 + c.extra)) : c.time;
+    const total=_totalSec*1000/sm;
     const elapsed=now-c.startTime;
     const pct=Math.min(100,(elapsed/total)*100);
     const remain=Math.max(0,Math.ceil((total-elapsed)/1000));
@@ -783,12 +786,15 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
       const totalCost={};
       if(mag){const c=calcModCost(baseId,mag,null);for(const k in c)totalCost[k]=(totalCost[k]||0)+c[k];}
       if(scope){const c=calcModCost(baseId,null,scope);for(const k in c)totalCost[k]=(totalCost[k]||0)+c[k];}
-      const totalTime=calcModTime(baseId,mag,scope);
+      /* rev-fix-mod-time-display: 与队列一致——除以发电机加速 sm */
+      const _rawTO=calcModTime(baseId,mag,scope);
+      const _genLvO=getBuildingLv('generator');const _smO=1+_genLvO*0.2;
+      const totalTime=_rawTO/_smO;
       body+='<div class="divider"></div>';
       body+='<div style="color:#a45ede;font-weight:bold;font-size:12px;margin:4px 0">'+newName+'</div>';
       let ok=true;
       for(const [k,v] of Object.entries(totalCost)){const have=materialEquivalent(k);const ok2=have>=v;if(!ok2)ok=false;body+='<div class="stat-line"><span class="k">'+MATERIALS[k].name+'</span><span class="v" style="color:'+(ok2?'#4caf50':'#e05252')+'">'+have+'/'+v+'</span></div>';}
-      {const _ft=totalTime>=3600?Math.round(totalTime/3600)+' 小時':(totalTime>=60?Math.round(totalTime/60)+' 分鐘':totalTime+' 秒');body+='<div class="stat-line"><span class="k">花費時間</span><span class="v">'+_ft+'</span></div>';}
+      {const _ft=totalTime>=3600?Math.round(totalTime/3600)+' 小時':(totalTime>=60?Math.round(totalTime/60)+' 分鐘':Math.round(totalTime)+' 秒');body+='<div class="stat-line"><span class="k">花費時間</span><span class="v">'+_ft+'</span></div>';}
       return {body,ok,totalCost,totalTime};
     }
     return {body,ok:false,totalCost:{},totalTime:0};
@@ -814,7 +820,10 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
     if(!state.crafting)state.crafting=[];
     if(state.crafting.length>=maxQueue){return;}
     for(const [k,v] of Object.entries(r.totalCost))consumeMaterial(k,v);
-    state.crafting.push({type:'mod',modInfo:{baseId,baseRarity,mag:state_mod.mag,scope:state_mod.scope,fromEquippedSlot:equippedSlot,originalId,originalRarity},time:r.totalTime,startTime:Date.now()});
+    var _source = equippedSlot ? { type: 'player', slot: equippedSlot } : { type: 'inventory' };
+    if(equippedSlot){ state.player.equipped[equippedSlot] = null; delete state.player.equippedRarity[equippedSlot]; }
+    else if(originalId){ invRemove(originalId, originalRarity || '傳奇', 1); }
+    state.crafting.push({type:'mod',modInfo:{baseId,baseRarity,mag:state_mod.mag,scope:state_mod.scope,source:_source,originalRarity,_consumedAtStart:true},time:r.totalTime,extra:(typeof calcModExtra==='function'?calcModExtra(baseId,state_mod.mag,state_mod.scope,null):0),startTime:Date.now()});
     save();closeModal();
   };
 }
@@ -898,8 +907,11 @@ function _wkEnsureStyles(){
     '.wk-dock{flex:1;min-height:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;display:flex;flex-direction:column;overflow:hidden}',
     '.wk-dock-title{flex:0 0 auto;padding:5px 10px;font-size:11px;color:#e8a33d;font-weight:bold;border-bottom:1px solid #2a231c;background:#17140f;display:flex;justify-content:space-between;align-items:center}',
     '.wk-dock-title .cnt{font-size:10px;color:#7a6f60;font-weight:normal}',
-    '.wk-dock-list{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;display:flex;gap:6px;padding:5px;scrollbar-width:none}',
+    '.wk-dock-list{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;display:flex;flex-wrap:nowrap;gap:6px;padding:5px;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}',
     '.wk-dock-list::-webkit-scrollbar{display:none}',
+    '#workbench-page img,.wk-picker-overlay img{-webkit-user-drag:none;-khtml-user-drag:none;-moz-user-drag:none;-o-user-drag:none;user-drag:none;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}',
+    '.wk-dock-list,.wk-dock-card,.wk-showcase,.wk-picker-bd,.wk-picker-bd .item-row{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}',
+    '.wk-dock-card,.wk-dock-card *{cursor:default}',
     '.wk-dock-card{flex:0 0 140px;background:#241d16;border:1px solid #3a2f25;border-radius:5px;padding:5px 8px;display:flex;flex-direction:column;gap:3px;box-sizing:border-box;overflow:hidden}',
     '.wk-dock-card .nm{font-size:10px;color:#e8a33d;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.wk-dock-card .bar{height:4px;background:#0e0c0a;border-radius:2px;overflow:hidden;border:1px solid #2a231c}',
@@ -929,32 +941,97 @@ function _wkRarityColor(r){
 
 function _wkGetCandidates(){
   var out = [];
+  var _gs = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
+  var _gl = {};
+  for(var _gk in _gs) _gl[_gs[_gk]] = _gk;
+  var _ss = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87':'c','PSO-1':'l','PS320':'l','1P59':'l' };
+  var _sl = {};
+  for(var _sk in _ss){ if(!_sl[_ss[_sk]]) _sl[_ss[_sk]] = []; _sl[_ss[_sk]].push(_sk); }
+
+  function _parseNid(nid){
+    var p = nid.split('_');
+    if(p.length < 4) return { mag:null, scope:null, grip:null };
+    var baseId = p[0];
+    var _rules = WEAPON_MOD_RULES[baseId] || {};
+    var _validScopes = _rules.scopes || [];
+    var _scopeShort = p[2];
+    var _scopeLong = null;
+    if(_scopeShort !== 'x'){
+      if(_validScopes.indexOf(_scopeShort) >= 0){ _scopeLong = _scopeShort; }
+      else {
+        var _cands = _sl[_scopeShort] || [];
+        for(var _ci = 0; _ci < _cands.length; _ci++){
+          if(_validScopes.indexOf(_cands[_ci]) >= 0){ _scopeLong = _cands[_ci]; break; }
+        }
+        if(!_scopeLong && _cands.length > 0) _scopeLong = _cands[0];
+      }
+    }
+    return {
+      mag: p[1] === 'x' ? null : parseInt(p[1], 10),
+      scope: _scopeLong,
+      grip: p[3] === 'x' ? null : (_gl[p[3]] || p[3])
+    };
+  }
+  function _add(rawId, rar, loc, locData, extra){
+    var def = itemDef(rawId);
+    if(!def) return;
+    var _baseId;
+    if(def.named){
+      _baseId = def.baseId;
+      if(!_baseId || !WEAPONS[_baseId]) return;
+    } else {
+      _baseId = rawId;
+      if(!WEAPONS[_baseId]) return;
+    }
+    var rules = WEAPON_MOD_RULES[_baseId];
+    if(!rules) return;
+    var _layoutMagsC = (typeof _getModOptionsFromLayout === 'function') ? _getModOptionsFromLayout(_baseId).mags : [];
+    var hasAny = (_layoutMagsC.length > 0) || (rules.scopes && rules.scopes.length) || (rules.grips && rules.grips.length);
+    if(!hasAny) return;
+    var _cur = def.named ? _parseNid(rawId) : { mag:null, scope:null, grip:null };
+    out.push(Object.assign({
+      rawId: rawId, baseId: _baseId, rarity: rar, location: loc, locData: locData || null,
+      type: (WEAPONS[_baseId] && WEAPONS[_baseId].type) || '',
+      curMag: _cur.mag, curScope: _cur.scope, curGrip: _cur.grip,
+      isNamed: !!def.named
+    }, extra || {}));
+  }
   ['primary','secondary','melee'].forEach(function(slot){
     var id = state.player.equipped[slot];
     if(!id) return;
     var rar = state.player.equippedRarity[slot] || '一般';
-    if(rar !== '傳奇') return;
-    var def = itemDef(id);
-    if(!def || def.named) return;
-    if(!WEAPONS[id]) return;
-    var rules = WEAPON_MOD_RULES[id];
-    if(!rules) return;
-    var hasAny = (rules.mags && rules.mags.length) || (rules.scopes && rules.scopes.length) || (rules.grips && rules.grips.length);
-    if(!hasAny) return;
-    out.push({ rawId: 'equipped:' + slot, baseId: id, rarity: rar, location: 'equipped', slot: slot, type: (WEAPONS[id] && WEAPONS[id].type) || '' });
+    if(rar !== '傳奇' && rar !== '具名') return;
+    _add(id, rar, 'equipped', { slot: slot }, { slot: slot });
   });
   for(var k in state.inventory){
-    var parts = k.split('@');
-    var iid = parts[0], irar = parts[1];
-    if(irar !== '傳奇') continue;
-    var def2 = itemDef(iid);
-    if(!def2 || def2.named) continue;
-    if(!WEAPONS[iid]) continue;
-    var rules2 = WEAPON_MOD_RULES[iid];
-    if(!rules2) continue;
-    var hasAny2 = (rules2.mags && rules2.mags.length) || (rules2.scopes && rules2.scopes.length) || (rules2.grips && rules2.grips.length);
-    if(!hasAny2) continue;
-    out.push({ rawId: k, baseId: iid, rarity: irar, location: 'inventory', count: state.inventory[k], type: (WEAPONS[iid] && WEAPONS[iid].type) || '' });
+    var p = k.split('@');
+    if(p[1] !== '傳奇' && p[1] !== '具名') continue;
+    _add(p[0], p[1], 'inventory', null, { count: state.inventory[k] });
+  }
+  /* rev-fix-named-in-station-guard: 载员 / 守卫装备的具名武器 */
+  var _passengers = (state.station && state.station.passengers) || [];
+  for(var _pi = 0; _pi < _passengers.length; _pi++){
+    var _pp = _passengers[_pi];
+    if(!_pp) continue;
+    if(_pp.primaryWeapon && typeof isNamedWeaponId === 'function' && isNamedWeaponId(_pp.primaryWeapon)){
+      _add(_pp.primaryWeapon, _pp.primaryWeaponRarity || '具名', 'passenger', { passengerIdx: _pi, slot: 'primary' });
+    }
+    if(_pp.secondaryWeapon && typeof isNamedWeaponId === 'function' && isNamedWeaponId(_pp.secondaryWeapon)){
+      _add(_pp.secondaryWeapon, _pp.secondaryWeaponRarity || '具名', 'passenger', { passengerIdx: _pi, slot: 'secondary' });
+    }
+  }
+  var _plots = (state.garden && state.garden.plots) || [];
+  for(var _ti = 0; _ti < _plots.length; _ti++){
+    var _plot = _plots[_ti];
+    if(!_plot || _plot.type !== 'tower' || !_plot.towerConfig || !_plot.towerConfig.eq) continue;
+    var _eq = _plot.towerConfig.eq;
+    var _eqR = _plot.towerConfig.eqRarity || {};
+    if(_eq.primary && typeof isNamedWeaponId === 'function' && isNamedWeaponId(_eq.primary)){
+      _add(_eq.primary, _eqR.primary || '具名', 'guard', { towerIdx: _ti, slot: 'primary' });
+    }
+    if(_eq.secondary && typeof isNamedWeaponId === 'function' && isNamedWeaponId(_eq.secondary)){
+      _add(_eq.secondary, _eqR.secondary || '具名', 'guard', { towerIdx: _ti, slot: 'secondary' });
+    }
   }
   return out;
 }
@@ -993,7 +1070,9 @@ function _wkRender(p){
     s.selectedRawId = c0.rawId;
     s.selectedBaseId = c0.baseId;
     s.selectedRarity = c0.rarity;
-    s.draftMag = null; s.draftScope = null; s.draftGrip = null;
+    s.draftMag = c0.curMag || null;
+    s.draftScope = c0.curScope || null;
+    s.draftGrip = c0.curGrip || null;
   }
 
   var html = '';
@@ -1013,7 +1092,8 @@ function _wkRender(p){
   var rarity = s.selectedRarity;
   var rarityColor = _wkRarityColor(rarity);
   var previewId = getNamedId(baseId, s.draftMag, s.draftScope, s.draftGrip);
-  var _imgPath = window.getItemIconPath(previewId);
+  var _hasDraft = !!(s.draftMag || s.draftScope || s.draftGrip);
+  var _imgPath = _hasDraft ? window.getItemIconPath(previewId) : window.getItemIconPath(baseId);
   var _fbPath = window.getItemIconPath(baseId);
   var _wname = (WEAPONS[baseId] && WEAPONS[baseId].name) || baseId;
 
@@ -1024,7 +1104,8 @@ function _wkRender(p){
   html += '</div>';
 
   var rules = WEAPON_MOD_RULES[baseId] || {};
-  var _hasMags = rules.mags && rules.mags.length;
+  var _layoutMagsR = (typeof _getModOptionsFromLayout === 'function') ? _getModOptionsFromLayout(baseId).mags : [];
+  var _hasMags = _layoutMagsR.length > 0;
   var _hasScopes = rules.scopes && rules.scopes.length;
   var _hasGrips = rules.grips && rules.grips.length;
 
@@ -1072,7 +1153,13 @@ function _wkRender(p){
 
   /* 時間與隊列狀態 */
   var totalTime = 0;
-  if(s.draftMag || s.draftScope || s.draftGrip) totalTime = calcModTime(baseId, s.draftMag, s.draftScope, s.draftGrip);
+  if(s.draftMag || s.draftScope || s.draftGrip){
+    /* rev-fix-mod-time-display: 按钮显示时间与队列一致——除以发电机加速 sm */
+    var _rawT = calcModTime(baseId, s.draftMag, s.draftScope, s.draftGrip);
+    var _genLvBtn = (typeof getBuildingLv === 'function') ? getBuildingLv('generator') : 0;
+    var _smBtn = 1 + _genLvBtn * 0.2;
+    totalTime = _rawT / _smBtn;
+  }
   var _canCraft = !!(s.draftMag || s.draftScope || s.draftGrip);
   if(_canCraft){
     for(var ck in totalCost){
@@ -1088,7 +1175,10 @@ function _wkRender(p){
   else if(_queueFull) _btnLabel = '隊列已滿 (' + _modQ.length + '/' + wbLv + ')';
   else if(!_canCraft) _btnLabel = '材料不足';
   else if(totalTime > 0){
-    var _tStr = totalTime >= 3600 ? Math.round(totalTime / 3600) + ' 小時' : (Math.round(totalTime / 60) + ' 分鐘');
+    var _tStr;
+    if(totalTime >= 3600) _tStr = Math.round(totalTime / 3600) + ' 小時';
+    else if(totalTime >= 60) _tStr = Math.round(totalTime / 60) + ' 分鐘';
+    else _tStr = Math.round(totalTime) + ' 秒';
     _btnLabel = '改造（' + _tStr + '）';
   }
 
@@ -1117,15 +1207,28 @@ function _wkRenderQueue(){
     return;
   }
   var now = Date.now();
+  var genLv = (typeof getBuildingLv === 'function') ? getBuildingLv('generator') : 0;
+  var sm = 1 + genLv * 0.2;
+  var wbLv = Math.min(50, Math.max(1, (typeof getBuildingLv === 'function' ? getBuildingLv('workbench') : 1) || 1));
+  var wbBaseSec = 86400 * Math.pow(300/86400, (wbLv-1)/49);
   var html = '';
   for(var i = 0; i < queue.length; i++){
     var c = queue[i], info = c.modInfo;
     var name = namedWeaponName(info.baseId, info.mag, info.scope, info.grip);
-    var total = c.time * 1000;
+    var _nid = getNamedId(info.baseId, info.mag, info.scope, info.grip);
+    var _imgPath = window.getItemIconPath(_nid);
+    var _fbPath = window.getItemIconPath(info.baseId);
+    var _totalSec = (typeof c.extra === 'number') ? (wbBaseSec * (1 + c.extra)) : c.time;
+    var total = _totalSec * 1000 / sm;
     var elapsed = now - c.startTime;
     var pct = Math.min(100, Math.max(0, elapsed / total * 100));
     var remain = Math.max(0, Math.ceil((total - elapsed) / 1000));
-    html += '<div class="wk-dock-card" data-qi="' + i + '"><div class="nm">' + name + '</div><div class="bar"><div class="fill" style="width:' + pct + '%"></div></div><div class="remain">剩 ' + remain + ' 秒</div></div>';
+    html += '<div class="wk-dock-card" data-qi="' + i + '">'
+          + '<div class="nm" style="color:#a45ede">' + name + '</div>'
+          + '<div style="flex:1 1 auto;min-height:28px;display:flex;align-items:center;justify-content:center;background:#151210;border-radius:3px;overflow:hidden"><img src="' + _imgPath + assetSuffix(_imgPath) + '" onerror="this.onerror=null;this.src=&quot;' + _fbPath + assetSuffix(_fbPath) + '&quot;" style="max-width:100%;max-height:100%;object-fit:contain" alt=""></div>'
+          + '<div class="bar"><div class="fill" style="width:' + pct + '%"></div></div>'
+          + '<div class="remain">剩 ' + remain + ' 秒</div>'
+          + '</div>';
   }
   body.innerHTML = html;
 }
@@ -1137,17 +1240,31 @@ function _wkUpdateQueueProgress(){
   var cards = body.querySelectorAll('[data-qi]');
   if(cards.length !== queue.length){ _wkRenderQueue(); return; }
   var now = Date.now();
+  var genLv = (typeof getBuildingLv === 'function') ? getBuildingLv('generator') : 0;
+  var sm = 1 + genLv * 0.2;
+  var wbLv = Math.min(50, Math.max(1, (typeof getBuildingLv === 'function' ? getBuildingLv('workbench') : 1) || 1));
+  var wbBaseSec = 86400 * Math.pow(300/86400, (wbLv-1)/49);
+  var _hasDone = false;
   for(var i = 0; i < queue.length; i++){
     var c = queue[i];
-    var total = c.time * 1000;
+    var _totalSec = (typeof c.extra === 'number') ? (wbBaseSec * (1 + c.extra)) : c.time;
+    var total = _totalSec * 1000 / sm;
     var elapsed = now - c.startTime;
     var pct = Math.min(100, Math.max(0, elapsed / total * 100));
     var remain = Math.max(0, Math.ceil((total - elapsed) / 1000));
+    if(remain <= 0) _hasDone = true;
     var el = cards[i];
     var fill = el.querySelector('.fill');
     var rem = el.querySelector('.remain');
     if(fill) fill.style.width = pct + '%';
     if(rem) rem.textContent = '剩 ' + remain + ' 秒';
+  }
+  /* rev-fix-craft-tick-via-ui: UI 看到完成时立即调 processCrafting，不等 buildingTick */
+  if(_hasDone && typeof processCrafting === 'function'){
+    try { processCrafting(); } catch(e){ console.warn('[processCrafting via UI]', e); }
+    if((state.crafting || []).filter(function(c){ return c.type === 'mod'; }).length !== queue.length){
+      _wkRender(document.getElementById('workbench-page'));
+    }
   }
 }
 
@@ -1178,13 +1295,16 @@ function _wkOpenWeaponPicker(){
   var filterType = '全部';
   var TYPES = ['全部','突擊步槍','機槍','狙擊槍','衝鋒槍','霰彈槍'];
 
-  var overlay = document.createElement('div');
-  overlay.className = 'wk-picker-overlay';
-
-  function _renderList(){
+  var bodyEl = document.createElement('div');
+  function _buildHTML(){
     var filtered = candidates.filter(function(c){
       if(filterType !== '全部' && c.type !== filterType) return false;
       return true;
+    });
+    filtered.sort(function(a, b){
+      var an = (WEAPONS[a.baseId] && WEAPONS[a.baseId].name) || a.baseId;
+      var bn = (WEAPONS[b.baseId] && WEAPONS[b.baseId].name) || b.baseId;
+      return an.localeCompare(bn, 'zh-Hant');
     });
     var filterHtml = '<div class="wk-filter-row">';
     TYPES.forEach(function(t){
@@ -1198,49 +1318,49 @@ function _wkOpenWeaponPicker(){
       for(var i = 0; i < filtered.length; i++){
         var c = filtered[i];
         var nm = (WEAPONS[c.baseId] && WEAPONS[c.baseId].name) || c.baseId;
+        nm = String(nm).toUpperCase();
+        var _subType = c.type || ((WEAPONS[c.baseId] && WEAPONS[c.baseId].type) || '?');
         var isCur = c.rawId === s.selectedRawId;
         var _c = _wkRarityColor(c.rarity);
-        listHtml += '<div class="item-row" data-rawid="' + c.rawId + '" style="' + (isCur ? 'border-color:' + _c + ';background:#2a1f10;' : 'border-left:3px solid ' + _c + ';') + '"><div class="info"><div class="nm" style="color:' + _c + '">' + nm + '</div><div class="sub">' + (c.type || '?') + ' · ' + (c.location === 'equipped' ? '已裝備' : '背包') + '</div></div>' + (isCur ? '<div class="cnt">✓</div>' : '') + '</div>';
+        listHtml += '<div class="item-row" data-rawid="' + c.rawId + '" style="' + (isCur ? 'border-color:' + _c + ';background:#2a1f10;' : 'border-left:3px solid ' + _c + ';') + '"><div class="info"><div class="nm" style="color:' + _c + '">' + nm + '</div><div class="sub">' + _subType + ' · ' + (c.location === 'equipped' ? '已裝備' : '背包') + '</div></div>' + (isCur ? '<div class="cnt">✓</div>' : '') + '</div>';
       }
     }
-    return '<div class="wk-picker"><div class="wk-picker-hd"><span>選擇武器</span><span class="x">✕</span></div>' + filterHtml + '<div class="wk-picker-bd">' + listHtml + '</div><div class="wk-picker-ft"><button class="btn ghost" id="wk-picker-cancel">取消</button></div></div>';
+    return filterHtml + listHtml;
   }
+  bodyEl.innerHTML = _buildHTML();
+  var bd = openModal({ title: '選擇武器', body: bodyEl });
 
-  function _bind(ovl){
-    ovl.querySelector('.x').onclick = function(){ ovl.remove(); };
-    var cancel = ovl.querySelector('#wk-picker-cancel');
-    if(cancel) cancel.onclick = function(){ ovl.remove(); };
-    ovl.querySelectorAll('[data-ft]').forEach(function(el){
-      el.onclick = function(){ filterType = el.getAttribute('data-ft'); refresh(); };
+  function _bind(){
+    bd.querySelectorAll('[data-ft]').forEach(function(el){
+      el.onclick = function(){ filterType = el.getAttribute('data-ft'); bodyEl.innerHTML = _buildHTML(); _bind(); };
     });
-    ovl.querySelectorAll('[data-rawid]').forEach(function(el){
+    bd.querySelectorAll('[data-rawid]').forEach(function(el){
       el.onclick = function(){
         var rawId = el.getAttribute('data-rawid');
         var c = null;
         for(var i = 0; i < candidates.length; i++){ if(candidates[i].rawId === rawId){ c = candidates[i]; break; } }
         if(!c) return;
         if(s.selectedRawId !== rawId){
-          s.draftMag = null; s.draftScope = null; s.draftGrip = null;
+          s.draftMag = c.curMag || null;
+          s.draftScope = c.curScope || null;
+          s.draftGrip = c.curGrip || null;
         }
         s.selectedRawId = rawId;
         s.selectedBaseId = c.baseId;
         s.selectedRarity = c.rarity;
-        ovl.remove();
+        closeModal();
         _wkRender(document.getElementById('workbench-page'));
       };
     });
   }
-
-  function refresh(){
-    overlay.innerHTML = _renderList();
-    _bind(overlay);
-  }
-
-  overlay.innerHTML = _renderList();
-  _bind(overlay);
-  document.body.appendChild(overlay);
+  _bind();
 }
 
+function _magLabel(n){
+  if(n >= 100) return n + ' 發彈箱';
+  if(n >= 75) return n + ' 發彈鼓';
+  return n + ' 發彈匣';
+}
 function _wkOpenPicker(slot){
   var s = window._wkState;
   var baseId = s.selectedBaseId;
@@ -1248,18 +1368,27 @@ function _wkOpenPicker(slot){
   var rules = WEAPON_MOD_RULES[baseId] || {};
   var options = [];
   if(slot === 'mag'){
-    options.push({ label: '保持原彈匣（' + WEAPONS[baseId].mag + ' 發）', val: null });
-    var mags = getMagOptionsForWeapon(baseId);
-    for(var i = 0; i < mags.length; i++){
-      if(mags[i] === WEAPONS[baseId].mag) continue;
-      options.push({ label: mags[i] + ' 發彈匣', val: mags[i] });
+    var _defMag = WEAPONS[baseId].mag;
+    options.push({ label: '保持原彈匣（' + _defMag + ' 發）', val: null });
+    var _allMags = getMagOptionsForWeapon(baseId).slice().sort(function(a,b){ return a - b; });
+    for(var i = 0; i < _allMags.length; i++){
+      if(_allMags[i] === _defMag) continue;
+      options.push({ label: _magLabel(_allMags[i]), val: _allMags[i] });
     }
   } else if(slot === 'scope'){
     options.push({ label: '不安裝瞄具', val: null });
-    var scopes = rules.scopes || [];
+    var scopes = (rules.scopes || []).slice().sort(function(a, b){
+      return (SCOPE_BONUS[a] || 0) - (SCOPE_BONUS[b] || 0);
+    });
     for(var j = 0; j < scopes.length; j++){
       var _rg = Math.round((SCOPE_RANGE_BONUS[scopes[j]] || 0) * 100);
-      options.push({ label: (SCOPE_NAME[scopes[j]] || scopes[j]) + '（射程+' + _rg + '%）', val: scopes[j] });
+      var _pen = (typeof SCOPE_MODE_PENALTY !== 'undefined' && SCOPE_MODE_PENALTY[scopes[j]]) ? SCOPE_MODE_PENALTY[scopes[j]] : null;
+      var _penStr = '';
+      if(_pen){
+        var _maxPen = Math.round((1 - (_pen['掃射'] || 1)) * 100);
+        if(_maxPen > 0) _penStr = ' · 掃射-' + _maxPen + '%';
+      }
+      options.push({ label: (SCOPE_NAME[scopes[j]] || scopes[j]) + '（射程+' + _rg + '%' + _penStr + '）', val: scopes[j] });
     }
   } else if(slot === 'grip'){
     options.push({ label: '不安裝握把', val: null });
@@ -1268,22 +1397,18 @@ function _wkOpenPicker(slot){
       options.push({ label: (GRIP_NAME[grips[k]] || grips[k]) + '（命中+' + GRIP_HIT_BONUS + '%）', val: grips[k] });
     }
   }
-  var overlay = document.createElement('div');
-  overlay.className = 'wk-picker-overlay';
-  var html = '<div class="wk-picker"><div class="wk-picker-hd"><span>' + (slot === 'mag' ? '彈匣' : slot === 'scope' ? '瞄具' : '握把') + '</span><span class="x">✕</span></div><div class="wk-picker-bd">';
+  var cur = slot === 'mag' ? s.draftMag : slot === 'scope' ? s.draftScope : s.draftGrip;
+  var html = '';
   for(var oi = 0; oi < options.length; oi++){
     var o = options[oi];
-    var cur = slot === 'mag' ? s.draftMag : slot === 'scope' ? s.draftScope : s.draftGrip;
     var isSel = (o.val === cur);
     html += '<div class="item-row" data-val="' + (o.val === null ? '__null__' : o.val) + '" style="' + (isSel ? 'border-color:#e8a33d;background:#2a1f10;' : '') + '"><div class="info"><div class="nm">' + o.label + '</div></div>' + (isSel ? '<div class="cnt">✓</div>' : '') + '</div>';
   }
-  html += '</div><div class="wk-picker-ft"><button class="btn ghost" id="wk-picker-cancel">取消</button></div></div>';
-  overlay.innerHTML = html;
-  document.body.appendChild(overlay);
-  function _close(){ overlay.remove(); }
-  overlay.querySelector('.x').onclick = _close;
-  overlay.querySelector('#wk-picker-cancel').onclick = _close;
-  overlay.querySelectorAll('[data-val]').forEach(function(row){
+  var bodyEl = document.createElement('div');
+  bodyEl.innerHTML = html;
+  var title = slot === 'mag' ? '彈匣' : slot === 'scope' ? '瞄具' : '握把';
+  var bd = openModal({ title: title, body: bodyEl });
+  bd.querySelectorAll('[data-val]').forEach(function(row){
     row.onclick = function(){
       var v = row.getAttribute('data-val');
       if(v === '__null__') v = null;
@@ -1291,13 +1416,17 @@ function _wkOpenPicker(slot){
       if(slot === 'mag') s.draftMag = v;
       else if(slot === 'scope') s.draftScope = v;
       else if(slot === 'grip') s.draftGrip = v;
-      _close();
+      closeModal();
       _wkRender(document.getElementById('workbench-page'));
     };
   });
 }
 
 function _wkConfirmCraft(){
+  var _ck = _wkGetCandidates();
+  var _found = false;
+  for(var _ki = 0; _ki < _ck.length; _ki++){ if(_ck[_ki].rawId === window._wkState.selectedRawId){ _found = true; break; } }
+  if(!_found){ if(typeof toast === 'function') toast('該型號武器正在改造中，完成後才能再次改造', 'err'); return; }
   var s = window._wkState;
   if(!s.selectedRawId) return;
   if(!s.draftMag && !s.draftScope && !s.draftGrip){ if(typeof toast === 'function') toast('至少選擇一項配件', 'err'); return; }
@@ -1314,25 +1443,23 @@ function _wkConfirmCraft(){
   var queue = (state.crafting || []).filter(function(x){ return x.type === 'mod'; });
   if(queue.length >= wbLv){ if(typeof toast === 'function') toast('改造隊列已滿', 'err'); return; }
   for(var ck2 in cost) consumeMaterial(ck2, cost[ck2]);
-  if(c.location === 'equipped'){
-    state.player.equipped[c.slot] = null;
-    delete state.player.equippedRarity[c.slot];
-    if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
-  } else {
-    var parts = c.rawId.split('@');
-    invRemove(parts[0], parts[1], 1);
-  }
+  var source;
+  if(c.location === 'equipped') source = { type: 'player', slot: c.locData.slot };
+  else if(c.location === 'passenger') source = { type: 'passenger', slot: c.locData.slot, passengerIdx: c.locData.passengerIdx };
+  else if(c.location === 'guard') source = { type: 'guard', slot: c.locData.slot, towerIdx: c.locData.towerIdx };
+  else source = { type: 'inventory', rawKey: c.rawId + '@' + c.rarity };
+  _removeWeaponFromSource(source, c.rawId);
   state.crafting.push({
     type: 'mod',
     modInfo: {
       baseId: c.baseId, baseRarity: c.rarity,
       mag: s.draftMag, scope: s.draftScope, grip: s.draftGrip,
-      fromEquippedSlot: c.location === 'equipped' ? c.slot : null,
-      originalId: null,
+      source: source,
       originalRarity: c.rarity,
       _consumedAtStart: true
     },
     time: calcModTime(c.baseId, s.draftMag, s.draftScope, s.draftGrip),
+    extra: (typeof calcModExtra === 'function' ? calcModExtra(c.baseId, s.draftMag, s.draftScope, s.draftGrip) : 0),
     startTime: Date.now()
   });
   if(typeof save === 'function') save();
@@ -1359,6 +1486,67 @@ function openWorkbenchPage(){
   }
   _wkRender(p);
   p.classList.add('on');
+  /* rev-fix-dock-scroll-delegate: 事件委托到 p，_wkRender 重建 DOM 后依然生效 */
+  if(!p._wkScrollBound){
+    p._wkScrollBound = true;
+    var _ss = { active: false, drag: false, sx: 0, sy: 0, sl: 0, list: null };
+    function _findDockList(e){
+      var t = e.target;
+      while(t && t !== p){
+        if(t.classList && t.classList.contains('wk-dock-list')) return t;
+        t = t.parentElement;
+      }
+      return null;
+    }
+    p.addEventListener('touchstart', function(e){
+      var list = _findDockList(e);
+      if(!list || !e.touches[0]) return;
+      _ss.active = true; _ss.drag = false;
+      _ss.sx = e.touches[0].clientX;
+      _ss.sy = e.touches[0].clientY;
+      _ss.sl = list.scrollLeft;
+      _ss.list = list;
+    }, { passive: true });
+    p.addEventListener('touchmove', function(e){
+      if(!_ss.active || !e.touches[0]) return;
+      var dx = e.touches[0].clientX - _ss.sx;
+      var dy = e.touches[0].clientY - _ss.sy;
+      if(!_ss.drag && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy)) _ss.drag = true;
+      if(_ss.drag){
+        if(e.cancelable) e.preventDefault();
+        _ss.list.scrollLeft = _ss.sl - dx;
+      }
+    }, { passive: false });
+    p.addEventListener('touchend', function(){ _ss.active = false; _ss.drag = false; });
+    p.addEventListener('touchcancel', function(){ _ss.active = false; _ss.drag = false; });
+    p.addEventListener('mousedown', function(e){
+      if(e.button !== 0) return;
+      var list = _findDockList(e);
+      if(!list) return;
+      _ss.active = true; _ss.drag = false;
+      _ss.sx = e.clientX; _ss.sy = e.clientY;
+      _ss.sl = list.scrollLeft;
+      _ss.list = list;
+    });
+    document.addEventListener('mousemove', function(e){
+      if(!_ss.active) return;
+      var dx = e.clientX - _ss.sx;
+      var dy = e.clientY - _ss.sy;
+      if(!_ss.drag && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy)) _ss.drag = true;
+      if(_ss.drag){
+        e.preventDefault();
+        _ss.list.scrollLeft = _ss.sl - dx;
+      }
+    });
+    document.addEventListener('mouseup', function(){ _ss.active = false; _ss.drag = false; });
+  }
+  /* rev-fix-dragstart: 兜底阻止 img 拖动 */
+  if(!p._wkDragBound){
+    p._wkDragBound = true;
+    p.addEventListener('dragstart', function(e){
+      if(e.target && e.target.tagName === 'IMG') e.preventDefault();
+    });
+  }
   if(window._wkTimer) clearInterval(window._wkTimer);
   window._wkTimer = setInterval(function(){
     var _p = document.getElementById('workbench-page');
