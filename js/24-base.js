@@ -848,7 +848,7 @@ function rarityPolicyBlockHTML(prefix, title, ctx, showExclude){
 
 
 /* ═══════════════════════════════════════════════════════════════
- * rev-workbench-v3: 工作台全屏頁面（參考車庫佈局）
+ * rev-workbench-v4: 工作台全屏頁面（對齊車庫設計語言）
  * ═══════════════════════════════════════════════════════════════ */
 function _wkEnsureStyles(){
   var old = document.getElementById('workbench-styles');
@@ -856,41 +856,52 @@ function _wkEnsureStyles(){
   var st = document.createElement('style');
   st.id = 'workbench-styles';
   st.textContent = [
-    '#workbench-page{position:fixed;top:0;left:0;right:0;bottom:calc(54px + env(safe-area-inset-bottom,0px));background:#0e0c0a;z-index:9300;display:none;flex-direction:column;overflow:hidden;padding:6px 8px;gap:6px}',
+    '#workbench-page{position:fixed;top:0;left:0;right:0;bottom:calc(54px + env(safe-area-inset-bottom,0px));background:#0e0c0a;z-index:9300;display:none;flex-direction:column;overflow:hidden;padding:6px 8px;gap:5px}',
     '#workbench-page.on{display:flex}',
     '.wk-header{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:4px 6px;background:#17140f;border:1px solid #2a231c;border-radius:6px}',
     '.wk-title{font-size:13px;color:#e8a33d;font-weight:bold}',
     '.wk-x{font-size:14px;color:#fff;padding:4px 10px;background:#6a2a2a;border-radius:5px;cursor:pointer;margin-left:auto;font-weight:bold}',
-    '.wk-main{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;overflow:hidden}',
-    '.wk-showcase{flex:0 0 24vh;background:linear-gradient(180deg,#1a1510,#14110c);border:2px solid #2a231c;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;min-height:0;overflow:hidden;padding:8px;box-sizing:border-box;transition:border-color 0.15s}',
+    '.wk-main{flex:1;min-height:0;display:flex;flex-direction:column;gap:5px;overflow:hidden}',
+    '.wk-showcase{flex:0 0 22vh;background:linear-gradient(180deg,#1a1510,#14110c);border:2px solid #2a231c;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;min-height:0;overflow:hidden;padding:6px;box-sizing:border-box;transition:border-color 0.15s}',
     '.wk-showcase:hover{filter:brightness(1.1)}',
     '.wk-showcase img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}',
-    '.wk-showcase .wname{position:absolute;top:6px;left:8px;font-size:13px;color:#fff;font-weight:bold;background:rgba(14,12,10,0.75);padding:3px 10px;border-radius:4px;pointer-events:none;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '.wk-showcase .switch{position:absolute;bottom:6px;right:8px;font-size:11px;color:#a89a85;background:rgba(14,12,10,0.75);padding:3px 10px;border-radius:4px;pointer-events:none}',
+    '.wk-showcase .wname{position:absolute;top:5px;left:7px;font-size:13px;font-weight:bold;background:rgba(14,12,10,0.78);padding:3px 10px;border-radius:4px;pointer-events:none;max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.wk-showcase .switch{position:absolute;bottom:5px;right:7px;font-size:10px;color:#a89a85;background:rgba(14,12,10,0.78);padding:2px 8px;border-radius:4px;pointer-events:none}',
     '.wk-showcase.empty{cursor:default;justify-content:center;color:#5a5040;font-size:12px;border-color:#2a231c !important}',
     '.wk-showcase.empty:hover{filter:none}',
-    '.wk-slots{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}',
-    '.wk-slot{background:#1a1510;border:1.5px solid #3a2f25;border-radius:6px;padding:10px 6px;min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;position:relative;text-align:center}',
+    '.wk-slots{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}',
+    '.wk-slot{background:#1a1510;border:1.5px solid #3a2f25;border-radius:6px;padding:8px 4px;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;text-align:center}',
     '.wk-slot:hover{border-color:#8a5f18}',
     '.wk-slot.filled{border-color:#8a5f18;background:#241d16}',
     '.wk-slot.disabled{opacity:0.35;cursor:not-allowed}',
     '.wk-slot.disabled:hover{border-color:#3a2f25}',
-    '.wk-slot .lbl{font-size:10px;color:#7a6f60;font-weight:bold}',
-    '.wk-slot .val{font-size:11px;color:#e8a33d;font-weight:bold;line-height:1.3;word-break:break-all;padding:0 2px}',
-    '.wk-info{flex:0 0 auto;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;font-size:11px}',
-    '.wk-info .row{display:flex;justify-content:space-between;padding:1px 0;gap:8px}',
-    '.wk-info .row .k{color:#7a6f60;flex:0 0 auto}',
-    '.wk-info .row .v{color:#e8a33d;font-weight:bold;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '.wk-info .row.bad .v{color:#e05252}',
+    '.wk-slot .lbl{font-size:9px;color:#7a6f60;font-weight:bold}',
+    '.wk-slot .val{font-size:10px;color:#e8a33d;font-weight:bold;line-height:1.3;word-break:break-all;padding:0 2px}',
+    '.wk-stats{flex:0 0 auto;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:6px 10px;display:flex;flex-direction:column;gap:1px;font-size:11px}',
+    '.wk-stat-row{display:flex;justify-content:space-between;gap:6px;padding:1px 0;align-items:baseline}',
+    '.wk-stat-row .k{flex:0 0 56px;color:#7a6f60}',
+    '.wk-stat-row .v-cur{flex:1;color:#a89a85;text-align:right;font-family:Menlo,Consolas,monospace}',
+    '.wk-stat-row .v-arrow{flex:0 0 auto;color:#5a5040;padding:0 3px}',
+    '.wk-stat-row .v-new{flex:1;color:#e8a33d;font-weight:bold;text-align:right;font-family:Menlo,Consolas,monospace}',
+    '.wk-stat-row .v-new.up{color:#4caf50}',
+    '.wk-stat-row .v-new.down{color:#e05252}',
+    '.wk-stat-row .v-new.same{color:#7a6f60}',
+    '.wk-mats{flex:0 0 auto;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:6px 10px;display:grid;grid-template-columns:1fr 1fr;gap:1px 12px;font-size:11px}',
+    '.wk-mat-row{display:flex;justify-content:space-between;gap:6px;padding:1px 0;min-width:0}',
+    '.wk-mat-row .k{color:#7a6f60;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}',
+    '.wk-mat-row .v{color:#a89a85;font-weight:bold;text-align:right;font-family:Menlo,Consolas,monospace;flex:0 0 auto}',
+    '.wk-mat-row.ok .v{color:#4caf50}',
+    '.wk-mat-row.bad .v{color:#e05252}',
+    '.wk-mat-row.none .v{color:#5a5040}',
     '.wk-actions{flex:0 0 auto;display:flex;gap:6px}',
     '.wk-actions .btn{flex:1;padding:9px;font-size:12px;border-radius:5px}',
     '.wk-dock{flex:1;min-height:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;display:flex;flex-direction:column;overflow:hidden}',
-    '.wk-dock-title{flex:0 0 auto;padding:6px 10px;font-size:11px;color:#e8a33d;font-weight:bold;border-bottom:1px solid #2a231c;background:#17140f;display:flex;justify-content:space-between;align-items:center}',
+    '.wk-dock-title{flex:0 0 auto;padding:5px 10px;font-size:11px;color:#e8a33d;font-weight:bold;border-bottom:1px solid #2a231c;background:#17140f;display:flex;justify-content:space-between;align-items:center}',
     '.wk-dock-title .cnt{font-size:10px;color:#7a6f60;font-weight:normal}',
-    '.wk-dock-list{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;display:flex;gap:6px;padding:6px;scrollbar-width:none}',
+    '.wk-dock-list{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;display:flex;gap:6px;padding:5px;scrollbar-width:none}',
     '.wk-dock-list::-webkit-scrollbar{display:none}',
-    '.wk-dock-card{flex:0 0 140px;background:#241d16;border:1px solid #3a2f25;border-radius:5px;padding:6px 8px;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;overflow:hidden}',
-    '.wk-dock-card .nm{font-size:11px;color:#e8a33d;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.wk-dock-card{flex:0 0 140px;background:#241d16;border:1px solid #3a2f25;border-radius:5px;padding:5px 8px;display:flex;flex-direction:column;gap:3px;box-sizing:border-box;overflow:hidden}',
+    '.wk-dock-card .nm{font-size:10px;color:#e8a33d;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.wk-dock-card .bar{height:4px;background:#0e0c0a;border-radius:2px;overflow:hidden;border:1px solid #2a231c}',
     '.wk-dock-card .bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,#e8a33d);transition:width 0.3s linear}',
     '.wk-dock-card .remain{font-size:9px;color:#7a6f60;text-align:right}',
@@ -948,6 +959,23 @@ function _wkGetCandidates(){
   return out;
 }
 
+/* 計算改造前後的屬性 */
+function _wkCalcStats(baseId, draftMag, draftScope, draftGrip){
+  var wdef = WEAPONS[baseId] || {};
+  var baseMag = wdef.mag || 0;
+  var newMag = draftMag || baseMag;
+  var baseRange = (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[wdef.type]) ? WEAPON_COMBAT_RANGE[wdef.type] : 0;
+  var scopeMult = draftScope ? (1 + ((typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[draftScope]) || 0)) : 1;
+  var newRange = baseRange * scopeMult;
+  var baseHit = 0;
+  var newHit = draftGrip ? ((typeof GRIP_HIT_BONUS !== 'undefined' ? GRIP_HIT_BONUS : 0)) : 0;
+  return {
+    baseMag: baseMag, newMag: newMag,
+    baseRange: baseRange, newRange: newRange,
+    baseHit: baseHit, newHit: newHit
+  };
+}
+
 function _wkRender(p){
   var wbLv = getBuildingLv('workbench');
   var s = window._wkState;
@@ -983,14 +1011,14 @@ function _wkRender(p){
 
   var baseId = s.selectedBaseId;
   var rarity = s.selectedRarity;
+  var rarityColor = _wkRarityColor(rarity);
   var previewId = getNamedId(baseId, s.draftMag, s.draftScope, s.draftGrip);
   var _imgPath = window.getItemIconPath(previewId);
   var _fbPath = window.getItemIconPath(baseId);
   var _wname = (WEAPONS[baseId] && WEAPONS[baseId].name) || baseId;
-  var _borderColor = _wkRarityColor(rarity);
 
-  html += '<div class="wk-showcase" id="wk-showcase" style="border-color:' + _borderColor + '">';
-  html += '<div class="wname">' + _wname + '</div>';
+  html += '<div class="wk-showcase" id="wk-showcase" style="border-color:' + rarityColor + '">';
+  html += '<div class="wname" style="color:' + rarityColor + '">' + _wname + '</div>';
   html += '<img src="' + _imgPath + assetSuffix(_imgPath) + '" onerror="this.onerror=null;this.src=&quot;' + _fbPath + assetSuffix(_fbPath) + '&quot;" alt="">';
   html += '<div class="switch">▼ 點擊切換</div>';
   html += '</div>';
@@ -1009,33 +1037,63 @@ function _wkRender(p){
   html += '<div class="wk-slot ' + (s.draftGrip ? 'filled' : '') + (_hasGrips ? '' : ' disabled') + '" data-slot="grip"><div class="lbl">握把</div><div class="val">' + gripDisp + '</div></div>';
   html += '</div>';
 
-  var totalCost = {}, totalTime = 0;
+  /* 數據對比（固定 3 行） */
+  var st = _wkCalcStats(baseId, s.draftMag, s.draftScope, s.draftGrip);
+  var _magUp = st.newMag > st.baseMag ? 'up' : (st.newMag < st.baseMag ? 'down' : 'same');
+  var _rangeUp = st.newRange > st.baseRange + 0.001 ? 'up' : (st.newRange < st.baseRange - 0.001 ? 'down' : 'same');
+  var _hitUp = st.newHit > st.baseHit ? 'up' : (st.newHit < st.baseHit ? 'down' : 'same');
+  html += '<div class="wk-stats">';
+  html += '<div class="wk-stat-row"><span class="k">彈匣</span><span class="v-cur">' + st.baseMag + ' 發</span><span class="v-arrow">→</span><span class="v-new ' + _magUp + '">' + st.newMag + ' 發</span></div>';
+  html += '<div class="wk-stat-row"><span class="k">射程</span><span class="v-cur">' + st.baseRange.toFixed(1) + ' m</span><span class="v-arrow">→</span><span class="v-new ' + _rangeUp + '">' + st.newRange.toFixed(1) + ' m</span></div>';
+  html += '<div class="wk-stat-row"><span class="k">命中</span><span class="v-cur">+' + st.baseHit + '%</span><span class="v-arrow">→</span><span class="v-new ' + _hitUp + '">+' + st.newHit + '%</span></div>';
+  html += '</div>';
+
+  /* 材料需求（固定 5 行，2 列網格） */
+  var totalCost = {};
   if(s.draftMag){ var c1 = calcModCost(baseId, s.draftMag, null, null); for(var k in c1) totalCost[k] = (totalCost[k] || 0) + c1[k]; }
   if(s.draftScope){ var c2 = calcModCost(baseId, null, s.draftScope, null); for(var k2 in c2) totalCost[k2] = (totalCost[k2] || 0) + c2[k2]; }
   if(s.draftGrip){ var c3 = calcModCost(baseId, null, null, s.draftGrip); for(var k3 in c3) totalCost[k3] = (totalCost[k3] || 0) + c3[k3]; }
-  if(s.draftMag || s.draftScope || s.draftGrip) totalTime = calcModTime(baseId, s.draftMag, s.draftScope, s.draftGrip);
 
-  var _canCraft = !!(s.draftMag || s.draftScope || s.draftGrip);
-  html += '<div class="wk-info">';
-  html += '<div class="row"><span class="k">改造後</span><span class="v">' + namedWeaponName(baseId, s.draftMag, s.draftScope, s.draftGrip) + '</span></div>';
-  if(totalTime > 0){
-    for(var ck in totalCost){
-      var have = materialEquivalent(ck);
-      var need = totalCost[ck];
-      if(have < need) _canCraft = false;
-      html += '<div class="row ' + (have >= need ? '' : 'bad') + '"><span class="k">' + MATERIALS[ck].name + '</span><span class="v">' + have + '/' + need + '</span></div>';
+  var MAT_LIST = ['metal', 'screws', 'gears', 'electronics'];
+  html += '<div class="wk-mats">';
+  for(var mi = 0; mi < MAT_LIST.length; mi++){
+    var mk = MAT_LIST[mi];
+    var mName = (MATERIALS[mk] && MATERIALS[mk].name) || mk;
+    var need = totalCost[mk] || 0;
+    var have = materialEquivalent(mk);
+    if(need === 0){
+      html += '<div class="wk-mat-row none"><span class="k">' + mName + '</span><span class="v">—</span></div>';
+    } else {
+      var cls = have >= need ? 'ok' : 'bad';
+      html += '<div class="wk-mat-row ' + cls + '"><span class="k">' + mName + '</span><span class="v">' + have + '/' + need + '</span></div>';
     }
-    var _tStr = totalTime >= 3600 ? Math.round(totalTime / 3600) + ' 小時' : (Math.round(totalTime / 60) + ' 分鐘');
-    html += '<div class="row"><span class="k">時間</span><span class="v">' + _tStr + '</span></div>';
   }
   html += '</div>';
 
+  /* 時間與隊列狀態 */
+  var totalTime = 0;
+  if(s.draftMag || s.draftScope || s.draftGrip) totalTime = calcModTime(baseId, s.draftMag, s.draftScope, s.draftGrip);
+  var _canCraft = !!(s.draftMag || s.draftScope || s.draftGrip);
+  if(_canCraft){
+    for(var ck in totalCost){
+      if(materialEquivalent(ck) < totalCost[ck]){ _canCraft = false; break; }
+    }
+  }
   var _modQ = (state.crafting || []).filter(function(c){ return c.type === 'mod'; });
   var _queueFull = _modQ.length >= wbLv;
   if(_queueFull) _canCraft = false;
 
+  var _btnLabel = '確認改造';
+  if(!s.draftMag && !s.draftScope && !s.draftGrip) _btnLabel = '請選擇配件';
+  else if(_queueFull) _btnLabel = '隊列已滿 (' + _modQ.length + '/' + wbLv + ')';
+  else if(!_canCraft) _btnLabel = '材料不足';
+  else if(totalTime > 0){
+    var _tStr = totalTime >= 3600 ? Math.round(totalTime / 3600) + ' 小時' : (Math.round(totalTime / 60) + ' 分鐘');
+    _btnLabel = '改造（' + _tStr + '）';
+  }
+
   html += '<div class="wk-actions">';
-  html += '<button class="btn primary" id="wk-craft"' + (_canCraft ? '' : ' disabled') + '>' + (_queueFull ? '隊列已滿 (' + _modQ.length + '/' + wbLv + ')' : '確認改造') + '</button>';
+  html += '<button class="btn primary" id="wk-craft"' + (_canCraft ? '' : ' disabled') + '>' + _btnLabel + '</button>';
   html += '<button class="btn ghost" id="wk-reset">重置</button>';
   html += '</div>';
 

@@ -2441,17 +2441,16 @@ function _render(){
     const fy = H * 0.95;
 
     if(e.hp <= 0){
-      if(!e._corpseSnapshot && !e._corpseFailed){
+      /* rev-fix-combat-corpse-layer: 战斗中死敌立即进 corpse-layer（z-index 20），
+       * 高于所有活载员（7）与玩家（5），与战斗后尸体层级一致。
+       * 不再在 combat-overlay（z-index 6）里绘制，避免战斗中/战斗后层级不一致。 */
+      if(!e._corpseRendered && !e._corpseFailed){
         try {
-          e._corpseSnapshot = (typeof _renderEnemyCorpseCanvas === 'function') ? _renderEnemyCorpseCanvas(e, H) : null;
-          if(!e._corpseSnapshot) e._corpseFailed = true;
+          if(typeof _startCorpses === 'function' && window._explore){
+            const _px = c.allies[0] ? c.allies[0].worldX : 0;
+            _startCorpses([e], [e.worldX - _px], e._eventRef);
+          } else { e._corpseFailed = true; }
         } catch(err){ e._corpseFailed = true; }
-      }
-      if(e._corpseSnapshot){
-        const snap = e._corpseSnapshot;
-        const dx = sx - snap.drawW / 2;
-        const dy = fy - snap.drawH;
-        try { ctx.drawImage(snap.canvas, dx, dy, snap.drawW, snap.drawH); } catch(err){}
       }
       continue;
     }

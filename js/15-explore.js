@@ -457,6 +457,13 @@ function _cleanPC(){
     for(const k in fx._pc){ try { fx._pc[k].remove(); } catch(e){} }
     fx._pc = {};
   }
+  /* rev-fix-cleanpc-layers: corpse-layer 和 passenger-layer 也清 */
+  try {
+    const _pl = document.getElementById('explore-passengers-layer');
+    if(_pl) _pl.innerHTML = '';
+    const _cl = document.getElementById('explore-corpses-layer');
+    if(_cl) _cl.innerHTML = '';
+  } catch(e){}
 }
 
 function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride, fallProgress){
@@ -467,10 +474,20 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride, fa
     cvs = document.createElement('canvas');
     cvs.width = Math.round(cw * 2);
     cvs.height = Math.round(chh * 2);
-    cvs.style.cssText = 'position:absolute;bottom:0;z-index:11;pointer-events:none;width:' + cw + 'px;height:' + chh + 'px;';
-    fx.appendChild(cvs);
+    cvs.style.cssText = 'position:absolute;bottom:0;pointer-events:none;';
+    cvs.style.width = cw + 'px';
+    cvs.style.height = chh + 'px';
     fx._pc[key] = cvs;
   }
+  /* rev-fix-passenger-corpse-layer: 载员按 dead 状态挂到不同层
+   * - 活：passenger-layer (z-index 7)
+   * - 死：corpse-layer (z-index 20)，与敌人尸体同级，高于所有活载员 */
+  const _drawIsDead = (animOverride === 'dead');
+  const _targetLayer = _drawIsDead
+    ? (typeof _getCorpseLayer === 'function' ? _getCorpseLayer() : fx)
+    : (typeof _getPassengerLayer === 'function' ? _getPassengerLayer() : fx);
+  if(_targetLayer && cvs.parentNode !== _targetLayer){ _targetLayer.appendChild(cvs); }
+  cvs.style.zIndex = _drawIsDead ? '21' : '7';
   cvs.style.left = (px - cw / 2) + 'px';
   const ctx = cvs.getContext('2d');
   ctx.setTransform(2, 0, 0, 2, 0, 0);
@@ -826,13 +843,31 @@ function _renderPass(now){
   }
   for(const kk in fx._pc){
     const idx = parseInt(kk.substring(1), 10);
-    /* [v182 G17] 删除阈值放宽到 -0.6 / 1.3，与 _drawP 一致。
-       原 -0.3 / 1.15 在载员 firing 时玩家走远、screenX 跨边界抖动 → canvas 反复删建 → 闪烁。 */
+    /* [v182 G17] 删除阈值放宽到 -0.6 / 1.3，与 _drawP 一致。 */
     if(isNaN(idx) || idx >= list.length || list[idx].screenX > 1.3 || list[idx].screenX < -0.6){
       try { fx._pc[kk].remove(); } catch(e){}
       delete fx._pc[kk];
     }
   }
+  /* rev-fix-passenger-layer-cleanup: 清理残留 canvas（可能在 corpse-layer） */
+  try {
+    const _pl = document.getElementById('explore-passengers-layer');
+    const _cl = document.getElementById('explore-corpses-layer');
+    if(_pl || _cl){
+      const _validKeys = new Set(Object.keys(fx._pc));
+      if(_pl){
+        const _kids = Array.from(_pl.children);
+        for(const _k of _kids){
+          if(!_k || _k.tagName !== 'CANVAS') continue;
+          let _found = false;
+          for(const _key of _validKeys){
+            if(fx._pc[_key] === _k){ _found = true; break; }
+          }
+          if(!_found){ try { _k.remove(); } catch(e){} }
+        }
+      }
+    }
+  } catch(e){}
   const z1El = document.getElementById('zone1');
   let _leftBox = document.getElementById('passenger-left-explore');
   if(!_leftBox && z1El){
@@ -876,12 +911,27 @@ function _getCorpseLayer(){
   if(!layer){
     layer = document.createElement('div');
     layer.id = 'explore-corpses-layer';
-    layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:14;overflow:hidden;';
+    /* rev-fix-corpse-zindex-top: 尸体层 z-index 20，高于所有活载员（7）与玩家（5） */
+    layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:20;overflow:hidden;';
     z1.appendChild(layer);
   }
   return layer;
 }
 window._getCorpseLayer = _getCorpseLayer;
+/* rev-fix-passenger-layer: 活载员独立层，z-index 7，位于 explore-fx (7) 之上（DOM 后 append） */
+function _getPassengerLayer(){
+  const z1 = document.getElementById('zone1');
+  if(!z1) return null;
+  let layer = document.getElementById('explore-passengers-layer');
+  if(!layer){
+    layer = document.createElement('div');
+    layer.id = 'explore-passengers-layer';
+    layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:7;overflow:hidden;';
+    z1.appendChild(layer);
+  }
+  return layer;
+}
+window._getPassengerLayer = _getPassengerLayer;
 
 function _startCorpses(enemies, enemyWX, ev){
   const ex = window._explore;
@@ -1335,21 +1385,10 @@ function _tickAlliesPositions(now){
     const _busyA = (a._reloadEnd && a._reloadEnd > now) || (a._fireAnimUntil && a._fireAnimUntil > now);
     if(_busyA){
       a._mode = 'firing';
-      /* rev-fix-busy-follow-fix: 换弹/射击期间，worldX 是否跟随玩家取决于「射程内有无可交战敌人」。
-       * 有敌人 → firing 站定，worldX 冻结（否则边射击边平移）。
-       * 无敌人 → following，worldX 跟随玩家（否则玩家走开载员原地发呆）。 */
-      const _rBusy = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(a.weapon.def) : 15;
-      const _hasTargetBusy = (_nearest != null) && (_nearestDist <= _rBusy);
-      if(_hasTargetBusy){
-        /* 站定开火，worldX 冻结 */
-        a._lastExWXForBusy = ex.worldX;
-      } else {
-        /* 无可交战敌人，跟随玩家 */
-        if(typeof a._lastExWXForBusy !== 'number') a._lastExWXForBusy = ex.worldX;
-        const _exDeltaB = ex.worldX - a._lastExWXForBusy;
-        if(Math.abs(_exDeltaB) < 2){ a.worldX += _exDeltaB; }
-        a._lastExWXForBusy = ex.worldX;
-      }
+      /* rev-fix-busy-freeze-hard: 开火/装弹动画播放期间，worldX 绝对冻结。
+       * 无论射程内有无敌人，载员都不移动——避免「开火动画 + 世界移动」造成视觉滑行。
+       * busy 过期后由 _nearest 分支重新判定 firing/advancing/following。 */
+      a._lastExWXForBusy = ex.worldX;
       _handled = true;
     } else if(_nearest){
       /* rev-fix-ah-range: 弹药手射程 = 场上幸存使用者最大射程（撤退检查已确保有使用者）；普通载员 = 自身武器射程。 */
