@@ -1098,6 +1098,11 @@ function drawBullet(b){
         b.t = (nowMs - b.startTime) / b.duration;
         if(b.t >= 1){
           b.x = b.tx; b.y = b.ty;
+          /* rev-fix-raid-rpg-fx: 后院 RPG 命中点生成独立特效 */
+          if(b.missile && typeof window._spawnRPGImpactFx === 'function'){
+            var _rR = wrapW * 0.18;
+            window._spawnRPGImpactFx(raidOwner, b.tx, b.ty, _rR);
+          }
           onBulletHit(b);
           bullets.splice(i, 1);
           continue;

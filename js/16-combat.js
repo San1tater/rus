@@ -478,6 +478,180 @@ window._spawnExplosionSmoke = function(owner, sx, sy, radiusPx){
     });
   }
 };
+/* rev-fix-rpg-impact-fx: RPG 爆炸专用特效——与手雷的灰色雾区分
+ * 时间线：
+ *   t=0     闪光    (0~0.14s) 白热中心爆发
+ *   t=0     火球    (0~0.55s) 橙红向外扩散
+ *   t=0~0.08 黑烟   (0~2.2s)  黑色烟柱向上飘升
+ *   t=0     碎片    (0~0.9s)  土黄细小颗粒，抛物线下落
+ *   t=0.05  火星    (0~1.2s)  红色亮点随机漂移
+ * radPx 是视觉半径（px），由调用方按屏幕宽度决定。 */
+window._spawnRPGImpactFx = function(owner, sx, sy, radPx){
+  if(!owner) return;
+  if(!owner.explosions) owner.explosions = [];
+  var _r = (typeof radPx === 'number' && radPx > 0) ? radPx : 60;
+  /* rev-fix-rpg-chaos: 消除规则感 —— 主/小分层、幂律尺寸速度、角度偏向、延迟生成 */
+  function _j(scale){ return (Math.random() - 0.5) * 2 * scale; }
+  function _pow(min, max, exp){
+    /* 幂律分布：返回 [min, max] 内偏 min 侧的值（exp>1）或偏 max 侧（exp<1） */
+    var t = Math.pow(Math.random(), exp || 2);
+    return min + (max - min) * t;
+  }
+
+  /* 1) 主闪光（白热，中心微偏）+ 30~60ms 二次闪光（暖色，位置抖动更大） */
+  owner.explosions.push({
+    x: sx + _j(_r * 0.10), y: sy + _j(_r * 0.10), vx: 0, vy: 0,
+    life: 0.11 + Math.random() * 0.05, maxLife: 0.16,
+    size: _r * (0.50 + Math.random() * 0.20),
+    growth: _r * (3.0 + Math.random() * 1.2),
+    kind: 'flash', isGround: false, gravity: 0
+  });
+  owner.explosions.push({
+    x: sx + _j(_r * 0.25), y: sy + _j(_r * 0.25), vx: 0, vy: 0,
+    life: 0.12, maxLife: 0.16,
+    size: _r * (0.30 + Math.random() * 0.15),
+    growth: _r * (1.6 + Math.random() * 0.8),
+    kind: 'flash2', isGround: false, gravity: 0,
+    delay: 0.03 + Math.random() * 0.03
+  });
+
+  /* 2) 火球：主 3~4 个（大、向上扇开）+ 小 8~12 个（小、任意角、更快） */
+  var _mainFire = 3 + Math.floor(Math.random() * 2);
+  for(var fi = 0; fi < _mainFire; fi++){
+    var _fa = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.9;
+    var _fs = _r * _pow(1.2, 2.8, 1.6);
+    var _fl = 0.40 + Math.random() * 0.24;
+    owner.explosions.push({
+      x: sx + _j(_r * 0.16), y: sy + _j(_r * 0.16),
+      vx: Math.cos(_fa) * _fs,
+      vy: Math.sin(_fa) * _fs - _r * 0.30,
+      life: _fl, maxLife: _fl,
+      size: _r * _pow(0.26, 0.48, 1.4),
+      growth: _r * (1.3 + Math.random() * 0.8),
+      kind: 'fire', isGround: false, gravity: 0,
+      delay: Math.random() * 0.02
+    });
+  }
+  var _smallFire = 8 + Math.floor(Math.random() * 5);
+  for(var fs2 = 0; fs2 < _smallFire; fs2++){
+    var _fa2 = Math.random() * Math.PI * 2;
+    var _fs2 = _r * _pow(0.8, 3.2, 2.2);
+    var _fl2 = 0.18 + Math.random() * 0.26;
+    owner.explosions.push({
+      x: sx + _j(_r * 0.25), y: sy + _j(_r * 0.25),
+      vx: Math.cos(_fa2) * _fs2,
+      vy: Math.sin(_fa2) * _fs2 - _r * 0.5,
+      life: _fl2, maxLife: _fl2,
+      size: _r * _pow(0.06, 0.18, 2.0),
+      growth: _r * (0.7 + Math.random() * 0.8),
+      kind: 'fire', isGround: false, gravity: 0,
+      delay: Math.random() * 0.05
+    });
+  }
+
+  /* 3) 黑烟：主烟柱 4~5 个（大、慢、向上）+ 次烟 10~15 个（小、散、延迟更宽） */
+  var _mainSmoke = 4 + Math.floor(Math.random() * 2);
+  for(var mi = 0; mi < _mainSmoke; mi++){
+    var _ma = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.7;
+    var _ms = _r * _pow(0.20, 0.55, 1.5);
+    var _ml = 1.4 + Math.random() * 0.95;
+    owner.explosions.push({
+      x: sx + _j(_r * 0.42), y: sy + _j(_r * 0.22),
+      vx: Math.cos(_ma) * _ms * 0.30,
+      vy: Math.sin(_ma) * _ms * 0.55 - _r * 0.10,
+      life: _ml, maxLife: _ml,
+      size: _r * _pow(0.28, 0.48, 1.3),
+      growth: _r * (0.9 + Math.random() * 0.7),
+      kind: 'smoke_dark', isGround: false, gravity: 0,
+      delay: Math.random() * 0.07
+    });
+  }
+  var _smallSmoke = 10 + Math.floor(Math.random() * 6);
+  for(var ms2 = 0; ms2 < _smallSmoke; ms2++){
+    var _ma2 = Math.random() * Math.PI * 2;
+    var _ms2 = _r * _pow(0.08, 0.32, 2.0);
+    var _ml2 = 0.7 + Math.random() * 0.85;
+    owner.explosions.push({
+      x: sx + _j(_r * 0.55), y: sy + _j(_r * 0.42),
+      vx: Math.cos(_ma2) * _ms2 * 0.40,
+      vy: Math.sin(_ma2) * _ms2 * 0.30 - _r * 0.06,
+      life: _ml2, maxLife: _ml2,
+      size: _r * _pow(0.10, 0.24, 2.2),
+      growth: _r * (0.4 + Math.random() * 0.5),
+      kind: 'smoke_dark', isGround: false, gravity: 0,
+      delay: Math.random() * 0.16
+    });
+  }
+
+  /* 4) 碎片：2~3 大块（快、远、重）+ 7~11 土渣（慢、近） */
+  var _bigDeb = 2 + Math.floor(Math.random() * 2);
+  for(var bi = 0; bi < _bigDeb; bi++){
+    var _ba = Math.random() * Math.PI * 2;
+    var _bs = _r * (2.0 + Math.random() * 1.7);
+    owner.explosions.push({
+      x: sx + _j(_r * 0.18), y: sy + _j(_r * 0.18),
+      vx: Math.cos(_ba) * _bs,
+      vy: Math.sin(_ba) * _bs - _r * 0.7,
+      life: 0.65 + Math.random() * 0.45, maxLife: 1.1,
+      size: 3.5 + Math.random() * 2.5,
+      growth: 0,
+      kind: 'debris', isGround: false,
+      gravity: 460 + Math.random() * 90,
+      delay: Math.random() * 0.02
+    });
+  }
+  var _smallDeb = 7 + Math.floor(Math.random() * 5);
+  for(var bd = 0; bd < _smallDeb; bd++){
+    var _ba2 = Math.random() * Math.PI * 2;
+    var _bs2 = _r * _pow(0.6, 2.0, 1.8);
+    owner.explosions.push({
+      x: sx + _j(_r * 0.30), y: sy + _j(_r * 0.30),
+      vx: Math.cos(_ba2) * _bs2,
+      vy: Math.sin(_ba2) * _bs2 - _r * 0.3,
+      life: 0.45 + Math.random() * 0.35, maxLife: 0.8,
+      size: 1.5 + Math.random() * 1.5,
+      growth: 0,
+      kind: 'debris', isGround: false,
+      gravity: 500 + Math.random() * 110,
+      delay: Math.random() * 0.04
+    });
+  }
+
+  /* 5) 火星：2 极快（向上偏）+ 4~6 中速（任意角） */
+  var _fastEmber = 2;
+  for(var ei = 0; ei < _fastEmber; ei++){
+    var _ea = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+    var _es = _r * (2.8 + Math.random() * 1.7);
+    owner.explosions.push({
+      x: sx + _j(_r * 0.12), y: sy + _j(_r * 0.12),
+      vx: Math.cos(_ea) * _es,
+      vy: Math.sin(_ea) * _es - _r * 0.4,
+      life: 0.95 + Math.random() * 0.45, maxLife: 1.4,
+      size: 2.5 + Math.random() * 1.5,
+      growth: 0,
+      kind: 'ember_hot', isGround: false,
+      gravity: 360 + Math.random() * 80,
+      delay: Math.random() * 0.02
+    });
+  }
+  var _slowEmber = 4 + Math.floor(Math.random() * 3);
+  for(var ei2 = 0; ei2 < _slowEmber; ei2++){
+    var _ea2 = Math.random() * Math.PI * 2;
+    var _es2 = _r * _pow(0.8, 2.4, 1.8);
+    owner.explosions.push({
+      x: sx + _j(_r * 0.22), y: sy + _j(_r * 0.22),
+      vx: Math.cos(_ea2) * _es2,
+      vy: Math.sin(_ea2) * _es2 - _r * 0.3,
+      life: 0.45 + Math.random() * 0.45, maxLife: 0.9,
+      size: 1.5 + Math.random() * 1.2,
+      growth: 0,
+      kind: 'ember', isGround: false,
+      gravity: 380 + Math.random() * 90,
+      delay: Math.random() * 0.06
+    });
+  }
+};
+
 window._tickBattleFX = function(owner, dt){
   if(!owner) return;
   if(owner.sparks){
@@ -493,8 +667,12 @@ window._tickBattleFX = function(owner, dt){
   if(owner.explosions){
     for(var j = owner.explosions.length - 1; j >= 0; j--){
       var q = owner.explosions[j];
+      /* rev-fix-fx-delay: 延迟生成期间不动、不缩、不消失 */
+      if(q.delay && q.delay > 0){ q.delay -= dt; if(q.delay < 0) q.delay = 0; continue; }
       q.x += q.vx * dt;
       q.y += q.vy * dt;
+      /* rev-fix-fx-gravity: 碎片/火星等受重力，需在摩擦前累加，摩擦只衰减速度 */
+      if(q.gravity) q.vy += q.gravity * dt;
       q.vx *= 0.95;
       q.vy *= 0.95;
       q.life -= dt;
@@ -567,14 +745,54 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
   if(owner.explosions){
     for(var j = 0; j < owner.explosions.length; j++){
       var q = owner.explosions[j];
-      var a2 = Math.max(0, Math.min(1, q.life / q.maxLife)) * 0.55;
+      /* rev-fix-fx-delay-render: 延迟期不绘制 */
+      if(q.delay && q.delay > 0) continue;
+      /* rev-fix-fx-alpha: flash / ember_hot 单独提高，其余保持 0.55 */
+      var _aBase = 0.55;
+      if(q.kind === 'flash') _aBase = 0.95;
+      else if(q.kind === 'flash2') _aBase = 0.80;
+      else if(q.kind === 'ember_hot') _aBase = 0.80;
+      var a2 = Math.max(0, Math.min(1, q.life / q.maxLife)) * _aBase;
       var _c2 = (q._top && ctxTop) ? ctxTop : ctx;
       _c2.save();
       _c2.globalAlpha = a2;
       var g = _c2.createRadialGradient(q.x, q.y, 0, q.x, q.y, q.size);
-      g.addColorStop(0, 'rgba(180,180,180,0.9)');
-      g.addColorStop(0.5, 'rgba(140,140,140,0.4)');
-      g.addColorStop(1, 'rgba(100,100,100,0)');
+      /* rev-fix-fx-kinds: 按 kind 分派渐变（默认走手雷灰） */
+      if(q.kind === 'flash'){
+        g.addColorStop(0, 'rgba(255,255,255,1)');
+        g.addColorStop(0.3, 'rgba(255,242,180,0.9)');
+        g.addColorStop(0.7, 'rgba(255,180,80,0.45)');
+        g.addColorStop(1, 'rgba(220,90,20,0)');
+      } else if(q.kind === 'fire'){
+        g.addColorStop(0, 'rgba(255,240,180,0.95)');
+        g.addColorStop(0.4, 'rgba(255,140,40,0.85)');
+        g.addColorStop(0.75, 'rgba(180,45,10,0.5)');
+        g.addColorStop(1, 'rgba(80,10,0,0)');
+      } else if(q.kind === 'smoke_dark'){
+        g.addColorStop(0, 'rgba(45,40,36,0.88)');
+        g.addColorStop(0.5, 'rgba(28,24,20,0.55)');
+        g.addColorStop(1, 'rgba(10,8,6,0)');
+      } else if(q.kind === 'debris'){
+        g.addColorStop(0, 'rgba(190,155,95,0.95)');
+        g.addColorStop(1, 'rgba(110,85,50,0)');
+      } else if(q.kind === 'ember'){
+        g.addColorStop(0, 'rgba(255,220,110,1)');
+        g.addColorStop(0.5, 'rgba(255,85,20,0.85)');
+        g.addColorStop(1, 'rgba(140,20,0,0)');
+      } else if(q.kind === 'flash2'){
+        g.addColorStop(0, 'rgba(255,255,220,1)');
+        g.addColorStop(0.4, 'rgba(255,190,90,0.85)');
+        g.addColorStop(1, 'rgba(200,60,10,0)');
+      } else if(q.kind === 'ember_hot'){
+        g.addColorStop(0, 'rgba(255,255,240,1)');
+        g.addColorStop(0.4, 'rgba(255,200,90,0.9)');
+        g.addColorStop(1, 'rgba(180,40,0,0)');
+      } else {
+        /* 默认（手雷灰色） */
+        g.addColorStop(0, 'rgba(180,180,180,0.9)');
+        g.addColorStop(0.5, 'rgba(140,140,140,0.4)');
+        g.addColorStop(1, 'rgba(100,100,100,0)');
+      }
       _c2.fillStyle = g;
       _c2.beginPath();
       if(q.isGround){
@@ -783,6 +1001,19 @@ function _playSwitch(now, toSecondary){
   heroAnim.name = anim;
   heroAnim.frame = 0;
   heroAnim.lastUpdate = now;
+}
+
+/* rev-fix-vehicle-hit-y: 载具战中的子弹落点 y 以载具视觉中心为准
+ *   原因：敌方子弹的 y 原本是敌人枪口高度（约 0.65~0.73），但载具主体在 0.4~0.55，
+ *   子弹飞向 y=0.7 会落在炮管下方的空气中（T-80）或车体侧下部（BTR-80），
+ *   视觉上「打空气」或「打侧面」。修正后瞄准载具视觉中心。 */
+function _getVehicleHitScreenY(){
+  var b = window.BTRSupport;
+  if(!b || !b.active) return 0.6;
+  var h = b.height;
+  if(!h) return 0.6;
+  var centerY = (h * 0.95 - b.targetH / 2) / h;
+  return Math.max(0.30, Math.min(0.60, centerY));
 }
 
 function _isDiscovered(en, evWorldX, isV, p, ex){
@@ -1639,9 +1870,14 @@ function _enemyFire(e, now){
         p.srv._injuredDown = true;
         p._injuredDown = true;
         if(typeof pushLog === 'function'){
+          /* rev-fix-passenger-killer-melee: 载员被近战打死 → 显示敌人名+实际武器 */
+          const _eNameNm = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
+          const _eClsNm = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
+          const _wNameNm = (_md && _md.name) ? _md.name : '近戰';
+          const _wClsNm = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
           const _sClsN = (typeof rarityClass === 'function') ? rarityClass(p.srv.rarity || '一般') : '';
           const _sNameN = (typeof servantLabel === 'function') ? servantLabel(p.srv) : '載員';
-          pushLog('<span class="' + _sClsN + '">' + _sNameN + '</span> 被近戰 <span class="lose">擊倒</span>', [], 'explore');
+          pushLog('<span class="' + _sClsN + '">' + _sNameN + '</span> 被 <span class="' + _eClsNm + '">' + _eNameNm + '</span> 用 <span class="' + _wClsNm + '">' + _wNameNm + '</span> <span class="lose">擊倒</span>', [], 'explore');
         }
       }
     }
@@ -1689,7 +1925,17 @@ function _enemyFire(e, now){
 
   const distPx = Math.abs(p.worldX - e.worldX) * c.sm.bgPixelsPerMeter;
   const _approachPx = Math.max(0, (window._explore && window._explore._currentSpeed) || 0) * c.sm.bgPixelsPerMeter;
-  const _ty = (p && p.isPassenger) ? (0.55 + (Math.random() - 0.5) * 0.10) : (mz.y + (Math.random() - 0.5) * 0.15);
+  /* rev-fix-vehicle-hit-pos: 载具目标 → 瞄准载具视觉中心；载员 → 0.55；玩家 → 敌人枪口高度 */
+  let _ty;
+  if(p && p.isVehicle){
+    _ty = (typeof _getVehicleHitScreenY === 'function')
+      ? (_getVehicleHitScreenY() + (Math.random() - 0.5) * 0.06)
+      : 0.45;
+  } else if(p && p.isPassenger){
+    _ty = 0.55 + (Math.random() - 0.5) * 0.10;
+  } else {
+    _ty = mz.y + (Math.random() - 0.5) * 0.15;
+  }
   let _tx, duration, isFast = false;
   if(_wdX && _wdX.cal){
     const _spd = (typeof _ammoSpeedForCal === 'function') ? _ammoSpeedForCal(_wdX.cal) : 500;
@@ -1791,9 +2037,14 @@ function _enemyFire(e, now){
           p.srv._injuredDown = true;
           p._injuredDown = true;
           if(typeof pushLog === 'function'){
+            /* rev-fix-passenger-killer-rifle: 载员被枪械打死 → 显示敌人名+武器名 */
+            const _eNameCK = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
+            const _eClsCK = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
+            const _wNameCK = (w && w.id && typeof WEAPONS !== 'undefined' && WEAPONS[w.id]) ? WEAPONS[w.id].name : (w && w.id ? w.id : '武器');
+            const _wClsCK = (typeof rarityClass === 'function') ? rarityClass((w && w.rarity) || e.rarity || '一般') : '';
             const _sClsK = (typeof rarityClass === 'function') ? rarityClass(p.srv.rarity || '一般') : '';
             const _sNameK = (typeof servantLabel === 'function') ? servantLabel(p.srv) : '載員';
-            pushLog('<span class="' + _sClsK + '">' + _sNameK + '</span> 被 <span class="lose">擊倒</span>', [], 'explore');
+            pushLog('<span class="' + _sClsK + '">' + _sNameK + '</span> 被 <span class="' + _eClsCK + '">' + _eNameCK + '</span> 用 <span class="' + _wClsCK + '">' + _wNameCK + '</span> <span class="lose">擊倒</span>', [], 'explore');
           }
         }
         _float(p, '-' + r.hpLost, '');
@@ -1875,7 +2126,17 @@ function _enemyFireRPG(e, p, now){
   const duration = Math.max(16, (Math.abs(p.worldX - e.worldX) / 280) * 1000);
   const _tx = hit ? tx : ((tx < mz.x) ? -0.5 : 1.5);
 
-  const _tyR = (p && p.isPassenger) ? (0.55 + (Math.random() - 0.5) * 0.08) : mz.y; /* rev-fix-target-y-pos-rpg */
+  /* rev-fix-vehicle-hit-pos: 载具目标 → 载具视觉中心 */
+  let _tyR;
+  if(p && p.isVehicle){
+    _tyR = (typeof _getVehicleHitScreenY === 'function')
+      ? (_getVehicleHitScreenY() + (Math.random() - 0.5) * 0.06)
+      : 0.45;
+  } else if(p && p.isPassenger){
+    _tyR = 0.55 + (Math.random() - 0.5) * 0.08;
+  } else {
+    _tyR = mz.y;
+  }
   c.bullets.push({
     sx: mz.x, sy: mz.y, tx: _tx, ty: _tyR, t: 0,
     start: performance.now(), duration: duration,
@@ -2305,7 +2566,17 @@ function _enemyThrowGrenade(e, p, now){
         if(r.target.isPassenger && r.target.hp <= 0 && r.target.srv){
           r.target.srv.hp = 0;
           r.target.srv.injuredUntil = Date.now() + 4 * 3600 * 1000;
+          r.target._injuredDown = true;
           r.target._retreating = true;
+          if(typeof pushLog === 'function'){
+            /* rev-fix-passenger-killer-grenade: 载员被手雷炸死 → 完整来源日志 */
+            const _eNameGK = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
+            const _eClsGK = (typeof rarityClass === 'function') ? rarityClass(e.rarity || '一般') : '';
+            const _wClsGK = (typeof rarityClass === 'function') ? rarityClass(gRar || '一般') : '';
+            const _sClsGK = (typeof rarityClass === 'function') ? rarityClass(r.target.srv.rarity || '一般') : '';
+            const _sNameGK = (typeof servantLabel === 'function') ? servantLabel(r.target.srv) : '載員';
+            pushLog('<span class="' + _sClsGK + '">' + _sNameGK + '</span> 被 <span class="' + _eClsGK + '">' + _eNameGK + '</span> 用 <span class="' + _wClsGK + '">' + (gDef.name || '手榴彈') + '</span> <span class="lose">擊倒</span>', [], 'explore');
+          }
         }
         _float(r.target, '-' + shown, r.hpLost > 0 ? '' : 'armor');
       }
@@ -2350,32 +2621,44 @@ function _tickBullets(dt){
     if(b.t >= 1){
       if(!b.resolved){
         b.resolved = true;
-        if(b.isGrenade){
-        var _fxElG = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
-        var _WG = _fxElG ? _fxElG.clientWidth : 400;
-        var _HG = _fxElG ? _fxElG.clientHeight : 500;
-        var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : _WG * 0.08;
-        var _explX, _explY;
-        if(typeof b.worldStartX === 'number' && typeof b.vx === 'number' && b.T > 0){
-          /* 修 F: 物理手雷按 T 時刻世界位置反推屏幕 */
-          const _dir = (b.dir === -1) ? -1 : 1;
-          const _finalWX = b.worldStartX + _dir * b.vx * b.T;
-          const _px0 = c.allies[0] ? c.allies[0].worldX : 0;
-          const _relWX = _finalWX - _px0;
-          const _sm = c.sm || (typeof computeScreenMetrics === 'function' ? computeScreenMetrics(_WG, _HG) : { screenRightWorld: 2 });
-          _explX = (EXPLORE_HERO_X_RATIO + (_relWX / _sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO)) * _WG;
-          _explY = _HG * 0.95;
-        } else {
-          _explX = b.tx * _WG;
-          _explY = b.ty * _HG;
+        /* rev-fix-rpg-fx: RPG（missile）用独立特效，手雷保持原烟 */
+        if(b.isGrenade || b.missile){
+          var _fxElG = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
+          var _WG = _fxElG ? _fxElG.clientWidth : 400;
+          var _HG = _fxElG ? _fxElG.clientHeight : 500;
+          var _explX, _explY;
+          if(b.isGrenade && typeof b.worldStartX === 'number' && typeof b.vx === 'number' && b.T > 0){
+            /* 手雷：按 T 时刻世界位置反推落点 */
+            const _dir = (b.dir === -1) ? -1 : 1;
+            const _finalWX = b.worldStartX + _dir * b.vx * b.T;
+            const _px0 = c.allies[0] ? c.allies[0].worldX : 0;
+            const _relWX = _finalWX - _px0;
+            const _sm = c.sm || (typeof computeScreenMetrics === 'function' ? computeScreenMetrics(_WG, _HG) : { screenRightWorld: 2 });
+            _explX = (EXPLORE_HERO_X_RATIO + (_relWX / _sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO)) * _WG;
+            _explY = _HG * 0.95;
+          } else {
+            /* RPG：直接命中点 */
+            _explX = b.tx * _WG;
+            _explY = b.ty * _HG;
+          }
+          /* 屏幕外（未命中飞出）不生成特效 */
+          if(_explX >= -_WG * 0.2 && _explX <= _WG * 1.2){
+            if(b.missile){
+              /* RPG：视觉半径约屏宽 18% */
+              var _radRPG = _WG * 0.18;
+              if(typeof window._spawnRPGImpactFx === 'function') window._spawnRPGImpactFx(c, _explX, _explY, _radRPG);
+            } else {
+              /* 手雷：保持原样（bgPixelsPerMeter × 4.5m） */
+              var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : _WG * 0.08;
+              if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, _explX, _explY, _radG);
+            }
+          }
         }
-        if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, _explX, _explY, _radG);
       }
       if(b._onHit){
         window._lastBullet = b;
         try { b._onHit(); } catch(err){ console.error(err); }
         window._lastBullet = null;
-      }
       }
       if(b.t > 2 || b.hit){
         c.bullets.splice(i, 1);

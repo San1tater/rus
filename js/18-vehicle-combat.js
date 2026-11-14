@@ -53,12 +53,14 @@ window._isVehicleWeaponUsable = function(wid, vid){
   return true;
 };
 
+/* rev-fix-vehicle-part-prob: 正面为主（70%），侧面 25%，后面 5%
+ * 玩家基本正面迎敌，所以击中部位以正面为主；侧面仍可能（转弯/侧身），后面极少。 */
 const _VEHICLE_PART_PROB = [
-  { key: 'hullFront',   w: 30 },
-  { key: 'side',        w: 25 },
-  { key: 'rear',        w: 15 },
-  { key: 'turretFront', w: 20 },
-  { key: 'turretSide',  w: 10 }
+  { key: 'hullFront',   w: 42 },
+  { key: 'turretFront', w: 28 },
+  { key: 'side',        w: 15 },
+  { key: 'turretSide',  w: 10 },
+  { key: 'rear',        w: 5 }
 ];
 
 const _VEHICLE_INTERNAL_WEIGHTS = {
