@@ -329,10 +329,10 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-plot{width:64px;height:64px;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;user-select:none;transition:transform .1s,border-color .15s,background .15s;box-sizing:border-box;padding-bottom:12px}
 .gp-plot:active{transform:scale(.94)}
 .gp-plot.empty .gp-plot-icon{font-size:22px;color:#4a4038;line-height:1}
-.gp-plot.empty{background-image:url('images/garden/default.png');background-size:cover;background-position:center;background-color:rgba(30,25,20,.85)}
-.gp-plot.built{border-color:#8a5f18;background-image:url('images/garden/default.png');background-size:cover;background-position:center;background-color:#241d16}
+.gp-plot.empty{background-image:url('icons/garden/plot_default.png');background-size:cover;background-position:center;background-color:rgba(30,25,20,.85)}
+.gp-plot.built{border-color:#8a5f18;background-image:url('icons/garden/plot_default.png');background-size:cover;background-position:center;background-color:#241d16}
 .gp-plot.built[data-type="soil"]{background-image:url('icons/garden/soil.png')}
-.gp-plot.broken{background-image:url('images/garden/default.png');background-size:cover;background-position:center}
+.gp-plot.broken{background-image:url('icons/garden/plot_default.png');background-size:cover;background-position:center}
 .gp-plot.built .gp-plot-lbl{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:8px;color:var(--c-accent);background:rgba(0,0,0,.55);padding:1px 0}
 .gp-plot.mature{border-color:#4caf50;box-shadow:0 0 8px rgba(76,175,80,.55), inset 0 0 0 999px rgba(76,175,80,0.12)}
 .gp-plot.mature .gp-plot-lbl{color:#7ee07e}
@@ -591,7 +591,7 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .garden-log-line .gl-time{color:#6a5f4d;font-size:9px;margin-right:2px}
 .garden-log-line.offline{cursor:pointer;color:#4a90d9;text-decoration:underline;text-decoration-style:dotted}
 .srv-tag{position:absolute;top:1px;right:2px;font-size:10px;background:rgba(0,0,0,.78);color:#fff;padding:0 3px;border-radius:3px;line-height:1.15;z-index:5;pointer-events:none;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:bold}
-.gp-grid-wrap{background-image:url('images/garden/bg.png');background-size:cover;background-position:center;background-repeat:no-repeat}
+.gp-grid-wrap{background-image:url('icons/garden/garden_bg.png');background-size:cover;background-position:center;background-repeat:no-repeat}
 .owner-row{display:flex;align-items:center;gap:10px;padding:6px 8px;background:#1a1510;border:1px solid #2a231c;border-radius:6px;margin-bottom:4px}
 .owner-row .tower-guard-btn{position:relative;flex:0 0 auto}
 .owner-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
