@@ -222,7 +222,7 @@ function _renderBg(){
   const _maxIdx = _pathNodes ? (_pathNodes.length - 1) : node.idx;
   const _safeIdx = Math.min(Math.max(0, node.idx), _maxIdx);
   const key = REGION_KEYS[_region.replace(/II$/,'')] + '_r' + _ri + '_n' + _safeIdx;
-  const _p = "images/bg/" + key + ".png";
+  const _p = "images/bg/explore/" + key + ".png";
   const url = "url('" + _p + (typeof assetSuffix === 'function' ? assetSuffix(_p) : '') + "')";
   const ls = document.querySelectorAll('#zone1 .bg-layer');
   for(let i = 0; i < ls.length; i++) ls[i].style.backgroundImage = url;
@@ -256,7 +256,7 @@ function preloadExploreBackgrounds(){
       const route = routes[r];
       if(!route || !route.nodes) continue;
       for(let n = 0; n < route.nodes.length; n++){
-        const _p = 'images/bg/' + key + '_r' + r + '_n' + n + '.png';
+        const _p = 'images/bg/explore/' + key + '_r' + r + '_n' + n + '.png';
         const url = _p + assetSuffix(_p);
         if(_bgPreloadCache.has(url)) continue;
         _bgPreloadCache.add(url);
@@ -553,7 +553,7 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride, fa
       const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
       const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
       if(layerDef){
-        const img = getHeroImg('icons/items/' + resolveIconId(eq.head) + '.png');
+        const img = getHeroImg(window.getItemIconPath(eq.head));
         units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
       }
     }
@@ -561,7 +561,7 @@ function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride, fa
       const cfg = getTopCfg(eq.top);
       const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
       if(layerDef){
-        const img = getHeroImg('icons/items/' + resolveIconId(eq.top) + '.png');
+        const img = getHeroImg(window.getItemIconPath(eq.top));
         units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
       }
     }
@@ -578,7 +578,7 @@ if(wps && eq[wps]){
         if(cfg){
           const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
           if(layerDef){
-            const img = getHeroImg('icons/items/' + resolveIconId(eq[wps]) + '.png');
+            const img = getHeroImg(window.getItemIconPath(eq[wps]));
             units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
           }
         }
@@ -1232,7 +1232,7 @@ function _startCombat(ev, first){
             heroAnim.healItem = (_healUsed.length > 0) ? _healUsed[0].id : null;
             /* rev-fix-preload-heal-item: 預先載入圖標，避免首幀空白 */
             if(heroAnim.healItem && typeof getHeroImg === 'function'){
-              try { getHeroImg('icons/items/' + resolveIconId(heroAnim.healItem) + '.png'); } catch(e){}
+              try { getHeroImg(window.getItemIconPath(heroAnim.healItem)); } catch(e){}
             }
           }
           if(typeof pushLog === 'function'){
@@ -1730,11 +1730,7 @@ function _tick(now){
     let _maxRange = Infinity;
     if(!_isVMode){
       const _pw = _getPW();
-      _maxRange = 15;
-      if(_pw && _pw.def){
-        if(_pw.def._shortRange) _maxRange = 20;
-        else if(typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[_pw.def.type]) _maxRange = WEAPON_COMBAT_RANGE[_pw.def.type];
-      }
+      _maxRange = (_pw && _pw.def && typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(_pw.def) : 15;
     }
     let _bestEv = null, _bestD = Infinity;
     for(let _ni = 0; _ni < ex.nodes.length; _ni++){

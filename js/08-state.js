@@ -193,6 +193,47 @@ function load(){
       }
     }
 
+    /* rev-workbench: 遷移舊 4 段 ID → 5 段（補 _x） */
+    (function _migrateNamed(){
+      function _fixId(id){
+        if(!id || id.indexOf('named_') !== 0) return id;
+        var parts = id.split('_');
+        if(parts.length === 4){
+          var baseId = parts[1];
+          var mag = parts[2] === 'x' ? null : parseInt(parts[2], 10);
+          var scope = parts[3] === 'x' ? null : parts[3];
+          if(WEAPONS[baseId]) getOrCreateNamedItem(baseId, mag, scope, null);
+          if(ALL_ITEMS[id]) delete ALL_ITEMS[id];
+          return id + '_x';
+        }
+        return id;
+      }
+      var _toDel = [], _toAdd = {};
+      for(var k in state.inventory){
+        var sp = k.split('@');
+        var nid = _fixId(sp[0]);
+        if(nid !== sp[0]){
+          _toDel.push(k);
+          var nk = nid + '@' + sp[1];
+          _toAdd[nk] = (_toAdd[nk] || 0) + state.inventory[k];
+        }
+      }
+      for(var i = 0; i < _toDel.length; i++) delete state.inventory[_toDel[i]];
+      for(var k2 in _toAdd) state.inventory[k2] = (state.inventory[k2] || 0) + _toAdd[k2];
+      for(var slot in state.player.equipped){
+        var eid = state.player.equipped[slot];
+        if(!eid) continue;
+        var neid = _fixId(eid);
+        if(neid !== eid) state.player.equipped[slot] = neid;
+      }
+      if(Array.isArray(state.crafting)){
+        for(var ci = 0; ci < state.crafting.length; ci++){
+          var c = state.crafting[ci];
+          if(c.type === 'mod' && c.modInfo && typeof c.modInfo.grip === 'undefined') c.modInfo.grip = null;
+        }
+      }
+    })();
+
     var _regen = function(id){
       if(!id || id.indexOf('named_') !== 0) return;
       var parts = id.split('_');
@@ -200,7 +241,8 @@ function load(){
         var baseId = parts[1];
         var mag = parts[2] === 'x' ? null : parseInt(parts[2], 10);
         var scope = parts[3] === 'x' ? null : parts[3];
-        if(WEAPONS[baseId]) getOrCreateNamedItem(baseId, mag, scope);
+        var grip = parts[4] && parts[4] !== 'x' ? parts[4] : null;
+        if(WEAPONS[baseId]) getOrCreateNamedItem(baseId, mag, scope, grip);
       }
     };
     for(var ik in state.inventory) _regen(ik.split('@')[0]);
@@ -1253,7 +1295,7 @@ function processCrafting(){
       const t = c.time * 1000 / sm;
       if(now - c.startTime >= t){
         const info = c.modInfo;
-        const namedId = getOrCreateNamedItem(info.baseId, info.mag, info.scope);
+        const namedId = getOrCreateNamedItem(info.baseId, info.mag, info.scope, info.grip || null);
         if(info.fromEquippedSlot){
           if(!state.player.equipped[info.fromEquippedSlot]){
             state.player.equipped[info.fromEquippedSlot] = namedId;
@@ -1263,7 +1305,8 @@ function processCrafting(){
             pushLog('<span class="pl">系統</span> 改造完成：<b class="r-具名">' + itemDef(namedId).name + '</b> 已放入背包（原槽位已被佔用）。', [], 'explore');
           }
         } else {
-          if(info.originalId) invRemove(info.originalId, info.originalRarity, 1);
+          /* rev-workbench: 工作台在加入队列时已消耗源武器，避免双删 */
+          if(info.originalId && !info._consumedAtStart) invRemove(info.originalId, info.originalRarity, 1);
           invAddRaw(namedId, '具名', 1);
         }
         pushLog('<span class="pl">玩家</span> 完成改造：<b class="r-具名">' + itemDef(namedId).name + '</b>。', [], 'explore');

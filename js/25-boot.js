@@ -51,6 +51,7 @@ $$('.tab').forEach(t=>{
     }
     if(typeof closeGaragePage === 'function'){ closeGaragePage(); }
     if(typeof closeStationPage === 'function'){ closeStationPage(); }
+    if(typeof closeWorkbenchPage === 'function'){ closeWorkbenchPage(); }
     currentTab = _nextTab;
     if(currentTab === 'base') _regionScrollPos = 0;
     $$('.tab').forEach(x => x.classList.toggle('active', x === t));

@@ -97,6 +97,8 @@ function _rangeOfWeaponDef(wd){
   if(wd.slot === 'melee') return 0.75;
   /* rev-fix-throw-range: 手榴彈射程 30 米 */
   if(wd.slot === 'throwable') return 30;
+  /* rev-workbench: 改裝瞄具後的武器自帶 combatRange，優先使用 */
+  if(typeof wd.combatRange === 'number' && wd.combatRange > 0) return wd.combatRange;
   if(wd._shortRange) return FOOT_RANGE_SHORT;
   return (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[wd.type]) || FOOT_RANGE_DEFAULT;
 }
@@ -484,7 +486,7 @@ window._drawBulletShape = function(ctx, px, py, opts){
   }
   /* 手雷图标 */
   if(opts.isGrenade && opts.grenadeId){
-    var _gimg = (typeof getHeroImg === 'function') ? getHeroImg('icons/items/' + opts.grenadeId + '.png') : null;
+    var _gimg = (typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(opts.grenadeId)) : null;
     var _gsize = 20 * scale;
     if(_gimg && _gimg.complete && _gimg.naturalWidth){
       ctx.save();

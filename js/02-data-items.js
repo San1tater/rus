@@ -185,21 +185,26 @@ const AMMO_ICON_BY_CAL = {
 };
 
 const WEAPON_MOD_RULES={
-  aks74u:{mags:[45,60],scopes:[]},aks74un:{mags:[45,60],scopes:['1P87','EKP-8-02','PK-06']},
-  ak74:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},
-  ak74n:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},ak74m:{mags:[45,60,95],scopes:['1P87','PSO-1','EKP-8-02','PK-06']},
-  akm:{mags:[45,75],scopes:[]},akms:{mags:[45,75],scopes:[]},akmn:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},
-  ak103:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},ak104:{mags:[45,75],scopes:['1P87','PSO-1','PK-06']},
-  ak105:{mags:[60,95],scopes:['1P87','PSO-1']},ak12:{mags:[45,60,95],scopes:['1P87','PSO-1']},
-  asval:{mags:[30],scopes:['PSO-1','1P87']},'9a91':{mags:[],scopes:['PSO-1']},sr3m:{mags:[],scopes:['1P87']},
-  vss:{mags:[20,30],scopes:['PSO-1']},svd:{mags:[15,20],scopes:['PSO-1']},sv98:{mags:[],scopes:['1P59']},
-  rpk16:{mags:[95],scopes:['1P87','PSO-1']},rpd:{mags:[],scopes:[]},
-  rpdn:{mags:[],scopes:['PSO-1']},
-  pkm:{mags:[200],scopes:[]},
-  pkp:{mags:[200],scopes:['1P87','PSO-1']},ash12:{mags:[10,20],scopes:['1P87']},pp19:{mags:[],scopes:['1P87','PK-06']},
-  pm:{mags:[8],scopes:[]},pb:{mags:[8],scopes:[]},mp443:{mags:[18],scopes:[]},aps:{mags:[30],scopes:[]},saiga12:{mags:[5,8,10,20],scopes:[]},
+  aks74u:{mags:[45,60],scopes:[],grips:['RK-1']},aks74un:{mags:[45,60],scopes:['1P87'],grips:['RK-1']},
+  ak74:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},
+  ak74n:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},ak74m:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},
+  akm:{mags:[75],scopes:[],grips:['RK-1']},akms:{mags:[75],scopes:[],grips:['RK-1']},akmn:{mags:[75],scopes:['1P87','PSO-1'],grips:['RK-1']},
+  ak103:{mags:[75],scopes:['1P87','PSO-1'],grips:['RK-1']},ak104:{mags:[75],scopes:['1P87','PSO-1'],grips:['RK-1']},
+  ak105:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},ak12:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},
+  asval:{mags:[30],scopes:['PSO-1','1P87'],grips:['RK-1']},'9a91':{mags:[],scopes:['PSO-1'],grips:['RK-1']},sr3m:{mags:[],scopes:['1P87'],grips:['RK-1']},
+  vss:{mags:[20,30],scopes:['PSO-1'],grips:['RK-1']},svd:{mags:[15,20],scopes:['PSO-1'],grips:[]},sv98:{mags:[],scopes:[],grips:[]},
+  rpk16:{mags:[95],scopes:['1P87','PSO-1'],grips:['RK-1']},rpd:{mags:[],scopes:[],grips:['RK-1']},
+  rpdn:{mags:[],scopes:['PSO-1'],grips:['RK-1']},
+  pkm:{mags:[200],scopes:[],grips:['RK-1']},
+  pkp:{mags:[200],scopes:['1P87','PSO-1'],grips:['RK-1']},ash12:{mags:[10,20],scopes:['1P87'],grips:['RK-1']},pp19:{mags:[],scopes:['1P87'],grips:['RK-1']},
+  pm:{mags:[],scopes:[],grips:[]},pb:{mags:[],scopes:[],grips:[]},mp443:{mags:[],scopes:[],grips:[]},aps:{mags:[],scopes:[],grips:[]},saiga12:{mags:[5,8,10,20],scopes:[],grips:[]},
 };
 const SCOPE_BONUS={'1P87':5,'PSO-1':8,'EKP-8-02':4,'PK-06':6,'1P59':12};
+/* rev-workbench: 瞄具距離加成 / 握把命中加成 */
+const SCOPE_RANGE_BONUS = { '1P87': 0.10, 'PSO-1': 0.25 };
+const GRIP_HIT_BONUS = 8;
+const GRIP_NAME = { 'RK-1': 'RK-1 戰術握把' };
+
 const SCOPE_NAME={'1P87':'1P87 全息','PSO-1':'PSO-1 光學','EKP-8-02':'EKP-8-02 紅點','PK-06':'PK-06 紅點','1P59':'1P59 Hyperion 高倍鏡'};
 
 const SEEDS = {
@@ -291,6 +296,34 @@ function fmtNum(n){
   return sign + Math.round(v / 1000000) + "M";
 }
 
+window.getItemIconPath = function(id){
+  if(!id) return '';
+  if(typeof SEEDS !== 'undefined' && SEEDS[id]){
+    var _img = SEEDS[id].img || id;
+    return 'icons/garden/seeds/' + _img + '.png';
+  }
+  if(typeof CROPS !== 'undefined' && CROPS[id]){
+    var _img2 = CROPS[id].img || id;
+    return 'icons/garden/crops/' + _img2 + '.png';
+  }
+  if(typeof GARDEN_EXTRAS !== 'undefined' && GARDEN_EXTRAS[id]){
+    return 'icons/garden/' + GARDEN_EXTRAS[id].img + '.png';
+  }
+  if(typeof AMMO !== 'undefined' && AMMO[id] && AMMO[id].cal){
+    var f = (typeof AMMO_ICON_BY_CAL !== 'undefined') ? AMMO_ICON_BY_CAL[AMMO[id].cal] : null;
+    if(f) return 'icons/ammo/' + f;
+  }
+  if(id === 'rpg') return 'icons/weapons/rpg.png';
+  if(typeof WEAPONS !== 'undefined' && WEAPONS[id]) return 'icons/weapons/' + id + '.png';
+  if(typeof ARMOR !== 'undefined' && ARMOR[id]) return 'icons/armor/' + id + '.png';
+  if(typeof CONSUMABLES !== 'undefined' && CONSUMABLES[id]) return 'icons/consumables/' + id + '.png';
+  if(id.indexOf('named_') === 0){
+    var parts = id.split('_');
+    if(parts.length >= 2 && WEAPONS[parts[1]]) return 'icons/weapons/named/' + id + '.png';
+  }
+  return 'icons/items/' + id + '.png';
+};
+
 function itemIcon(id,size){
   const s=size||24;
   if(!id) return "";
@@ -309,12 +342,11 @@ function itemIcon(id,size){
   if(ammoDef && ammoDef.cal){
     const f=AMMO_ICON_BY_CAL[ammoDef.cal];
     if(f){
-      const _p = "icons/items/" + f;
+      const _p = "icons/ammo/" + f;
       return `<img src="${_p}${assetSuffix(_p)}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
     }
   }
-  const rid=resolveIconId(id);
-  const _p = "icons/items/" + rid + ".png";
+  const _p = window.getItemIconPath(id);
   return `<img src="${_p}${assetSuffix(_p)}" style="width:${s}px;height:${s}px;object-fit:contain" alt="">`;
 }
 function seedImgHtml(seedId, size){
@@ -504,7 +536,7 @@ function getMagOptionsForWeapon(weaponId){
   if(cal === '5.45' && (type === '突擊步槍' || type === '機槍')){
     candidates = [30, 60, 95];
   } else if(cal === '7.62' && type === '突擊步槍'){
-    candidates = [30, 45, 75];
+    candidates = [30, 75];
   } else if(cal === '9x39'){
     candidates = [20, 30];
   } else if(cal === '7.62x54'){
