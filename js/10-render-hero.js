@@ -376,6 +376,18 @@ function getHeroImg(src){
   const cacheKey = src + v;
   if(heroImgCache.has(cacheKey)) return heroImgCache.get(cacheKey);
   const img = new Image();
+  img._fallbackTried = false;
+  img.onerror = function(){
+    if(img._fallbackTried) return;
+    img._fallbackTried = true;
+    const _fn = src.split('/').pop().replace(/\.png$/i, '');
+    const _parts = _fn.split('_');
+    if(_parts[0] === 'named' && _parts[1]){
+      const _fbPath = window.getItemIconPath(_parts[1]);
+      const _fv = (typeof assetSuffix === 'function') ? assetSuffix(_fbPath) : '';
+      img.src = _fbPath + _fv;
+    }
+  };
   img.src = src + v;
   heroImgCache.set(cacheKey, img);
   return img;
@@ -389,26 +401,39 @@ function preloadStaticAssets(){
     if(typeof WEAPONS !== 'undefined'){
       for(var k in WEAPONS){
         if(WEAPONS[k] && WEAPONS[k].slot){
-          getHeroImg('icons/items/' + k + '.png'); _ok++;
+          getHeroImg(window.getItemIconPath(k)); _ok++;
         }
       }
     }
     // 防具
     if(typeof ARMOR !== 'undefined'){
       for(var k in ARMOR){
-        getHeroImg('icons/items/' + k + '.png'); _ok++;
+        getHeroImg(window.getItemIconPath(k)); _ok++;
       }
     }
     // 消耗品
     if(typeof CONSUMABLES !== 'undefined'){
       for(var k in CONSUMABLES){
-        getHeroImg('icons/items/' + k + '.png'); _ok++;
+        getHeroImg(window.getItemIconPath(k)); _ok++;
       }
     }
     // 彈藥（按口徑映射）
     if(typeof AMMO_ICON_BY_CAL !== 'undefined'){
       for(var cal in AMMO_ICON_BY_CAL){
-        getHeroImg('icons/items/' + AMMO_ICON_BY_CAL[cal]); _ok++;
+        getHeroImg('icons/ammo/' + AMMO_ICON_BY_CAL[cal]); _ok++;
+      }
+    }
+    // [rev-img-path] 已装备的改装武器
+    if(typeof state !== 'undefined' && state.player && state.player.equipped){
+      ['primary','secondary','melee'].forEach(function(slot){
+        var _id = state.player.equipped[slot];
+        if(_id && _id.indexOf('named_') === 0) getHeroImg(window.getItemIconPath(_id));
+      });
+    }
+    if(typeof state !== 'undefined' && state.stashedWeapons){
+      for(var _sk in state.stashedWeapons){
+        var _sw = state.stashedWeapons[_sk];
+        if(_sw && _sw.id && _sw.id.indexOf('named_') === 0) getHeroImg(window.getItemIconPath(_sw.id));
       }
     }
     // 建築
@@ -440,8 +465,8 @@ function preloadStaticAssets(){
     for(var i = 0; i < _gardenIcons.length; i++){
       getHeroImg('icons/garden/' + _gardenIcons[i] + '.png'); _ok++;
     }
-    getHeroImg('images/garden/default.png'); _ok++;
-    getHeroImg('images/garden/bg.png'); _ok++;
+    getHeroImg('icons/garden/plot_default.png'); _ok++;
+    getHeroImg('icons/garden/garden_bg.png'); _ok++;
     // 敵人武器池（關鍵——修屍體沒武器的根本）
     if(typeof ENEMY_WEAPON_POOLS !== 'undefined'){
       var _seen = {};
@@ -455,7 +480,7 @@ function preloadStaticAssets(){
             var wid = arr[ai];
             if(_seen[wid]) continue;
             _seen[wid] = 1;
-            getHeroImg('icons/items/' + wid + '.png'); _ok++;
+            getHeroImg(window.getItemIconPath(wid)); _ok++;
           }
         }
       }
@@ -484,7 +509,7 @@ function preloadStaticAssets(){
     if(typeof BOSSES !== 'undefined'){
       for(var bid2 in BOSSES){
         var _base2 = bid2.replace(/_ii$/, '');
-        getHeroImg('images/bg/boss_' + _base2 + '.png'); _ok++;
+        getHeroImg('images/bg/boss/boss_' + _base2 + '.png'); _ok++;
       }
     }
   } catch(e){ console.warn('[preloadStatic]', e); }
@@ -770,7 +795,7 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
     const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
     const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
     if(layerDef){
-      const img = getHeroImg(`icons/items/${resolveIconId(eq.head)}.png`);
+      const img = getHeroImg(window.getItemIconPath(eq.head));
       units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
     }
   }
@@ -779,7 +804,7 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
     const cfg = getTopCfg(eq.top);
     const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
     if(layerDef){
-      const img = getHeroImg(`icons/items/${resolveIconId(eq.top)}.png`);
+      const img = getHeroImg(window.getItemIconPath(eq.top));
       units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
     }
   }
@@ -806,7 +831,7 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
       if(cfg){
         const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
         if(layerDef){
-          const img = getHeroImg(`icons/items/${resolveIconId(wpId)}.png`);
+          const img = getHeroImg(window.getItemIconPath(wpId));
           units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
         }
       }
@@ -817,7 +842,7 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
   if(healItemId){
     const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
     if(_fa){
-      const _hImg = getHeroImg(`icons/items/${resolveIconId(healItemId)}.png`);
+      const _hImg = getHeroImg(window.getItemIconPath(healItemId));
       units.push({ z: _fa.z - 0.4, kind:'eq', layerId: 'front_arm', ox: 0.88, oy: 0.15, scale: 0.35, rotation: 45, img: _hImg, _fitMax: true });
     }
   }
@@ -1112,7 +1137,7 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
     var cH = (typeof HEAD_ARMOR_LAYOUT !== 'undefined' && HEAD_ARMOR_LAYOUT[equipped.head]) ? HEAD_ARMOR_LAYOUT[equipped.head] : HERO_VISIBLE_EQ.head;
     var lH = GAME_LAYERS.find(function(l){ return l.id === cH.layer; });
     if(lH){
-      var imgH = getHeroImg('icons/items/' + resolveIconId(equipped.head) + '.png');
+      var imgH = getHeroImg(window.getItemIconPath(equipped.head));
       units.push({z:lH.z+0.5, kind:'eq', layerId:cH.layer, ox:cH.ox, oy:cH.oy, scale:cH.scale, rotation:cH.rotation, img:imgH});
     }
   }
@@ -1120,7 +1145,7 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
     var cT = getTopCfg(equipped.top);
     var lT = GAME_LAYERS.find(function(l){ return l.id === cT.layer; });
     if(lT){
-      var imgT = getHeroImg('icons/items/' + resolveIconId(equipped.top) + '.png');
+      var imgT = getHeroImg(window.getItemIconPath(equipped.top));
       units.push({z:lT.z+0.5, kind:'eq', layerId:cT.layer, ox:cT.ox, oy:cT.oy, scale:cT.scale, rotation:cT.rotation, img:imgT});
     }
   }
@@ -1152,7 +1177,7 @@ function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, 
     if(cW){
       var lW = GAME_LAYERS.find(function(l){ return l.id === cW.layer; });
       if(lW){
-        var imgW = getHeroImg('icons/items/' + resolveIconId(wpI) + '.png');
+        var imgW = getHeroImg(window.getItemIconPath(wpI));
         units.push({z:lW.z-0.5, kind:'eq', layerId:cW.layer, ox:cW.ox, oy:cW.oy, scale:cW.scale, rotation:cW.rotation, img:imgW, trim:cW.trim});
       }
     }

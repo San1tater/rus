@@ -92,7 +92,7 @@ function _tryDrawArmorAtLayer(ctx, armorId, lw, lh, px, py){
   if(typeof HEAD_ARMOR_LAYOUT === 'undefined') return false;
   var cfg = HEAD_ARMOR_LAYOUT[armorId];
   if(!cfg) return false;
-  var img = (typeof getHeroImg === 'function') ? getHeroImg('icons/items/' + resolveIconId(armorId) + '.png') : null;
+  var img = (typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(armorId)) : null;
   if(!img || !img.complete || !img.naturalWidth) return false;
   var lid = cfg.layer || 'head';
   var pl = GAME_LAYERS.find(function(l){ return l.id === lid; });
@@ -129,7 +129,7 @@ function _tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
   var baseId = resolveIconId(weaponId);
   var layout = WEAPON_LAYOUT[baseId] || HERO_VISIBLE_EQ.primary;
   if(!layout) return false;
-  var img = (typeof getHeroImg === 'function') ? getHeroImg('icons/items/' + baseId + '.png') : null;
+  var img = (typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(weaponId)) : null;
   if(!img || !img.complete || !img.naturalWidth) return false;
   var hasTrim = !!(layout.trim && layout.trim.w > 0 && layout.trim.h > 0), bW, bH;
   if(hasTrim){
@@ -287,7 +287,7 @@ window._rev506_getRandomEquip = _getRandomEquipForEnemy;
   }
   setTimeout(function(){
     for(var id in _ids){
-      try { getHeroImg('icons/items/' + resolveIconId(id) + '.png'); } catch(e){}
+      try { getHeroImg(window.getItemIconPath(id)); } catch(e){}
     }
   }, 200);
 })();

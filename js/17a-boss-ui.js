@@ -1555,7 +1555,7 @@ function manualHeal(){
     battleHeroAnim.healItem = item.id;
     /* rev-fix-preload-heal-item-boss */
     if(typeof getHeroImg === 'function'){
-      try { getHeroImg('icons/items/' + resolveIconId(item.id) + '.png'); } catch(e){}
+      try { getHeroImg(window.getItemIconPath(item.id)); } catch(e){}
     }
   }
   if(battle.healTimer) clearTimeout(battle.healTimer);
@@ -1903,7 +1903,7 @@ function startBossBattle(bid){
         by -= _arcH;
       }
       if(bx < -30 || bx > W + 30 || by < -30 || by > H + 30) continue;
-      var _gimg = (bb.grenadeId && typeof getHeroImg === 'function') ? getHeroImg('icons/items/' + bb.grenadeId + '.png') : null;
+      var _gimg = (bb.grenadeId && typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(bb.grenadeId)) : null;
       var _gsize = 20;
       if(_gimg && _gimg.complete && _gimg.naturalWidth){
         ctx.save();

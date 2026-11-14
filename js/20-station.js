@@ -438,7 +438,7 @@ function _stRender(page){
       beltRows += '<div class="st-belt-row" data-belt-wid="' + wid + '">';
       beltRows += '<div class="st-belt-name">' + _calPrefix + wid.toUpperCase() + '</div>';
       beltRows += '<div class="st-belt-count">' + _stFmtNum(cu) + ' / ' + _stFmtNum(mx) + '</div>';
-      beltRows += '<div class="st-belt-preset"><img src="icons/ammo/belt_' + pimg + '.png' + assetSuffix('icons/ammo/belt_' + pimg + '.png') + '" alt="">' + pn + ' ▶</div>';
+      beltRows += '<div class="st-belt-preset"><img src="icons/vehicle-ammo/belts/belt_' + pimg + '.png' + assetSuffix('icons/vehicle-ammo/belts/belt_' + pimg + '.png') + '" alt="">' + pn + ' ▶</div>';
       beltRows += '</div>';
     }
   }
@@ -474,7 +474,7 @@ function _stRender(page){
         const srcT = a2.presetBreakdown || a2.breakdown;
         const cnt = (srcT && srcT[d.id]) || 0;
         if(cnt <= 0) continue;
-        icons += '<div class="st-main-icon"><img src="icons/ammo/' + (d.img || d.id) + '.png' + assetSuffix('icons/ammo/' + (d.img || d.id) + '.png') + '" alt=""><div class="st-main-icon-lbl">×' + _stFmtNum(cnt) + '</div></div>';
+        icons += '<div class="st-main-icon"><img src="icons/vehicle-ammo/rounds/' + (d.img || d.id) + '.png' + assetSuffix('icons/vehicle-ammo/rounds/' + (d.img || d.id) + '.png') + '" alt=""><div class="st-main-icon-lbl">×' + _stFmtNum(cnt) + '</div></div>';
       }
       if(!icons) icons = '<div style="color:#5a5040;font-size:11px;padding:8px">未配置</div>';
       const _calPrefix2 = (_ST_CALIBER_MAP[wid2] ? _ST_CALIBER_MAP[wid2] + 'mm ' : '');
@@ -728,7 +728,7 @@ function _stOpenMainAmmoPicker(vid, wid, onClose){
       const d = defs[i];
       const srcS = a.presetBreakdown || a.breakdown;
       const cnt = (srcS && srcS[d.id]) || 0;
-      h += '<div class="st-ammo-cell"><div class="st-ammo-cell-hd"><img src="icons/ammo/' + d.id + '.png' + assetSuffix('icons/ammo/' + d.id + '.png') + '" alt=""><span class="nm">' + d.name + '</span><span class="cnt" id="st-ammo-cnt-' + d.id + '">' + cnt + '</span></div><input type="range" class="st-main-slider" data-ammo-id="' + d.id + '" min="0" max="' + mr + '" value="' + cnt + '"></div>';
+      h += '<div class="st-ammo-cell"><div class="st-ammo-cell-hd"><img src="icons/vehicle-ammo/rounds/' + d.id + '.png' + assetSuffix('icons/vehicle-ammo/rounds/' + d.id + '.png') + '" alt=""><span class="nm">' + d.name + '</span><span class="cnt" id="st-ammo-cnt-' + d.id + '">' + cnt + '</span></div><input type="range" class="st-main-slider" data-ammo-id="' + d.id + '" min="0" max="' + mr + '" value="' + cnt + '"></div>';
     }
     h += '<button class="btn primary" id="st-ammo-confirm" style="width:100%;margin-top:8px">確認</button>';
     return h;

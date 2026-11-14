@@ -680,7 +680,7 @@ window.renderEquipZone = function(z2){
       const isFixed = def && def.fixed;
       let inner = '';
       if(def){
-        inner = '<img class="slot-img" src="icons/items/' + resolveIconId(id) + '.png' + assetSuffix('icons/items/' + resolveIconId(id) + '.png') + '" alt=""><div class="lbl">' + labels[key] + '</div>';
+        inner = '<img class="slot-img" src="' + window.getItemIconPath(id) + assetSuffix(window.getItemIconPath(id)) + '" alt=""><div class="lbl">' + labels[key] + '</div>';
       } else {
         inner = '<div class="nm">' + labels[key] + '</div>';
       }

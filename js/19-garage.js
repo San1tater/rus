@@ -448,7 +448,7 @@ function _garageRenderHtml(){
       const _fLiq = fmtNum(liq);
       const _fLiqMax = fmtNum(tgt.researchCost.liquor);
       h += '<div class="garage-req-row">';
-      h += '<span class="' + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + '"><img src="icons/items/545.png' + assetSuffix('icons/items/545.png') + '" class="req-icon" alt=""> ' + _fAmmo + '/' + _fAmmoMax + '</span>';
+      h += '<span class="' + (ammo >= tgt.researchCost.ammoCount ? 'ok' : 'bad') + '"><img src="icons/ammo/545.png' + assetSuffix('icons/ammo/545.png') + '" class="req-icon" alt=""> ' + _fAmmo + '/' + _fAmmoMax + '</span>';
       h += '<span class="' + (liq >= tgt.researchCost.liquor ? 'ok' : 'bad') + '"><img src="icons/garden/liquor.png' + assetSuffix('icons/garden/liquor.png') + '" class="req-icon" alt=""> ' + _fLiq + '/' + _fLiqMax + '</span>';
       h += '</div>';
     }
@@ -848,7 +848,7 @@ function _garageShowTechDetail(vid){
     const canBuy = expDone && ammo >= v.researchCost.ammoCount && liq >= v.researchCost.liquor;
     const isTarget = (g.researchTarget === vid);
     body += '<div class="garage-tech-detail-col-title">研發需求</div>';
-    body += '<div class="tech-detail-row"><span class="k"><img src="icons/items/545.png' + assetSuffix('icons/items/545.png') + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
+    body += '<div class="tech-detail-row"><span class="k"><img src="icons/ammo/545.png' + assetSuffix('icons/ammo/545.png') + '" class="req-icon" alt=""> 彈藥</span><span class="v ' + (ammo >= v.researchCost.ammoCount ? 'ok' : 'bad') + '">' + Math.floor(ammo) + '/' + v.researchCost.ammoCount + '</span></div>';
     body += '<div class="tech-detail-row"><span class="k"><img src="icons/garden/liquor.png' + assetSuffix('icons/garden/liquor.png') + '" class="req-icon" alt=""> 私酒</span><span class="v ' + (liq >= v.researchCost.liquor ? 'ok' : 'bad') + '">' + Math.floor(liq) + '/' + v.researchCost.liquor + '</span></div>';
     body += '<div class="tech-detail-row"><span class="k">經驗</span><span class="v ' + (expDone ? 'ok' : 'bad') + '">' + prog + '/' + need + '</span></div>';
     body += '<div class="tech-detail-btn-col">';
