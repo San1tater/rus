@@ -166,7 +166,8 @@ const VEHICLE_ANNOTATION_BTR82 = {
         "backUses": "solid_color"
       }
     ],
-    "hatch": []
+    "hatch": [],
+    "fusion": []
   },
   "weaponAreas": [],
   "muzzles": [
@@ -185,6 +186,7 @@ const VEHICLE_ANNOTATION_BTR82 = {
       "layerOrder": "above"
     }
   ],
+  "missiles": [],
   "btrDoorTimeline": {
     "cycle": 20,
     "segments": [

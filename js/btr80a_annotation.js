@@ -30,7 +30,7 @@ const VEHICLE_ANNOTATION_BTR80A = {
       }
     ]
   },
-  "trackLine": null,
+  "trackLoop": null,
   "trackScroll": {
     "enabled": false,
     "direction": -1,
@@ -167,7 +167,8 @@ const VEHICLE_ANNOTATION_BTR80A = {
         "backUses": "solid_color"
       }
     ],
-    "hatch": []
+    "hatch": [],
+    "fusion": []
   },
   "weaponAreas": [
     {
@@ -211,6 +212,7 @@ const VEHICLE_ANNOTATION_BTR80A = {
       "layerOrder": "above"
     }
   ],
+  "missiles": [],
   "btrDoorTimeline": {
     "cycle": 20,
     "segments": [
