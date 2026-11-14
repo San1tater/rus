@@ -74,8 +74,11 @@ $$('.tab').forEach(t=>{
     if(e.touches.length !== 1){ active = false; return; }
     const tgt = e.target;
     if(tgt && tgt.closest){
+      /* rev-fix-workbench-swipe: 工作台 / 車站 / 車庫開啟時禁止主 tab 左右滑動切換
+       * （workbench 內部有 _wkScrollBound 處理隊列橫向滾動，不能讓主 swipe 攔截後再切 tab） */
       if(tgt.closest('#joystick') || tgt.closest('#fire-btn') || tgt.closest('#heal-btn') ||
-         tgt.closest('#modal-layer')){
+         tgt.closest('#modal-layer') || tgt.closest('#workbench-page') ||
+         tgt.closest('#station-page') || tgt.closest('#garage-page')){
         active = false; return;
       }
     }

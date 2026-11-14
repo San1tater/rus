@@ -677,6 +677,11 @@ function renderModQueueHtml(workbenchLv){
 
 function openModding(workbenchLv){
   const candidates=[];
+  /* rev-fix-openModding-busy: 旧路径也标记 busy */
+  const _busyBaseIds = {};
+  (state.crafting || []).forEach(function(c){
+    if(c.type === 'mod' && c.modInfo && c.modInfo.baseId){ _busyBaseIds[c.modInfo.baseId] = true; }
+  });
   for(const slot of ['primary','secondary']){
     const id=state.player.equipped[slot];
     const rar=state.player.equippedRarity[slot];
@@ -690,7 +695,7 @@ function openModding(workbenchLv){
       const magOpts = getMagOptionsForWeapon(baseId);
       const scopeOpts = rules.scopes||[];
       if(magOpts.length || scopeOpts.length){
-        candidates.push({id, rarity:rar, baseId, mag:def.mag, scope:def.scope||null, equippedSlot:slot, def});
+        candidates.push({id, rarity:rar, baseId, mag:def.mag, scope:def.scope||null, equippedSlot:slot, def, busy:!!_busyBaseIds[baseId]});
       }
     }
   }
@@ -705,7 +710,7 @@ function openModding(workbenchLv){
     const magOpts = getMagOptionsForWeapon(baseId);
     const scopeOpts = rules.scopes||[];
     if(magOpts.length || scopeOpts.length){
-      candidates.push({id, rarity:r, baseId, mag:def.mag, scope:def.scope||null, equippedSlot:null, def, count:state.inventory[k]});
+      candidates.push({id, rarity:r, baseId, mag:def.mag, scope:def.scope||null, equippedSlot:null, def, count:state.inventory[k], busy:!!_busyBaseIds[baseId]});
     }
   }
   candidates.sort((a,b)=>{
@@ -728,14 +733,22 @@ function openModding(workbenchLv){
     const wdef=WEAPONS[c.baseId];
     const rules=WEAPON_MOD_RULES[c.baseId]||{mags:[],scopes:[]};
     const typeMaxed=isProfMaxed(wdef.type);
-    const eqLabel=c.equippedSlot?'（裝備中）':'×'+(c.count||1);
-    body+='<div class="item-row" data-idx="'+candidates.indexOf(c)+'" style="'+(typeMaxed?'':'opacity:.5')+'"><div class="icon">'+itemIcon(c.id,30)+'</div><div class="info"><div class="nm '+(c.rarity==='具名'?'r-具名':'r-傳奇')+'">'+c.def.name+' '+eqLabel+'</div><div class="sub">彈匣：'+(getMagOptionsForWeapon(c.baseId).join('/')||'—')+' ｜ 瞄具：'+((rules.scopes||[]).join('/')||'—')+'</div><div class="sub" style="color:'+(typeMaxed?'#4caf50':'#e05252')+'">熟練度 '+Math.floor(state.proficiency[wdef.type]||0)+'/'+MAX_PROF_LEVEL+'</div></div></div>';
+    /* rev-fix-openModding-busy-render */
+    const isBusy=!!c.busy;
+    const eqLabel=c.equippedSlot?'（裝備中）':(isBusy?'（改造中）':'×'+(c.count||1));
+    const _dim = !typeMaxed || isBusy;
+    body+='<div class="item-row'+(isBusy?' disabled':'')+'" data-idx="'+candidates.indexOf(c)+'" data-busy="'+(isBusy?'1':'0')+'" style="'+(_dim?'opacity:.4':'')+(isBusy?';cursor:not-allowed':'')+'"><div class="icon">'+itemIcon(c.id,30)+'</div><div class="info"><div class="nm '+(c.rarity==='具名'?'r-具名':'r-傳奇')+'">'+c.def.name+' '+eqLabel+'</div><div class="sub">彈匣：'+(getMagOptionsForWeapon(c.baseId).join('/')||'—')+' ｜ 瞄具：'+((rules.scopes||[]).join('/')||'—')+'</div><div class="sub" style="color:'+(typeMaxed?'#4caf50':'#e05252')+'">熟練度 '+Math.floor(state.proficiency[wdef.type]||0)+'/'+MAX_PROF_LEVEL+'</div></div></div>';
   }
   const bd=openModal({title:'工作台 · 改造',body});
   if(window.modQueueTimer){clearInterval(window.modQueueTimer);window.modQueueTimer=null;}
   window.modQueueTimer=setInterval(()=>{const qa=document.getElementById('mod-queue-area');if(!qa){if(window.modQueueTimer){clearInterval(window.modQueueTimer);window.modQueueTimer=null;}return;}qa.innerHTML=renderModQueueHtml(workbenchLv);},500);
   $$('.item-row[data-idx]',bd).forEach(r=>{
     r.onclick=()=>{
+      /* rev-fix-openModding-busy-click */
+      if(r.getAttribute('data-busy') === '1'){
+        if(typeof toast === 'function') toast('該型號武器正在改造中，完成後才能再次改造', 'err');
+        return;
+      }
       const idx = parseInt(r.dataset.idx);
       const c = candidates[idx];
       const wdef=WEAPONS[c.baseId];
@@ -941,6 +954,11 @@ function _wkRarityColor(r){
 
 function _wkGetCandidates(){
   var out = [];
+  /* rev-fix-busy-candidate: 改造隊列中的 baseId 不可再選（避免改造期間撿到同型號武器被二次改造） */
+  var _busyBaseIds = {};
+  (state.crafting || []).forEach(function(c){
+    if(c.type === 'mod' && c.modInfo && c.modInfo.baseId){ _busyBaseIds[c.modInfo.baseId] = true; }
+  });
   var _gs = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
   var _gl = {};
   for(var _gk in _gs) _gl[_gs[_gk]] = _gk;
@@ -993,7 +1011,8 @@ function _wkGetCandidates(){
       rawId: rawId, baseId: _baseId, rarity: rar, location: loc, locData: locData || null,
       type: (WEAPONS[_baseId] && WEAPONS[_baseId].type) || '',
       curMag: _cur.mag, curScope: _cur.scope, curGrip: _cur.grip,
-      isNamed: !!def.named
+      isNamed: !!def.named,
+      busy: !!_busyBaseIds[_baseId]
     }, extra || {}));
   }
   ['primary','secondary','melee'].forEach(function(slot){
@@ -1066,13 +1085,19 @@ function _wkRender(p){
     if(!_found){ s.selectedRawId = null; s.selectedBaseId = null; s.selectedRarity = null; }
   }
   if(!s.selectedRawId && candidates.length > 0){
-    var c0 = candidates[0];
-    s.selectedRawId = c0.rawId;
-    s.selectedBaseId = c0.baseId;
-    s.selectedRarity = c0.rarity;
-    s.draftMag = c0.curMag || null;
-    s.draftScope = c0.curScope || null;
-    s.draftGrip = c0.curGrip || null;
+    /* rev-fix-render-c0: 自动选中跳过 busy 项 */
+    var c0 = null;
+    for(var _ci0 = 0; _ci0 < candidates.length; _ci0++){
+      if(!candidates[_ci0].busy){ c0 = candidates[_ci0]; break; }
+    }
+    if(c0){
+      s.selectedRawId = c0.rawId;
+      s.selectedBaseId = c0.baseId;
+      s.selectedRarity = c0.rarity;
+      s.draftMag = c0.curMag || null;
+      s.draftScope = c0.curScope || null;
+      s.draftGrip = c0.curGrip || null;
+    }
   }
 
   var html = '';
@@ -1322,7 +1347,18 @@ function _wkOpenWeaponPicker(){
         var _subType = c.type || ((WEAPONS[c.baseId] && WEAPONS[c.baseId].type) || '?');
         var isCur = c.rawId === s.selectedRawId;
         var _c = _wkRarityColor(c.rarity);
-        listHtml += '<div class="item-row" data-rawid="' + c.rawId + '" style="' + (isCur ? 'border-color:' + _c + ';background:#2a1f10;' : 'border-left:3px solid ' + _c + ';') + '"><div class="info"><div class="nm" style="color:' + _c + '">' + nm + '</div><div class="sub">' + _subType + ' · ' + (c.location === 'equipped' ? '已裝備' : '背包') + '</div></div>' + (isCur ? '<div class="cnt">✓</div>' : '') + '</div>';
+        /* rev-fix-picker-busy: busy 项灰掉 + 不可点 */
+        var _isBusy = !!c.busy;
+        var _styleAttr;
+        if(_isBusy){ _styleAttr = 'opacity:0.4;cursor:not-allowed;'; }
+        else if(isCur){ _styleAttr = 'border-color:' + _c + ';background:#2a1f10;'; }
+        else { _styleAttr = 'border-left:3px solid ' + _c + ';'; }
+        var _badge;
+        if(_isBusy){ _badge = '<div class="cnt" style="color:#e8a33d;font-size:9px">改造中</div>'; }
+        else if(isCur){ _badge = '<div class="cnt">✓</div>'; }
+        else { _badge = ''; }
+        var _locTxt = (c.location === 'equipped' ? '已裝備' : (c.location === 'inventory' ? '背包' : (c.location === 'passenger' ? '載員' : (c.location === 'guard' ? '守衛' : c.location))));
+        listHtml += '<div class="item-row' + (_isBusy ? ' disabled' : '') + '" data-rawid="' + c.rawId + '" data-busy="' + (_isBusy ? '1' : '0') + '" style="' + _styleAttr + '"><div class="info"><div class="nm" style="color:' + _c + '">' + nm + '</div><div class="sub">' + _subType + ' · ' + _locTxt + '</div></div>' + _badge + '</div>';
       }
     }
     return filterHtml + listHtml;
@@ -1336,6 +1372,11 @@ function _wkOpenWeaponPicker(){
     });
     bd.querySelectorAll('[data-rawid]').forEach(function(el){
       el.onclick = function(){
+        /* rev-fix-picker-busy-click: busy 项点击拒绝 */
+        if(el.getAttribute('data-busy') === '1'){
+          if(typeof toast === 'function') toast('該型號武器正在改造中，完成後才能再次改造', 'err');
+          return;
+        }
         var rawId = el.getAttribute('data-rawid');
         var c = null;
         for(var i = 0; i < candidates.length; i++){ if(candidates[i].rawId === rawId){ c = candidates[i]; break; } }
@@ -1425,8 +1466,17 @@ function _wkOpenPicker(slot){
 function _wkConfirmCraft(){
   var _ck = _wkGetCandidates();
   var _found = false;
-  for(var _ki = 0; _ki < _ck.length; _ki++){ if(_ck[_ki].rawId === window._wkState.selectedRawId){ _found = true; break; } }
-  if(!_found){ if(typeof toast === 'function') toast('該型號武器正在改造中，完成後才能再次改造', 'err'); return; }
+  /* rev-fix-confirm-busy: 选中项若为 busy 则拒绝 */
+  for(var _ki = 0; _ki < _ck.length; _ki++){
+    if(_ck[_ki].rawId === window._wkState.selectedRawId){
+      if(_ck[_ki].busy){
+        if(typeof toast === 'function') toast('該型號武器正在改造中，完成後才能再次改造', 'err');
+        return;
+      }
+      _found = true; break;
+    }
+  }
+  if(!_found){ if(typeof toast === 'function') toast('武器不存在', 'err'); return; }
   var s = window._wkState;
   if(!s.selectedRawId) return;
   if(!s.draftMag && !s.draftScope && !s.draftGrip){ if(typeof toast === 'function') toast('至少選擇一項配件', 'err'); return; }
