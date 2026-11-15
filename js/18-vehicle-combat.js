@@ -613,33 +613,85 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
   const crit = Math.random() < _VEHICLE_CRIT_RATE;
   const finalDmg = crit ? Math.round(baseDmg * _VEHICLE_CRIT_MULT) : baseDmg;
 
-  const hit = Math.random() * 100 < hr;
-
-  const _distM = Math.abs(target.worldX - p.worldX);
   let _spd = 800;
-  /* 按载具区分的 ATGM 速度（9M14=120 / 9M113=200）*/
   if(_usedAmmoId && typeof VEHICLE_AMMO_SPEED_MS !== 'undefined' && VEHICLE_AMMO_SPEED_MS[_usedAmmoId]) _spd = VEHICLE_AMMO_SPEED_MS[_usedAmmoId];
   else if(typeof VEHICLE_AMMO_SPEED_MS !== 'undefined' && VEHICLE_AMMO_SPEED_MS[wid]) _spd = VEHICLE_AMMO_SPEED_MS[wid];
-  
-  const _duration = Math.max(16, _distM / _spd * 1000);
 
-  /* rev-predict-vs-guided: 開火瞬間快照目標位置。炮彈不預判（用快照），導彈實時制導（用 target.worldX） */
+  /* rev-weapon-core-onBTRFire: 载具武器统一走 _weaponFire
+   * 与步战同一套：预判 + AABB 碰撞 + 精度散射
+   * 制导类（GL-ATGM / 独立 atgm）传 guidanceMode 让 _weaponFire 内部实时更新预判
+   * 炮弹类 guidanceMode='none'，一次预判不更新
+   * 视觉仍由 BTRSupport 自己绘制，不经过 _weaponFire 的渲染 */
+  if(typeof window._weaponFire === 'function'){
+    const _isGuidedW = _isGLATGMId(_usedAmmoId) || wid === 'atgm';
+    let _guideMode = 'none';
+    let _guideMs = 0;
+    if(_isGuidedW && _usedAmmoId && typeof VEHICLE_ATGM_AMMO !== 'undefined' && VEHICLE_ATGM_AMMO[_usedAmmoId]){
+      _guideMode = VEHICLE_ATGM_AMMO[_usedAmmoId].guidanceMode || 'laser';
+      _guideMs = VEHICLE_ATGM_AMMO[_usedAmmoId].guidanceUpdateMs || 250;
+    }
+    const _spMainW = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30, _isAinet);
+    const _weaponRangeW = (typeof VEHICLE_RANGE_M !== 'undefined' && VEHICLE_RANGE_M[wid]) ? VEHICLE_RANGE_M[wid] : 300;
+    const _bulletRef = window._weaponFire({
+      owner: c,
+      weaponId: wid,
+      ammoId: _usedAmmoId,
+      target: target,
+      startX: p.worldX,
+      startY: 1.5,
+      flightSpeed: _spd,
+      hr: hr,
+      burstCount: 1,
+      weaponRange: _weaponRangeW,
+      guidanceMode: _guideMode,
+      guidanceUpdateMs: _guideMs,
+      isEnemyBullet: false,
+      onHit: function(hitX, hitY, tgt){
+        if(_spMainW){
+          _applyVehicleSplash(_spMainW, hitX, baseDmg, penMM, 1.0, wid, _usedAmmoId);
+          return;
+        }
+        if(tgt && tgt.hp > 0){
+          const mainProxy = { hp: tgt.hp, armor: tgt.armor || 0 };
+          const mainRes = applyDamage(mainProxy, finalDmg, penMM, {
+            armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(tgt, part) : 0; }
+          });
+          tgt.hp = mainProxy.hp;
+          if(tgt.armor !== undefined) tgt.armor = mainProxy.armor;
+          const _shownMain = mainRes.hpLost > 0 ? mainRes.hpLost : mainRes.armorLost;
+          _vehicleCombatFloat(tgt.worldX, '-' + _shownMain + (crit ? '!' : ''), crit ? 'crit' : (mainRes.hpLost > 0 ? 'enemy' : 'armor'));
+          if(tgt.hp <= 0){
+            _onBTRKillTarget(tgt, wid, c, _usedAmmoId);
+          }
+        }
+      },
+      onMiss: function(impactX, impactY){
+        const _spMissW = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
+        if(_spMissW && target){
+          _applyVehicleSplash(_spMissW, impactX, baseDmg, penMM, 0.6, wid, _usedAmmoId);
+        }
+      }
+    });
+    /* rev-atgm-flighttime: 供 _fireMuzzle 计算导弹视觉速度 */
+    const _flightSec = (_bulletRef && typeof _bulletRef.flightTimeSec === 'number' && _bulletRef.flightTimeSec > 0) ? _bulletRef.flightTimeSec : 1;
+    return { ok: true, ammoId: _usedAmmoId, reloadMs: _calcReloadMs(wid, _usedAmmoId, p.vehicleId), flightTimeSec: _flightSec, realSpeedMps: _spd };
+  }
+
+  /* fallback 旧路径（_weaponFire 不存在时，理论上不可达） */
+  const hit = Math.random() * 100 < hr;
+  const _distM = Math.abs(target.worldX - p.worldX);
+  const _duration = Math.max(16, _distM / _spd * 1000);
   const _isGuidedWeapon = _isGLATGMId(_usedAmmoId) || wid === 'atgm';
   const _fireTargetWX = target.worldX;
-
+  const _fallbackFlightSec = _duration / 1000;
   c.bullets.push({
-    sx: 0.1, sy: 0.5, 
-    tx: 0.9, ty: 0.5,
-    start: performance.now(),
-    duration: _duration,
-    enemy: false, 
-    isFast: true,
+    sx: 0.1, sy: 0.5, tx: 0.9, ty: 0.5,
+    start: performance.now(), duration: _duration,
+    enemy: false, isFast: true,
     _onHit: function(){
-      // [v206] 抵達落點後結算
       if(!hit){
         const _spMiss = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30);
         if(_spMiss && target){
-          /* rev-predict-vs-guided: miss 分支同樣按武器類型選基準，順修 target 物件→數值的 NaN bug */
           const _aimWXMiss = _isGuidedWeapon ? target.worldX : _fireTargetWX;
           const _scatterMiss = _spMiss.maxR * (1 - hr / 100);
           const _impactXMiss = _aimWXMiss + (Math.random() * 2 - 1) * _scatterMiss;
@@ -647,19 +699,14 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
         }
         return;
       }
-      
-      /* rev-splash-area: 有溅射的武器改用面积法，落点锁定 + 散射，
-       * 主目标也走面积法（不再独立 applyDamage），命中率低 → 散射大 → 主目标可能打偏 */
       const _spMain = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30, _isAinet);
       if(_spMain && target){
         const _scatterM = _spMain.maxR * (1 - hr / 100);
-        /* rev-predict-vs-guided: 炮彈用開火快照（不預判），導彈用實時位置（制導） */
         const _aimWX = _isGuidedWeapon ? target.worldX : _fireTargetWX;
         const _impactX = _aimWX + (Math.random() * 2 - 1) * _scatterM;
         _applyVehicleSplash(_spMain, _impactX, baseDmg, penMM, 1.0, wid, _usedAmmoId);
         return;
       }
-      /* 无溅射（AP 等）：二值命中，不变 */
       if(!hit) return;
       if(target && target.hp > 0){
         const mainProxy = { hp: target.hp, armor: target.armor || 0 };
@@ -677,8 +724,7 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
     }
   });
 
-  /* rev-gl-atgm: 返回对象供 _fireMuzzle 消费 */
-  return { ok: true, ammoId: _usedAmmoId, reloadMs: _calcReloadMs(wid, _usedAmmoId, p.vehicleId) };
+  return { ok: true, ammoId: _usedAmmoId, reloadMs: _calcReloadMs(wid, _usedAmmoId, p.vehicleId), flightTimeSec: _fallbackFlightSec, realSpeedMps: _spd };
 };
 
 window._settleVehicleEventIfCleared = function(enemy){

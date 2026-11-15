@@ -705,6 +705,20 @@ function renderVehicle(ctx, id, x, y, w, h, animTime, opts){
 
 window.VehicleRenderer = { render: renderVehicle };
 
+/* rev-veh-aabb: 載具 AABB 從遊戲圖像比例推導（橫向=車長，縱向=車高）
+ * 圖像已按玩家 1.7m 高度等比例縮放，所以 imgRatio × realH = 車長（米）
+ * 返回 { width: 車長, height: 車高, centerY: 車高/2 } */
+window.getVehicleAABB = function(vid){
+  var realH = (typeof VEHICLE_REAL_HEIGHTS !== 'undefined' && VEHICLE_REAL_HEIGHTS[vid]) ? VEHICLE_REAL_HEIGHTS[vid] : 2.5;
+  var ann = (typeof VEHICLE_ANNOTATIONS !== 'undefined') ? VEHICLE_ANNOTATIONS[vid] : null;
+  if(!ann || !ann.imageSize || !ann.imageSize.h){
+    return { width: realH * 2.5, height: realH, centerY: realH / 2 };
+  }
+  var imgRatio = ann.imageSize.w / ann.imageSize.h;
+  var length = realH * imgRatio;
+  return { width: length, height: realH, centerY: realH / 2 };
+};
+
 window.computeVehicleDustSource = function(ann){
   if(!ann) return null;
   if(ann.trackLoop && ann.trackLoop.points && ann.trackLoop.points.length >= 2){
@@ -1374,6 +1388,16 @@ const BTRSupport = {
     const basePy = this.height * 0.95 - (this._contentBottomRatio || 1) * this.targetH + this.yOffset + (this.shakeY || 0);
     const isMG = (m.weaponId === 'pkt' || m.weaponId === 'nsvt' || m.weaponId === 'kpvt');
     const isATGM = _isAtgm;
+    /* rev-atgm-visual-speed-v2: 导弹视觉速度 = 真实速度 × 像素/米
+     * 屏幕只显示 2-3m 世界距离，导弹穿越屏幕的时间 = screenRightWorld / 速度
+     * 9M14 (120m/s) / 9M113 (200m/s) / 9M119M (350m/s) 都在 5-20ms 内穿过屏幕
+     * 尾烟按距离生成（见 _updateMissiles）形成长轨迹，弥补导弹瞬时穿越的视觉 */
+    const _atgmRealSpeedMps = (_fireRes && typeof _fireRes.realSpeedMps === 'number' && _fireRes.realSpeedMps > 0) ? _fireRes.realSpeedMps : 200;
+    const _screenMetrics = (typeof window.computeScreenMetrics === 'function')
+      ? window.computeScreenMetrics(this.width, this.height)
+      : { bgPixelsPerMeter: (this.height * 0.58 / 1.7) };
+    const _atgmSpeedPx = _atgmRealSpeedMps * _screenMetrics.bgPixelsPerMeter;
+    const _atgmFlightDurMs = 5000;
     const isMain = (m.weaponId === '2a46' || m.weaponId === '2a46m1' || m.weaponId === '2a28' || m.weaponId === '2a70');
     let parentRc = 0;
     if(m._parentId && this.recoilStates[m._parentId]){
@@ -1517,14 +1541,14 @@ const BTRSupport = {
               img: _c49.canvas, imgW: _c49.imgW, imgH: _c49.imgH, box: _c49.box,
               x: muzzleX, y: muzzleY, startTime: now,
               lastJetTime: now, lastSpreadTime: now,
-              speed: this.width * 0.8, isImageEntity: true
+              speed: _atgmSpeedPx, isImageEntity: true, _flightDurMs: _atgmFlightDurMs
             });
             _pushed49 = true;
           }
         }
       }
       if(!_pushed49){
-        this.missiles.push({ x: muzzleX, y: muzzleY, startTime: now, lastJetTime: now, lastSpreadTime: now, speed: this.width * 0.8 });
+        this.missiles.push({ x: muzzleX, y: muzzleY, startTime: now, lastJetTime: now, lastSpreadTime: now, speed: _atgmSpeedPx, _flightDurMs: _atgmFlightDurMs });
       }
     }
     m.recoilDur = rcDur;
@@ -1590,18 +1614,33 @@ const BTRSupport = {
     if(!this.missiles || !this.missiles.length) return;
     for(let i = this.missiles.length - 1; i >= 0; i--){
       const mis = this.missiles[i];
-      mis.x += mis.speed * dt;
-      if(mis.x > this.width + 200 || now - mis.startTime > 3000){
+      const _dxThisFrame = mis.speed * dt;
+      mis.x += _dxThisFrame;
+      /* rev-smoke-by-distance: 按本帧移动距离生成烟雾，保证高速穿屏密度
+       * 每 5px 一个 jet，每 10px 一个 spread */
+      if(_dxThisFrame > 0){
+        const _nJet = Math.max(1, Math.ceil(_dxThisFrame / 5));
+        for(let _kj = 0; _kj < _nJet; _kj++){
+          const _tJ = (_kj + 1) / _nJet;
+          const _pxJ = mis.x - _dxThisFrame + _dxThisFrame * _tJ;
+          this.fx.spawnMissileJet(_pxJ, mis.y);
+        }
+        const _nSpread = Math.max(1, Math.ceil(_dxThisFrame / 10));
+        for(let _ks = 0; _ks < _nSpread; _ks++){
+          const _tS = (_ks + 1) / _nSpread;
+          const _pxS = mis.x - _dxThisFrame + _dxThisFrame * _tS;
+          this.fx.spawnMissileSpread(_pxS, mis.y);
+        }
+      }
+      /* 飞出屏幕右侧 200px 清理 */
+      if(mis.x > this.width + 200){
         this.missiles.splice(i, 1);
         continue;
       }
-      if(now - mis.lastJetTime >= 16){
-        mis.lastJetTime = now;
-        this.fx.spawnMissileJet(mis.x, mis.y);
-      }
-      if(now - mis.lastSpreadTime >= 30){
-        mis.lastSpreadTime = now;
-        this.fx.spawnMissileSpread(mis.x, mis.y);
+      /* 安全上限 5s（防止死循环） */
+      if(now - mis.startTime > (mis._flightDurMs || 5000)){
+        this.missiles.splice(i, 1);
+        continue;
       }
     }
   },
