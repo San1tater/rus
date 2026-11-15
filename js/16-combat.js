@@ -5,6 +5,25 @@
 window._combat = null;
 window._combatActive = false;
 
+/* rev-arena: 口径字符串转 mm 数值 */
+function _calToMM(cal){
+  if(!cal) return 7.62;
+  if(typeof cal === 'number') return cal;
+  var s = String(cal);
+  if(s === '5.45') return 5.45;
+  if(s === '7.62') return 7.62;
+  if(s === '7.62x54') return 7.62;
+  if(s === '9x18') return 9;
+  if(s === '9x19') return 9;
+  if(s === '9x39') return 9;
+  if(s === '12ga' || s === '20/70') return 12;
+  if(s === '12.7') return 12.7;
+  if(s === '23x75') return 23;
+  var m = s.match(/^([d.]+)/);
+  return m ? parseFloat(m[1]) : 7.62;
+}
+window._calToMM = _calToMM;
+
 const REACTION_FIRST_MS = 300;
 const REACTION_SECOND_MS = 600;
 const SECOND_HIT_RATE = 0.8;
@@ -655,6 +674,28 @@ window._spawnRPGImpactFx = function(owner, sx, sy, radPx){
   }
 };
 
+/* rev-world-anchor: 把刚生成的爆炸粒子从屏幕 px 转成世界米 _wx / _wvx，之后动画永远锚定世界位置。
+ * 手雷 / RPG / APS 拦截统一走这个，之前不转导致跟屏幕静止。 */
+window._applyWorldAnchor = function(owner, startIdx, camWX, sm){
+  if(!owner || !owner.explosions) return;
+  if(startIdx >= owner.explosions.length) return;
+  var _cmb = window._combat;
+  var W = (_cmb && _cmb.playerCanvas && _cmb.playerCanvas.width) || 400;
+  var _sr = (sm && sm.screenRightWorld) || 2;
+  var _hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  var _invD = 1 / (1 - _hr);
+  for(var i = startIdx; i < owner.explosions.length; i++){
+    var q = owner.explosions[i];
+    if(q._wx !== undefined) continue;
+    if(!isFinite(q.x)) continue;
+    var _relM = (q.x / W - _hr) * _invD * _sr;
+    q._wx = camWX + _relM;
+    q._wvx = q.vx / W * _invD * _sr;
+    q.x = 0;
+    q.vx = 0;
+  }
+};
+
 window._tickBattleFX = function(owner, dt){
   if(!owner) return;
   if(owner.sparks){
@@ -672,14 +713,20 @@ window._tickBattleFX = function(owner, dt){
       var q = owner.explosions[j];
       /* rev-fix-fx-delay: 延迟生成期间不动、不缩、不消失 */
       if(q.delay && q.delay > 0){ q.delay -= dt; if(q.delay < 0) q.delay = 0; continue; }
-      q.x += q.vx * dt;
+      /* rev-world-anchor: _wx 粒子走世界静止，其他走屏幕 */
+      if(q._wx !== undefined){
+        q._wx += q._wvx * dt;
+        q._wvx *= 0.95;
+      } else {
+        q.x += q.vx * dt;
+        q.vx *= 0.95;
+      }
       q.y += q.vy * dt;
       /* rev-fix-fx-gravity: 碎片/火星等受重力，需在摩擦前累加，摩擦只衰减速度 */
       if(q.gravity) q.vy += q.gravity * dt;
-      q.vx *= 0.95;
       q.vy *= 0.95;
       q.life -= dt;
-      q.size += q.growth * dt;
+      q.size += (q.growth || 0) * dt;
       if(q.life <= 0) owner.explosions.splice(j, 1);
     }
   }
@@ -758,9 +805,24 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
       else if(q.kind === 'ember_hot') _aBase = 0.80;
       var a2 = Math.max(0, Math.min(1, q.life / q.maxLife)) * _aBase;
       var _c2 = (q._top && ctxTop) ? ctxTop : ctx;
+      /* rev-fx-guard: NaN/负 size 直接跳过 */
+      if(!isFinite(q.size) || q.size <= 0) continue;
+      /* rev-world-anchor: _wx 粒子按当前相机换算屏幕 x，屏幕外跳过 */
+      var _px = q.x;
+      if(q._wx !== undefined){
+        var _cmb = window._combat;
+        var _camWX = (_cmb && _cmb.allies && _cmb.allies[0]) ? _cmb.allies[0].worldX : 0;
+        var _smR = (_cmb && _cmb.sm) || { screenRightWorld: 2 };
+        var _srR = _smR.screenRightWorld || 2;
+        var _hrR = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+        var _WrR = ctx.canvas.width;
+        _px = (_hrR + (q._wx - _camWX) / _srR * (1 - _hrR)) * _WrR;
+        if(_px < -_WrR * 0.5 || _px > _WrR * 1.5) continue;
+      }
+      if(!isFinite(_px) || !isFinite(q.y)) continue;
       _c2.save();
       _c2.globalAlpha = a2;
-      var g = _c2.createRadialGradient(q.x, q.y, 0, q.x, q.y, q.size);
+      var g = _c2.createRadialGradient(_px, q.y, 0, _px, q.y, q.size);
       /* rev-fix-fx-kinds: 按 kind 分派渐变（默认走手雷灰） */
       if(q.kind === 'flash'){
         g.addColorStop(0, 'rgba(255,255,255,1)');
@@ -776,6 +838,11 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
         g.addColorStop(0, 'rgba(45,40,36,0.88)');
         g.addColorStop(0.5, 'rgba(28,24,20,0.55)');
         g.addColorStop(1, 'rgba(10,8,6,0)');
+      } else if(q.kind === 'smoke_light'){
+        /* rev-aps-smoke: APS 拦截残留烟云，浅灰/白，轻薄快速消散 */
+        g.addColorStop(0, 'rgba(220,220,225,0.75)');
+        g.addColorStop(0.5, 'rgba(200,200,210,0.35)');
+        g.addColorStop(1, 'rgba(180,180,190,0)');
       } else if(q.kind === 'debris'){
         g.addColorStop(0, 'rgba(190,155,95,0.95)');
         g.addColorStop(1, 'rgba(110,85,50,0)');
@@ -800,9 +867,9 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
       _c2.fillStyle = g;
       _c2.beginPath();
       if(q.isGround){
-        _c2.ellipse(q.x, q.y, q.size, q.size * 0.18, 0, 0, Math.PI * 2);
+        _c2.ellipse(_px, q.y, q.size, q.size * 0.18, 0, 0, Math.PI * 2);
       } else {
-        _c2.arc(q.x, q.y, q.size, 0, Math.PI * 2);
+        _c2.arc(_px, q.y, q.size, 0, Math.PI * 2);
       }
       _c2.fill();
       _c2.restore();
@@ -1983,7 +2050,10 @@ function _enemyFire(e, now){
           const _eNameV = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
           const _wNameV = (w && w.id && typeof WEAPONS !== 'undefined' && WEAPONS[w.id]) ? WEAPONS[w.id].name : (w && w.id ? w.id : '武器');
           const _wRarV = (w && w.rarity) || '一般';
-          window._vHitVehicle(p, _vdmg, penMM, w.ammoId || 'unknown', _eNameV, _wNameV, _wRarV, e.rarity || '一般');
+          /* rev-arena: 传弹速与口径 */
+          var _speedV = (_wdX && _wdX.cal && typeof _ammoSpeedForCal === 'function') ? _ammoSpeedForCal(_wdX.cal) : 700;
+          var _calV = (_wdX && _wdX.cal) ? _calToMM(_wdX.cal) : 7.62;
+          window._vHitVehicle(p, _vdmg, penMM, w.ammoId || 'unknown', _eNameV, _wNameV, _wRarV, e.rarity || '一般', _speedV, _calV);
         }
         return;
       }
@@ -2157,9 +2227,9 @@ function _enemyFireRPG(e, p, now){
       if(p.isVehicle){
         if(typeof window._vHitVehicle === 'function'){
           const _eNameR = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
-          window._vHitVehicle(p, baseDmg, penMM, 'atgm', _eNameR, 'RPG', rar, e.rarity || '一般');
+          /* rev-arena: RPG 弹速 280 m/s，口径 85mm（PG-7V 弹头） */
+          window._vHitVehicle(p, baseDmg, penMM, 'atgm', _eNameR, 'RPG', rar, e.rarity || '一般', 280, 85);
         }
-        /* rev-fix-rpg-splash-vehicle: 不 return 繼續走濺射 */
       }
 
       if(p.isPlayer){
@@ -2651,10 +2721,13 @@ function _tickBullets(dt){
               var _explY = b.isGrenade ? (_HG * 0.95) : (b.ty * _HG);
               if(b.isRPG){
                 var _radRPG = _WG * 0.18;
+                var _startIdxR = c.explosions ? c.explosions.length : 0;
                 if(typeof window._spawnRPGImpactFx === 'function') window._spawnRPGImpactFx(c, _explX, _explY, _radRPG);
+                if(typeof window._applyWorldAnchor === 'function') window._applyWorldAnchor(c, _startIdxR, _px0, c.sm);
               } else {
                 var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : _WG * 0.08;
                 if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, _explX, _explY, _radG);
+                if(typeof window._applyWorldAnchor === 'function') window._applyWorldAnchor(c, 0, _px0, c.sm);
               }
             }
           }

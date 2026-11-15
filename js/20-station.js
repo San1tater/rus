@@ -338,12 +338,23 @@ function _stSlotHtml(slot, label, id, rar, cnt){
 function _stVehicleHealth(vid){
   const d = state.vehicleDamage && state.vehicleDamage[vid];
   if(!d) return { hp: 2600, max: 2600, pct: 100, repairing: false, destroyed: false };
-  const maxParts = 800 + 1000 + 400;
+  /* rev-fix-veh-hp-max: gun 已从 parts 移到 weapons，但 sum 仍含 gun（0~400）
+   * maxParts 必须含 gun 400 → 800+1000+400+400 = 2600 */
+  const maxParts = 2600;
   if(d.destroyed) return { hp: 0, max: maxParts, pct: 0, repairing: false, destroyed: true };
   if(d.repairUntil && d.repairUntil > Date.now()){
     return { hp: 0, max: maxParts, pct: 0, repairing: true, repairUntil: d.repairUntil, destroyed: false };
   }
-  const sum = (d.parts.engine || 0) + (d.parts.tracks || 0) + (d.parts.gun || 0) + (d.parts.turret || 0);
+  /* rev-fix-parts-gun: v140 已把 gun 移到 d.weapons，d.parts.gun 恒 0；此处改用 weapons 平均 HP 补足 */
+  let _gunHp = 0, _gunMax = 0;
+  if(d.weapons){
+    for(const _wid in d.weapons){
+      _gunHp += Math.max(0, d.weapons[_wid].hp || 0);
+      _gunMax += Math.max(1, d.weapons[_wid].max || 400);
+    }
+  }
+  const sum = (d.parts.engine || 0) + (d.parts.tracks || 0) + (d.parts.turret || 0)
+            + (_gunMax > 0 ? Math.round(400 * _gunHp / _gunMax) : 400);
   return { hp: Math.round(sum), max: maxParts, pct: Math.round(sum / maxParts * 100), repairing: false, destroyed: false };
 }
 
@@ -746,7 +757,14 @@ function _stOpenMainAmmoPicker(vid, wid, onClose){
         let v = parseInt(sl.value, 10) || 0;
         let other = 0;
         for(const k in a.presetBreakdown){ if(k !== id && _validIdsIn.indexOf(k) >= 0) other += (a.presetBreakdown[k] || 0); }
-        const c = mr - other;
+        let c = mr - other;
+        /* rev-gl-atgm: GL-ATGM 独立硬上限 */
+        const _defItem = defs.find(function(x){ return x.id === id; });
+        if(_defItem && _defItem.type === 'gl_atgm' && typeof GL_ATGM_MAX_CARRY !== 'undefined'){
+          const _glMax = (GL_ATGM_MAX_CARRY[vid] && GL_ATGM_MAX_CARRY[vid][id]) || 0;
+          if(_glMax > 0 && v > _glMax){ v = _glMax; sl.value = v; }
+          if(_glMax > 0) c = Math.min(c, _glMax);
+        }
         if(v > c){ v = c; sl.value = c; }
         a.presetBreakdown[id] = v;
         const ce = bd.querySelector('#st-ammo-cnt-' + id);

@@ -340,8 +340,13 @@ function _disembark(){
     }
   }
   const _retreatingList = _oldList.filter(function(it){ return it._retreating; });
-  const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-  const vid = g ? g.currentVehicle : 'btr80';
+  /* rev-bug-disembark-vid: 用 BTRSupport.vehicleId（启动时锁定）而非 garage.currentVehicle。
+   * 原逻辑读 garage.currentVehicle：玩家在 T-80U 支援期间把车库切到 BMD-4，
+   * 支援结束时读 bmd4（cap=5）→ 把车队配置的乘客塞进 ex.passengersFollowing，
+   * 但 T-80U 不能载人，产生幽灵乘客。 */
+  const _btrD = window.BTRSupport;
+  const vid = (_btrD && _btrD.vehicleId) ? _btrD.vehicleId
+            : ((typeof _garageInitState === 'function' && _garageInitState()) ? (_garageInitState().currentVehicle || 'btr80') : 'btr80');
   const cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
   if(cap <= 0){
     /* rev-fix-disembark-cap0: 当前载具无载员容量（T-80 系列等），清空 passengersFollowing。
@@ -1456,6 +1461,7 @@ function _tickAlliesPositions(now){
 function _tick(now){
   const ex = window._explore;
   if(!ex.active) return;
+  const _fg = (typeof currentTab === 'undefined') || currentTab === 'explore';
   if(typeof _cleanupDeadEvents === 'function') _cleanupDeadEvents();
   /* 治療期間完全停止，不執行任何移動/載員邏輯 */
   if(ex.mode === 'healing'){
@@ -1496,13 +1502,15 @@ function _tick(now){
           heroAnim.healItem = null;
         }
       }
-      /* [v187 H34] healing 时仍跑 _tickAlliesPositions + _renderPass（载员 screenX 正常更新） */
+      /* [v187 H34] healing 时仍跑 _tickAlliesPositions（世界推进）+ _renderPass（视觉，前台才跑） */
       if(window._combat && window._combat.active && window._combat.sceneType === 'foot'){
         _tickAlliesPositions(now);
       }
-      if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
-      _updateBgTransform();
-      _updateCorpsesLayout();
+      if(_fg){
+        if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
+        _updateBgTransform();
+        _updateCorpsesLayout();
+      }
       return;
     }
   }
@@ -1538,7 +1546,7 @@ function _tick(now){
   if(window._combat && window._combat.active && window._combat.sceneType === 'foot'){
     _tickAlliesPositions(now);
   }
-  if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
+  if(_fg && ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
 
   if(ex.mode === 'dead'){
     /* rev-fix-tick-hero-death: 统一走 _playHeroDeath（含 _deathStart 记录） */
@@ -1547,8 +1555,10 @@ function _tick(now){
     const _deadRemain = _deadUntilMs - Date.now();
     if(_deadRemain > 0){
       ex._currentSpeed = 0;
-      _updateBgTransform();
-      _updateCorpsesLayout();
+      if(_fg){
+        _updateBgTransform();
+        _updateCorpsesLayout();
+      }
       return;
     }
     ex.mode = 'walk';
@@ -1684,7 +1694,7 @@ function _tick(now){
     }
   }
   if(_delta > 0.001 && typeof window._combatPlayerAdvance === 'function') window._combatPlayerAdvance(_delta);
-  _updateCorpsesLayout();
+  if(_fg) _updateCorpsesLayout();
 
   /* [v194 3] 無戰鬥時載員 worldX 三態：超前等待、落後追趕、到位跟隨。 */
   if(!window._combat || !window._combat.active){
@@ -1759,8 +1769,10 @@ function _tick(now){
   const prev = ex._curNodeIdx || 0;
   const curr = _curNodeIdx();
   if(prev !== curr){ ex._curNodeIdx = curr; ex._bgDirty = true; }
-  if(ex._bgDirty) _renderBg();
-  _updateBgTransform();
+  if(_fg){
+    if(ex._bgDirty) _renderBg();
+    _updateBgTransform();
+  }
 
   if(!ex.combatEvent && (ex.mode === 'walk' || ex.mode === 'vehicle') && !(ex._lootingUntil > 0 && now < ex._lootingUntil) && !(window._combat && window._combat.active)){
     const mode = state.preferences.actionMode || 'attack';

@@ -199,31 +199,139 @@ const VEHICLE_WEAPON_STATS = {
   '2a46_he':     { dmg: 1000, penMM: 30 },
 };
 
-/* 載具裝甲 RHA（mm） */
-const VEHICLE_ARMOR_RHA = {
-  btr80:{hullFront:20,turretFront:12,side:12,rear:10},
-  btr80a:{hullFront:20,turretFront:14,side:12,rear:10},
-  btr82:{hullFront:22,turretFront:15,side:13,rear:11},
-  btr82a:{hullFront:22,turretFront:15,side:13,rear:11},
-  btr90:{hullFront:33,turretFront:35,side:16,rear:12},
-  bmp1:{hullFront:28,turretFront:32,side:20,rear:16},
-  bmp1m:{hullFront:28,turretFront:34,side:20,rear:16},
-  bmp2:{hullFront:28,turretFront:32,side:20,rear:16},
-  bmp3:{hullFront:70,turretFront:65,side:40,rear:22},
-  bmd4:{hullFront:25,turretFront:38,side:18,rear:14},
-  t80:{hullFront:380,turretFront:410,side:80,rear:45},
-  t80b:{hullFront:430,turretFront:480,side:80,rear:45},
-  t80bv:{hullFront:480,turretFront:520,side:80,rear:45,era:1},
-  t80u:{hullFront:550,turretFront:675,side:80,rear:45,era:2},
-  t80uk:{hullFront:550,turretFront:675,side:80,rear:45,era:2},
-  t80um:{hullFront:570,turretFront:690,side:80,rear:45,era:2}
+/* rev-7part: 載具 7 部位裝甲 RHA 等效（不含 ERA，ERA 額外加成見 ERA_TYPES）
+ * 部位：hullUpperFront / hullLowerFront / hullSide / hullRear / turretFront / turretSide / turretRear
+ * baseKE = 對動能彈等效（mm RHA），baseHEAT = 對化學能彈等效
+ * era = 掛載的 ERA 型號（null 表示無），加成查 ERA_TYPES */
+const VEHICLE_ARMOR_LAYOUT = {
+  /* ═══ BTR 系列（輪式，純鋼） ═══ */
+  btr80: {
+    hullUpperFront:{baseKE:20,baseHEAT:20,era:null}, hullLowerFront:{baseKE:12,baseHEAT:12,era:null},
+    hullSide:{baseKE:12,baseHEAT:12,era:null},       hullRear:{baseKE:10,baseHEAT:10,era:null},
+    turretFront:{baseKE:12,baseHEAT:12,era:null},    turretSide:{baseKE:8,baseHEAT:8,era:null},    turretRear:{baseKE:8,baseHEAT:8,era:null}
+  },
+  btr80a: {
+    hullUpperFront:{baseKE:20,baseHEAT:20,era:null}, hullLowerFront:{baseKE:12,baseHEAT:12,era:null},
+    hullSide:{baseKE:12,baseHEAT:12,era:null},       hullRear:{baseKE:10,baseHEAT:10,era:null},
+    turretFront:{baseKE:14,baseHEAT:14,era:null},    turretSide:{baseKE:10,baseHEAT:10,era:null},  turretRear:{baseKE:8,baseHEAT:8,era:null}
+  },
+  btr82: {
+    hullUpperFront:{baseKE:22,baseHEAT:22,era:null}, hullLowerFront:{baseKE:13,baseHEAT:13,era:null},
+    hullSide:{baseKE:13,baseHEAT:13,era:null},       hullRear:{baseKE:11,baseHEAT:11,era:null},
+    turretFront:{baseKE:15,baseHEAT:15,era:null},    turretSide:{baseKE:10,baseHEAT:10,era:null},  turretRear:{baseKE:9,baseHEAT:9,era:null}
+  },
+  btr82a: {
+    hullUpperFront:{baseKE:22,baseHEAT:22,era:null}, hullLowerFront:{baseKE:13,baseHEAT:13,era:null},
+    hullSide:{baseKE:13,baseHEAT:13,era:null},       hullRear:{baseKE:11,baseHEAT:11,era:null},
+    turretFront:{baseKE:15,baseHEAT:15,era:null},    turretSide:{baseKE:10,baseHEAT:10,era:null},  turretRear:{baseKE:9,baseHEAT:9,era:null}
+  },
+  btr90: {
+    hullUpperFront:{baseKE:33,baseHEAT:33,era:null}, hullLowerFront:{baseKE:20,baseHEAT:20,era:null},
+    hullSide:{baseKE:16,baseHEAT:16,era:null},       hullRear:{baseKE:12,baseHEAT:12,era:null},
+    turretFront:{baseKE:35,baseHEAT:35,era:null},    turretSide:{baseKE:25,baseHEAT:25,era:null},  turretRear:{baseKE:20,baseHEAT:20,era:null}
+  },
+  /* ═══ BMP 系列（履帶步戰，純鋼） ═══ */
+  bmp1: {
+    hullUpperFront:{baseKE:28,baseHEAT:28,era:null}, hullLowerFront:{baseKE:17,baseHEAT:17,era:null},
+    hullSide:{baseKE:20,baseHEAT:20,era:null},       hullRear:{baseKE:16,baseHEAT:16,era:null},
+    turretFront:{baseKE:32,baseHEAT:32,era:null},    turretSide:{baseKE:22,baseHEAT:22,era:null},  turretRear:{baseKE:18,baseHEAT:18,era:null}
+  },
+  bmp1m: {
+    hullUpperFront:{baseKE:28,baseHEAT:28,era:null}, hullLowerFront:{baseKE:17,baseHEAT:17,era:null},
+    hullSide:{baseKE:20,baseHEAT:20,era:null},       hullRear:{baseKE:16,baseHEAT:16,era:null},
+    turretFront:{baseKE:34,baseHEAT:34,era:null},    turretSide:{baseKE:24,baseHEAT:24,era:null},  turretRear:{baseKE:18,baseHEAT:18,era:null}
+  },
+  bmp2: {
+    hullUpperFront:{baseKE:28,baseHEAT:28,era:null}, hullLowerFront:{baseKE:17,baseHEAT:17,era:null},
+    hullSide:{baseKE:20,baseHEAT:20,era:null},       hullRear:{baseKE:16,baseHEAT:16,era:null},
+    turretFront:{baseKE:32,baseHEAT:32,era:null},    turretSide:{baseKE:22,baseHEAT:22,era:null},  turretRear:{baseKE:18,baseHEAT:18,era:null}
+  },
+  bmp3: {
+    hullUpperFront:{baseKE:70,baseHEAT:70,era:null}, hullLowerFront:{baseKE:42,baseHEAT:42,era:null},
+    hullSide:{baseKE:40,baseHEAT:40,era:null},       hullRear:{baseKE:22,baseHEAT:22,era:null},
+    turretFront:{baseKE:65,baseHEAT:65,era:null},    turretSide:{baseKE:45,baseHEAT:45,era:null},  turretRear:{baseKE:30,baseHEAT:30,era:null}
+  },
+  bmd4: {
+    hullUpperFront:{baseKE:25,baseHEAT:25,era:null}, hullLowerFront:{baseKE:15,baseHEAT:15,era:null},
+    hullSide:{baseKE:18,baseHEAT:18,era:null},       hullRear:{baseKE:14,baseHEAT:14,era:null},
+    turretFront:{baseKE:38,baseHEAT:38,era:null},    turretSide:{baseKE:26,baseHEAT:26,era:null},  turretRear:{baseKE:20,baseHEAT:20,era:null}
+  },
+  /* ═══ T-80 系列（複合 + ERA） ═══ */
+  t80: {
+    hullUpperFront:{baseKE:425,baseHEAT:475,era:null}, hullLowerFront:{baseKE:90,baseHEAT:90,era:null},
+    hullSide:{baseKE:80,baseHEAT:80,era:null},         hullRear:{baseKE:45,baseHEAT:45,era:null},
+    turretFront:{baseKE:395,baseHEAT:475,era:null},    turretSide:{baseKE:175,baseHEAT:175,era:null},  turretRear:{baseKE:70,baseHEAT:70,era:null}
+  },
+  t80b: {
+    hullUpperFront:{baseKE:425,baseHEAT:475,era:null}, hullLowerFront:{baseKE:90,baseHEAT:90,era:null},
+    hullSide:{baseKE:80,baseHEAT:80,era:null},         hullRear:{baseKE:45,baseHEAT:45,era:null},
+    turretFront:{baseKE:395,baseHEAT:475,era:null},    turretSide:{baseKE:175,baseHEAT:175,era:null},  turretRear:{baseKE:70,baseHEAT:70,era:null}
+  },
+  t80bv: {
+    hullUpperFront:{baseKE:425,baseHEAT:475,era:'kontakt_1'}, hullLowerFront:{baseKE:90,baseHEAT:90,era:null},
+    hullSide:{baseKE:80,baseHEAT:80,era:'kontakt_1'},         hullRear:{baseKE:45,baseHEAT:45,era:null},
+    turretFront:{baseKE:395,baseHEAT:475,era:'kontakt_1'},    turretSide:{baseKE:175,baseHEAT:175,era:'kontakt_1'}, turretRear:{baseKE:70,baseHEAT:70,era:null}
+  },
+  t80u: {
+    hullUpperFront:{baseKE:515,baseHEAT:575,era:'kontakt_5'}, hullLowerFront:{baseKE:90,baseHEAT:90,era:null},
+    hullSide:{baseKE:80,baseHEAT:80,era:'kontakt_5_light'},   hullRear:{baseKE:45,baseHEAT:45,era:null},
+    turretFront:{baseKE:510,baseHEAT:600,era:'kontakt_5'},    turretSide:{baseKE:210,baseHEAT:225,era:'kontakt_5'}, turretRear:{baseKE:70,baseHEAT:70,era:null}
+  },
+  t80uk: {
+    hullUpperFront:{baseKE:515,baseHEAT:575,era:'kontakt_5'}, hullLowerFront:{baseKE:90,baseHEAT:90,era:null},
+    hullSide:{baseKE:80,baseHEAT:80,era:'kontakt_5_light'},   hullRear:{baseKE:45,baseHEAT:45,era:null},
+    turretFront:{baseKE:510,baseHEAT:600,era:'kontakt_5'},    turretSide:{baseKE:210,baseHEAT:225,era:'kontakt_5'}, turretRear:{baseKE:70,baseHEAT:70,era:null}
+  },
+  t80um: {
+    hullUpperFront:{baseKE:515,baseHEAT:575,era:'kontakt_5'}, hullLowerFront:{baseKE:90,baseHEAT:90,era:null},
+    hullSide:{baseKE:80,baseHEAT:80,era:'kontakt_5_light'},   hullRear:{baseKE:45,baseHEAT:45,era:null},
+    turretFront:{baseKE:510,baseHEAT:600,era:'kontakt_5'},    turretSide:{baseKE:210,baseHEAT:225,era:'kontakt_5'}, turretRear:{baseKE:70,baseHEAT:70,era:null}
+  }
+};
+
+/* rev-veh-length: 載具半車長（世界米），供投擲/濺射落點部位判定 */
+const VEHICLE_HALF_LENGTH_WORLD = {
+  btr80:3.85, btr80a:3.85, btr82:3.85, btr82a:3.85, btr90:4.0,
+  bmp1:3.37, bmp1m:3.37, bmp2:3.36, bmp3:3.57, bmd4:3.05,
+  t80:3.5, t80b:3.5, t80bv:3.5, t80u:3.5, t80uk:3.5, t80um:3.5
+};
+window.getVehicleHalfLengthWorld = function(vid){
+  return VEHICLE_HALF_LENGTH_WORLD[vid] || 3.6;
 };
 
 /* 載具基礎命中率（百分比） */
 /* rev-fix-atgm-ammo: 導彈彈藥表（與 VEHICLE_MAIN_AMMO_POOL 平級）*/
 const VEHICLE_ATGM_AMMO = {
-  '9m14':  { name:'9M14 嬰兒',  dmg:1000, penMM:400, speed:120 },
-  '9m113': { name:'9M113 競賽', dmg:1200, penMM:600, speed:200 }
+  '9m14':   { name:'9M14 嬰兒',    dmg:1000, penMM:400, speed:120, caliberMM:125, hrBonus:3 },
+  '9m113':  { name:'9M113 競賽',   dmg:1200, penMM:600, speed:200, caliberMM:120, hrBonus:8 },
+  '9m112':  { name:'9M112 眼鏡蛇', dmg:650,  penMM:600, speed:350, caliberMM:125, isGL:true, hrBonus:5 },
+  '9m119m': { name:'9M119M 殷鋼',  dmg:850,  penMM:800, speed:350, caliberMM:125, isGL:true, hrBonus:10 },
+  '9m117m1':{ name:'9M117M1 阿爾坎', dmg:750, penMM:750, speed:320, caliberMM:100, isGL:true, hrBonus:8 }
+};
+/* rev-gl-atgm: 每車 GL-ATGM 硬上限（不做 UI 强制，供 _stOpenMainAmmoPicker 校驗） */
+const GL_ATGM_MAX_CARRY = {
+  t80b:  { '9m112': 6 },   t80bv:{ '9m112': 6 },
+  t80u:  { '9m119m': 6 },  t80uk:{ '9m119m': 6 }, t80um:{ '9m119m': 6 },
+  bmp3:  { '9m117m1': 8 },
+  bmd4:  { '9m117m1': 4 }
+};
+/* rev-gl-atgm: GL-ATGM 按車型的裝填時間（ms）；主炮裝填查 MUZZLE_PROFILES[wid].pauseMs */
+const GL_ATGM_RELOAD_MS = {
+  t80b: 7500, t80bv: 7500,
+  t80u: 7500, t80uk: 7500, t80um: 7500,
+  bmp3: 15000,
+  bmd4: 4000
+};
+/* rev-fix-features: 車輛特性開關，新車只加表不改邏輯 */
+const VEHICLE_FEATURES = {
+  t80uk: { ainet: true,  arena: false },
+  t80um: { ainet: false, arena: true, arenaAmmo: 22 }
+};
+/* rev-fix-era: 爆炸反應裝甲等效（對 KE / HEAT） */
+const ERA_TYPES = {
+  kontakt_1:       { ke: 20,  heat: 300 },
+  kontakt_5:       { ke: 135, heat: 525 },
+  kontakt_5_light: { ke: 65,  heat: 350 }
 };
 
 /* [v206] 載具武器真實彈速（m/s） */
@@ -236,8 +344,9 @@ const VEHICLE_AMMO_SPEED_MS = {
   '2a42': 960, '2a72': 960,
   '30mm_ap': 960, '30mm_apds': 1120, '30mm_hef': 960,
   'kpvt': 1000, 'nsvt': 845, 'pkt': 825,
-  // 导弹（默认值；载具专属速度见 VEHICLE_ATGM_SPEED）
-  '9m14': 120, '9m113': 200
+  // 导弹
+  '9m14': 120, '9m113': 200,
+  '9m112': 350, '9m119m': 350, '9m117m1': 320
 };
 
 const VEHICLE_BASE_HR = {
@@ -248,17 +357,21 @@ const VEHICLE_BASE_HR = {
 
 /* 主炮默認彈種配比 */
 const VEHICLE_AMMO_DEFAULT_BREAKDOWN = {
-  '2a46':   {'3bm42':20,'3of26':15,'3bk29':5},
-  '2a46m1': {'3bm42':20,'3of26':15,'3bk29':5},
-  '2a70':   {'3uof17':40},
+  '2a46':   {'3bm42':20,'3of26':10,'3bk29':4,'9m112':6},
+  '2a46m1': {'3bm42':20,'3of26':10,'3bk29':4,'9m119m':6},
+  '2a70':   {'3uof17':32,'9m117m1':8},
   '2a28':   {'pg15v':25,'og15v':15}
+};
+/* rev-gl-atgm: BMD-4 与 BMP-3 共用 2a70，但 BMD-4 只带 4 发 GL-ATGM */
+const VEHICLE_AMMO_DEFAULT_BREAKDOWN_BY_VEHICLE = {
+  bmd4: { '2a70': {'3uof17':36,'9m117m1':4} }
 };
 
 /* 主炮彈種池 */
 const VEHICLE_MAIN_AMMO_POOL = {
-  '2a46':   [{id:'3bm42',name:'3BM42 穿甲',type:'ap'},{id:'3of26',name:'3OF26 高爆',type:'he'},{id:'3bk29',name:'3BK29 破甲',type:'heat'}],
-  '2a46m1': [{id:'3bm42',name:'3BM42 穿甲',type:'ap'},{id:'3of26',name:'3OF26 高爆',type:'he'},{id:'3bk29',name:'3BK29 破甲',type:'heat'}],
-  '2a70':   [{id:'3uof17',name:'3UOF17 高爆',type:'he'}],
+  '2a46':   [{id:'3bm42',name:'3BM42 穿甲',type:'ap'},{id:'3of26',name:'3OF26 高爆',type:'he'},{id:'3bk29',name:'3BK29 破甲',type:'heat'},{id:'9m112',name:'9M112 眼鏡蛇',type:'gl_atgm'}],
+  '2a46m1': [{id:'3bm42',name:'3BM42 穿甲',type:'ap'},{id:'3of26',name:'3OF26 高爆',type:'he'},{id:'3bk29',name:'3BK29 破甲',type:'heat'},{id:'9m119m',name:'9M119M 殷鋼',type:'gl_atgm'}],
+  '2a70':   [{id:'3uof17',name:'3UOF17 高爆',type:'he'},{id:'9m117m1',name:'9M117M1 阿爾坎',type:'gl_atgm'}],
   '2a28':   [{id:'pg15v',name:'PG-15V 破甲',type:'heat'},{id:'og15v',name:'OG-15V 高爆',type:'he'}]
 };
 

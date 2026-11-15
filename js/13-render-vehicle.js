@@ -926,6 +926,8 @@ const BTRSupport = {
     this.fireFx = []; this.dustParticles = []; this.fx.smoke = []; this.fx.tracers = [];
     this.recoilStates = {}; this.missiles = []; this.erasedMissilePolys = []; this.erasedBaseImg = null;
     this.playerClipH = 1.0; this.playerXOffset = 0; this._finished = false;
+    /* rev-gl-atgm-fix: 按 wid 记录首发射，避免并列机枪 pkt 抢先消耗 */
+    this._cannonFirstShotDone = {};
     this._setupCanvas();
     this._setupMuzzles();
     const self = this;
@@ -1340,9 +1342,10 @@ const BTRSupport = {
     }
     const _isAtgm = (m.weaponId === 'atgm');
     const _inBurst = m.shotsLeft < m.profile.burst;
-    const _fired = (typeof window._onBTRFire === 'function')
+    const _fireRes = (typeof window._onBTRFire === 'function')
       ? window._onBTRFire(m.weaponId, now, m._syncGroup, m._preselectedTarget)
       : true;
+    const _fired = (_fireRes === true) || (_fireRes && _fireRes.ok);
     m._preselectedTarget = null;
     if(!_fired && !_inBurst){
       /* rev-fix-nofire: 無目標時短重試，避免長 pauseMs 懲罰（2A70 從 4s → 500ms） */
@@ -1419,7 +1422,12 @@ const BTRSupport = {
     });
 
     m.shotsLeft--;
-    if(m.shotsLeft <= 0){ m.shotsLeft = m.profile.burst; m.nextFireAt = now + m.profile.pauseMs; }
+    if(m.shotsLeft <= 0){
+      m.shotsLeft = m.profile.burst;
+      /* rev-gl-atgm: reloadMs 由 _onBTRFire 按弹种动态定 */
+      var _reloadMs = (_fireRes && typeof _fireRes.reloadMs === 'number') ? _fireRes.reloadMs : m.profile.pauseMs;
+      m.nextFireAt = now + _reloadMs;
+    }
     else { m.nextFireAt = now + m.profile.intervalMs; }
 
     /* rev-fix-magazine: 機槍扣彈箱；打空則進入換彈延遲，覆蓋 nextFireAt */

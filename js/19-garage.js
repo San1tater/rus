@@ -381,14 +381,209 @@ function _spdRow(cur, tgt){
   const tv = tgt ? _spdText(tgt) : null;
   let h = '<div class="garage-stat-row" title="前進 / 倒車"><span class="k">速度</span>';
   if(tv !== null){
+    const cf = (cur.speedFwd != null) ? cur.speedFwd : cur.speedRoad;
+    const tf = (tgt.speedFwd != null) ? tgt.speedFwd : tgt.speedRoad;
+    let cls = '';
+    if(cf != null && tf != null){
+      if(tf > cf) cls = ' up';
+      else if(tf < cf) cls = ' down';
+    } else if(cv !== tv) cls = ' diff';
     h += '<span class="v-cur">' + cv + '</span>';
     h += '<span class="v-arrow">→</span>';
-    h += '<span class="v-new' + (cv !== tv ? ' diff' : '') + '">' + tv + '</span>';
+    h += '<span class="v-new' + cls + '">' + tv + '</span>';
   } else {
     h += '<span class="v-cur-only">' + cv + '</span>';
   }
   h += '</div>';
   return h;
+}
+
+/* rev-garage-armor-v3: 固定行数，无数据显示「無」/「—」。装配系统表结构一致。
+ * 車體正面/車體側後/炮塔/附加裝甲/特殊武器/炮射導彈 各占固定一行。 */
+function _eraLabel(era){
+  return { kontakt_1: '接觸-1', kontakt_5: '接觸-5', kontakt_5_light: '接觸-5L' }[era] || era;
+}
+function _eraShort(era){
+  return { kontakt_1: 'K1', kontakt_5: 'K5', kontakt_5_light: 'K5L' }[era] || era;
+}
+function _specialWeaponItems(vid){
+  const items = [];
+  if(!vid) return items;
+  if(typeof VEHICLE_FEATURES !== 'undefined' && VEHICLE_FEATURES[vid]){
+    const f = VEHICLE_FEATURES[vid];
+    if(f.arena) items.push({ type:'aps', label:'競技場 APS' });
+    if(f.ainet) items.push({ type:'ainet', label:'3OF26 編程彈' });
+  }
+  if(typeof VEHICLE_LOADOUT !== 'undefined' && VEHICLE_LOADOUT[vid]){
+    const ld = VEHICLE_LOADOUT[vid];
+    if(ld.atgm && ld.atgm.ammoId && (ld.atgm.rounds || 0) > 0 && typeof VEHICLE_ATGM_AMMO !== 'undefined'){
+      const a = VEHICLE_ATGM_AMMO[ld.atgm.ammoId];
+      if(a) items.push({ type:'atgm', label:a.name.split(' ')[0], id:ld.atgm.ammoId, count:ld.atgm.rounds });
+    }
+  }
+  return items;
+}
+function _specialWeaponText(vid){
+  const items = _specialWeaponItems(vid);
+  return items.length ? items.map(function(x){ return x.label; }).join('、') : '無';
+}
+function _spItemSpan(it, vid){
+  if(it.type === 'atgm'){
+    return '<span data-atgm-ammo-id="' + it.id + '" data-atgm-count="' + (it.count || 0) + '" data-vid="' + vid + '" style="text-decoration:underline dotted;cursor:pointer">' + it.label + '</span>';
+  }
+  return '<span>' + it.label + '</span>';
+}
+function _spItemsHtml(items, vid){
+  if(!items.length) return '無';
+  return items.map(function(it){ return _spItemSpan(it, vid); }).join('、');
+}
+function _spCompareCls(curItems, tgtItems){
+  if(!curItems.length && tgtItems.length) return ' up';
+  if(curItems.length && !tgtItems.length) return ' down';
+  const curAtgm = curItems.find(function(x){ return x.type === 'atgm'; });
+  const tgtAtgm = tgtItems.find(function(x){ return x.type === 'atgm'; });
+  if(curAtgm && tgtAtgm && curAtgm.id !== tgtAtgm.id){
+    const cp = (VEHICLE_ATGM_AMMO[curAtgm.id] && VEHICLE_ATGM_AMMO[curAtgm.id].penMM) || 0;
+    const tp = (VEHICLE_ATGM_AMMO[tgtAtgm.id] && VEHICLE_ATGM_AMMO[tgtAtgm.id].penMM) || 0;
+    if(tp > cp) return ' up';
+    if(tp < cp) return ' down';
+    return ' diff';
+  }
+  return curItems.map(function(x){ return x.label; }).join('、') !== tgtItems.map(function(x){ return x.label; }).join('、') ? ' diff' : '';
+}
+function _garageSpecialRow(curId, tgtId){
+  const curItems = _specialWeaponItems(curId);
+  let h = '<div class="garage-stat-row"><span class="k">特殊武器</span>';
+  if(!tgtId){
+    h += '<span class="v-cur-only">' + _spItemsHtml(curItems, curId) + '</span>';
+  } else {
+    const tgtItems = _specialWeaponItems(tgtId);
+    const cls = _spCompareCls(curItems, tgtItems);
+    h += '<span class="v-cur">' + _spItemsHtml(curItems, curId) + '</span>';
+    h += '<span class="v-arrow">→</span>';
+    h += '<span class="v-new' + cls + '">' + _spItemsHtml(tgtItems, tgtId) + '</span>';
+  }
+  h += '</div>';
+  return h;
+}
+function _glAtgmTxt(vid){
+  if(!vid || typeof VEHICLE_MAIN_AMMO_POOL === 'undefined') return '無';
+  const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
+  if(!ld) return '無';
+  let mw = null;
+  for(const w in ld){ if(w !== 'atgm' && VEHICLE_MAIN_AMMO_POOL[w]){ mw = w; break; } }
+  if(!mw) return '無';
+  const gl = (VEHICLE_MAIN_AMMO_POOL[mw] || []).find(function(x){ return x.type === 'gl_atgm'; });
+  if(!gl) return '無';
+  const mx = (GL_ATGM_MAX_CARRY[vid] && GL_ATGM_MAX_CARRY[vid][gl.id]) || 0;
+  if(!mx) return '無';
+  return gl.name + ' ×' + mx;
+}
+function _glAtgmPenMM(vid){
+  if(typeof VEHICLE_MAIN_AMMO_POOL === 'undefined') return 0;
+  const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
+  if(!ld) return 0;
+  let mw = null;
+  for(const w in ld){ if(w !== 'atgm' && VEHICLE_MAIN_AMMO_POOL[w]){ mw = w; break; } }
+  if(!mw) return 0;
+  const gl = (VEHICLE_MAIN_AMMO_POOL[mw] || []).find(function(x){ return x.type === 'gl_atgm'; });
+  if(!gl) return 0;
+  const a = (typeof VEHICLE_ATGM_AMMO !== 'undefined') ? VEHICLE_ATGM_AMMO[gl.id] : null;
+  return a ? (a.penMM || 0) : 0;
+}
+function _glAtgmShort(vid){
+  var full = _glAtgmTxt(vid);
+  if(full === '無') return '無';
+  return full.split(' ')[0];
+}
+function _glAtgmHas(vid){
+  return _glAtgmTxt(vid) !== '無';
+}
+function _glAtgmRow(vid, compareVid){
+  const curTxt = _glAtgmShort(vid);
+  let h = '<div class="garage-stat-row"><span class="k">炮射導彈</span>';
+  if(!compareVid){
+    h += '<span class="v-cur-only" data-gl-atgm-vid="' + vid + '" style="text-decoration:underline dotted;cursor:pointer">' + curTxt + '</span>';
+  } else {
+    const tgtTxt = _glAtgmShort(compareVid);
+    let cls = '';
+    if(curTxt === '無' && tgtTxt !== '無'){
+      cls = ' up';
+    } else if(curTxt !== '無' && tgtTxt === '無'){
+      cls = ' down';
+    } else if(curTxt !== tgtTxt){
+      const _cp = _glAtgmPenMM(vid);
+      const _tp = _glAtgmPenMM(compareVid);
+      if(_tp > _cp) cls = ' up';
+      else if(_tp < _cp) cls = ' down';
+      else cls = ' diff';
+    }
+    h += '<span class="v-cur" data-gl-atgm-vid="' + vid + '" style="text-decoration:underline dotted;cursor:pointer">' + curTxt + '</span>';
+    h += '<span class="v-arrow">→</span>';
+    h += '<span class="v-new' + cls + '" data-gl-atgm-vid="' + compareVid + '" style="text-decoration:underline dotted;cursor:pointer">' + tgtTxt + '</span>';
+  }
+  h += '</div>';
+  return h;
+}
+function _armorPartFmt(p){
+  const eraKE = (p.era && typeof ERA_TYPES !== 'undefined' && ERA_TYPES[p.era]) ? ERA_TYPES[p.era].ke : 0;
+  const totalKE = p.baseKE + eraKE;
+  return totalKE + (p.era ? '*' : '');
+}
+function _armorGroupTxt(layout, keys){
+  if(!layout) return '—';
+  const parts = keys.map(k => layout[k]).filter(Boolean);
+  if(!parts.length) return '—';
+  return parts.map(_armorPartFmt).join('/');
+}
+function _erasOfLayout(lay){
+  if(!lay) return [];
+  const s = new Set();
+  for(const k in lay){ if(lay[k].era) s.add(lay[k].era); }
+  return Array.from(s);
+}
+function _eraTxtOf(lay){
+  const arr = _erasOfLayout(lay);
+  if(!arr.length) return '無';
+  return arr.map(_eraLabel).join(' · ');
+}
+function _armorGroupKE(layout, keys){
+  if(!layout) return 0;
+  const parts = keys.map(k => layout[k]).filter(Boolean);
+  return parts.reduce(function(s, p){
+    const eraKE = (p.era && typeof ERA_TYPES !== 'undefined' && ERA_TYPES[p.era]) ? ERA_TYPES[p.era].ke : 0;
+    return s + p.baseKE + eraKE;
+  }, 0);
+}
+function _armorLayoutRows(vid, compareVid){
+  const layout = (typeof VEHICLE_ARMOR_LAYOUT !== 'undefined') ? VEHICLE_ARMOR_LAYOUT[vid] : null;
+  const compareLayout = (compareVid && typeof VEHICLE_ARMOR_LAYOUT !== 'undefined') ? VEHICLE_ARMOR_LAYOUT[compareVid] : null;
+  const groups = [
+    { label: '車體正面', keys: ['hullUpperFront', 'hullLowerFront'] },
+    { label: '車體側後', keys: ['hullSide', 'hullRear'] },
+    { label: '炮塔',     keys: ['turretFront', 'turretSide'] }
+  ];
+  const _style = ' style="text-decoration:underline dotted;cursor:pointer"';
+  let out = '';
+  for(const g of groups){
+    const curTxt = _armorGroupTxt(layout, g.keys);
+    const keysStr = g.keys.join(',');
+    let row = '<div class="garage-stat-row"><span class="k">' + g.label + '</span>';
+    if(compareLayout){
+      const tgtTxt = _armorGroupTxt(compareLayout, g.keys);
+      const curKE = _armorGroupKE(layout, g.keys);
+      const tgtKE = _armorGroupKE(compareLayout, g.keys);
+      const cls = tgtKE > curKE ? ' up' : (tgtKE < curKE ? ' down' : '');
+      row += '<span class="v-cur" data-armor-keys="' + keysStr + '" data-vid="' + vid + '"' + _style + '>' + curTxt + '</span>';
+      row += '<span class="v-arrow">→</span>';
+      row += '<span class="v-new' + cls + '" data-armor-keys="' + keysStr + '" data-vid="' + compareVid + '"' + _style + '>' + tgtTxt + '</span>';
+    } else {
+      row += '<span class="v-cur-only" data-armor-keys="' + keysStr + '" data-vid="' + vid + '"' + _style + '>' + curTxt + '</span>';
+    }
+    row += '</div>';
+    out += row;
+  }
+  return out;
 }
 
 function _garageDetailHtml(cur, tgt, cu, mu){
@@ -397,13 +592,11 @@ function _garageDetailHtml(cur, tgt, cu, mu){
   const tw = tgt ? _splitVehicleWeaponList(tgt) : null;
   h += _garageDetailRowMulti('主炮', cw.mainGun, tw ? tw.mainGun : null);
   h += _garageDetailRowMulti('機槍', cw.machineGun, tw ? tw.machineGun : null);
-  h += _garageDetailRow('特殊武器', cur.weaponSpecial || '無', tgt ? (tgt.weaponSpecial || '無') : null);
-  h += _armorRows(cur.armorGrid, tgt ? tgt.armorGrid : null);
+  h += _garageSpecialRow(cur.id, tgt ? tgt.id : null);
+  h += _glAtgmRow(cur.id, tgt ? tgt.id : null);
+  h += _armorLayoutRows(cur.id, tgt ? tgt.id : null);
   h += _spdRow(cur, tgt);
   h += _garageDetailRow('支援', cur.supportDuration + 's', tgt ? tgt.supportDuration + 's' : null);
-  if(cu != null && mu > 0){
-    h += '<div class="garage-stat-row"><span class="k">電台</span><span class="v-cur-only">' + cu + ' / ' + mu + '</span></div>';
-  }
   return h;
 }
 
@@ -806,6 +999,7 @@ function _garageResearchErrMsg(r){
 function _garageShowTechDetail(vid){
   const v = VEHICLES[vid];
   if(!v) return;
+  window._garageCurrentDetailVid = vid;
   const g = _garageInitState();
   const cur = VEHICLES[g.currentVehicle] || VEHICLES.btr80;
   const owned = g.ownedVehicles.indexOf(vid) >= 0;
@@ -951,3 +1145,277 @@ function _garageShowTechDetail(vid){
     }
   }
 }
+
+/* rev-garage-popup: 装甲详情 / 炮射导弹详情弹窗（openModal 自带 X 关闭） */
+window._showArmorDetail = function(vid, keys, returnFn){
+  const layout = (typeof VEHICLE_ARMOR_LAYOUT !== 'undefined') ? VEHICLE_ARMOR_LAYOUT[vid] : null;
+  if(!layout) return;
+  const labels = {
+    hullUpperFront: '車體首上', hullLowerFront: '車體首下',
+    hullSide: '車體側面', hullRear: '車體後部',
+    turretFront: '炮塔正面', turretSide: '炮塔側面', turretRear: '炮塔後部'
+  };
+  let body = '';
+  keys.forEach(function(k){
+    const p = layout[k];
+    if(!p) return;
+    body += '<div style="margin-bottom:12px">';
+    body += '<div style="font-size:12px;color:#e8a33d;font-weight:bold;margin-bottom:6px">' + (labels[k] || k) + '</div>';
+    const eraKE = (p.era && typeof ERA_TYPES !== 'undefined' && ERA_TYPES[p.era]) ? ERA_TYPES[p.era].ke : 0;
+    const eraHEAT = (p.era && typeof ERA_TYPES !== 'undefined' && ERA_TYPES[p.era]) ? ERA_TYPES[p.era].heat : 0;
+    const keTxt = eraKE > 0 ? (p.baseKE + ' + ' + eraKE + ' (' + _eraLabel(p.era) + ') = ' + (p.baseKE + eraKE)) : String(p.baseKE);
+    const heatTxt = eraHEAT > 0 ? (p.baseHEAT + ' + ' + eraHEAT + ' (' + _eraLabel(p.era) + ') = ' + (p.baseHEAT + eraHEAT)) : String(p.baseHEAT);
+    body += '<div class="stat-line"><span class="k">動能彈防禦等效</span><span class="v">' + keTxt + ' mm</span></div>';
+    body += '<div class="stat-line"><span class="k">化學能彈防禦等效</span><span class="v">' + heatTxt + ' mm</span></div>';
+    body += '</div>';
+  });
+  openModal({
+    title: '裝甲詳情',
+    body: body,
+    onClose: function(){
+      closeModal();
+      if(typeof returnFn === 'function'){
+        returnFn();
+      }
+    }
+  });
+};
+
+window._showGLAtgmDetail = function(vid, returnFn){
+  const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
+  if(!ld) return;
+  let mw = null;
+  for(const w in ld){ if(w !== 'atgm' && VEHICLE_MAIN_AMMO_POOL[w]){ mw = w; break; } }
+  if(!mw) return;
+  const gl = (VEHICLE_MAIN_AMMO_POOL[mw] || []).find(function(x){ return x.type === 'gl_atgm'; });
+  if(!gl) return;
+  const mx = (GL_ATGM_MAX_CARRY[vid] && GL_ATGM_MAX_CARRY[vid][gl.id]) || 0;
+  const ammoDef = (typeof VEHICLE_ATGM_AMMO !== 'undefined') ? VEHICLE_ATGM_AMMO[gl.id] : null;
+  const reloadMs = (typeof GL_ATGM_RELOAD_MS !== 'undefined' && GL_ATGM_RELOAD_MS[vid]) || 0;
+
+  let body = '';
+  body += '<div class="detail-title">' + gl.name + '</div>';
+  body += '<div class="detail-sub">炮射導彈</div>';
+  body += '<div class="stat-line"><span class="k">攜帶</span><span class="v">×' + mx + '</span></div>';
+  if(ammoDef){
+    if(ammoDef.caliberMM) body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + ammoDef.caliberMM + ' mm</span></div>';
+    if(ammoDef.speed) body += '<div class="stat-line"><span class="k">飛行速度</span><span class="v">' + ammoDef.speed + ' m/s</span></div>';
+    if(ammoDef.penMM) body += '<div class="stat-line"><span class="k">穿深</span><span class="v">' + ammoDef.penMM + ' mm</span></div>';
+    if(ammoDef.dmg) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + ammoDef.dmg + '</span></div>';
+  }
+  if(ammoDef && ammoDef.hrBonus) body += '<div class="stat-line"><span class="k">命中加成</span><span class="v">+' + ammoDef.hrBonus + '</span></div>';
+  if(reloadMs > 0) body += '<div class="stat-line"><span class="k">裝填</span><span class="v">' + (reloadMs / 1000).toFixed(1) + ' s</span></div>';
+  openModal({
+    title: '炮射導彈詳情',
+    body: body,
+    onClose: function(){
+      closeModal();
+      if(typeof returnFn === 'function'){
+        returnFn();
+      }
+    }
+  });
+};
+
+window._showAtgmDetail = function(ammoId, count, returnFn){
+  const a = (typeof VEHICLE_ATGM_AMMO !== 'undefined') ? VEHICLE_ATGM_AMMO[ammoId] : null;
+  if(!a) return;
+  let body = '';
+  body += '<div class="detail-title">' + a.name + '</div>';
+  body += '<div class="detail-sub">獨立反坦克導彈</div>';
+  if(typeof count === 'number' && count > 0) body += '<div class="stat-line"><span class="k">攜帶</span><span class="v">×' + count + '</span></div>';
+  if(a.caliberMM) body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + a.caliberMM + ' mm</span></div>';
+  if(a.speed) body += '<div class="stat-line"><span class="k">飛行速度</span><span class="v">' + a.speed + ' m/s</span></div>';
+  if(a.penMM) body += '<div class="stat-line"><span class="k">穿深</span><span class="v">' + a.penMM + ' mm</span></div>';
+  if(a.dmg) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + a.dmg + '</span></div>';
+  if(a.hrBonus) body += '<div class="stat-line"><span class="k">命中加成</span><span class="v">+' + a.hrBonus + '</span></div>';
+  openModal({
+    title: '反坦克導彈詳情',
+    body: body,
+    onClose: function(){
+      closeModal();
+      if(typeof returnFn === 'function'){
+        returnFn();
+      }
+    }
+  });
+};
+
+document.addEventListener('click', function(e){
+  if(!e.target || !e.target.closest) return;
+  /* rev-return-to-compare: 退回进入时的比较页，不是装甲元素 data-vid */
+  const _mkReturn = function(){
+    const _vid = window._garageCurrentDetailVid;
+    return function(){
+      if(_vid && typeof _garageShowTechDetail === 'function'){
+        setTimeout(function(){ _garageShowTechDetail(_vid); }, 20);
+      }
+    };
+  };
+  const armorEl = e.target.closest('[data-armor-keys]');
+  if(armorEl){
+    const keys = (armorEl.getAttribute('data-armor-keys') || '').split(',').filter(Boolean);
+    const vid = armorEl.getAttribute('data-vid');
+    if(keys.length && vid && typeof window._showArmorDetail === 'function'){
+      window._showArmorDetail(vid, keys, _mkReturn());
+    }
+    e.stopPropagation();
+    return;
+  }
+  const glEl = e.target.closest('[data-gl-atgm-vid]');
+  if(glEl){
+    const vid = glEl.getAttribute('data-gl-atgm-vid');
+    if(vid && typeof window._showGLAtgmDetail === 'function' && _glAtgmHas(vid)){
+      window._showGLAtgmDetail(vid, _mkReturn());
+    }
+    e.stopPropagation();
+    return;
+  }
+  const atgmEl = e.target.closest('[data-atgm-ammo-id]');
+  if(atgmEl){
+    const ammoId = atgmEl.getAttribute('data-atgm-ammo-id');
+    const count = parseInt(atgmEl.getAttribute('data-atgm-count') || '0', 10);
+    if(ammoId && typeof window._showAtgmDetail === 'function'){
+      window._showAtgmDetail(ammoId, count, _mkReturn());
+    }
+    e.stopPropagation();
+    return;
+  }
+});
+
+/* rev-garage-popup: 装甲详情 / 炮射导弹详情弹窗（openModal 自带 X 关闭） */
+window._showArmorDetail = function(vid, keys, returnFn){
+  const layout = (typeof VEHICLE_ARMOR_LAYOUT !== 'undefined') ? VEHICLE_ARMOR_LAYOUT[vid] : null;
+  if(!layout) return;
+  const labels = {
+    hullUpperFront: '車體首上', hullLowerFront: '車體首下',
+    hullSide: '車體側面', hullRear: '車體後部',
+    turretFront: '炮塔正面', turretSide: '炮塔側面', turretRear: '炮塔後部'
+  };
+  let body = '';
+  keys.forEach(function(k){
+    const p = layout[k];
+    if(!p) return;
+    body += '<div style="margin-bottom:12px">';
+    body += '<div style="font-size:12px;color:#e8a33d;font-weight:bold;margin-bottom:6px">' + (labels[k] || k) + '</div>';
+    const eraKE = (p.era && typeof ERA_TYPES !== 'undefined' && ERA_TYPES[p.era]) ? ERA_TYPES[p.era].ke : 0;
+    const eraHEAT = (p.era && typeof ERA_TYPES !== 'undefined' && ERA_TYPES[p.era]) ? ERA_TYPES[p.era].heat : 0;
+    const keTxt = eraKE > 0 ? (p.baseKE + ' + ' + eraKE + ' (' + _eraLabel(p.era) + ') = ' + (p.baseKE + eraKE)) : String(p.baseKE);
+    const heatTxt = eraHEAT > 0 ? (p.baseHEAT + ' + ' + eraHEAT + ' (' + _eraLabel(p.era) + ') = ' + (p.baseHEAT + eraHEAT)) : String(p.baseHEAT);
+    body += '<div class="stat-line"><span class="k">動能彈防禦等效</span><span class="v">' + keTxt + ' mm</span></div>';
+    body += '<div class="stat-line"><span class="k">化學能彈防禦等效</span><span class="v">' + heatTxt + ' mm</span></div>';
+    body += '</div>';
+  });
+  openModal({
+    title: '裝甲詳情',
+    body: body,
+    onClose: function(){
+      closeModal();
+      if(typeof returnFn === 'function'){
+        returnFn();
+      }
+    }
+  });
+};
+
+window._showGLAtgmDetail = function(vid, returnFn){
+  const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
+  if(!ld) return;
+  let mw = null;
+  for(const w in ld){ if(w !== 'atgm' && VEHICLE_MAIN_AMMO_POOL[w]){ mw = w; break; } }
+  if(!mw) return;
+  const gl = (VEHICLE_MAIN_AMMO_POOL[mw] || []).find(function(x){ return x.type === 'gl_atgm'; });
+  if(!gl) return;
+  const mx = (GL_ATGM_MAX_CARRY[vid] && GL_ATGM_MAX_CARRY[vid][gl.id]) || 0;
+  const ammoDef = (typeof VEHICLE_ATGM_AMMO !== 'undefined') ? VEHICLE_ATGM_AMMO[gl.id] : null;
+  const reloadMs = (typeof GL_ATGM_RELOAD_MS !== 'undefined' && GL_ATGM_RELOAD_MS[vid]) || 0;
+
+  let body = '';
+  body += '<div class="detail-title">' + gl.name + '</div>';
+  body += '<div class="detail-sub">炮射導彈</div>';
+  body += '<div class="stat-line"><span class="k">攜帶</span><span class="v">×' + mx + '</span></div>';
+  if(ammoDef){
+    if(ammoDef.caliberMM) body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + ammoDef.caliberMM + ' mm</span></div>';
+    if(ammoDef.speed) body += '<div class="stat-line"><span class="k">飛行速度</span><span class="v">' + ammoDef.speed + ' m/s</span></div>';
+    if(ammoDef.penMM) body += '<div class="stat-line"><span class="k">穿深</span><span class="v">' + ammoDef.penMM + ' mm</span></div>';
+    if(ammoDef.dmg) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + ammoDef.dmg + '</span></div>';
+  }
+  if(ammoDef && ammoDef.hrBonus) body += '<div class="stat-line"><span class="k">命中加成</span><span class="v">+' + ammoDef.hrBonus + '</span></div>';
+  if(reloadMs > 0) body += '<div class="stat-line"><span class="k">裝填</span><span class="v">' + (reloadMs / 1000).toFixed(1) + ' s</span></div>';
+  openModal({
+    title: '炮射導彈詳情',
+    body: body,
+    onClose: function(){
+      closeModal();
+      if(typeof returnFn === 'function'){
+        returnFn();
+      }
+    }
+  });
+};
+
+window._showAtgmDetail = function(ammoId, count, returnFn){
+  const a = (typeof VEHICLE_ATGM_AMMO !== 'undefined') ? VEHICLE_ATGM_AMMO[ammoId] : null;
+  if(!a) return;
+  let body = '';
+  body += '<div class="detail-title">' + a.name + '</div>';
+  body += '<div class="detail-sub">獨立反坦克導彈</div>';
+  if(typeof count === 'number' && count > 0) body += '<div class="stat-line"><span class="k">攜帶</span><span class="v">×' + count + '</span></div>';
+  if(a.caliberMM) body += '<div class="stat-line"><span class="k">口徑</span><span class="v">' + a.caliberMM + ' mm</span></div>';
+  if(a.speed) body += '<div class="stat-line"><span class="k">飛行速度</span><span class="v">' + a.speed + ' m/s</span></div>';
+  if(a.penMM) body += '<div class="stat-line"><span class="k">穿深</span><span class="v">' + a.penMM + ' mm</span></div>';
+  if(a.dmg) body += '<div class="stat-line"><span class="k">傷害</span><span class="v">' + a.dmg + '</span></div>';
+  if(a.hrBonus) body += '<div class="stat-line"><span class="k">命中加成</span><span class="v">+' + a.hrBonus + '</span></div>';
+  openModal({
+    title: '反坦克導彈詳情',
+    body: body,
+    onClose: function(){
+      closeModal();
+      if(typeof returnFn === 'function'){
+        returnFn();
+      }
+    }
+  });
+};
+
+document.addEventListener('click', function(e){
+  if(!e.target || !e.target.closest) return;
+  /* rev-return-to-compare: 退回进入时的比较页，不是装甲元素 data-vid */
+  const _mkReturn = function(){
+    const _vid = window._garageCurrentDetailVid;
+    return function(){
+      if(_vid && typeof _garageShowTechDetail === 'function'){
+        setTimeout(function(){ _garageShowTechDetail(_vid); }, 20);
+      }
+    };
+  };
+  const armorEl = e.target.closest('[data-armor-keys]');
+  if(armorEl){
+    const keys = (armorEl.getAttribute('data-armor-keys') || '').split(',').filter(Boolean);
+    const vid = armorEl.getAttribute('data-vid');
+    if(keys.length && vid && typeof window._showArmorDetail === 'function'){
+      window._showArmorDetail(vid, keys, _mkReturn());
+    }
+    e.stopPropagation();
+    return;
+  }
+  const glEl = e.target.closest('[data-gl-atgm-vid]');
+  if(glEl){
+    const vid = glEl.getAttribute('data-gl-atgm-vid');
+    if(vid && typeof window._showGLAtgmDetail === 'function' && _glAtgmHas(vid)){
+      window._showGLAtgmDetail(vid, _mkReturn());
+    }
+    e.stopPropagation();
+    return;
+  }
+  const atgmEl = e.target.closest('[data-atgm-ammo-id]');
+  if(atgmEl){
+    const ammoId = atgmEl.getAttribute('data-atgm-ammo-id');
+    const count = parseInt(atgmEl.getAttribute('data-atgm-count') || '0', 10);
+    if(ammoId && typeof window._showAtgmDetail === 'function'){
+      window._showAtgmDetail(ammoId, count, _mkReturn());
+    }
+    e.stopPropagation();
+    return;
+  }
+});

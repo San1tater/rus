@@ -170,11 +170,13 @@ window._tickHeroWalkSwitch = function(now){
 function heroLoop(now){
   if(typeof window._tickHeroWalkSwitch === 'function') window._tickHeroWalkSwitch(now);
   updateHeroAnim(now);
+  /* rev-tab-explore-continue: 探索 tick 无条件跑（世界推进/事件触发/combat 触发） */
+  if(typeof window._exploreTick === 'function'){
+    try { window._exploreTick(now); } catch(e){ console.warn('[exploreTick]', e); }
+  }
+  /* 视觉渲染只在 explore tab 跑 */
   if(currentTab === 'explore'){
     renderExploreHeroCanvas();
-    if(typeof window._exploreTick === 'function'){
-      try { window._exploreTick(now); } catch(e){ console.warn('[exploreTick]', e); }
-    }
   }
   if(!heroLoop._lastHpCheck || now - heroLoop._lastHpCheck > 500){
     heroLoop._lastHpCheck = now;
@@ -268,6 +270,11 @@ document.addEventListener('click', e => {
   const t = e.target.closest('.itm');
   if(t && t.dataset.iid) openItemDetail(t.dataset.iid, t.dataset.irar);
 });
+
+/* rev-fix-img-drag: 阻止所有 <img> 被拖动（HTML 原生 draggable 行为） */
+document.addEventListener('dragstart', function(e){
+  if(e.target && e.target.tagName === 'IMG') e.preventDefault();
+}, false);
 
 /* ===== 後院診斷 ===== */
 window.__gpDiag = function(){
