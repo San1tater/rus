@@ -97,7 +97,7 @@ const GARDEN_GUARD_DETECTABLE_R = 40;
 /* rev142: 載員 R=80；玩家身高作為載具 R 計算基準 */
 const SERVANT_DETECTABLE_R = 80;
 const PLAYER_HEIGHT_M = 1.7;
-const BULLET_VISUAL_RADIUS = { normal: 3, grenade: 5, missile: 6 };
+const BULLET_VISUAL_RADIUS = { normal: 3, grenade: 5, rpg: 6 };
 
 /* [v198] 現實彈速（m/s） */
 const AMMO_SPEED_MS = {

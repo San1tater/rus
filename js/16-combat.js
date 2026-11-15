@@ -95,17 +95,20 @@ function _enemyWeaponIsMelee(w){
   return d && d.slot === "melee";
 }
 function _enemyActiveWeapon(e){
+  /* rev-fix-enemy-exhaust: 跳过已耗尽的武器，回退到下一把 */
   if(e._activeWeapon && e._activeWeapon.id) return e._activeWeapon;
-  if(e.primaryWeapon && e.primaryWeapon.id) return (e._activeWeapon = e.primaryWeapon);
-  if(e.secondaryWeapon && e.secondaryWeapon.id) return (e._activeWeapon = e.secondaryWeapon);
-  if(e.melee && e.melee.id) return (e._activeWeapon = e.melee);
+  var _ex = e._exhaustedWeapons || {};
+  if(e.primaryWeapon && e.primaryWeapon.id && !_ex[e.primaryWeapon.id]) return (e._activeWeapon = e.primaryWeapon);
+  if(e.secondaryWeapon && e.secondaryWeapon.id && !_ex[e.secondaryWeapon.id]) return (e._activeWeapon = e.secondaryWeapon);
+  if(e.melee && e.melee.id && !_ex[e.melee.id]) return (e._activeWeapon = e.melee);
   return null;
 }
 function _enemyDetachWeapon(e, w){
+  /* rev-fix-enemy-exhaust: 不再置 null 武器字段（否则 rollEnemyLoot 会丢武器掉落），
+   * 只标记该武器已耗尽，下次 _enemyActiveWeapon 跳过。 */
   if(!w) return;
-  if(e.primaryWeapon === w) e.primaryWeapon = null;
-  else if(e.secondaryWeapon === w) e.secondaryWeapon = null;
-  else if(e.melee === w) e.melee = null;
+  if(!e._exhaustedWeapons) e._exhaustedWeapons = {};
+  if(w.id) e._exhaustedWeapons[w.id] = true;
   e._activeWeapon = null;
 }
 /* 返回 { ok, weapon, melee }：ok 时执行射击/近战；换弹或切枪时 ok=false */
@@ -707,9 +710,10 @@ window._drawBulletShape = function(ctx, px, py, opts){
     /* 图标加载失败 → 圆点兜底 */
   }
   /* 圆形 */
-  var _br = (typeof BULLET_VISUAL_RADIUS !== 'undefined') ? BULLET_VISUAL_RADIUS : { normal: 3, grenade: 5, missile: 6 };
+  var _br = (typeof BULLET_VISUAL_RADIUS !== 'undefined') ? BULLET_VISUAL_RADIUS : { normal: 3, grenade: 5, rpg: 6 };
   var _r;
-  if(opts.missile){ _r = _br.missile; }
+  /* 兼容旧版常量：优先 rpg，回退 missile，最后硬编码 6 */
+  if(opts.rpg){ _r = _br.rpg || _br.missile || 6; }
   else if(opts.big || opts.isGrenade){ _r = _br.grenade; }
   else { _r = _br.normal; }
   _r *= scale;
@@ -2140,8 +2144,9 @@ function _enemyFireRPG(e, p, now){
   c.bullets.push({
     sx: mz.x, sy: mz.y, tx: _tx, ty: _tyR, t: 0,
     start: performance.now(), duration: duration,
-    enemy: true, big: true, missile: true, hit: hit,
+    enemy: true, big: true, isRPG: true, hit: hit,
     rarity: rar, _target: p,
+    _absWorldX: hit ? p.worldX : (p.worldX - 10),
     _onHit: function() {
       if(!hit || p.hp <= 0) return;
       const critRate = calcCritRate(rar, rar);
@@ -2589,7 +2594,7 @@ function _tickBullets(dt){
   const c = window._combat;
   if(!c) return;
   const now = performance.now();
-  if(!c.missileSmoke) c.missileSmoke = [];
+  if(!c.rpgSmoke) c.rpgSmoke = [];
   
   for(let i = c.bullets.length - 1; i >= 0; i--){
     const b = c.bullets[i];
@@ -2600,20 +2605,19 @@ function _tickBullets(dt){
       b.t += dt * 5;
     }
     
-    if(b.missile){
-      /* [v198b] 高速導彈尾煙插值：按距離生成，不按幀生成，確保不會斷檔 */
+    if(b.isRPG){
+      /* rev-fix-rpg-trail: 步戰 RPG 尾煙插值（按距離生成，不按幀） */
       const _dtT = b.duration > 0 ? (dt * 1000) / b.duration : 0;
       const _startT = Math.max(0, b.t - _dtT);
       const _endT = Math.min(1, b.t);
       const _span = _endT - _startT;
       if(_span > 0){
-        // 根據飛過的距離插值生成粒子，保證密度
         const _steps = Math.max(1, Math.ceil(_span * 300));
         for(let _k = 0; _k < _steps; _k++){
           const _kt = _startT + _span * (_k / _steps);
           const _bx = b.sx + (b.tx - b.sx) * _kt;
           const _by = b.sy + (b.ty - b.sy) * _kt;
-          c.missileSmoke.push({ x: _bx, y: _by, age: 0, size: 0.015 + Math.random() * 0.010 });
+          c.rpgSmoke.push({ x: _bx, y: _by, age: 0, size: 0.015 + Math.random() * 0.010 });
         }
       }
     }
@@ -2621,36 +2625,37 @@ function _tickBullets(dt){
     if(b.t >= 1){
       if(!b.resolved){
         b.resolved = true;
-        /* rev-fix-rpg-fx: RPG（missile）用独立特效，手雷保持原烟 */
-        if(b.isGrenade || b.missile){
-          var _fxElG = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
-          var _WG = _fxElG ? _fxElG.clientWidth : 400;
-          var _HG = _fxElG ? _fxElG.clientHeight : 500;
-          var _explX, _explY;
+        /* rev-fix-fx-world-crop: 爆炸落点以世界坐标为准，超出屏幕范围不生成。
+         * 手雷：worldStartX + vx*T 反推落点世界坐标。
+         * RPG：bullet 携带 _absWorldX。
+         * 不 clamp 到屏幕内——世界坐标映射后 sxN ∉ [0,1] 天然不生成。 */
+        if(b.isGrenade || b.isRPG){
+          var _finalWX = null;
           if(b.isGrenade && typeof b.worldStartX === 'number' && typeof b.vx === 'number' && b.T > 0){
-            /* 手雷：按 T 时刻世界位置反推落点 */
-            const _dir = (b.dir === -1) ? -1 : 1;
-            const _finalWX = b.worldStartX + _dir * b.vx * b.T;
-            const _px0 = c.allies[0] ? c.allies[0].worldX : 0;
-            const _relWX = _finalWX - _px0;
-            const _sm = c.sm || (typeof computeScreenMetrics === 'function' ? computeScreenMetrics(_WG, _HG) : { screenRightWorld: 2 });
-            _explX = (EXPLORE_HERO_X_RATIO + (_relWX / _sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO)) * _WG;
-            _explY = _HG * 0.95;
-          } else {
-            /* RPG：直接命中点 */
-            _explX = b.tx * _WG;
-            _explY = b.ty * _HG;
+            var _dirG = (b.dir === -1) ? -1 : 1;
+            _finalWX = b.worldStartX + _dirG * b.vx * b.T;
+          } else if(typeof b._absWorldX === 'number'){
+            _finalWX = b._absWorldX;
           }
-          /* 屏幕外（未命中飞出）不生成特效 */
-          if(_explX >= -_WG * 0.2 && _explX <= _WG * 1.2){
-            if(b.missile){
-              /* RPG：视觉半径约屏宽 18% */
-              var _radRPG = _WG * 0.18;
-              if(typeof window._spawnRPGImpactFx === 'function') window._spawnRPGImpactFx(c, _explX, _explY, _radRPG);
-            } else {
-              /* 手雷：保持原样（bgPixelsPerMeter × 4.5m） */
-              var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : _WG * 0.08;
-              if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, _explX, _explY, _radG);
+          if(_finalWX !== null){
+            var _fxElG = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
+            var _WG = _fxElG ? _fxElG.clientWidth : 400;
+            var _HG = _fxElG ? _fxElG.clientHeight : 500;
+            var _px0 = c.allies[0] ? c.allies[0].worldX : 0;
+            var _relWX = _finalWX - _px0;
+            var _smC = c.sm || { screenRightWorld: 2 };
+            var _sxN = EXPLORE_HERO_X_RATIO + (_relWX / _smC.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
+            /* 天然裁切：屏幕映射后超出 [0,1] 就跳过 */
+            if(_sxN >= 0 && _sxN <= 1){
+              var _explX = _sxN * _WG;
+              var _explY = b.isGrenade ? (_HG * 0.95) : (b.ty * _HG);
+              if(b.isRPG){
+                var _radRPG = _WG * 0.18;
+                if(typeof window._spawnRPGImpactFx === 'function') window._spawnRPGImpactFx(c, _explX, _explY, _radRPG);
+              } else {
+                var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : _WG * 0.08;
+                if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, _explX, _explY, _radG);
+              }
             }
           }
         }
@@ -2666,9 +2671,9 @@ function _tickBullets(dt){
     }
   }
 
-  for(let k = c.missileSmoke.length - 1; k >= 0; k--){
-    c.missileSmoke[k].age += dt;
-    if(c.missileSmoke[k].age > 1.2) c.missileSmoke.splice(k, 1);
+  for(let k = c.rpgSmoke.length - 1; k >= 0; k--){
+    c.rpgSmoke[k].age += dt;
+    if(c.rpgSmoke[k].age > 1.2) c.rpgSmoke.splice(k, 1);
   }
   for(let j = c.floats.length - 1; j >= 0; j--){
     c.floats[j].age += dt;
@@ -2830,11 +2835,11 @@ function _render(){
     ctx.restore();
   }
 
-  if(c.missileSmoke){
+  if(c.rpgSmoke){
     ctx.save();
     ctx.globalCompositeOperation = 'lighter'; // 加色混合，徹底消除圓形邊界
-    for(let si = 0; si < c.missileSmoke.length; si++){
-      const s = c.missileSmoke[si];
+    for(let si = 0; si < c.rpgSmoke.length; si++){
+      const s = c.rpgSmoke[si];
       const sa = 1 - s.age / 1.2;
       if(sa <= 0) continue;
       const sr = s.size * W * (1 + s.age * 1.5);
@@ -2896,7 +2901,7 @@ function _render(){
     const _ctx = _isTopLayer && ctxTop ? ctxTop : ctx;
     if(bx < -30 || bx > W + 30 || by < -30 || by > H + 30) continue;
     window._drawBulletShape(_ctx, bx, by, {
-      rarity: bb.rarity, missile: !!bb.missile, big: !!bb.big,
+      rarity: bb.rarity, rpg: !!bb.isRPG, big: !!bb.big,
       isGrenade: !!bb.isGrenade, grenadeId: bb.grenadeId, t: bb.t
     });
   }

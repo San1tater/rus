@@ -1014,7 +1014,7 @@ function drawBullet(b){
       bullets.push({
         sx: sx, sy: sy, tx: tx, ty: ty, x: sx, y: sy, t: 0,
         startTime: performance.now(), duration: _rpgDurMs,
-        hit: hit, isEnemy: true, big: true, missile: true,
+        hit: hit, isEnemy: true, big: true, isRPG: true,
         fromU: e, toU: target, rarity: _rar,
         _onHit: function(){
           if(!hit || !target.alive) return;
@@ -1098,8 +1098,8 @@ function drawBullet(b){
         b.t = (nowMs - b.startTime) / b.duration;
         if(b.t >= 1){
           b.x = b.tx; b.y = b.ty;
-          /* rev-fix-raid-rpg-fx: 后院 RPG 命中点生成独立特效 */
-          if(b.missile && typeof window._spawnRPGImpactFx === 'function'){
+          /* rev-fix-raid-rpg-fx: 后院 RPG 命中点生成独立特效（用 isRPG 判据） */
+          if(b.isRPG && typeof window._spawnRPGImpactFx === 'function'){
             var _rR = wrapW * 0.18;
             window._spawnRPGImpactFx(raidOwner, b.tx, b.ty, _rR);
           }

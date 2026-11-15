@@ -188,16 +188,31 @@ function rollEnemyLoot(en){
   var rarIdx = RARITY_ORDER.indexOf(rar);
   var baseChance = rarIdx >= 0 ? Math.max(0.55, 0.85 - rarIdx * 0.08) : 0.85;
 
+  /* rev-fix-enemy-loot-ammo: 武器本身掉落与弹药状态解耦
+   * - 武器：始终按原概率掉
+   * - 弹药：仅在还有剩余弹时掉（打光不掉），掉落量按剩余估算 */
   if(en.primaryWeapon && Math.random() < baseChance * 0.90){
     L.push({id: en.primaryWeapon.id, rarity: en.primaryWeapon.rarity, count: 1});
-    if(en.primaryWeapon.ammoId && Math.random() < 0.60){
-      L.push({id: en.primaryWeapon.ammoId, rarity: _getAmmoRarity(en.primaryWeapon.ammoId), count: rndInt(15, 35)});
+    var _pwL = en.primaryWeapon;
+    var _pwHasAmmo = ((_pwL.ammoInMag || 0) + (_pwL.magsLeft || 0)) > 0;
+    if(_pwHasAmmo && _pwL.ammoId && Math.random() < 0.60){
+      var _pwRemain = (_pwL.ammoInMag || 0) + (_pwL.magsLeft || 0) * (_pwL.magSize || 0);
+      var _pwDrop = Math.min(_pwRemain, rndInt(15, 35));
+      if(_pwDrop > 0){
+        L.push({id: _pwL.ammoId, rarity: _getAmmoRarity(_pwL.ammoId), count: _pwDrop});
+      }
     }
   }
   if(en.secondaryWeapon && Math.random() < baseChance * 0.60){
     L.push({id: en.secondaryWeapon.id, rarity: en.secondaryWeapon.rarity, count: 1});
-    if(en.secondaryWeapon.ammoId && Math.random() < 0.60){
-      L.push({id: en.secondaryWeapon.ammoId, rarity: _getAmmoRarity(en.secondaryWeapon.ammoId), count: rndInt(10, 25)});
+    var _swL = en.secondaryWeapon;
+    var _swHasAmmo = ((_swL.ammoInMag || 0) + (_swL.magsLeft || 0)) > 0;
+    if(_swHasAmmo && _swL.ammoId && Math.random() < 0.60){
+      var _swRemain = (_swL.ammoInMag || 0) + (_swL.magsLeft || 0) * (_swL.magSize || 0);
+      var _swDrop = Math.min(_swRemain, rndInt(10, 25));
+      if(_swDrop > 0){
+        L.push({id: _swL.ammoId, rarity: _getAmmoRarity(_swL.ammoId), count: _swDrop});
+      }
     }
   }
   if(en.helmet && Math.random() < baseChance * 0.40){

@@ -825,11 +825,12 @@ const BTRSupport = {
       });
     },
     spawnTracer(x, y, speed, type, layerOrder, angleDeg){
+      /* rev-fix-mg-tracer: 机枪曳光长度 40→60、宽度 1.5→2，随速度提升更明显 */
       this.tracers.push({
         startX: x, startY: y, born: performance.now(),
         speed: speed,
-        len: type === 'cannon' ? 80 : 40,
-        width: type === 'cannon' ? 3 : 1.5,
+        len: type === 'cannon' ? 80 : 60,
+        width: type === 'cannon' ? 3 : 2,
         type: type,
         _layerOrder: layerOrder || 'above',
         _ang: (angleDeg || 0) * Math.PI / 180
@@ -1387,16 +1388,17 @@ const BTRSupport = {
     if(isMG) this.fx.spawnMG(muzzleX, muzzleY, m.layerOrder);
 
     if(!isATGM){
+      /* rev-fix-mg-tracer: 机枪曳光每 2 发一条 + 速度提到 2000px/s（穿全屏 200ms） */
       let showTracer = false;
       const _shotIdx = m.profile.burst - m.shotsLeft + 1;
       if(isMain) showTracer = Math.random() < 0.5;
-      else if(isMG) showTracer = (_shotIdx % 5 === 0);
+      else if(isMG) showTracer = (_shotIdx % 2 === 0);
       else showTracer = (_shotIdx % 4 === 0);
       if(showTracer){
         let _trAng = 0;
         if(typeof m.angle === 'number') _trAng = m.angle;
         else if(window.MUZZLE_ANGLES && window.MUZZLE_ANGLES[m.weaponId]) _trAng = window.MUZZLE_ANGLES[m.weaponId];
-        this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 800 : 1200, isMG ? 'mg' : 'cannon', m.layerOrder, _trAng);
+        this.fx.spawnTracer(muzzleX, muzzleY, isMG ? 2000 : 1200, isMG ? 'mg' : 'cannon', m.layerOrder, _trAng);
       }
     }
 
