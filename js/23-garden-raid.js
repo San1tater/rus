@@ -801,6 +801,8 @@ function _gardenRaidShowBattle(guards, enemies, region){
     const bullets = [];
     const damageTexts = [];
     const raidOwner = { sparks: [], explosions: [] };
+    /* rev-fix-raid-rpg-trail: 后院 RPG 尾烟粒子容器（与探索 c.rpgSmoke 等价） */
+    const raidRpgSmoke = [];
 
     /* rev-fix-corpse-timing: 獨立屍體數組 */
     const corpses = [];
@@ -881,7 +883,8 @@ function drawBullet(b){
       const _ehExpl = (_z1 ? _z1.clientHeight : 500) * _chf;
       const _scale = Math.max(0.1, CHAR_PX / _ehExpl);
       let _baseR = _br.normal;
-      if(b.missile){ _baseR = _br.missile; }
+      /* rev-fix-raid-rpg-bullet: RPG 用 rpg 半径（6px），兼容旧 missile 常量 */
+      if(b.isRPG){ _baseR = _br.rpg || _br.missile || 6; }
       else if(b.big || b.isGrenade){ _baseR = _br.grenade; }
       const _r = _baseR * _scale;
       ctx.save();
@@ -1095,6 +1098,7 @@ function drawBullet(b){
       const nowMs = performance.now();
       for(let i = bullets.length - 1; i >= 0; i--){
         const b = bullets[i];
+        const _prevT = (typeof b.t === 'number') ? b.t : 0;
         b.t = (nowMs - b.startTime) / b.duration;
         if(b.t >= 1){
           b.x = b.tx; b.y = b.ty;
@@ -1107,8 +1111,29 @@ function drawBullet(b){
           bullets.splice(i, 1);
           continue;
         }
+        /* rev-fix-raid-rpg-trail: 后院 RPG 尾烟（与探索 _tickBullets 一致）
+         * 按本帧飞过的距离插值生成粒子，300 步/单位，不按帧计数 */
+        if(b.isRPG){
+          const _startT = Math.max(0, _prevT);
+          const _endT = Math.min(1, b.t);
+          const _span = _endT - _startT;
+          if(_span > 0){
+            const _steps = Math.max(1, Math.ceil(_span * 300));
+            for(let _k = 0; _k < _steps; _k++){
+              const _kt = _startT + _span * (_k / _steps);
+              const _bx = b.sx + (b.tx - b.sx) * _kt;
+              const _by = b.sy + (b.ty - b.sy) * _kt;
+              raidRpgSmoke.push({ x: _bx, y: _by, age: 0, size: 0.015 + Math.random() * 0.010 });
+            }
+          }
+        }
         b.x = b.sx + (b.tx - b.sx) * b.t;
         b.y = b.sy + (b.ty - b.sy) * b.t;
+      }
+      /* rev-fix-raid-rpg-trail: 尾烟衰老与清理（1.2s 生命周期，与探索一致） */
+      for(let k = raidRpgSmoke.length - 1; k >= 0; k--){
+        raidRpgSmoke[k].age += dt;
+        if(raidRpgSmoke[k].age > 1.2) raidRpgSmoke.splice(k, 1);
       }
     }
 
@@ -1599,6 +1624,27 @@ function drawBullet(b){
         ctx.restore();
       }
       for(const u of enemyUnits) drawUnit(u, nowD);
+      
+      /* rev-fix-raid-rpg-trail: 后院 RPG 尾烟渲染（与探索 _render 的 c.rpgSmoke 一致）
+       * 加色混合 + 双层径向渐变 + 随 age 膨胀衰减 */
+      if(raidRpgSmoke.length){
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for(let si = 0; si < raidRpgSmoke.length; si++){
+          const s = raidRpgSmoke[si];
+          const sa = 1 - s.age / 1.2;
+          if(sa <= 0) continue;
+          const sr = s.size * wrapW * (1 + s.age * 1.5);
+          ctx.globalAlpha = sa * 0.15;
+          const sg = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, sr);
+          sg.addColorStop(0, 'rgba(230,230,235,0.9)');
+          sg.addColorStop(0.6, 'rgba(200,200,210,0.2)');
+          sg.addColorStop(1, 'rgba(180,180,190,0)');
+          ctx.fillStyle = sg;
+          ctx.beginPath(); ctx.arc(s.x, s.y, sr, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
       
       // [v210] 統一更新與渲染
       if(window.MuzzleFX) {
