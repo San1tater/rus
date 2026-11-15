@@ -792,6 +792,33 @@ window._spawnAPSInterceptFx = function(owner, sx, sy, radPx){
     }
   }
 };
+
+/* rev-aps-world: 拦截点直接用世界坐标生成粒子，不经过屏幕中转。
+ * 每个粒子的 _wx = interceptWorldX + (q.x × px→m)，屏幕宽度只影响视觉缩放。
+ * 不同设备下拦截点世界坐标都是 camWX + halfLen + 2m。 */
+window._spawnAPSInterceptFxWorld = function(owner, interceptWorldX, syPx, radPx){
+  if(!owner) return;
+  if(!owner.explosions) owner.explosions = [];
+  var _r = (typeof radPx === 'number' && radPx > 0) ? radPx : 60;
+  var _startIdx = owner.explosions.length;
+  if(typeof window._spawnRPGImpactFx === 'function'){
+    window._spawnRPGImpactFx(owner, 0, syPx, _r);
+  }
+  var _c = window._combat;
+  var W = (_c && _c.playerCanvas) ? _c.playerCanvas.width : 400;
+  var _sr = (_c && _c.sm) ? (_c.sm.screenRightWorld || 2) : 2;
+  var _hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  var _pxToM = (1 / (1 - _hr)) * _sr / W;
+  for(var i = _startIdx; i < owner.explosions.length; i++){
+    var q = owner.explosions[i];
+    if(q._wx !== undefined) continue;
+    if(q.kind === 'smoke_dark') q.kind = 'smoke_light';
+    q._wx = interceptWorldX + q.x * _pxToM;
+    q._wvx = q.vx * _pxToM;
+    q.x = 0;
+    q.vx = 0;
+  }
+};
 /* rev-arena: T-80UM 硬杀拦截。口径 >=40mm 且 弹速 [100,400] m/s 才拦；每车 22 发，0.3s 冷却，82% 成功率。 */
 function _tryArenaIntercept(vid, bulletSpeed, caliberMM){
   const feat = (typeof VEHICLE_FEATURES !== 'undefined') ? VEHICLE_FEATURES[vid] : null;
@@ -816,24 +843,16 @@ function _tryArenaIntercept(vid, bulletSpeed, caliberMM){
     const _c = window._combat;
     const _btr = window.BTRSupport;
     if(_c && _btr && _btr.active && _btr.width > 0 && _btr.targetW > 0){
-      /* rev-aps-front: 拦截点 = 车头前方 2m（世界坐标），按当前相机换算屏幕坐标。
-       * 支援中 19.4m/s 下，拦截点在屏幕右侧外 ~4.18m；玩家前进 0.22s 后进入屏幕，
-       * 0.06s 后滚出左边缘。_applyWorldAnchor 后世界静止，随背景滚入屏幕。 */
+      /* rev-aps-world: 拦截点用世界坐标直接生成，不经过屏幕中转。
+       * 拦截点世界坐标 = camWX + halfLen + 2m，与屏幕宽度无关。
+       * 不同设备下拦截点位置都是同一个世界坐标，只是视觉上映射到不同屏幕位置。 */
       const _camWXa = (_c.allies && _c.allies[0] && typeof _c.allies[0].worldX === 'number') ? _c.allies[0].worldX : 0;
       const _halfLenA = (typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(vid) : 3.6;
       const _interceptWXA = _camWXa + _halfLenA + 2;
-      const _screenRightA = (_c.sm && _c.sm.screenRightWorld) ? _c.sm.screenRightWorld : 2;
-      const _sxNA = EXPLORE_HERO_X_RATIO + (_interceptWXA - _camWXa) / _screenRightA * (1 - EXPLORE_HERO_X_RATIO);
-      const _sxPx = _sxNA * _btr.width;
       const _syPx = _btr.height * 0.25;
       const _radPx = Math.max(40, _btr.width * 0.15);
-      const _camWX = (_c.allies && _c.allies[0] && typeof _c.allies[0].worldX === 'number') ? _c.allies[0].worldX : 0;
-      const _startIdx = _c.explosions ? _c.explosions.length : 0;
-      if(typeof window._spawnAPSInterceptFx === 'function'){
-        window._spawnAPSInterceptFx(_c, _sxPx, _syPx, _radPx);
-      }
-      if(typeof window._applyWorldAnchor === 'function'){
-        window._applyWorldAnchor(_c, 0, _camWX, _c.sm);
+      if(typeof window._spawnAPSInterceptFxWorld === 'function'){
+        window._spawnAPSInterceptFxWorld(_c, _interceptWXA, _syPx, _radPx);
       }
       /* 飘字：位置与载具受伤飘字一致（x=EXPLORE_HERO_X_RATIO=0.25, y=0.12） */
       if(!_c.floats) _c.floats = [];
