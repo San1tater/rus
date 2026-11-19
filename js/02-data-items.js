@@ -185,7 +185,7 @@ const AMMO_ICON_BY_CAL = {
 };
 
 const WEAPON_MOD_RULES={
-  aks74u:{mags:[45,60],scopes:[],grips:['RK-1']},aks74un:{mags:[45,60],scopes:['1P87'],grips:['RK-1']},
+  aks74u:{mags:[45,60],scopes:[],grips:['RK-1']},aks74un:{mags:[45,60],scopes:['1P87','PSO-1'],grips:['RK-1']},
   ak74:{mags:[60,95],scopes:[],grips:['RK-1']},
   ak74n:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},ak74m:{mags:[60,95],scopes:['1P87','PSO-1'],grips:['RK-1']},
   akm:{mags:[75],scopes:[],grips:['RK-1']},akms:{mags:[75],scopes:[],grips:['RK-1']},akmn:{mags:[75],scopes:['1P87','PSO-1'],grips:['RK-1']},
@@ -203,6 +203,20 @@ const SCOPE_BONUS = { '1P87': 0, 'PSO-1': 0, 'PS320': 0, 'EKP-8-02': 0, 'PK-06':
 /* rev-workbench: 瞄具距離加成 / 握把命中加成 */
 const SCOPE_RANGE_BONUS = { '1P87': 0.20, 'PSO-1': 0.50, 'PS320': 0.50, '1P59': 0.80 };
 const GRIP_HIT_BONUS = 6;
+/* rev-scope-sort: 瞄具排序唯一真相源 —— 一律按「射程增益」由小到大。
+   SCOPE_BONUS（命中）目前全為 0，用它排序會退化成不穩定的原始順序，
+   造成不同槍枝的選單順序不一致。同值時以顯示名稱穩定排序。 */
+window._scopeRangeBonus = function(id){
+  return (typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[id]) || 0;
+};
+window._sortScopesAsc = function(a, b){
+  var ra = window._scopeRangeBonus(a), rb = window._scopeRangeBonus(b);
+  if(ra !== rb) return ra - rb;
+  var na = (typeof SCOPE_NAME !== 'undefined' && SCOPE_NAME[a]) || String(a);
+  var nb = (typeof SCOPE_NAME !== 'undefined' && SCOPE_NAME[b]) || String(b);
+  return String(na).localeCompare(String(nb), 'zh-Hant');
+};
+
 /* rev-fix-scope-mode-penalty: 高倍鏡連射精度懲罰（乘在 MODE_ACCURACY 上） */
 const SCOPE_MODE_PENALTY = {
   'PSO-1': { '掃射': 0.5, '長點射': 0.75, '短點射': 0.9, '點射': 1.0 },
@@ -652,3 +666,47 @@ function armorMMForSlot(id, slot){
 }
 
 (function(){ var s=['aks74u','aks74un','ak105','ak104','pp19','sr3m','9a91']; for(var i=0;i<s.length;i++){ if(WEAPONS[s[i]]&&WEAPONS[s[i]].type==='突擊步槍') WEAPONS[s[i]]._shortRange=true; } })();
+
+/* rev-weapon-aim-burst: 統一瞄准點 Y 與連發累積係數
+ * aimY = 目標局部 Y（腳底=0）瞄准位置，單位米
+ * burstFactor = 連發第 N 發的偏移乘數增量（0 = 無累積） */
+(function(){
+  var _DEF_AIM = 0.85, _DEF_BURST = 0.08;
+  for(var _wid in WEAPONS){
+    var _w = WEAPONS[_wid];
+    if(!_w) continue;
+    if(typeof _w.aimY !== 'number') _w.aimY = _DEF_AIM;
+    if(typeof _w.burstFactor !== 'number') _w.burstFactor = _DEF_BURST;
+  }
+  /* 霰彈類：低穿深，瞄腿（無甲區） */
+  var _shotguns = ['mp133','mp153','mp155','saiga12','toz106','ks23'];
+  for(var _si = 0; _si < _shotguns.length; _si++){
+    var _sid = _shotguns[_si];
+    if(WEAPONS[_sid]){ WEAPONS[_sid].aimY = 0.35; WEAPONS[_sid].burstFactor = 0; }
+  }
+  /* 單發精確武器：無連發累積 */
+  var _single = ['svd','sv98','rpg'];
+  for(var _i1 = 0; _i1 < _single.length; _i1++){
+    if(WEAPONS[_single[_i1]]) WEAPONS[_single[_i1]].burstFactor = 0;
+  }
+  /* 衝鋒槍：略高於半自動 */
+  if(WEAPONS['pp19']) WEAPONS['pp19'].burstFactor = 0.12;
+  /* 手槍：低累積 */
+  var _pistols = ['pm','pb','mp443'];
+  for(var _i2 = 0; _i2 < _pistols.length; _i2++){
+    if(WEAPONS[_pistols[_i2]]) WEAPONS[_pistols[_i2]].burstFactor = 0.05;
+  }
+  /* APS 手槍全自動：高累積 */
+  if(WEAPONS['aps']) WEAPONS['aps'].burstFactor = 0.35;
+  /* 近戰：無累積，瞄胸 */
+  var _melee = ['6kh2','6kh5','kukri'];
+  for(var _i3 = 0; _i3 < _melee.length; _i3++){
+    if(WEAPONS[_melee[_i3]]){ WEAPONS[_melee[_i3]].aimY = 0.85; WEAPONS[_melee[_i3]].burstFactor = 0; }
+  }
+  /* 投擲物：不瞄準，拋物線 */
+  var _throw = ['f1','rgd5','rgo','rgn','vog17','vog25'];
+  for(var _i4 = 0; _i4 < _throw.length; _i4++){
+    if(WEAPONS[_throw[_i4]]){ WEAPONS[_throw[_i4]].aimY = 0; WEAPONS[_throw[_i4]].burstFactor = 0; }
+  }
+})();
+

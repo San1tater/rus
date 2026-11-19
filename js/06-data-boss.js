@@ -56,86 +56,92 @@ const BOSS_PHASES = {
   ]
 };
 
+/* rev-boss-reach: 遠程射程必須覆蓋「玩家實際能開火的距離」。
+   玩家開火閘門 = dist ≤ R_boss 且 dist ≤ 武器射程，
+   所以各 Boss 的遠程手段至少要覆蓋自己的 R_boss，否則玩家可站樁無傷輸出。
+   蝮蛇 mobile:false（定點王），完全靠遠程 —— 原 22~24m 對 30m 步槍毫無威脅，
+   現提高到 56~60m（R_boss 55 / II 44）。其餘 Boss 會追趕，
+   但突進／雷射也一併拉長，讓牠們在交戰距離就能反擊而非只能貼身。
+   telegraphRatio 維持原值（視覺指示圈），不隨射程放大到蓋滿屏幕。 */
 const BOSS_SKILLS = {
   factory_king: [
-    { id:'smash', name:'碎地重錘', type:'aoe', cd:10, range:0.20,
-      dmg:45, penMM:12, anim:'skill_charge',
+    { id:'smash', name:'碎地重錘', type:'aoe', cd:10, range:0.30,
+      dmg:45, penMM:12, anim:'skill_smash',
       telegraph:1300, hitDelay:1300, totalTime:2000,
       aoe:true, knockback:0.10, telegraphRatio:0.20, unlockPhase:0 },
-    { id:'sweep', name:'揮錘掃擊', type:'aoe', cd:16, range:0.30,
+    { id:'sweep', name:'揮錘掃擊', type:'aoe', cd:16, range:0.45,
       dmg:30, penMM:12, anim:'attack_swipe',
       telegraph:800, hitDelay:800, totalTime:1500,
       aoe:true, knockback:0.12, telegraphRatio:0.30, unlockPhase:0 },
-    { id:'dash', name:'突進', type:'dash', cd:14, range:0.65, minRange:0.20,
+    { id:'dash', name:'突進', type:'dash', cd:14, range:1.10, minRange:0.20,
       dmg:35, penMM:12, contactDmg:20,
       telegraph:800, dashSpeed:0.55, dashDistance:0.35,
       exhaustMs:1500, hitTickMs:250,
-      unlockPhase: 1 }
+      unlockPhase:1 }
   ],
   lab_queen: [
-    { id:'smash', name:'腹部噴酸', type:'aoe', cd:9, range:0.24,
+    { id:'smash', name:'腹部噴酸', type:'aoe', cd:9, range:0.35,
       dmg:55, penMM:18, anim:'skill_charge',
       telegraph:1300, hitDelay:1300, totalTime:2000,
       aoe:true, knockback:0.08, telegraphRatio:0.20, unlockPhase:0,
       projectile:'acid' },
-    { id:'sweep', name:'前肢橫掃', type:'aoe', cd:14, range:0.30,
+    { id:'sweep', name:'前肢橫掃', type:'aoe', cd:14, range:0.50,
       dmg:38, penMM:18, anim:'attack_swipe',
       telegraph:800, hitDelay:800, totalTime:1500,
       aoe:true, knockback:0.10, telegraphRatio:0.30, unlockPhase:0,
       projectile:'web' },
-    { id:'dash', name:'蛛絲突進', type:'dash', cd:15, range:0.68, minRange:0.20,
+    { id:'dash', name:'蛛絲突進', type:'dash', cd:15, range:1.15, minRange:0.20,
       dmg:42, penMM:18, contactDmg:25,
       telegraph:800, dashSpeed:0.55, dashDistance:0.38,
       exhaustMs:1500, contactRadius:0.12, hitTickMs:250,
       unlockPhase:1 }
   ],
   road_tyrant: [
-    { id:'smash', name:'碎地重錘', type:'aoe', cd:12, range:0.16,
-      dmg:60, penMM:24, anim:'skill_charge',
+    { id:'smash', name:'碎地重錘', type:'aoe', cd:12, range:0.30,
+      dmg:60, penMM:24, anim:'skill_smash',
       telegraph:1300, hitDelay:1300, totalTime:2000,
       aoe:true, knockback:0.10, telegraphRatio:0.16, unlockPhase:0 },
-    { id:'sweep', name:'盾牌橫掃', type:'aoe', cd:16, range:0.20,
+    { id:'sweep', name:'盾牌橫掃', type:'aoe', cd:16, range:0.45,
       dmg:45, penMM:24, anim:'attack_swipe',
       telegraph:800, hitDelay:800, totalTime:1500,
       aoe:true, knockback:0.12, telegraphRatio:0.20, unlockPhase:0 },
-    { id:'charge', name:'盾牌衝撞', type:'dash', cd:15, range:0.65, minRange:0.20,
+    { id:'charge', name:'盾牌衝撞', type:'dash', cd:15, range:1.20, minRange:0.20,
       dmg:55, penMM:24, contactDmg:30,
       telegraph:800, dashSpeed:0.55, dashDistance:0.38,
       exhaustMs:1500, hitTickMs:250,
       unlockPhase:1 }
   ],
   swamp_hydra: [
-    { id:'spray',  name:'腐蝕噴灑', type:'aoe', cd:8,  range:0.56,
+    { id:'spray', name:'腐蝕噴灑', type:'aoe', cd:8, range:1.40,
       dmg:55, penMM:30, anim:'skill_charge',
       telegraph:1200, hitDelay:1200, totalTime:2000,
       aoe:true, knockback:0.06, telegraphRatio:0.56, unlockPhase:0,
       projectile:'acid' },
-    { id:'burst',  name:'毒沼爆發', type:'aoe', cd:14, range:0.58,
+    { id:'burst', name:'毒沼爆發', type:'aoe', cd:14, range:1.45,
       dmg:75, penMM:30, anim:'skill_charge',
       telegraph:1500, hitDelay:1500, totalTime:2400,
       aoe:true, knockback:0.10, telegraphRatio:0.58, unlockPhase:0 },
-    { id:'breath', name:'毒霧吐息', type:'aoe', cd:20, range:0.60,
+    { id:'breath', name:'毒霧吐息', type:'aoe', cd:20, range:1.50,
       dmg:100, penMM:30, anim:'skill_charge',
       telegraph:1800, hitDelay:1800, totalTime:2800,
       aoe:true, knockback:0.08, telegraphRatio:0.60, unlockPhase:1,
       projectile:'acid' }
   ],
   core_omega: [
-    { id:'laser_single', name:'單發雷射', type:'aoe', cd:6, range:0.40,
+    { id:'laser_single', name:'單發雷射', type:'aoe', cd:6, range:1.20,
       dmg:50, penMM:36, anim:'laser_single',
       telegraph:900, hitDelay:900, totalTime:1400,
       aoe:true, knockback:0.05, telegraphRatio:0.12, unlockPhase:0, armRequired:'ring_t' },
-    { id:'laser_spray', name:'掃射雷射', type:'aoe', cd:12, range:0.35,
+    { id:'laser_spray', name:'掃射雷射', type:'aoe', cd:12, range:1.15,
       dmg:32, penMM:30, anim:'laser_spray',
       telegraph:1200, hitDelay:1200, totalTime:1800,
       aoe:true, knockback:0.06, telegraphRatio:0.15, unlockPhase:1, armRequired:'ring_r' },
-    { id:'laser_charge', name:'蓄力雷射', type:'aoe', cd:20, range:0.50,
+    { id:'laser_charge', name:'蓄力雷射', type:'aoe', cd:20, range:1.30,
       dmg:95, penMM:36, anim:'laser_charge',
       telegraph:2000, hitDelay:2000, totalTime:2800,
       aoe:true, knockback:0.10, telegraphRatio:0.18, unlockPhase:2, armRequired:'ring_b' }
   ]
 };
-
 /* rev-fix-getBossSkillList: 補全缺失定義（17a/17b 用 typeof 守衛回退到 BOSS_SKILLS[bossId]） */
 function getBossSkillList(bossId){
   return BOSS_SKILLS[bossId] || [];
@@ -206,7 +212,7 @@ const BOSS_LAYERS = {
       { id:'shield_4', z:100, color:'#073b0a', pivot:{x:0.5, y:0.5}, x:-0.091, y:-0.209, w:0.2, h:0.2, anchor:{target:'shield', rot:true} },
       { id:'shield', z:110, color:'#073b0a', pivot:{x:0.5, y:0.5}, x:-0.39, y:-0.151, w:0.2, h:0.5, anchor:{target:'arm_l', rot:true} },
       { id:'shield_2', z:120, color:'#073b0a', pivot:{x:0.5, y:0.5}, x:-0.099, y:0.013, w:0.2, h:0.2, anchor:{target:'shield', rot:true} },
-      { id:'hammer-h', z:130, color:'#442f12', pivot:{x:0.5, y:0.5}, x:0.87, y:0.48, w:0.06, h:0.38 },
+      { id:'hammer-h', z:130, color:'#442f12', pivot:{x:0.5, y:0.5}, x:0, y:0, w:0.06, h:0.38, anchor:{target:'arm_r', rot:true} },
       { id:'arm_r', z:140, color:'#311877', pivot:{x:0.5, y:0.1}, x:0.78, y:0.34, w:0.13, h:0.34 },
       { id:'shoulder_r', z:150, color:'#2d0101', pivot:{x:0.5, y:0.5}, x:0.72, y:0.16, w:0.2, h:0.2 },
       { id:'hammer', z:160, color:'#ff540a', pivot:{x:0.5, y:0.5}, x:-0.009, y:-0.229, w:0.22, h:0.2, anchor:{target:'hammer-h', rot:true} }
@@ -285,3 +291,35 @@ const BOSS_LAYERS = {
     ]
   }
 };
+
+/* ===== rev-animatk2:start ===== */
+/* rev-animatk2: 攻擊幀元資料 —— 武器層 / 接觸幀 / 判定區間 / 可取消幀。
+   接觸幀 = 武器掃到玩家側的那一幀；量測腳本可驗證每個 reach。 */
+window.BOSS_ATTACK_META = {
+  factory_king: {
+    attack_swipe: { weapon:'hammer',   hitFrame:4, activeFrames:[4,5],  cancelFrom:6 },
+    skill_smash:  { weapon:'hammer',   hitFrame:9, activeFrames:[9,10], cancelFrom:10 },
+    skill_charge: { weapon:'hammer',   hitFrame:7, activeFrames:[7,7],  cancelFrom:7 }
+  },
+  lab_queen: {
+    attack_swipe: { weapon:'mandible', hitFrame:3, activeFrames:[3,4],  cancelFrom:6 },
+    skill_charge: { weapon:'abdomen',  hitFrame:4, activeFrames:[4,5],  cancelFrom:7 }
+  },
+  road_tyrant: {
+    attack_swipe: { weapon:'shield',   hitFrame:3, activeFrames:[3,4],  cancelFrom:5 },
+    skill_smash:  { weapon:'hammer',   hitFrame:9, activeFrames:[9,10], cancelFrom:10 },
+    skill_charge: { weapon:'hammer',   hitFrame:4, activeFrames:[4,4],  cancelFrom:7 }
+  },
+  swamp_hydra: {
+    attack_swipe: { weapon:'head_3',   hitFrame:4, activeFrames:[4,5],  cancelFrom:6 },
+    skill_charge: { weapon:'head_3',   hitFrame:5, activeFrames:[5,5],  cancelFrom:7 }
+  },
+  core_omega: {
+    attack_swipe: { weapon:'ring_l',   hitFrame:3, activeFrames:[3,4],  cancelFrom:5 },
+    laser_single: { weapon:'ring_t',   hitFrame:2, activeFrames:[2,3],  cancelFrom:5 },
+    laser_spray:  { weapon:'ring_r',   hitFrame:2, activeFrames:[2,3],  cancelFrom:5 },
+    laser_charge: { weapon:'ring_b',   hitFrame:3, activeFrames:[3,4],  cancelFrom:5 },
+    skill_charge: { weapon:'core',     hitFrame:5, activeFrames:[5,5],  cancelFrom:7 }
+  }
+};
+/* ===== rev-animatk2:end ===== */

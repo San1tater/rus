@@ -58,6 +58,13 @@ window.hasCrewTalent = function(role, talentId){
 /* rev142: 統一的「可被發現半徑 R」查詢入口 */
 window.getEntityDetectableR = function(entity){
   if(!entity) return 80;
+  /* rev-known-target: 已選定的既有目標（掃蕩清單來自 defeatedBosses）沒有隱蔽性。
+     術語鎖不變：A 對 B 開火 <=> dist <= R_B 且 dist <= A 自身射程；
+     這裡只讓「已知目標」的 R_B = Infinity，武器射程閘門完全保留。 */
+  if(entity._known) return Infinity;
+  if(entity.isBoss){
+    return (typeof window._bossDetectableR === 'function') ? window._bossDetectableR(entity.bossId) : 70;
+  }
   if(entity.isVehicle){
     return (typeof window.getVehicleDetectableR === 'function') ? window.getVehicleDetectableR(entity.vehicleId) : 80;
   }
@@ -65,9 +72,11 @@ window.getEntityDetectableR = function(entity){
     return (typeof SERVANT_DETECTABLE_R !== 'undefined') ? SERVANT_DETECTABLE_R : 80;
   }
   if(entity.isPlayer){
-    if(typeof PLAYER_DETECTABLE_R === 'undefined') return 80;
-    var _mode = (typeof state !== 'undefined' && state.preferences && state.preferences.actionMode) ? state.preferences.actionMode : 'attack';
-    return PLAYER_DETECTABLE_R[_mode] || 80;
+    /* 潛行 R 由「當前是否帶主副武器」決定 —— 唯一真相源是裝備，不是模式旗標 */
+    var eq = (typeof state !== 'undefined' && state.player && state.player.equipped) ? state.player.equipped : null;
+    var armed = !!(eq && (eq.primary || eq.secondary));
+    if(typeof PLAYER_DETECTABLE_R === 'undefined') return armed ? 80 : 40;
+    return armed ? (PLAYER_DETECTABLE_R.attack || 80) : (PLAYER_DETECTABLE_R.stealth || 40);
   }
   if(entity.isGuard){
     return (typeof GARDEN_GUARD_DETECTABLE_R !== 'undefined') ? GARDEN_GUARD_DETECTABLE_R : 40;
@@ -75,9 +84,7 @@ window.getEntityDetectableR = function(entity){
   if(entity.rarity && typeof ENEMY_DETECTABLE_R !== 'undefined'){
     return ENEMY_DETECTABLE_R[entity.rarity] || 225;
   }
-  if(typeof entity.detectableR === 'number'){
-    return entity.detectableR;
-  }
+  if(typeof entity.detectableR === 'number') return entity.detectableR;
   return 80;
 };
 
@@ -140,6 +147,13 @@ window._getLiveVehicleAmmo = window._getLiveVehicleAmmo || function(vid){
   return state.vehicleAmmo && state.vehicleAmmo[vid];
 };
 
+/* 世界推進速度唯一出口：探索讀 _explore，掃蕩讀 battle._worldSpeed。
+   載具渲染 / wreck 位移 / 掃蕩推進全部走這條，不再各自讀一份。 */
+window._currentWorldSpeed = function(){
+  var b = (window.BossModule && window.BossModule.battle) ? window.BossModule.battle : null;
+  if(b && b.active && b.sweep && typeof b._worldSpeed === 'number') return b._worldSpeed;
+  return (window._explore && window._explore._currentSpeed) || 0;
+};
 window.canEngage = function(attackerRange, targetOrR, dist){
   var R;
   if(typeof targetOrR === 'number') R = targetOrR;
@@ -158,3 +172,16 @@ window._hexToRgba = function(hex, a){
   return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
 };
 })();
+
+/* ===== rev-unify:start ===== */
+/* ============================================================
+   rev-unify: 距離數字唯一格式化器。
+   規則完全照探索 _renderFrames 現行：< 1m 保留一位小數，否則整數。
+   探索右側氣泡 / 左側載員氣泡 / 後院氣泡 / Boss 氣泡 / Boss 虛影標籤
+   一律呼叫此函式，任何一处改規則不會再造成场景間不一致。
+   ============================================================ */
+window._fmtDistN = function(d){
+  var v = (typeof d === "number" && isFinite(d)) ? Math.abs(d) : 0;
+  return v < 1 ? v.toFixed(1) : String(Math.round(v));
+};
+/* ===== rev-unify:end ===== */

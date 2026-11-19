@@ -39,7 +39,14 @@ function renderCurrentTab(){
 /* ===== tab 切換 ===== */
 $$('.tab').forEach(t=>{
   t.onclick = () => {
-    if(BossModule.isActive()){
+      if(window._sweepLock) return; /* rev-sweeplock-tab */
+if(window._sweepLock) return;
+    /* rev-sweep-ux: 掃蕩中切出 = 放棄；點當前戰鬥頁不動作 */
+if(window._sweepLock){
+  if(t.dataset.tab === 'combat') return;
+  if(typeof window._abandonSweep === 'function') window._abandonSweep('tab');
+}
+if(BossModule.isActive()){
       if(!confirm('戰鬥尚未結束，確定要離開嗎？')) return;
       BossModule.battle.active = false;
       BossModule.battle = null;
@@ -98,11 +105,13 @@ $$('.tab').forEach(t=>{
     if(dt > 800) return;
     if(Math.abs(dx) < 60) return;
     if(Math.abs(dy) > Math.abs(dx) * 0.6) return;
-    if(typeof BossModule !== 'undefined' && BossModule.isActive()) return;
+    if(typeof BossModule !== 'undefined' && BossModule.isActive() && !window._sweepLock) return; /* rev-sweep-ux-swipe */
     const _gp = document.getElementById('garage-page');
     if(_gp && _gp.classList.contains('on')) return;
     if(typeof currentTab !== 'string') return;
-    const curIdx = TABS.indexOf(currentTab);
+    if(window._sweepLock) return;
+if(window._sweepLock) return; /* rev-sweeplock-swipe */
+const curIdx = TABS.indexOf(currentTab);
     if(curIdx < 0) return;
     const nextIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
     if(nextIdx < 0 || nextIdx >= TABS.length) return;
@@ -142,7 +151,7 @@ window._tickHeroWalkSwitch = function(now){
      H21 只在 walk/idle 分支清，combat/vehicle/dead/healing 模式下不清——
      战斗中 heal 被打断 → eqSlot='__hidden__' 残留 → 武器一直不显示。
      这里在模式判定之前清，所有模式都生效。 */
-  if(heroAnim.name !== 'heal_melee'){
+  if(!(window._heroEqHolds && window._heroEqHolds(heroAnim.name))){ /* rev-eqslot-guard */
     if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
     if(heroAnim.healItem) heroAnim.healItem = null;
   }
@@ -263,6 +272,52 @@ function init(){
     }
   }, 500);
 }
+/* ===== rev-offline-seal-rig:start =====
+   離線 Boss 信物：_offlineExploreSettle 原只 roll 掉落，從未 roll sealRate。
+   按勝場逐場補 roll（與線上 _lootVictory 逐事件同機率），寫入 state.seals，
+   並把「獲得 X 信物 ×N」附加到離線摘要。安裝在 init() 之前 → 首次結算即生效。 */
+(function(){
+'use strict';
+if(window.__revOfflineSealRig) return;
+window.__revOfflineSealRig = true;
+var _origExplore = _offlineExploreSettle;
+_offlineExploreSettle = function(now, baseTime){
+  var res = _origExplore(now, baseTime);
+  try{
+    if(res && res.wins > 0 && typeof REGIONS !== 'undefined'){
+      var R = REGIONS[res.region];
+      if(R && R.seal && R.sealRate > 0){
+        var got = 0;
+        for(var i = 0; i < res.wins; i++){ if(Math.random() < R.sealRate) got++; }
+        if(got > 0){
+          if(!state.seals) state.seals = {};
+          state.seals[R.seal] = Math.max(0, parseInt(state.seals[R.seal] || 0, 10)) + got;
+          res.seals = got;
+          window.__revLastOfflineSeals = { name: (R.name || res.region), count: got };
+        }
+      }
+    }
+  }catch(e){ console.warn('[offline seal]', e); }
+  return res;
+};
+var _origSettle = offlineSettle;
+offlineSettle = function(){
+  window.__revLastOfflineSeals = null;
+  var r = _origSettle.apply(this, arguments);
+  try{
+    var info = window.__revLastOfflineSeals;
+    if(info && info.count > 0 && state.logs && state.logs.length){
+      var last = state.logs[state.logs.length - 1];
+      if(last && last.type === 'offline'){
+        last.html += ' <span class="win">獲得 ' + info.name + ' 信物 ×' + info.count + '</span>';
+      }
+    }
+  }catch(e){}
+  return r;
+};
+})();
+/* ===== rev-offline-seal-rig:end ===== */
+
 init();
 
 /* ===== 全局點擊物品詳情 ===== */
@@ -386,6 +441,7 @@ function _offlineExploreSettle(now, baseTime){
     return Math.max(1, _hp * 0.8 + _ar * 1.5 + _dmg * 3);
   };
   var wins = 0, losses = 0;
+var _sealsGot = {};
   var offlineServantGained = null;
   var allLoot = {};
   var searchCount = 0;
@@ -486,7 +542,12 @@ function _offlineExploreSettle(now, baseTime){
           var _srv = grantRandomServant();
           if(_srv && !offlineServantGained) offlineServantGained = _srv;
         }
-        for(var ei2 = 0; ei2 < eventEnemies.length; ei2++){
+        /* 離線戰鬥事件與在線同語義：每個事件 roll 一次區域信物（I / II 皆適用） */
+if(R.seal && R.sealRate && Math.random() < R.sealRate){
+state.seals[R.seal] = Math.max(0, parseInt(state.seals[R.seal] || 0, 10)) + 1;
+_sealsGot[R.seal] = (_sealsGot[R.seal] || 0) + 1;
+}
+for(var ei2 = 0; ei2 < eventEnemies.length; ei2++){
           var loot = (typeof rollEnemyLoot === 'function') ? rollEnemyLoot(eventEnemies[ei2]) : [];
           _lootAdd(loot);
         }
@@ -529,7 +590,8 @@ function _offlineExploreSettle(now, baseTime){
     emptyCount: emptyCount,
     items: items,
     exp: exp,
-    servant: offlineServantGained
+    servant: offlineServantGained,
+seals: _sealsGot
   };
 }
 
@@ -571,6 +633,12 @@ function offlineSettle(){
       _ep.push('獲 ' + _cnt + ' 件');
     }
     if(exploreResult.exp > 0) _ep.push('經驗 +' + exploreResult.exp);
+if(exploreResult.seals){
+var _rNameS = (typeof REGIONS !== 'undefined' && REGIONS[exploreResult.region]) ? REGIONS[exploreResult.region].name : exploreResult.region;
+for(var _skS in exploreResult.seals){
+_ep.push('<b class="win">' + _rNameS + ' 信物 ×' + exploreResult.seals[_skS] + '</b>');
+}
+}
     if(exploreResult.servant){
       var _sdef = (typeof SERVANT_TYPES !== 'undefined' && SERVANT_TYPES[exploreResult.servant.type]) ? SERVANT_TYPES[exploreResult.servant.type] : null;
       _ep.push('招募了 <b class="r-' + exploreResult.servant.rarity + '">' + (_sdef ? _sdef.name : '僕人') + '</b>');

@@ -207,7 +207,9 @@ function _ensureGardenPage(){
       if(Math.abs(dy) > Math.abs(dx) * 0.6) return;
       if(typeof BossModule !== 'undefined' && BossModule.isActive()) return;
       if(typeof currentTab !== 'string') return;
-      const curIdx = TABS.indexOf(currentTab);
+      if(window._sweepLock) return;
+if(window._sweepLock) return; /* rev-sweeplock-garden */
+const curIdx = TABS.indexOf(currentTab);
       if(curIdx < 0) return;
       const nextIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
       if(nextIdx < 0 || nextIdx >= TABS.length) return;
@@ -868,6 +870,15 @@ function plotCoordName(idx){
   const row = Math.floor(idx / 4);
   return 'ABCD'[col] + (row + 1);
 }
+/* 僕人卡片左上角徽章：車站編組 = 🚂（20-station.js 標題同源）；後院工作 = 🌱（tabbar 同源）。
+   車站優先（已編組即不在後院執勤）。判定重用既有 _isServantInStation。 */
+function _srvBadge(s){
+  if(!s || !s.id) return '';
+  if(typeof _isServantInStation === 'function' && _isServantInStation(s.id)) return '🚂';
+  if(Array.isArray(s.assignedPlots) && s.assignedPlots.length) return '🌱';
+  return '';
+}
+
 
 
 function _gardenHasAnySeed(){

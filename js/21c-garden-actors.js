@@ -776,7 +776,7 @@ function _gardenRenderActors(now){
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
   if(typeof _raidDrawHuman !== 'function') return;
-  const CHAR_PX = 56;
+  const CHAR_PX = 56; window._gardenActorCharPx = CHAR_PX; /* rev-raid-muzzle-scale: 發布守衛實際繪製字高，供 23 槍口對位 */
   const SCALE = CHAR_PX / 386;
   const plots = _gardenGetPlots();
   const SPEED = 55;
@@ -870,8 +870,26 @@ function _gardenRenderActors(now){
     let _facingLeft = (typeof a._facingLeft === 'boolean') ? a._facingLeft : false;
     if(window._raidLiveActive && a.type === 'guard'){ _facingLeft = false; }
     /* rev-fix-dead-y-center: 让尸体居中在自己格子内（格子高 64，尸体高约 58） */
-    const _drawY = (animName === 'dead') ? (a.y - 32) : a.y;
-    (window.drawHumanSprite || _raidDrawHuman)(ctx, a.x, _drawY, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, _facingLeft, _hasBucket, _handItem);
+    /* rev-guard-corpse-ground: 守衛倒地 = 逆時針向後（遠離敵人）+ 貼地。
+   後院 actor canvas 是整張大畫布，沒有探索模式的逐 sprite 底部裁切：
+   順時針倒會把槍管插進地面，舊版為藏槍把身體上移 32px → 屍體懸空。
+   改為腳底為軸逆時針 350ms 漸倒（與探索倒地時長一致）：
+   軸心隨 sin 右移 193·SCALE（屍體水平中心對齊塔位，與探索 193 常數同源）、
+   上移 51·SCALE（軀幹半厚，躺平瞬間軀幹底緣正好落在 a.y 地面），
+   槍口朝上不入地；屍體不鏡像，固定向後倒。 */
+if(animName === 'dead'){
+const _gp = Math.min(1, Math.max(0, (now - (animStart || now)) / 350));
+const _gr = _gp * Math.PI / 2;
+const _gs = Math.sin(_gr);
+ctx.save();
+ctx.translate(a.x + 193 * SCALE * _gs, a.y - 51 * SCALE * _gs);
+ctx.rotate(-_gr);
+ctx.translate(-a.x, -a.y);
+(window.drawHumanSprite || _raidDrawHuman)(ctx, a.x, a.y, SCALE, equipped, equippedRarity, 'idle', 0, wpSlot, a.type, false, false, null);
+ctx.restore();
+} else {
+(window.drawHumanSprite || _raidDrawHuman)(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, _facingLeft, _hasBucket, _handItem);
+}
     /* rev-fix-raid-actor-bar: 守衛戰鬥中在 actor canvas 上畫血條 */
     if(a._combatUnit && a._combatUnit.alive && window._raidLiveActive){
       const _cu = a._combatUnit;
@@ -893,7 +911,7 @@ function _gardenRenderActors(now){
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       const _tw = ctx.measureText(_lbl).width;
-      const _by = a.y - CHAR_PX - 14;
+      const _by = (a._animName === 'dead') ? (a.y - 22) : (a.y - CHAR_PX - 14); /* rev-guard-corpse-ground-label: 名牌貼近躺倒屍體 */
       ctx.fillStyle = 'rgba(0,0,0,0.72)';
       ctx.fillRect(a.x - _tw/2 - 3, _by - 11, _tw + 6, 12);
       ctx.fillStyle = '#fff';

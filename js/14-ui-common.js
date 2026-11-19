@@ -196,45 +196,41 @@ function openSlotDetail(slot){
 
   const un = ft.querySelector('#m-unequip');
   if(un) un.onclick = function(){
-    if(slot === 'throwable'){ unequipThrowable(); }
-    else {
-      const curId = state.player.equipped[slot];
-      const curRar = state.player.equippedRarity[slot] || '一般';
-      state.player.equipped[slot] = null;
-      delete state.player.equippedRarity[slot];
-      if(curId) invAdd(curId, curRar, 1);
-    }
-    refreshPlayerStats(); save(); closeModal(); renderCurrentTab();
-  };
+  /* rev-eq-coexist: 卸下只清自己的持有位，不回填庫存、不影響其它持有位。 */
+  if(slot === 'throwable'){
+    unequipThrowable();
+  } else {
+    state.player.equipped[slot] = null;
+    delete state.player.equippedRarity[slot];
+  }
+  refreshPlayerStats(); save(); closeModal(); renderCurrentTab();
+};;
 }
 
 function openSlotPicker(slot, returnFn){
-  const list = [];
-  for(const it of invList()){
-    const d = it.def;
-    if(!d) continue;
-    if(d.slot === slot) list.push(it);
-  }
-  list.sort(function(a, b){
-    const ra = sortByRarityDesc(a, b);
-    if(ra !== 0) return ra;
-    const an = (a.def && a.def.name) || '';
-    const bn = (b.def && b.def.name) || '';
-    return an.localeCompare(bn);
-  });
+  /* rev-eq-coexist: 與載員 / 守衛同源；每型號一列最高稀有度。 */
+  const list = (typeof window._equipCandidates === 'function') ? window._equipCandidates(slot) : [];
   let body = '';
-  if(!list.length) body = '<div class="empty-hint">倉庫中沒有可裝備於此槽位的物品</div>';
-  else {
+  if(!list.length){
+    body = '<div class="empty-hint">尚未擁有可裝備於此槽位的物品</div>';
+  } else {
     for(const it of list){
       const _ac = (it.def.armor != null && it.def.level) ? _armorClassWithSub(it.def) : '';
       const _acHtml = _ac ? ' <span class="armor-class">' + _ac + '</span>' : '';
-      /* rev-fix-slotpicker-weight: 顯示重量，與車站載員配置統一 */
-      const _wP14 = (typeof getItemWeight === 'function') ? getItemWeight(it.id, it.rarity).toFixed(1) + 'kg' : '';
-      body += '<div class="item-row" data-iid="' + it.id + '" data-irar="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div><div class="sub">' + (it.def.type || slot) + ' · ' + it.rarity + (_wP14 ? ' · ' + _wP14 : '') + '</div></div><div class="cnt">*' + it.count + '</div></div>';
+      const _w = (typeof getItemWeight === 'function') ? getItemWeight(it.id, it.rarity).toFixed(1) + 'kg' : '';
+      const _now = (state.player.equipped[slot] === it.id && (state.player.equippedRarity[slot] || '一般') === it.rarity);
+      const _cnt = (slot === 'throwable')
+        ? '<div class="cnt">' + it.count + '</div>'
+        : (_now ? '<div class="cnt">使用中</div>' : '');
+      body += '<div class="item-row" data-iid="' + it.id + '" data-irar="' + it.rarity + '">'
+        + '<div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div>'
+        + '<div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div>'
+        + '<div class="sub">' + (it.def.type || slot) + ' · ' + it.rarity + (_w ? ' · ' + _w : '') + '</div></div>'
+        + _cnt + '</div>';
     }
   }
-  const _slotPickerOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
-  const bd = openModal({ title: '選擇 ' + window.slotLabel(slot) + ' 裝備', body: body, onClose: _slotPickerOnClose });
+  const _onClose = (typeof returnFn === 'function') ? returnFn : closeModal;
+  const bd = openModal({ title: '選擇 ' + window.slotLabel(slot) + ' 裝備', body: body, onClose: _onClose });
   bd.querySelectorAll('.item-row').forEach(function(row){
     row.onclick = function(){
       const iid = row.dataset.iid, irar = row.dataset.irar;
@@ -386,28 +382,30 @@ function openEquipmentCompare(slot, newId, newRarity, onConfirm, onCancel){
   openModal({ title: '更換 ' + labels[slot], body: body, footer: ft, onClose: function(){ closeModal(); if(onCancel) onCancel(); else renderCurrentTab(); } });
 
   ft.querySelector('#m-confirm').onclick = function(){
+  /* rev-eq-coexist: 裝備 = 寫引用。不扣庫存、不回填庫存 ——
+     載員 / 守衛持有同一把不影響玩家，反之亦然。投擲物是消耗品，仍走庫存。 */
+  if((slot === 'primary' || slot === 'secondary') && state.preferences && state.preferences.actionMode === 'stealth' && typeof setActionMode === 'function'){
+    setActionMode('attack');
+  }
+  if(slot === 'throwable'){
+    if(state.player.equipped.throwable) unequipThrowable();
+    equipThrowable(newId, newRarity);
+  } else {
     const oldId2 = state.player.equipped[slot];
-    if(oldId2){
-      const o = state.player.equippedRarity[slot] || '一般';
-      if(slot === 'throwable'){ unequipThrowable(); }
-      else if(state.pendingSalvageEquipped && state.pendingSalvageEquipped[slot]){
-        salvageToMaterials(oldId2, o, 1);
-        delete state.pendingSalvageEquipped[slot];
-      } else {
-        state.player.equipped[slot] = null;
-        delete state.player.equippedRarity[slot];
-        invAdd(oldId2, o, 1);
-      }
+    if(oldId2 && state.pendingSalvageEquipped && state.pendingSalvageEquipped[slot]){
+      salvageToMaterials(oldId2, state.player.equippedRarity[slot] || '一般', 1);
+      delete state.pendingSalvageEquipped[slot];
     }
-    if(slot === 'throwable'){ equipThrowable(newId, newRarity); }
-    else {
-      invRemove(newId, newRarity, 1);
-      state.player.equipped[slot] = newId;
-      state.player.equippedRarity[slot] = newRarity;
-    }
-    refreshPlayerStats(); save(); closeModal(); renderCurrentTab();
-    if(onConfirm) onConfirm();
-  };
+    const rar = newRarity || '一般';
+    state.player.equipped[slot] = newId;
+    state.player.equippedRarity[slot] = rar;
+    if(!state.unlockedEquip) state.unlockedEquip = {};
+    state.unlockedEquip[newId + '@' + rar] = true;
+    if(!state.inventory[newId + '@' + rar]) state.inventory[newId + '@' + rar] = 1;
+  }
+  refreshPlayerStats(); save(); closeModal(); renderCurrentTab();
+  if(onConfirm) onConfirm();
+};;
 }
 
 /* ============== 倉庫 ============== */

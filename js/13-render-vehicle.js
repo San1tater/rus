@@ -2,9 +2,21 @@
 'use strict';
 
 const VEHICLE_REAL_HEIGHTS = {
-  btr80: 2.41, btr80a: 2.80, btr82: 2.725, btr82a: 2.725, btr90: 2.98,
-  t80: 2.74, t80b: 2.74, t80bv: 2.74, t80u: 2.74, t80uk: 2.74, t80um: 2.74,
-  bmp1: 2.15, bmp1m: 2.25, bmp2: 2.45, bmp3: 2.40, bmd4: 2.17
+/* rev-veh-realh2: 實車高 = 地面 → 圖片最頂端可見部件（含車頂武器）。使用者提供，勿改。 */
+btr80: 2.50, btr80a: 2.85, btr82: 2.85, btr82a: 2.88, btr90: 3.05,
+t80: 2.75, t80b: 2.78, t80bv: 2.78, t80u: 2.75, t80uk: 2.80, t80um: 2.80,
+bmp1: 2.15, bmp1m: 2.35, bmp2: 2.45, bmp3: 2.65, bmd4: 2.45
+};
+/* rev-veh-scale-fn: 縮放唯一真相源（只回傳繪製高，不涉及定位 / 下沉）。
+   人偶實際視覺高 = H×CHAR_HEIGHT_FACTOR×(455.74/386)；
+   載具可見內容高 = 實車高/1.7 × 人偶視覺高；targetH 為整圖高，故除以內容高佔比。 */
+window._vehScaleH = function(vid, sceneH, contentH){
+var rh = (typeof VEHICLE_REAL_HEIGHTS !== 'undefined' && VEHICLE_REAL_HEIGHTS[vid]) ? VEHICLE_REAL_HEIGHTS[vid] : 2.5;
+var chf = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+var phm = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+var ch = (typeof contentH === 'number' && isFinite(contentH) && contentH >= 0.1) ? contentH : 1;
+if(!(sceneH > 0)) return 0;
+return (rh / phm) * (sceneH * chf * (455.74 / 386)) / ch;
 };
 
 /* rev142: 載具可被發現半徑 R = 80 × 車高 / 玩家身高，取整十 */
@@ -915,7 +927,7 @@ const BTRSupport = {
   },
 
   start(vid){
-    if(this.active) return;
+    if(this.active){ this._suspend(); } /* rev-session2 */
     this.vehicleId = vid || 'btr80';
     if(!VEHICLE_ANNOTATIONS[this.vehicleId]) this.vehicleId = 'btr80';
     if(typeof VEHICLES !== 'undefined' && VEHICLES[this.vehicleId] && VEHICLES[this.vehicleId].supportDuration) BTR_TIMELINE.supportDur = VEHICLES[this.vehicleId].supportDuration;
@@ -980,72 +992,95 @@ const BTRSupport = {
   },
 
   _setupCanvas(){
-    const zone = document.getElementById('zone1');
-    if(!zone) return;
-    let c = document.getElementById('btr-support-canvas');
-    if(!c){
-      c = document.createElement('canvas');
-      c.id = 'btr-support-canvas';
-      zone.appendChild(c);
+  /* rev-veh-scale2: 自包含尺寸計算 —— 移除 _vehApplyBounds 依賴（rig 不存在時 targetH=0 的修復）。
+     縮放 = 實車高/1.7 × 人偶視覺高 ÷ 圖片內容高佔比；
+     doorX / centerPX / sinkOffset 沿用原公式，不加入任何「塞進畫面」邏輯。 */
+  const zone = document.getElementById('zone1');
+  if(!zone) return;
+  let c = document.getElementById('btr-support-canvas');
+  if(!c){
+    c = document.createElement('canvas');
+    c.id = 'btr-support-canvas';
+    zone.appendChild(c);
+  }
+  this.canvas = c;
+  const dpr = window.devicePixelRatio || 1;
+  const w = zone.clientWidth, h = zone.clientHeight;
+  c.width = Math.floor(w * dpr);
+  c.height = Math.floor(h * dpr);
+  c.style.width = w + 'px';
+  c.style.height = h + 'px';
+  this.ctx = c.getContext('2d');
+  this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  this.width = w; this.height = h; this.dpr = dpr;
+  const ann = (typeof VEHICLE_ANNOTATIONS !== 'undefined') ? VEHICLE_ANNOTATIONS[this.vehicleId] : null;
+  if(!ann) return;
+  let _contentMinY = 0, _contentMaxY = 1, _contentH = 1;
+  const _mi = (typeof _loadVehicleImg === 'function') ? _loadVehicleImg(this.vehicleId) : null;
+  const _imgReady = !!(_mi && _mi.complete && _mi.naturalWidth);
+  try{
+    if(_imgReady && typeof _measureImgContentBounds === 'function'){
+      const _b = _measureImgContentBounds(_mi);
+      if(_b){ _contentMinY = _b.minY; _contentMaxY = _b.maxY; _contentH = _b.maxY - _b.minY; }
     }
-    this.canvas = c;
-    const dpr = window.devicePixelRatio || 1;
-    const w = zone.clientWidth, h = zone.clientHeight;
-    c.width = Math.floor(w * dpr);
-    c.height = Math.floor(h * dpr);
-    c.style.width = w + 'px';
-    c.style.height = h + 'px';
-    this.ctx = c.getContext('2d');
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.width = w; this.height = h; this.dpr = dpr;
-    const ann = VEHICLE_ANNOTATIONS[this.vehicleId];
-    if(ann){
-      let _contentMinY = 0, _contentMaxY = 1, _contentH = 1.0, _contentMaxX = 1.0;
-      try {
-        const _m = _loadVehicleImg(this.vehicleId);
-        if(_m && _m.complete && _m.naturalWidth && typeof _measureImgContentBounds === 'function'){
-          const _b = _measureImgContentBounds(_m);
-          if(_b){ _contentMinY = _b.minY; _contentMaxY = _b.maxY; _contentH = _b.maxY - _b.minY; _contentMaxX = _b.maxX; }
-        }
-      } catch(_e){}
-      if(!isFinite(_contentH) || _contentH < 0.1){ _contentH = 1.0; _contentMinY = 0; _contentMaxY = 1; }
-      this._contentMinYRatio = _contentMinY;
-      this._contentBottomRatio = _contentMaxY;
-      this._contentH = _contentH;
-      const _realH = (typeof VEHICLE_REAL_HEIGHTS !== 'undefined' && VEHICLE_REAL_HEIGHTS[this.vehicleId]) || 2.5;
-      this.targetH = h * 0.6735 * (_realH / 1.7);
-      this.targetW = this.targetH * (ann.imageSize.w / ann.imageSize.h);
-      /* rev-fix-door-inline: door 位置统一在此计算——fusion 优先，回退 upper/lower/hatch。 */
-      const playerCenterX = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
-      let _doorCenterRatio = 0.48;
-      if(ann.doors){
-        let _doorList = [];
-        if(ann.doors.fusion && ann.doors.fusion.length) _doorList = ann.doors.fusion;
-        else {
-          if(ann.doors.upper) _doorList = _doorList.concat(ann.doors.upper);
-          if(ann.doors.lower) _doorList = _doorList.concat(ann.doors.lower);
-          if(ann.doors.hatch) _doorList = _doorList.concat(ann.doors.hatch);
-        }
-        let _sumX = 0, _sumN = 0;
-        for(const _d of _doorList){
-          if(!_d.polygon) continue;
-          for(const _p of _d.polygon){ _sumX += _p.x; _sumN++; }
-        }
-        if(_sumN > 0) _doorCenterRatio = _sumX / _sumN;
-      }
-      this.doorOffsetRatio = _doorCenterRatio;
-      this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
-      let maxMuzzleX = 0;
-      if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
-      const targetMuzzleRatio = 0.9;
-      const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW;
-      const leftPx = Math.min(w/2 - this.targetW/2, maxAllowedLeft);
-      this.centerPX = leftPx / w;
-      const groundY = h * 0.95;
-      const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
-      this.sinkOffset = py0 < 4 ? (4 - py0) : 0;
+  }catch(_e){}
+  if(!isFinite(_contentH) || _contentH < 0.1){ _contentH = 1; _contentMinY = 0; _contentMaxY = 1; }
+  this._contentMinYRatio = _contentMinY;
+  this._contentBottomRatio = _contentMaxY;
+  this._contentH = _contentH;
+  this._boundsReady = _imgReady;
+  const _realH = (typeof VEHICLE_REAL_HEIGHTS !== 'undefined' && VEHICLE_REAL_HEIGHTS[this.vehicleId]) || 2.5;
+  const _chf = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+  const _phm = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+  this.targetH = (typeof window._vehScaleH === 'function')
+    ? window._vehScaleH(this.vehicleId, h, _contentH)
+    : ((_realH / _phm) * (h * _chf * (455.74 / 386)) / _contentH);
+  this.targetW = this.targetH * (ann.imageSize.w / ann.imageSize.h);
+  if(this.fx) this.fx.targetW = this.targetW;
+  /* door 位置：fusion 優先，回退 upper/lower/hatch（原公式） */
+  const playerCenterX = w * (typeof EXPLORE_HERO_X_RATIO === 'number' ? EXPLORE_HERO_X_RATIO : 0.25);
+  let _doorCenterRatio = 0.48;
+  if(ann.doors){
+    let _doorList = [];
+    if(ann.doors.fusion && ann.doors.fusion.length) _doorList = ann.doors.fusion;
+    else {
+      if(ann.doors.upper) _doorList = _doorList.concat(ann.doors.upper);
+      if(ann.doors.lower) _doorList = _doorList.concat(ann.doors.lower);
+      if(ann.doors.hatch) _doorList = _doorList.concat(ann.doors.hatch);
     }
-  },
+    let _sumX = 0, _sumN = 0;
+    for(const _d of _doorList){
+      if(!_d.polygon) continue;
+      for(const _p of _d.polygon){ _sumX += _p.x; _sumN++; }
+    }
+    if(_sumN > 0) _doorCenterRatio = _sumX / _sumN;
+  }
+  this.doorOffsetRatio = _doorCenterRatio;
+  this.doorX = (playerCenterX - this.doorOffsetRatio * this.targetW) / w;
+  let maxMuzzleX = 0;
+  if(ann.muzzles){ for(const m of ann.muzzles){ if(m.x > maxMuzzleX) maxMuzzleX = m.x; } }
+  const targetMuzzleRatio = 0.9;
+  const maxAllowedLeft = w * targetMuzzleRatio - 12 - maxMuzzleX * this.targetW;
+  const leftPx = Math.min(w / 2 - this.targetW / 2, maxAllowedLeft);
+  this.centerPX = leftPx / w;
+  const groundY = h * 0.95;
+  const py0 = groundY - (this._contentBottomRatio || 1) * this.targetH;
+  this.sinkOffset = py0 < 4 ? (4 - py0) : 0;
+  /* 圖片晚到：一次性 onload 重跑本函式（僅尺寸計算，所有公式不變） */
+  try{
+    if(_mi && !_mi.complete && !_mi.__vehScaleHook2){
+      _mi.__vehScaleHook2 = true;
+      const _self = this;
+      _mi.addEventListener('load', function(){
+        try{
+          if(!_self.active) return;
+          if(!_self.canvas || !_self.canvas.isConnected) return;
+          _self._setupCanvas();
+        }catch(_e2){}
+      }, { once:true });
+    }
+  }catch(_e3){}
+},
 
   _loop(t){
     if(!this.active) return;
@@ -1086,7 +1121,7 @@ const BTRSupport = {
       }
       return;
     }
-    if(this.active && this.phase === 'support' && window._explore && window._explore._lootingUntil > 0){
+    if(this.active && this.phase === 'support' && !(window.BossModule && window.BossModule.battle && window.BossModule.battle.sweep) && window._explore && window._explore._lootingUntil > 0){
       window._explore._lootingUntil = 0;
       window._explore._corpseLootTriggered = false;
       if(window._explore._pendingLootEvents) window._explore._pendingLootEvents = null;
@@ -1104,6 +1139,10 @@ const BTRSupport = {
     if(curPhase !== this.phase){ this._onPhaseEnter(curPhase); }
     this.phase = curPhase;
     this.phaseT = phaseT;
+    /* rev-sweep-fire: 掃蕩目標已發現，接人（arrive）之後即可開火，不必等到 support */
+    if(window.BossModule && window.BossModule.battle && window.BossModule.battle.sweep){
+      if(curPhase === 'arrive' || curPhase === 'sink' || curPhase === 'center') this._fireReadyMuzzles(now);
+    }
     if(curPhase === 'enter'){
       const p = phaseT / BTR_TIMELINE.enterDur;
       this.x = -1.5 + this._easeInOut(Math.min(1, p)) * (this.doorX - (-1.5));
@@ -1199,7 +1238,7 @@ const BTRSupport = {
     this._lastWreckTick = now;
     const _ex = window._explore;
     if(_ex && this.width > 0){
-      const _spd = _ex._currentSpeed || 0;
+      const _spd = (typeof window._currentWorldSpeed === 'function') ? window._currentWorldSpeed() : (_ex._currentSpeed || 0);
       const _sm = computeScreenMetrics(this.width, this.height);
       const _ppm = _sm.bgPixelsPerMeter;
       const _dxPx = _spd * _dt * _ppm;
@@ -1225,62 +1264,51 @@ const BTRSupport = {
   },
 
   _onPhaseEnter(phase){
+    /* rev-sweep-session: 車型一律用 start() 鎖定的 vehicleId；
+       世界錨點用「當前領軍單位」的 worldX。掃蕩中不得改寫探索狀態。 */
+    const _inSweep = !!(window.BossModule && window.BossModule.battle && window.BossModule.battle.sweep);
+    const _vid = this.vehicleId;
+    const _vdef = (typeof VEHICLES !== 'undefined') ? VEHICLES[_vid] : null;
+    const _vh = (_vdef && _vdef.hp) ? _vdef.hp : 500;
+    const _c = window._combat;
+    const _leadWX = function(c){
+      if(c && c.allies && c.allies[0] && typeof c.allies[0].worldX === 'number') return c.allies[0].worldX;
+      return (window._explore && window._explore.worldX) ? window._explore.worldX : 0;
+    };
+    const _toVehicle = function(c){
+      c.sceneType = 'vehicle';
+      c.allies = [{ isVehicle:true, vehicleId:_vid, hp:_vh, maxHp:_vh, armorGrid:[30,20,15], armorLevel:5, worldX:_leadWX(c) }];
+      c._playerMag = { inMag:0, ammoRef:null, weaponId:null };
+      c._playerReloadEnd = 0;
+      c._playerSwitchEnd = 0;
+      c._fireAnim = null;
+      c._playerAnimUntil = 0;
+      c.bullets = c.bullets.filter(function(b){ return b.enemy; });
+    };
     if(phase === 'arrive'){
-      /* 問題 3：車門開啟即切 vehicle，玩家不再射擊/受擊 */
-      const _cArr = window._combat;
-      if(_cArr && _cArr.active && _cArr.sceneType === 'foot'){
-        const _g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-        const _vid = _g ? _g.currentVehicle : 'btr80';
-        const _vdef = (typeof VEHICLES !== 'undefined') ? VEHICLES[_vid] : null;
-        const _vh = (_vdef && _vdef.hp) ? _vdef.hp : 500;
-        const _exWX = (window._explore && window._explore.worldX) ? window._explore.worldX : 0;
-        _cArr.sceneType = 'vehicle';
-        _cArr.allies = [{ isVehicle: true, vehicleId: _vid, hp: _vh, maxHp: _vh, armorGrid: [30,20,15], armorLevel: 5, worldX: _exWX }];
-        _cArr._playerMag = { inMag: 0, ammoRef: null, weaponId: null };
-        _cArr._playerReloadEnd = 0;
-        _cArr._playerSwitchEnd = 0;
-        _cArr._fireAnim = null;
-        _cArr._playerAnimUntil = 0;
-        _cArr.bullets = _cArr.bullets.filter(function(b){ return b.enemy; });
-      }
+      if(_c && _c.active && _c.sceneType === 'foot') _toVehicle(_c);
     }
     if(phase === 'support'){
       this.lastTickSec = -1;
-      if(typeof window._exploreSetVehicleMode === 'function') window._exploreSetVehicleMode(true);
-      const _cSup = window._combat;
-      if(_cSup && _cSup.active && _cSup.sceneType === 'foot'){
-        const _g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-        const _vid = _g ? _g.currentVehicle : 'btr80';
-        const _vdef = (typeof VEHICLES !== 'undefined') ? VEHICLES[_vid] : null;
-        const _vh = (_vdef && _vdef.hp) ? _vdef.hp : 500;
-        const _exWX = (window._explore && window._explore.worldX) ? window._explore.worldX : 0;
-        _cSup.sceneType = 'vehicle';
-        _cSup.allies = [{ isVehicle: true, vehicleId: _vid, hp: _vh, maxHp: _vh, armorGrid: [30,20,15], armorLevel: 5, worldX: _exWX }];
-        _cSup._playerMag = { inMag: 0, ammoRef: null, weaponId: null };
-        _cSup._playerReloadEnd = 0;
-        _cSup._playerSwitchEnd = 0;
-        _cSup._fireAnim = null;
-        _cSup._playerAnimUntil = 0;
-        _cSup.bullets = _cSup.bullets.filter(function(b){ return b.enemy; });
-        if(typeof pushLog === 'function') pushLog('<span class="pl">玩家</span> 進入載具，切換為載具戰', [], 'explore');
+      if(!_inSweep && typeof window._exploreSetVehicleMode === 'function') window._exploreSetVehicleMode(true);
+      if(_c && _c.active && _c.sceneType === 'foot'){
+        _toVehicle(_c);
+        if(!_inSweep && typeof pushLog === 'function'){
+          pushLog('<span class="pl">玩家</span> 進入載具，切換為載具戰', [], 'explore');
+        }
       }
     } else if(phase === 'lift'){
-      /* v28: BTR 结束直接清 ex，不依赖 _forceEndVehicleCombat */
-      /* [v179 F2a] 只在载具战时清 ex。若 R5 已切 foot，保留步战状态，不再误清。 */
-      var _cLiftF2 = window._combat;
-      var _isVehLiftF2 = !!(_cLiftF2 && _cLiftF2.active && _cLiftF2.sceneType === 'vehicle');
-      if(window._explore && _isVehLiftF2){
-        if(window._explore.mode === 'combat' || window._explore.mode === 'vehicle'){
-          window._explore.mode = 'walk';
-        }
+      if(_inSweep) return;
+      var _isVeh = !!(_c && _c.active && _c.sceneType === 'vehicle');
+      if(window._explore && _isVeh){
+        if(window._explore.mode === 'combat' || window._explore.mode === 'vehicle') window._explore.mode = 'walk';
         window._explore.combatEvent = null;
         window._explore._pendingLootEvents = null;
       }
-      /* [v179 F2a] _combatCleanup 已交由 _forceEndVehicleCombat 内部条件判断 */
       if(typeof window._forceEndVehicleCombat === 'function'){
         try{ window._forceEndVehicleCombat(); }catch(e){ console.warn('[lift forceEnd]', e); }
-      } else {
-        if(typeof window._exploreSetVehicleMode === 'function') window._exploreSetVehicleMode(false);
+      } else if(typeof window._exploreSetVehicleMode === 'function'){
+        window._exploreSetVehicleMode(false);
       }
     }
   },
@@ -1288,28 +1316,26 @@ const BTRSupport = {
   _updateSupport(phaseT, now){
     this.shakeX = Math.sin(now / 40) * 1.5;
     this.shakeY = Math.cos(now / 55) * 1.2;
+    this._fireReadyMuzzles(now);
+  },
+  /* rev-sweep-fire: 開火段唯一實作 —— 探索 support 與掃蕩 arrive/sink/center 共用 */
+  _fireReadyMuzzles(now){
     const _ready = [];
-    for(const m of this.muzzles){
-      if(now >= m.nextFireAt) _ready.push(m);
-    }
+    for(const m of this.muzzles){ if(now >= m.nextFireAt) _ready.push(m); }
     if(!_ready.length) return;
-
     const _p = window._combat && window._combat.allies[0];
     let _mainTarget = null;
     for(const m of _ready){
       if(m._syncGroup === 'main'){
         m._preselectedTarget = (typeof window._pickBTRTarget === 'function') ? window._pickBTRTarget(m.weaponId, 'main') : null;
-        if(m._preselectedTarget && !_mainTarget && m.weaponId !== 'pkt') _mainTarget = m._preselectedTarget;  /* rev-fix-pkt-follow */
+        if(m._preselectedTarget && !_mainTarget && m.weaponId !== 'pkt') _mainTarget = m._preselectedTarget;
       }
     }
-    /* rev143: 載具主炮同步瞄準——以 canEngage 統一判定（含目標 R 與自身射程） */
     for(const m of _ready){
       if(m._syncGroup === 'main'){
-        if(_mainTarget && m._preselectedTarget !== _mainTarget){
-          if(_p){
-            const _rM = (typeof VEHICLE_RANGE_M !== 'undefined' && VEHICLE_RANGE_M[m.weaponId]) || 300;
-            if(window.canEngage(_rM, _mainTarget, Math.abs(_mainTarget.worldX - _p.worldX))) m._preselectedTarget = _mainTarget;
-          }
+        if(_mainTarget && m._preselectedTarget !== _mainTarget && _p){
+          const _rM = (typeof VEHICLE_RANGE_M !== 'undefined' && VEHICLE_RANGE_M[m.weaponId]) || 300;
+          if(window.canEngage(_rM, _mainTarget, Math.abs(_mainTarget.worldX - _p.worldX))) m._preselectedTarget = _mainTarget;
         }
       } else {
         if(_mainTarget && _p){
@@ -1322,9 +1348,7 @@ const BTRSupport = {
         m._preselectedTarget = (typeof window._pickBTRTarget === 'function') ? window._pickBTRTarget(m.weaponId, m._syncGroup) : null;
       }
     }
-    for(const m of _ready){
-      this._fireMuzzle(m, now);
-    }
+    for(const m of _ready){ this._fireMuzzle(m, now); }
   },
 
   _fireMuzzle(m, now){
@@ -1556,6 +1580,7 @@ const BTRSupport = {
   },
 
   _getBTRWorldSpeed(){
+    if(this.phase === 'sweepOut') return 130;
     if(this.phase === 'support') return 100;
     if(this.phase === 'enter' || this.phase === 'leave') return 130;
     if(this.phase === 'center' || this.phase === 'lift') return 60;
@@ -1646,7 +1671,7 @@ const BTRSupport = {
   },
 
   _render(now){
-    const _spd = (window._explore && window._explore._currentSpeed) || 0;
+    const _spd = (typeof window._currentWorldSpeed === 'function') ? window._currentWorldSpeed() : ((window._explore && window._explore._currentSpeed) || 0);
     const _g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
     const _vid = _g ? _g.currentVehicle : 'btr80';
     let _maxSpd = 80 / 3.6;
@@ -1699,7 +1724,7 @@ const BTRSupport = {
       } else {
         let _p25ratio = 0;
         if(this.phase === 'support'){
-          const _supSpd = (window._explore && window._explore._currentSpeed) || 0;
+          const _supSpd = (typeof window._currentWorldSpeed === 'function') ? window._currentWorldSpeed() : ((window._explore && window._explore._currentSpeed) || 0); /* rev-supspeed-unify */
           _p25ratio = Math.min(1, Math.max(0, _supSpd / (80 / 3.6)));
         } else if(this.phase === 'enter' || this.phase === 'leave'){
           _p25ratio = 1;
@@ -1712,7 +1737,8 @@ const BTRSupport = {
         } else {
           _p25ratio = 0;
         }
-        _renderOpts = { trackVel: 300 * _p25ratio, wheelSpeed: 20 * _p25ratio, doorOpen: (this.doorOpen || 0) * 180, recoils: recoilsPx };
+        if(this.phase === 'sweepOut') _p25ratio = 1; /* rev-sweep-out-render */
+     _renderOpts = { trackVel: 300 * _p25ratio, wheelSpeed: 20 * _p25ratio, doorOpen: (this.doorOpen || 0) * 180, recoils: recoilsPx };
       }
 
       if(this.erasedMissilePolys && this.erasedMissilePolys.length > 0){
@@ -1883,28 +1909,132 @@ const BTRSupport = {
     if(typeof currentTab !== 'undefined' && currentTab === 'explore' && typeof renderZone3Log === 'function') renderZone3Log();
   },
 
-  _cleanup(){
-    /* rev-fix-station-snapshot: 寫回彈藥消耗（不覆蓋配置）與載員 ammoBox 計數 */
-    try {
-      if(this._ammoSnap && this._ammoSnap[this.vehicleId] && state.vehicleAmmo && state.vehicleAmmo[this.vehicleId]){
-        const src = this._ammoSnap[this.vehicleId], dst = state.vehicleAmmo[this.vehicleId];
-        for(const wid in src){
-          if(!dst[wid]) dst[wid] = {};
-          if(typeof src[wid].current === 'number') dst[wid].current = src[wid].current;
-          if(src[wid].breakdown && dst[wid].breakdown){
-            for(const k in src[wid].breakdown) dst[wid].breakdown[k] = src[wid].breakdown[k];
+  /* rev-sweep-session: 掃蕩 = 另一場戰鬥，需要借用同一台 BTRSupport。
+   探索支援期間若發起掃蕩，start() 的 if(this.active) return 會直接空跑，
+   玩家又讀到探索的 playerClipH=0 → 玩家與載具雙雙隱形。
+   這裡把當前 session 完整凍結（含時間軸），掃蕩結束後原樣續行。 */
+_suspend(){
+    if(!this.active) return null;
+    const s = {
+      at: performance.now(),
+      vehicleId: this.vehicleId, startTime: this.startTime,
+      phase: this.phase, phaseT: this.phaseT,
+      x: this.x, yOffset: this.yOffset, doorOpen: this.doorOpen,
+      playerClipH: this.playerClipH, playerXOffset: this.playerXOffset,
+      shakeX: this.shakeX, shakeY: this.shakeY,
+      muzzles: this.muzzles, fireFx: this.fireFx, dustParticles: this.dustParticles,
+      recoilStates: this.recoilStates, missiles: this.missiles,
+      smoke: this.fx.smoke, tracers: this.fx.tracers,
+      erasedMissilePolys: this.erasedMissilePolys,
+      erasedMissileImgs: this.erasedMissileImgs, erasedBaseImg: this.erasedBaseImg,
+      kills: this.kills, loot: this.loot, killCount: this.killCount, weaponKills: this.weaponKills,
+      _finished: this._finished, _cannonFirstShotDone: this._cannonFirstShotDone,
+      _snap: this._snap, _ammoSnap: this._ammoSnap,
+      lastTickSec: this.lastTickSec,
+      _wreckDisembarked: this._wreckDisembarked,
+      wreckPauseStart: this.wreckPauseStart, wreckPauseDuration: this.wreckPauseDuration,
+      wreckStartTime: this.wreckStartTime, _wreckStartYOffset: this._wreckStartYOffset,
+      combat: window._combat || null,
+      combatActive: !!window._combatActive,
+      exMode: (window._explore ? window._explore.mode : null),
+      exSpeed: (window._explore ? window._explore._currentSpeed : 0)
+    };
+    if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
+    if(this.canvas){ this.canvas.remove(); this.canvas = null; this.ctx = null; }
+    this.active = false;
+    this._suspended = s;
+    return s;
+  },
+  _resume(){
+    /* rev-session2: 原樣續行被凍結的 session。所有時間節點整體平移 gap，
+       否則恢復瞬間全部槍口 / 後座 / 曳光會同時過期而爆一波。 */
+    const s = this._suspended;
+    if(!s) return false;
+    this._suspended = null;
+    const gap = performance.now() - s.at;
+    this.vehicleId = s.vehicleId;
+    this.startTime = s.startTime + gap;
+    this.phase = s.phase; this.phaseT = s.phaseT;
+    this.x = s.x; this.yOffset = s.yOffset; this.doorOpen = s.doorOpen;
+    this.playerClipH = s.playerClipH; this.playerXOffset = s.playerXOffset;
+    this.shakeX = s.shakeX; this.shakeY = s.shakeY;
+    this.muzzles = s.muzzles || []; this.fireFx = s.fireFx || [];
+    this.dustParticles = s.dustParticles || [];
+    this.recoilStates = s.recoilStates || {}; this.missiles = s.missiles || [];
+    this.fx.smoke = s.smoke || []; this.fx.tracers = s.tracers || [];
+    this.erasedMissilePolys = s.erasedMissilePolys || [];
+    this.erasedMissileImgs = s.erasedMissileImgs || [];
+    this.erasedBaseImg = s.erasedBaseImg || null;
+    this.kills = s.kills || {}; this.loot = s.loot || [];
+    this.killCount = s.killCount || 0; this.weaponKills = s.weaponKills || {};
+    this._finished = s._finished; this._cannonFirstShotDone = s._cannonFirstShotDone || {};
+    this._snap = s._snap; this._ammoSnap = s._ammoSnap;
+    this.lastTickSec = s.lastTickSec; this._lastTick = performance.now();
+    this._wreckDisembarked = s._wreckDisembarked;
+    this.wreckPauseStart = s.wreckPauseStart ? s.wreckPauseStart + gap : s.wreckPauseStart;
+    this.wreckPauseDuration = s.wreckPauseDuration;
+    this.wreckStartTime = s.wreckStartTime ? s.wreckStartTime + gap : s.wreckStartTime;
+    this._lastWreckTick = performance.now();
+    this._wreckStartYOffset = s._wreckStartYOffset;
+    for(const m of this.muzzles){
+      if(isFinite(m.nextFireAt)) m.nextFireAt += gap;
+      if(isFinite(m.lastFireAt)) m.lastFireAt += gap;
+    }
+    for(const k in this.recoilStates){ if(this.recoilStates[k]) this.recoilStates[k].startTime += gap; }
+    for(const f of this.fireFx){ f.startTime += gap; f.endTime += gap; }
+    for(const mi of this.missiles){ mi.startTime += gap; }
+    for(const tr of this.fx.tracers){ tr.born += gap; }
+    if(s.combat && (!window._combat || !window._combat.active)){
+      window._combat = s.combat;
+      window._combatActive = s.combatActive;
+      s.combat.lastTick = performance.now();
+    }
+    if(window._explore && s.exMode){
+      window._explore.mode = s.exMode;
+      window._explore._currentSpeed = s.exSpeed;
+    }
+    this.active = true;
+    this._setupCanvas();
+    const self = this;
+    this.raf = requestAnimationFrame(function(t){ self._loop(t); });
+    return true;
+  },
+  /* rev-sweep-out: 撞擊 / 擊殺後，車保持原速衝出屏幕，不被 Boss 卡住。
+   世界仍以車速滾動（背景不停），車相對屏幕再加速右移直到出緣。 */
+  enterSweepOut(){
+    if(this.phase === 'sweepOut') return;
+    this.phase = 'sweepOut';
+    this._sweepOutLast = performance.now();
+    this.doorOpen = 0;
+    this.playerClipH = 0;
+    this.playerXOffset = 0;
+    for(let i = 0; i < this.muzzles.length; i++){ this.muzzles[i].nextFireAt = Infinity; }
+  },_cleanup(){
+    /* rev-sweep-session: 掃蕩已在 _executeSweep 預扣信物 / 私酒 / 彈藥等值，
+       不得再把車戰彈藥快照寫回，也不得污染探索的拾取 / 模式狀態。 */
+    const _inSweep = !!(window.BossModule && window.BossModule.battle && window.BossModule.battle.sweep);
+    if(!_inSweep){
+      try {
+        if(this._ammoSnap && this._ammoSnap[this.vehicleId] && state.vehicleAmmo && state.vehicleAmmo[this.vehicleId]){
+          const src = this._ammoSnap[this.vehicleId], dst = state.vehicleAmmo[this.vehicleId];
+          for(const wid in src){
+            if(!dst[wid]) dst[wid] = {};
+            if(typeof src[wid].current === 'number') dst[wid].current = src[wid].current;
+            if(src[wid].breakdown && dst[wid].breakdown){
+              for(const k in src[wid].breakdown) dst[wid].breakdown[k] = src[wid].breakdown[k];
+            }
           }
         }
-      }
-      if(this._snap && state.station && Array.isArray(state.station.passengers) && Array.isArray(this._snap.passengers)){
-        for(let i = 0; i < this._snap.passengers.length && i < state.station.passengers.length; i++){
-          const sp = this._snap.passengers[i], stp = state.station.passengers[i];
-          if(!sp || !stp || sp.srvId !== stp.srvId) continue;
-          if(sp.ammoPouch && stp.ammoPouch) stp.ammoPouch.count = sp.ammoPouch.count;
-          if(sp.ammoBox   && stp.ammoBox)   stp.ammoBox.count   = sp.ammoBox.count;
+        if(this._snap && state.station && Array.isArray(state.station.passengers) && Array.isArray(this._snap.passengers)){
+          for(let i = 0; i < this._snap.passengers.length && i < state.station.passengers.length; i++){
+            const sp = this._snap.passengers[i], stp = state.station.passengers[i];
+            if(!sp || !stp || sp.srvId !== stp.srvId) continue;
+            if(sp.ammoPouch && stp.ammoPouch) stp.ammoPouch.count = sp.ammoPouch.count;
+            if(sp.ammoBox && stp.ammoBox) stp.ammoBox.count = sp.ammoBox.count;
+          }
         }
-      }
-    } catch(e){ console.warn('[cleanup sync]', e); }
+      } catch(e){ console.warn('[cleanup sync]', e); }
+    }
     this._snap = null; this._ammoSnap = null;
     try {
       if(window._combat && window._combat.active && window._combat.sceneType === 'vehicle'){
@@ -1913,16 +2043,12 @@ const BTRSupport = {
         if(typeof cb === 'function'){ try { cb(true); } catch(e){} }
       }
     } catch(e){}
-    if(window._explore){
-      /* rev-fix-keep-corpses: 不清空 ex.corpses，讓屍體繼續隨世界向左移出 */
+    if(!_inSweep && window._explore){
       window._explore._lootingUntil = 0;
       window._explore._corpseLootTriggered = false;
       window._explore._pendingLootEvents = null;
       if(window._explore.mode === 'combat') window._explore.mode = 'walk';
     }
-    /* [v179 F1] 只在「战斗不存在」或「战斗是载具战」时清 _combatActive。
-       若 R5 已把 c 切成 foot，不误清 foot 战斗，否则 _tick 走 walk 速度分支
-       → 玩家滑行、载员 _mode 冻结不射不动。 */
     if(!window._combat || !window._combat.active || window._combat.sceneType === 'vehicle'){
       window._combatActive = false;
     }
@@ -2261,4 +2387,99 @@ if(!document.getElementById('detonateStyle')){
   document.head.appendChild(st);
 }
 
+/* ===== rev-veh-scale-rig:start =====
+   車高縮放唯一真相源：玩家裸人偶 1.7m = 455.74 原圖單位，
+   繪製縮放 = H × CHAR_HEIGHT_FACTOR / 386 → px/m = H × 0.58 × (455.74/386) / 1.7。
+   載具圖片含車頂武器，整圖內容高（量測）對應 VEHICLE_REAL_HEIGHTS 的實車高。 */
+(function(){
+'use strict';
+if(window.__vehScaleRig) return;
+window.__vehScaleRig = true;
 
+window._vehApplyBounds = function(btr, w, h){
+  var ann = (typeof VEHICLE_ANNOTATIONS !== 'undefined') ? VEHICLE_ANNOTATIONS[btr.vehicleId] : null;
+  if(!ann || !(w > 0) || !(h > 0)) return false;
+  var minY = 0, maxY = 1, cH = 1, ready = false;
+  try{
+    var img = _loadVehicleImg(btr.vehicleId);
+    if(img && img.complete && img.naturalWidth && typeof _measureImgContentBounds === 'function'){
+      var b = _measureImgContentBounds(img);
+      if(b){ minY = b.minY; maxY = b.maxY; cH = b.maxY - b.minY; ready = true; }
+    }
+  }catch(e){}
+  if(!isFinite(cH) || cH < 0.1){ cH = 1; minY = 0; maxY = 1; }
+  btr._contentMinYRatio = minY;
+  btr._contentBottomRatio = maxY;
+  btr._contentH = cH;
+  btr._boundsReady = ready;
+  var realH = (typeof VEHICLE_REAL_HEIGHTS !== 'undefined' && VEHICLE_REAL_HEIGHTS[btr.vehicleId]) || 2.5;
+  var chf = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+  var phm = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+  var ppm = h * chf * (455.74 / 386) / phm;
+  btr._pxPerMeter = ppm;
+  btr.targetH = realH * ppm / cH;
+  btr.targetW = btr.targetH * (ann.imageSize.w / ann.imageSize.h);
+  var playerCenterX = w * ((typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25);
+  var doorRatio = 0.48;
+  if(ann.doors){
+    var list = [];
+    if(ann.doors.fusion && ann.doors.fusion.length) list = ann.doors.fusion;
+    else{
+      if(ann.doors.upper) list = list.concat(ann.doors.upper);
+      if(ann.doors.lower) list = list.concat(ann.doors.lower);
+      if(ann.doors.hatch) list = list.concat(ann.doors.hatch);
+    }
+    var sx = 0, n = 0;
+    for(var i = 0; i < list.length; i++){
+      var d = list[i];
+      if(!d.polygon) continue;
+      for(var j = 0; j < d.polygon.length; j++){ sx += d.polygon[j].x; n++; }
+    }
+    if(n > 0) doorRatio = sx / n;
+  }
+  btr.doorOffsetRatio = doorRatio;
+  btr.doorX = (playerCenterX - doorRatio * btr.targetW) / w;
+  var maxMx = 0;
+  if(ann.muzzles){ for(var k = 0; k < ann.muzzles.length; k++){ if(ann.muzzles[k].x > maxMx) maxMx = ann.muzzles[k].x; } }
+  var maxLeft = w * 0.9 - 12 - maxMx * btr.targetW;
+  var leftPx = Math.min(w / 2 - btr.targetW / 2, maxLeft);
+  btr.centerPX = leftPx / w;
+  var py0 = h * 0.95 - maxY * btr.targetH;
+  btr.sinkOffset = py0 < 4 ? (4 - py0) : 0;
+  return ready;
+};
+
+/* 實繪車體幾何（歸一化螢幕 Y）：曳光 / 火箭 / 命中特效對齊用 */
+window._vehicleRenderMetrics = function(){
+  var b = window.BTRSupport;
+  if(!b || !b.active || !(b.targetH > 0) || !(b.height > 0)) return null;
+  var h = b.height;
+  var cMin = (typeof b._contentMinYRatio === 'number') ? b._contentMinYRatio : 0;
+  var cBot = (typeof b._contentBottomRatio === 'number') ? b._contentBottomRatio : 1;
+  var yOff = (b.yOffset || 0);
+  var botN = (h * 0.95 + yOff) / h;
+  var topN = botN - (cBot - cMin) * b.targetH / h;
+  return { topN: topN, botN: botN, centerN: (topN + botN) / 2 };
+};
+
+/* 實繪車體中心 → 世界米（供統一武器核心 aimY / 命中視覺反算） */
+window._vehicleAimWorldY = function(){
+  var m = window._vehicleRenderMetrics();
+  if(!m) return null;
+  var chf = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+  var phm = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+  return Math.max(0.15, (0.95 - m.centerN) * phm / chf);
+};
+
+/* 圖片晚到 → 下一幀重量測一次（_boundsReady 鎖定後不再重算） */
+var _origRender = BTRSupport._render;
+BTRSupport._render = function(now){
+  try{
+    if(this.active && !this._boundsReady && this.width > 0){
+      window._vehApplyBounds(this, this.width, this.height);
+    }
+  }catch(e){}
+  return _origRender.apply(this, arguments);
+};
+})();
+/* ===== rev-veh-scale-rig:end ===== */

@@ -686,7 +686,7 @@ function _stPickBelt(vid, wid){
     const on = (k === cur);
     const _rowDesc = (_descMap && _descMap[k]) || pr.desc;
     body += '<div class="item-row" data-preset="' + k + '"' + (on ? ' style="border-color:#e8a33d;background:#2a1f10"' : '') + '>';
-    body += '<div class="icon" style="background:transparent;border-color:transparent"><img src="icons/ammo/belt_' + pr.img + '.png' + assetSuffix('icons/ammo/belt_' + pr.img + '.png') + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>';
+    body += '<div class="icon" style="background:transparent;border-color:transparent"><img src="icons/vehicle-ammo/belts/belt_' + pr.img + '.png' + assetSuffix('icons/vehicle-ammo/belts/belt_' + pr.img + '.png') + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>';
     body += '<div class="info"><div class="nm">' + pr.name + '</div><div class="sub">' + _rowDesc + '</div></div>';
     if(on) body += '<div style="color:#e8a33d;font-weight:bold;padding:0 6px">✓</div>';
     body += '</div>';
@@ -1134,31 +1134,26 @@ function _stPickEquip(idx, slot){
   const bw = tw - csw;
   const list = [];
   let hint = '';
-
+  /* rev-eq-coexist: 武器 / 護甲 = 引用，與玩家 / 守衛同時存在，不扣庫存。
+     彈掛 / 彈藥箱 / 彈藥手彈箱 = 消耗品，仍從庫存扣除。 */
   if(slot === 'primaryWeapon'){
-    for(const k in state.unlockedEquip){
-      const pp = k.split('@');
-      const d = itemDef(pp[0]);
-      if(!d || d.slot !== 'primary') continue;
-      list.push({ id: pp[0], rarity: pp[1], def: d, count: 0 });
-    }
+    const cands = (typeof window._equipCandidates === 'function') ? window._equipCandidates('primary') : [];
+    for(const c of cands) list.push({ id:c.id, rarity:c.rarity, def:c.def, count:0 });
     if(tal.indexOf('ammo_handler') >= 0){
       for(const k5 in state.inventory){
         const pp5 = k5.split('@');
         if(!AMMO[pp5[0]]) continue;
         if(state.inventory[k5] <= 0) continue;
         const _bc = Math.min(AMMOBOX_CAPACITY, state.inventory[k5]);
-        list.push({ id: pp5[0], rarity: pp5[1], def: AMMO[pp5[0]], count: _bc, isBox: true });
+        list.push({ id:pp5[0], rarity:pp5[1], def:AMMO[pp5[0]], count:_bc, isBox:true });
       }
     }
   } else if(slot === 'helmet' || slot === 'body'){
     const tgt = (slot === 'helmet') ? 'head' : 'top';
-    for(const k2 in state.unlockedEquip){
-      const pp2 = k2.split('@');
-      const d2 = itemDef(pp2[0]);
-      if(!d2 || d2.slot !== tgt) continue;
-      const dv = ARMOR[d2.id] || {};
-      list.push({ id: pp2[0], rarity: pp2[1], def: d2, count: 0, armorLv: dv.level || 0, armorVal: equipArmorValue(pp2[0], pp2[1]) });
+    const cands2 = (typeof window._equipCandidates === 'function') ? window._equipCandidates(tgt) : [];
+    for(const c2 of cands2){
+      const dv = ARMOR[c2.id] || {};
+      list.push({ id:c2.id, rarity:c2.rarity, def:c2.def, count:0, armorLv:dv.level || 0, armorVal:equipArmorValue(c2.id, c2.rarity) });
     }
   } else if(slot === 'ammoPouch'){
     const pw = p.primaryWeapon;
@@ -1173,7 +1168,7 @@ function _stPickEquip(idx, slot){
           if(!AMMO[pp3[0]]) continue;
           if(AMMO[pp3[0]].cal !== cal) continue;
           if(state.inventory[k3] <= 0) continue;
-          list.push({ id: pp3[0], rarity: pp3[1], def: AMMO[pp3[0]], count: Math.min(120, state.inventory[k3]) });
+          list.push({ id:pp3[0], rarity:pp3[1], def:AMMO[pp3[0]], count:Math.min(120, state.inventory[k3]) });
         }
         if(!list.length) hint = '庫存沒有主武器口徑彈藥';
       }
@@ -1183,35 +1178,34 @@ function _stPickEquip(idx, slot){
       const pp4 = k4.split('@');
       if(!AMMO[pp4[0]]) continue;
       if(state.inventory[k4] <= 0) continue;
-      list.push({ id: pp4[0], rarity: pp4[1], def: AMMO[pp4[0]], count: Math.min(AMMOBOX_CAPACITY, state.inventory[k4]) });
+      list.push({ id:pp4[0], rarity:pp4[1], def:AMMO[pp4[0]], count:Math.min(AMMOBOX_CAPACITY, state.inventory[k4]) });
     }
   }
-
   list.sort(function(a, b){
     const rd = sortByRarityDesc(a, b);
     return rd !== 0 ? rd : (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
   });
-
   let body = '';
   const hasCur = (slot === 'primaryWeapon' && p.primaryWeapon) || (slot === 'helmet' && p.helmet) || (slot === 'body' && p.body) || (slot === 'ammoPouch' && p.ammoPouch) || (slot === 'ammoBox' && p.ammoBox);
-  if(hasCur) body += '<div class="item-row" data-clear="1"><div class="icon">✕</div><div class="info"><div class="nm">卸下</div><div class="sub">清空此欄</div></div></div>';
+  if(hasCur) body += '<div class="item-row" data-clear="1"><div class="icon">✕</div><div class="info"><div class="nm">卸下</div><div class="sub">清空此欄（不影響其它位置）</div></div></div>';
   if(hint) body += '<div class="empty-hint">' + hint + '</div>';
   else if(!list.length) body += '<div class="empty-hint">沒有可選項</div>';
-  const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI'];
-
   for(let li = 0; li < list.length; li++){
     const it = list[li];
     const iw = _stCandW(slot, it);
     const dis = (bw + iw) > mw;
     let wl = iw.toFixed(1) + ' kg' + (dis ? ' · 超重' : '');
-    if(it.count && (slot === 'ammoPouch' || slot === 'ammoBox')) wl += ' ×' + it.count;
+    if(it.count && (slot === 'ammoPouch' || slot === 'ammoBox' || it.isBox)) wl += ' ×' + it.count;
     const _isArmorSlot = (slot === 'helmet' || slot === 'body');
     if(_isArmorSlot && it.armorVal) wl += ' · 甲' + it.armorVal;
     const _acStr = _isArmorSlot ? (_armorClassWithSub(it.def) || '') : '';
     const _acHtml = _acStr ? ' <span class="armor-class">' + _acStr + '</span>' : '';
-    body += '<div class="item-row' + (dis ? ' disabled' : '') + '" data-eid="' + it.id + '" data-rid="' + it.rarity + '"><div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 40) + '</div><div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div><div class="sub">' + it.rarity + ' · ' + wl + '</div></div>' + (dis ? '<div class="cnt" style="color:#e05252;font-weight:bold">✕</div>' : '') + '</div>';
+    body += '<div class="item-row' + (dis ? ' disabled' : '') + '" data-eid="' + it.id + '" data-rid="' + it.rarity + '">'
+      + '<div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 40) + '</div>'
+      + '<div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div>'
+      + '<div class="sub">' + it.rarity + ' · ' + wl + '</div></div>'
+      + (dis ? '<div class="cnt" style="color:#e05252;font-weight:bold">✕</div>' : '') + '</div>';
   }
-
   const _title = '選擇 ' + (_ST_SLOT_LABELS[slot] || slot) + ' · ' + tw.toFixed(1) + ' / ' + mw + ' kg' + (tw > mw ? ' ⚠' : '');
   const bd = openModal({ title: _title, body: body, onClose: function(){ closeModal(); _stDetail(idx); } });
   const rows = bd.querySelectorAll('.item-row:not(.disabled)');
@@ -1226,28 +1220,23 @@ function _stPickEquip(idx, slot){
           else if(slot === 'body'){ p.body = null; p.bodyRarity = ''; }
           else if(slot === 'ammoPouch'){ if(p.ammoPouch) invAdd(p.ammoPouch.ammoId, p.ammoPouch.rarity, p.ammoPouch.count); p.ammoPouch = null; }
           else if(slot === 'ammoBox'){ if(p.ammoBox) invAdd(p.ammoBox.ammoId, p.ammoBox.rarity, p.ammoBox.count); p.ammoBox = null; }
-          save();
-          closeModal();
-          _stDetail(idx);
-          return;
+          save(); closeModal(); _stDetail(idx); return;
         }
         const eid = el.getAttribute('data-eid');
         const rid = el.getAttribute('data-rid');
         if(slot === 'ammoPouch' || slot === 'ammoBox'){
           let f = null;
-          for(let fi = 0; fi < list.length; fi++){
-            if(list[fi].id === eid && list[fi].rarity === rid){ f = list[fi]; break; }
-          }
+          for(let fi = 0; fi < list.length; fi++){ if(list[fi].id === eid && list[fi].rarity === rid){ f = list[fi]; break; } }
           if(!f) return;
           const take = f.count;
           if(take <= 0) return;
           invRemove(eid, rid, take);
           if(slot === 'ammoPouch'){
             if(p.ammoPouch) invAdd(p.ammoPouch.ammoId, p.ammoPouch.rarity, p.ammoPouch.count);
-            p.ammoPouch = { ammoId: eid, rarity: rid, count: take };
+            p.ammoPouch = { ammoId:eid, rarity:rid, count:take };
           } else {
             if(p.ammoBox) invAdd(p.ammoBox.ammoId, p.ammoBox.rarity, p.ammoBox.count);
-            p.ammoBox = { ammoId: eid, rarity: rid, count: take };
+            p.ammoBox = { ammoId:eid, rarity:rid, count:take };
           }
         } else {
           if(slot === 'primaryWeapon'){
@@ -1272,10 +1261,7 @@ function _stPickEquip(idx, slot){
           } else if(slot === 'helmet'){ p.helmet = eid; p.helmetRarity = rid; }
           else if(slot === 'body'){ p.body = eid; p.bodyRarity = rid; }
         }
-        save();
-        closeModal();
-        _stRefresh();
-        _stDetail(idx);
+        save(); closeModal(); _stRefresh(); _stDetail(idx);
       };
     })(rows[ri]);
   }
@@ -1456,39 +1442,18 @@ function _openRelocateConfirm(targetLabel, onConfirm, onCancel){
 }
 
 function _stReturnPassengerEquip(p){
+  /* rev-eq-coexist: 移除載員只清自己的持有位。武器 / 護甲是引用，不回填庫存
+     （否則會造出第二份 → 被唯一化分解 → 憑空刷材料）。彈藥仍是消耗品，退回。 */
   if(!p) return;
-  if(p.primaryWeapon){
-    if(AMMO[p.primaryWeapon]){
-      invAdd(p.primaryWeapon, p.primaryWeaponRarity || '一般', p.primaryWeaponBoxCount || AMMOBOX_CAPACITY);
-    } else {
-      invAdd(p.primaryWeapon, p.primaryWeaponRarity || '一般', 1);
-    }
-    p.primaryWeapon = null;
-    p.primaryWeaponRarity = '';
-    p.primaryWeaponBoxCount = 0;
+  if(p.primaryWeapon && AMMO[p.primaryWeapon]){
+    invAdd(p.primaryWeapon, p.primaryWeaponRarity || '一般', p.primaryWeaponBoxCount || AMMOBOX_CAPACITY);
   }
-  if(p.helmet){
-    invAdd(p.helmet, p.helmetRarity || '一般', 1);
-    p.helmet = null;
-    p.helmetRarity = '';
-  }
-  if(p.body){
-    invAdd(p.body, p.bodyRarity || '一般', 1);
-    p.body = null;
-    p.bodyRarity = '';
-  }
-  if(p.ammoPouch){
-    invAdd(p.ammoPouch.ammoId, p.ammoPouch.rarity || '一般', p.ammoPouch.count || 0);
-    p.ammoPouch = null;
-  }
-  if(p.ammoBox){
-    invAdd(p.ammoBox.ammoId, p.ammoBox.rarity || '一般', p.ammoBox.count || 0);
-    p.ammoBox = null;
-  }
-  if(Array.isArray(p.grenades)){
-    /* rev141: 手榴彈 = 配置，卸載員時不退庫存 */
-    for(let i = 0; i < p.grenades.length; i++) p.grenades[i] = null;
-  }
+  p.primaryWeapon = null; p.primaryWeaponRarity = ''; p.primaryWeaponBoxCount = 0;
+  p.helmet = null; p.helmetRarity = '';
+  p.body = null; p.bodyRarity = '';
+  if(p.ammoPouch){ invAdd(p.ammoPouch.ammoId, p.ammoPouch.rarity || '一般', p.ammoPouch.count || 0); p.ammoPouch = null; }
+  if(p.ammoBox){ invAdd(p.ammoBox.ammoId, p.ammoBox.rarity || '一般', p.ammoBox.count || 0); p.ammoBox = null; }
+  if(Array.isArray(p.grenades)){ for(let i = 0; i < p.grenades.length; i++) p.grenades[i] = null; }
 }
 
 function _stSwapPassenger(idx){

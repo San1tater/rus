@@ -95,6 +95,8 @@ function save(){
 }
 
 function load(){
+  window.__eqLoading = true; /* rev-eq-load */
+  window.__stateLoading = true; /* rev-uniq-safe */
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if(!raw) return false;
@@ -524,13 +526,28 @@ function load(){
         }
       }
     })();
-    _initUnlockedFrom();
-
-    /* rev-fix-sanitize-state: 通用存檔自檢 */
+    window.__stateLoading = false; /* rev-uniq-safe */
+  window.__stateLoading = false; /* rev-load-clear */
+  _initUnlockedFrom();
+  /* rev-canon-persist: 還原「最後改裝」註冊表（跨 reload 生效） */
+  if(state.weaponCanonAt && typeof state.weaponCanonAt === 'object'){
+    for(var _ck in state.weaponCanonAt){ _weaponCanonAt[_ck] = state.weaponCanonAt[_ck]; }
+  }
+  /* rev-eq-loadorder: 先解除 __eqLoading 守衛，再跑遷移。
+     舊順序在守衛仍為 true 時呼叫 _eqMigrateAll → _unifyWeaponBase 全部空跑，
+     遷移從未在 load 生效。 */
+  window.__eqLoading = false;
+  try{ window._eqMigrateAll(); }catch(e){ console.warn('[eq migrate]', e); }
+  /* rev-weapon-single-migrate 已移除：它是引用模型之前的舊遷移，會把
+     「持有位已引用」的庫存 canonical（擁有權記錄）當重複副本刪除 —— 語義相反。
+     新模型：canonical 恆存在且為 1；玩家 / 載員 / 守衛是它的引用，兩者共存。 *//* rev-fix-sanitize-state: 通用存檔自檢 */
     _sanitizeState();
 
     return true;
   } catch(e){
+    window.__stateLoading = false; /* rev-uniq-safe */
+    window.__stateLoading = false; /* rev-load-flag-catch */
+    window.__eqLoading = false;
     console.warn('[load] err:', e);
     return false;
   }
@@ -552,82 +569,163 @@ function rarityClass(r){ return 'r-' + r; }
 function invKey(id, r){ return id + '@' + r; }
 /* rev-unique-weapon: 同 baseId 主副武器唯一，保留优先级最高的 */
 function _weaponPriority(id, rarity){
+  /* rev-eq-coexist: 型號唯一適用於 主/副/近戰 + 護甲；投擲物 / 背包不適用 */
   if(!id) return -1;
   var d = ALL_ITEMS[id];
   if(!d) return -1;
-  if(d.slot !== 'primary' && d.slot !== 'secondary') return -1;
+  if(!d.slot || d.slot === 'throwable' || d.slot === 'backpack') return -1;
   var r = RARITY_ORDER.indexOf(rarity);
   if(r < 0) return -1;
   return r + (d.named ? 0.5 : 0);
 }
 function _weaponBaseId(id){
+  /* rev-eq-coexist: 型號 key */
   if(!id) return null;
   var d = ALL_ITEMS[id];
   if(!d) return null;
-  if(d.slot !== 'primary' && d.slot !== 'secondary') return null;
+  if(!d.slot || d.slot === 'throwable' || d.slot === 'backpack') return null;
   if(d.named) return d.baseId || null;
-  return WEAPONS[id] ? id : null;
+  if(d.slot === 'primary' || d.slot === 'secondary' || d.slot === 'melee') return WEAPONS[id] ? id : null;
+  return id;
 }
-function _salvageWeaponOne(where, key, slot, id, rarity){
-  if(where === 'inv'){ delete state.inventory[key]; }
-  else { state.player.equipped[slot] = null; delete state.player.equippedRarity[slot]; }
-  var _name = ALL_ITEMS[id] ? ALL_ITEMS[id].name : id;
-  var _rc = (typeof rarityClass === 'function') ? rarityClass(rarity) : '';
-  if(typeof salvageToMaterials === 'function') salvageToMaterials(id, rarity, 1);
-  if(typeof pushLog === 'function'){
-    pushLog('<span class="pl">系統</span> 同型號已有更高稀有度武器，<span class="' + _rc + '">' + _name + '</span> 自動分解', [], 'explore');
+/* 同型號主副武器唯一化：玩家 / 載員 / 守衛塔 / 背包合計只保留一把。
+   優先序 = 稀有度（具名 > 傳奇 > …），同為具名時以最後改裝為準。
+   落敗的持有位直接換成 canonical（自動更新，不卸下）；背包多餘分解為材料。 */
+var _weaponCanonAt = {};
+var _unifyBusy = false;
+function _weaponRefs(){
+  /* rev-eq-coexist: 所有持有位。每個持有位都是「同一把武器的引用」，
+     可以與其它持有位同時存在，互不排斥。 */
+  var out = [];
+  var eq = state.player.equipped || {};
+  var er = state.player.equippedRarity || {};
+  ['primary','secondary','melee','head','face','top','pants','shoes'].forEach(function(s){
+    if(!eq[s]) return;
+    out.push({ label:'玩家·' + window.slotLabel(s), id:eq[s], rar:er[s] || '一般',
+      set:function(id, r){ eq[s] = id; if(id) er[s] = r; else delete er[s]; } });
+  });
+  var ps = (state.station && state.station.passengers) || [];
+  ps.forEach(function(p, i){
+    if(!p) return;
+    [['primary','primaryWeapon','primaryWeaponRarity'],
+     ['secondary','secondaryWeapon','secondaryWeaponRarity'],
+     ['head','helmet','helmetRarity'],
+     ['top','body','bodyRarity']].forEach(function(t){
+      if(!p[t[1]]) return;
+      out.push({ label:'載員#' + (i + 1) + '·' + window.slotLabel(t[0]), id:p[t[1]], rar:p[t[2]] || '一般',
+        set:function(id, r){ p[t[1]] = id; p[t[2]] = id ? r : ''; } });
+    });
+  });
+  var plots = (state.garden && state.garden.plots) || [];
+  plots.forEach(function(pl, i){
+    var tc = pl && pl.towerConfig;
+    if(!tc || !tc.eq) return;
+    ['primary','secondary','head','top'].forEach(function(s){
+      if(!tc.eq[s]) return;
+      var nm = (typeof plotCoordName === 'function') ? plotCoordName(i) : ('#' + (i + 1));
+      out.push({ label:'守衛' + nm + '·' + window.slotLabel(s), id:tc.eq[s], rar:(tc.eqRarity && tc.eqRarity[s]) || '一般',
+        set:function(id, r){ tc.eq[s] = id; tc.eqRarity = tc.eqRarity || {}; if(id) tc.eqRarity[s] = r; else delete tc.eqRarity[s]; } });
+    });
+  });
+  return out;
+}
+function _weaponScore(baseId, id, rar){
+  var pri = _weaponPriority(id, rar);
+  if(pri < 0) return -1;
+  var reg = _weaponCanonAt[baseId];
+  var t = (reg && reg.id === id) ? (reg.at || 0) : 0;
+  return pri * 1e15 + t;
+}
+function _weaponBest(baseId){
+  var best = null, bs = -1;
+  var refs = _weaponRefs();
+  for(var i = 0; i < refs.length; i++){
+    var r = refs[i];
+    if(_weaponBaseId(r.id) !== baseId) continue;
+    var s = _weaponScore(baseId, r.id, r.rar);
+    if(s > bs){ bs = s; best = { id:r.id, rar:r.rar }; }
   }
+  var keys = Object.keys(state.inventory);
+  for(var j = 0; j < keys.length; j++){
+    var p = keys[j].split('@');
+    if(p.length !== 2 || (state.inventory[keys[j]] || 0) <= 0) continue;
+    if(_weaponBaseId(p[0]) !== baseId) continue;
+    var s2 = _weaponScore(baseId, p[0], p[1]);
+    if(s2 > bs){ bs = s2; best = { id:p[0], rar:p[1] }; }
+  }
+  return best;
 }
-/* true = 新武器應該分解 */
+function _unifyWeaponBase(baseId){
+  /* rev-eq-coexist: 一個型號只保留最高稀有度那一份。
+     庫存那一份 = 擁有權記錄；玩家 / 載員 / 守衛是它的「引用」，可同時存在。
+       · 持有位一律升級為 canonical —— 絕不清空
+       · canonical 庫存 key 恆存在且為 1 —— 絕不刪除
+       · 只分解「較低稀有度」與「同鍵多餘」
+       · unlockedEquip 收斂到 canonical
+       · 全程靜默；存檔載入期間不執行 */
+  if(_unifyBusy || !baseId || window.__eqLoading) return;
+  _unifyBusy = true;
+  try{
+    var best = _weaponBest(baseId);
+    if(!best || !ALL_ITEMS[best.id]) return;
+    var bestRar = best.rar || '一般';
+    var bestKey = best.id + '@' + bestRar;
+    var refs = _weaponRefs();
+    for(var r = 0; r < refs.length; r++){
+      var ref = refs[r];
+      if(_weaponBaseId(ref.id) !== baseId) continue;
+      if(ref.id === best.id && (ref.rar || '一般') === bestRar) continue;
+      ref.set(best.id, bestRar);
+    }
+    var keys = Object.keys(state.inventory);
+    for(var i = 0; i < keys.length; i++){
+      var k = keys[i];
+      var p = k.split('@');
+      if(p.length !== 2) continue;
+      if(_weaponBaseId(p[0]) !== baseId) continue;
+      var n = state.inventory[k] || 0;
+      if(k === bestKey){
+        if(n <= 0){ state.inventory[k] = 1; continue; }
+        if(n > 1){ state.inventory[k] = 1; salvageToMaterials(p[0], p[1], n - 1); }
+        continue;
+      }
+      delete state.inventory[k];
+      if(n > 0) salvageToMaterials(p[0], p[1], n);
+    }
+    if(!state.inventory[bestKey]) state.inventory[bestKey] = 1;
+    if(!state.unlockedEquip) state.unlockedEquip = {};
+    for(var uk in state.unlockedEquip){
+      var up = uk.split('@');
+      if(up.length !== 2) continue;
+      if(_weaponBaseId(up[0]) !== baseId) continue;
+      if(uk !== bestKey) delete state.unlockedEquip[uk];
+    }
+    state.unlockedEquip[bestKey] = true;
+  } finally { _unifyBusy = false; }
+}
+/* true = 新武器優先級低於現有同型號，應該分解 */
 function _resolveWeaponUniqueness(newId, newRarity){
+  /* rev-eq-coexist: 只有「嚴格低於」現有 canonical 才在入手時直接分解。
+     等於（同 id 同稀有度）放行 → 交由 _unifyWeaponBase 收斂為 1。 */
   var baseId = _weaponBaseId(newId);
   if(!baseId) return false;
-  var newPri = _weaponPriority(newId, newRarity);
-  if(newPri < 0) return false;
-  var conflicts = [];
-  for(var k in state.inventory){
-    var p = k.split('@');
-    if(p[0] === newId && p[1] === newRarity) continue;
-    if(_weaponBaseId(p[0]) !== baseId) continue;
-    conflicts.push({where:'inv', key:k, id:p[0], r:p[1], pri:_weaponPriority(p[0], p[1])});
-  }
-  for(var s in state.player.equipped){
-    var eid = state.player.equipped[s];
-    if(!eid) continue;
-    var er = state.player.equippedRarity[s] || '一般';
-    if(eid === newId && er === newRarity) continue;
-    if(_weaponBaseId(eid) !== baseId) continue;
-    conflicts.push({where:'eq', slot:s, id:eid, r:er, pri:_weaponPriority(eid, er)});
-  }
-  if(!conflicts.length) return false;
-  var maxPri = -1;
-  for(var i = 0; i < conflicts.length; i++) if(conflicts[i].pri > maxPri) maxPri = conflicts[i].pri;
-  if(newPri >= maxPri){
-    for(var j = 0; j < conflicts.length; j++){
-      _salvageWeaponOne(conflicts[j].where, conflicts[j].key, conflicts[j].slot, conflicts[j].id, conflicts[j].r);
-    }
-    return false;
-  }
-  return true;
+  var best = _weaponBest(baseId);
+  if(!best) return false;
+  if(newId === best.id && (newRarity || '一般') === (best.rar || '一般')) return false;
+  return _weaponScore(baseId, newId, newRarity) < _weaponScore(baseId, best.id, best.rar);
 }
 function invAddRaw(id, r, c){
-  /* rev-fix-uniqueness-call */
-  if(_resolveWeaponUniqueness(id, r)){
-    if(typeof salvageToMaterials === 'function') salvageToMaterials(id, r, c);
-    return;
-  }
-
   if(c <= 0) return;
-  if(!ALL_ITEMS[id] && !isNamedWeaponId(id)){
-    console.warn('[invAddRaw] 非法物品', id);
-    return;
-  }
+  if(!ALL_ITEMS[id] && !isNamedWeaponId(id)){ console.warn('[invAddRaw] 非法物品', id); return; }
+  if(_resolveWeaponUniqueness(id, r)){ salvageToMaterials(id, r, c); return; }
   var k = invKey(id, r);
   state.inventory[k] = (state.inventory[k] || 0) + c;
   if(ALL_ITEMS[id] && ALL_ITEMS[id].slot){
     if(!state.unlockedEquip) state.unlockedEquip = {};
     state.unlockedEquip[id + '@' + r] = true;
   }
+  var _b = _weaponBaseId(id);
+  if(_b) _unifyWeaponBase(_b);
 }
 function invRemove(id, r, c){
   if(typeof SEEDS !== 'undefined' && SEEDS[id]){ return gardenStorageRemove(id, r, c); }
@@ -860,21 +958,145 @@ function _sanitizeState(){
 }
 
 function _initUnlockedFrom(){
+  /* rev-eq-permission: 權限來源 = 背包 + 所有持有位（玩家 / 載員 / 守衛塔）。
+     裝備給守衛或載員不會留在背包，但權限必須保留，否則玩家選單會看不到。 */
   if(!state.unlockedEquip || typeof state.unlockedEquip !== 'object') state.unlockedEquip = {};
+  var _reg = function(id, rar){
+    if(!id) return;
+    var d = ALL_ITEMS[id];
+    if(d && d.slot) state.unlockedEquip[id + '@' + (rar || '一般')] = true;
+  };
   for(var k in state.inventory){
     var p = k.split('@');
     if(p.length !== 2) continue;
-    var d = ALL_ITEMS[p[0]];
-    if(d && d.slot) state.unlockedEquip[k] = true;
+    _reg(p[0], p[1]);
   }
   for(var slot in state.player.equipped){
-    var id = state.player.equipped[slot];
-    if(!id) continue;
-    var rar = state.player.equippedRarity[slot] || '一般';
-    var d2 = ALL_ITEMS[id];
-    if(d2 && d2.slot) state.unlockedEquip[id + '@' + rar] = true;
+    _reg(state.player.equipped[slot], state.player.equippedRarity[slot]);
+  }
+  var _ps = (state.station && state.station.passengers) || [];
+  for(var i = 0; i < _ps.length; i++){
+    var pp = _ps[i]; if(!pp) continue;
+    _reg(pp.primaryWeapon, pp.primaryWeaponRarity);
+    _reg(pp.secondaryWeapon, pp.secondaryWeaponRarity);
+    _reg(pp.helmet, pp.helmetRarity);
+    _reg(pp.body, pp.bodyRarity);
+  }
+  var _plots = (state.garden && state.garden.plots) || [];
+  for(var j = 0; j < _plots.length; j++){
+    var tc = _plots[j] && _plots[j].towerConfig;
+    if(!tc || !tc.eq) continue;
+    var tr = tc.eqRarity || {};
+    var slots = ['head','top','primary','secondary'];
+    for(var s = 0; s < slots.length; s++){ _reg(tc.eq[slots[s]], tr[slots[s]]); }
   }
 }
+/* rev-eq-canon: 所有裝備選單的唯一候選來源。
+   每個型號一列，只顯示最高稀有度；來源 = 庫存（擁有權）∪ 所有持有位。
+   絕不讀 unlockedEquip —— 那是「每個 id@稀有度」的永久log，會把所有稀有度都列出來。
+   投擲物是消耗品，仍按庫存逐稀有度列出。 */
+window._equipCandidates = function(slot){
+  /* rev-eq-coexist: 三個選單（玩家 / 載員 / 守衛）的唯一候選來源。
+     每型號一列，只顯示最高稀有度；來源 = 庫存（擁有權）∪ 所有持有位。
+     絕不讀 unlockedEquip（那是全稀有度 log）。投擲物仍按庫存逐稀有度列出。 */
+  if(!window.__eqMigrated){
+    window.__eqMigrated = true;
+    try{ if(typeof window._eqMigrateAll === 'function') window._eqMigrateAll(); }catch(e){ console.warn('[eq migrate]', e); }
+  }
+  var out = [];
+  var _sort = function(a, b){
+    var ra = sortByRarityDesc(a, b);
+    if(ra !== 0) return ra;
+    return String((a.def && a.def.name) || '').localeCompare(String((b.def && b.def.name) || ''), 'zh-Hant');
+  };
+  if(slot === 'throwable'){
+    for(var k in state.inventory){
+      var p = k.split('@');
+      if(p.length !== 2) continue;
+      if((state.inventory[k] || 0) <= 0) continue;
+      var d = itemDef(p[0]);
+      if(!d || d.slot !== 'throwable') continue;
+      out.push({ id:p[0], rarity:p[1], def:d, count:state.inventory[k] });
+    }
+    out.sort(_sort);
+    return out;
+  }
+  var byBase = {};
+  function consider(id, rar){
+    if(!id) return;
+    var d = itemDef(id);
+    if(!d || d.slot !== slot) return;
+    var b = _weaponBaseId(id) || id;
+    var sc = _weaponScore(b, id, rar || '一般');
+    var prev = byBase[b];
+    if(!prev || sc > prev._sc) byBase[b] = { id:id, rarity:rar || '一般', def:d, _sc:sc };
+  }
+  for(var k2 in state.inventory){
+    var p2 = k2.split('@');
+    if(p2.length !== 2) continue;
+    if((state.inventory[k2] || 0) <= 0) continue;
+    consider(p2[0], p2[1]);
+  }
+  _weaponRefs().forEach(function(r){ consider(r.id, r.rar); });
+  for(var b2 in byBase){
+    var e = byBase[b2];
+    out.push({ id:e.id, rarity:e.rarity, def:e.def, count:1 });
+  }
+  out.sort(_sort);
+  return out;
+};;
+/* 一次性遷移：持有位引用但庫存缺記錄 → 補回；同型號收斂到最高稀有度 */
+window._eqMigrateAll = function(){
+  /* rev-eq-regen: 具名武器定義自愈。ALL_ITEMS 是執行期物件，reload 後靠
+     load 的 _regen 從「庫存 + 玩家裝備」重建；舊遷移刪掉庫存擁有權記錄後，
+     只被載員 / 守衛持有的具名武器永遠重建不出來 → itemDef=null → 視同被移除。
+     此處從 持有位 / 庫存 / 潛行收槍 的 id 本身重建（id 編碼 baseId_mag_scope_grip）。 */
+  function _regenFromId(id){
+    if(!id || ALL_ITEMS[id] || !isNamedWeaponId(id)) return;
+    var p = parseNamedId(id);
+    if(!p || !WEAPONS[p.baseId]) return;
+    var _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87':'c','PSO-1':'l','PS320':'l','1P59':'l' };
+    var _sLong = {};
+    for(var sk in _sMap){ if(!_sLong[_sMap[sk]]) _sLong[_sMap[sk]] = []; _sLong[_sMap[sk]].push(sk); }
+    var _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1':'g' };
+    var _gLong = {};
+    for(var gk in _gMap){ _gLong[_gMap[gk]] = gk; }
+    var rules = WEAPON_MOD_RULES[p.baseId] || {};
+    var valid = rules.scopes || [];
+    var scopeLong = null;
+    if(p.scope){
+      if(valid.indexOf(p.scope) >= 0){ scopeLong = p.scope; }
+      else {
+        var cands = _sLong[p.scope] || [];
+        for(var ci = 0; ci < cands.length; ci++){ if(valid.indexOf(cands[ci]) >= 0){ scopeLong = cands[ci]; break; } }
+        if(!scopeLong && cands.length > 0) scopeLong = cands[0];
+      }
+    }
+    var gripLong = p.grip ? (_gLong[p.grip] || p.grip) : null;
+    getOrCreateNamedItem(p.baseId, p.mag, scopeLong, gripLong);
+  }
+  var seen = {};
+  _weaponRefs().forEach(function(r){
+    _regenFromId(r.id);
+    var b = _weaponBaseId(r.id); if(b) seen[b] = 1;
+  });
+  for(var k in state.inventory){
+    var p = k.split('@');
+    if(p.length !== 2) continue;
+    _regenFromId(p[0]);
+    var b2 = _weaponBaseId(p[0]);
+    if(b2) seen[b2] = 1;
+  }
+  if(state.stashedWeapons){
+    for(var ss in state.stashedWeapons){
+      var st = state.stashedWeapons[ss];
+      if(st && st.id){ _regenFromId(st.id); var sb = _weaponBaseId(st.id); if(sb) seen[sb] = 1; }
+    }
+  }
+  var n = 0;
+  for(var b3 in seen){ _unifyWeaponBase(b3); n++; }
+  return n;
+};
 function _isNamedWeaponComboValid(id){
   var _p2 = parseNamedId(id);
   if(!_p2) return false;
@@ -1093,7 +1315,7 @@ function consolidateInventoryDuplicates(){
 }
 function salvageToMaterials(id, rarity, count){
   var cat = itemCat(id);
-  var mult = {'破舊':1,'一般':2,'庫存':3,'精品':5,'傳奇':8,'具名':8}[rarity] || 1;
+  var mult = { '破舊':1, '一般':2, '庫存':3, '精品':5, '傳奇':8, '具名':8 }[rarity] || 1;
   var mats = [];
   if(cat === 'armor') mats = [['cloth', mult], ['metal', mult]];
   else if(cat === 'weapon'){
@@ -1115,73 +1337,18 @@ function salvageToMaterials(id, rarity, count){
     invAddRaw(mats[i][0], '一般', mats[i][1] * count);
   }
   addProf('salvage', 0.5 * count);
+  /* 拆掉舊槍後，仍指向它的守衛塔 / 載員 / 玩家自動換成現存最高版本 */
+  if(cat === 'weapon'){
+    var _b = _weaponBaseId(id);
+    if(_b) _unifyWeaponBase(_b);
+  }
   return true;
 }
 function invAdd(id, rarity, count){
+  /* rev-eq-canon: 唯一化統一交给 invAddRaw / _unifyWeaponBase。
+     舊版護甲分支會標記 pendingSalvageEquipped，配合引用模型會誤拆新裝備，已移除。 */
   if(count <= 0) return;
   if(typeof SEEDS !== 'undefined' && SEEDS[id]){ gardenStorageAdd(id, rarity, count); return; }
-  if(!ALL_ITEMS[id] && !isNamedWeaponId(id)){
-    console.warn('[invAdd] 非法物品', id);
-    return;
-  }
-  var cat = itemCat(id);
-
-  if(cat === 'weapon' && !isNamedWeaponId(id) && rarity === '傳奇'){
-    var _pfx = id + '_';
-    var _hasNamed = false;
-    for(var k in state.inventory){
-      var _iid = k.split('@')[0];
-      if(_iid.indexOf(_pfx) === 0){ _hasNamed = true; break; }
-    }
-    if(!_hasNamed){
-      for(var s in state.player.equipped){
-        var _eid = state.player.equipped[s];
-        if(_eid && _eid.indexOf(_pfx) === 0){ _hasNamed = true; break; }
-      }
-    }
-    if(_hasNamed){ salvageToMaterials(id, rarity, count); return; }
-  }
-
-  if(cat === 'weapon' || cat === 'armor'){
-    var newMult = RARITY_MULT[rarity] || 1;
-    var maxInvMult = 0, maxInvKey = null;
-    for(var k2 in state.inventory){
-      var p2 = k2.split('@');
-      if(p2[0] !== id) continue;
-      var m = RARITY_MULT[p2[1]] || 1;
-      if(m > maxInvMult){ maxInvMult = m; maxInvKey = k2; }
-    }
-    var maxEqMult = 0, maxEqSlot = null;
-    for(var s2 in state.player.equipped){
-      if(state.player.equipped[s2] === id){
-        var eRar = state.player.equippedRarity[s2] || '一般';
-        var m2 = RARITY_MULT[eRar] || 1;
-        if(m2 > maxEqMult){ maxEqMult = m2; maxEqSlot = s2; }
-      }
-    }
-    var maxExisting = Math.max(maxInvMult, maxEqMult);
-    if(maxExisting > 0){
-      if(newMult <= maxExisting){ salvageToMaterials(id, rarity, count); return; }
-      else {
-        var _toDel = [];
-        for(var k3 in state.inventory){
-          var p3 = k3.split('@');
-          if(p3[0] !== id) continue;
-          var m3 = RARITY_MULT[p3[1]] || 1;
-          if(m3 < newMult) _toDel.push({k:k3, rar:p3[1], cnt:state.inventory[k3]});
-        }
-        for(var di = 0; di < _toDel.length; di++){
-          delete state.inventory[_toDel[di].k];
-          salvageToMaterials(id, _toDel[di].rar, _toDel[di].cnt);
-        }
-        if(maxEqSlot){
-          if(!state.pendingSalvageEquipped) state.pendingSalvageEquipped = {};
-          state.pendingSalvageEquipped[maxEqSlot] = true;
-        }
-      }
-    }
-  }
-
   invAddRaw(id, rarity, count);
 }
 
@@ -1843,7 +2010,7 @@ function processCrafting(){
   const genLv = (typeof getBuildingLv === 'function') ? getBuildingLv('generator') : 0;
   const sm = 1 + genLv * 0.2;
   const wbLv = Math.min(50, Math.max(1, (typeof getBuildingLv === 'function' ? getBuildingLv('workbench') : 1) || 1));
-  const wbBaseSec = 86400 * Math.pow(300/86400, (wbLv-1)/49);
+  const wbBaseSec = 86400 * Math.pow(300 / 86400, (wbLv - 1) / 49);
   for(let i = state.crafting.length - 1; i >= 0; i--){
     const c = state.crafting[i];
     if(c.type === 'mod'){
@@ -1852,6 +2019,8 @@ function processCrafting(){
       if(now - c.startTime >= t){
         const info = c.modInfo;
         const namedId = getOrCreateNamedItem(info.baseId, info.mag, info.scope, info.grip || null);
+        /* 註冊為該型號的最新版本；守衛塔 / 載員 / 玩家若仍持有改造前版本，統一換成它 */
+        _weaponCanonAt[info.baseId] = { id: namedId, at: Date.now() };
         if(info.source && info.source.type !== 'inventory' && _putWeaponToSource(info.source, namedId)){
           /* 放回原位 */
         } else {
@@ -1860,11 +2029,12 @@ function processCrafting(){
             pushLog('<span class="pl">系統</span> 改造完成：<b class="r-具名">' + itemDef(namedId).name + '</b> 已放入背包（原位置已被佔用）。', [], 'explore');
           }
         }
+        _unifyWeaponBase(info.baseId);
         pushLog('<span class="pl">玩家</span> 完成改造：<b class="r-具名">' + itemDef(namedId).name + '</b>。', [], 'explore');
         state.crafting.splice(i, 1);
-        if (typeof addProf === 'function') addProf('craft', 1);
-        if (typeof refreshPlayerStats === 'function') refreshPlayerStats();
-        if (typeof save === 'function') save();
+        if(typeof addProf === 'function') addProf('craft', 1);
+        if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
+        if(typeof save === 'function') save();
       }
     }
   }

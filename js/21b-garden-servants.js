@@ -269,7 +269,7 @@ function renderGardenServants(box){
           const s = servants[idx];
           const tDef = SERVANT_TYPES[s.type] || {name:'?'};
           const _img = 'icons/servants/' + s.type + '.png' + assetSuffix('icons/servants/' + s.type + '.png');
-          const _star = _isServantWorking(s) ? '<div class="srv-star">★</div>' : '';
+          const _star = (_srvBadge(s) !== '') ? '<div class="srv-star">' + _srvBadge(s) + '</div>' : '';
           const _label = servantLabel(s);
           const _labelEsc = _servantEscHtml(_label);
           /* rev-fix-servant-tab-injured: 重伤守卫卡片加 cant-go */

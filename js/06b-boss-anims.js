@@ -834,3 +834,139 @@ const BOSS_ANIMS = {
 })();
 
 if(BOSS_LAYERS.swamp_hydra) BOSS_LAYERS.swamp_hydra._hydraFollow = true;
+
+/* ===== rev-animatk2:start ===== */
+/* rev-animatk2: 五 Boss 攻擊動畫重建 + 鍵名正規化。
+   冪等：skill_smash / leap / hydra swipe 用存在守衛；鉗子 rekey 用執行期旗標；
+   factory / lab swipe 為確定性覆寫。II 變體共享同一物件引用，自動生效。 */
+(function(){
+'use strict';
+if(typeof BOSS_ANIMS==='undefined'||typeof BOSS_LAYERS==='undefined')return;
+/* 鍵名空白正規化："hammer-h " 之類的死鍵 trim 到 layer id */
+var _nc=0;
+for(var _bid in BOSS_ANIMS){
+  var _AA=BOSS_ANIMS[_bid]; if(!_AA) continue;
+  for(var _an in _AA){
+    var _A=_AA[_an]; if(!_A||!_A.keys) continue;
+    for(var _lid in _A.keys){
+      var _t=_lid.replace(/^\s+|\s+$/g,'');
+      if(_t!==_lid){ if(!_A.keys[_t]) _A.keys[_t]=_A.keys[_lid]; delete _A.keys[_lid]; _nc++; }
+    }
+  }
+}
+window._bossKeyNormCount=_nc;
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function idle8(A,fps){
+  var src=A.idle, out={frameCount:8,fps:fps||14,loop:false,keys:{}};
+  for(var lid in src.keys){
+    var arr=src.keys[lid], n=arr.length, o=[];
+    for(var i=0;i<8;i++) o.push(clone(arr[i%n]));
+    out.keys[lid]=o;
+  }
+  return out;
+}
+function setK(an,lid,prop,vals){
+  var arr=an.keys[lid]; if(!arr) return;
+  for(var i=0;i<arr.length&&i<vals.length;i++) arr[i][prop]=vals[i];
+}
+function extend(an,n){
+  an.frameCount=n;
+  for(var lid in an.keys){
+    var arr=an.keys[lid], last=clone(arr[arr.length-1]);
+    while(arr.length<n) arr.push(clone(last));
+  }
+}
+
+/* ── 鐵匠：揮錘弧掃向玩家側（畫布左側）+ 落錘段 + leap ── */
+var FK=BOSS_ANIMS.factory_king;
+if(FK&&FK.idle){
+  var sw=idle8(FK,14);
+  setK(sw,'hammer-h','rot',[-1.85,-70,-130,-172,-235,-262,-225,-90]);
+  setK(sw,'hammer-h','dx',[-22.26,-20,-16,-12,-34,-35,-29,-22.26]);
+  setK(sw,'hammer-h','dy',[12.39,7,1,-5,8,13,13,12.39]);
+  setK(sw,'arm_r','rot',[0,-30,-62,-95,48,62,28,0]);
+  setK(sw,'torso','rot',[0,-3,-6,-9,7,9,4,0]);
+  setK(sw,'head','rot',[0,-2,-4,-6,5,6,3,0]);
+  setK(sw,'arm_l','rot',[0,6,10,14,-8,-10,-4,0]);
+  FK.attack_swipe=sw;
+  if(FK.skill_charge&&!FK.skill_smash){
+    var sm=clone(FK.skill_charge); sm.fps=10; sm.loop=false; extend(sm,11);
+    setK(sm,'hammer-h','rot',[-1.85,-15,-27.07,-38.55,-64.08,-93.36,-139.81,-184.14,-215,-240,-268]);
+    setK(sm,'hammer-h','dx',[-22.26,-11.88,-7.1,-0.07,11.1,18.04,5.79,-26.2,-28,-34,-31]);
+    setK(sm,'hammer-h','dy',[12.39,13.18,11.484,9.6,2.78,-13.17,-10.72,-1.39,2,8,12]);
+    setK(sm,'arm_r','rot',[0,-15,-37.07,-29.04,-29.04,-40.3,-40.3,-17.5,-60,40,55]);
+    setK(sm,'torso','rot',[0,-5,-1.1,-1.1,-1.1,-1.1,-1.1,-8.7,-4,8,6]);
+    FK.skill_smash=sm;
+  }
+  if(FK.walk&&!FK.leap){
+    var lp=clone(FK.walk); lp.loop=true;
+    setK(lp,'leg_r','rot',[26,30,26,22,26,30,26,22]);
+    setK(lp,'leg_l','rot',[-18,-22,-18,-14,-18,-22,-18,-14]);
+    setK(lp,'torso','rot',[-8,-9,-8,-7,-8,-9,-8,-7]);
+    FK.leap=lp;
+  }
+}
+
+/* ── 醫師：顎刺深化（幀3 = 接觸，reach ≥ 2.6m）+ leap ── */
+var LQ=BOSS_ANIMS.lab_queen;
+if(LQ&&LQ.idle){
+  var ls=idle8(LQ,14);
+  setK(ls,'mandible','dx',[19.34,26,34,-60,-48,-10,8,19.34]);
+  setK(ls,'mandible','dy',[-4.3,-5,-6,-2,-1,-3,-4,-4.3]);
+  setK(ls,'head','rot',[0.26,-4,-9,12,15,6,2,0.26]);
+  setK(ls,'head','dx',[6.88,9,12,-28,-22,0,4,6.88]);
+  setK(ls,'torso','rot',[0,-3,-6,7,9,4,1,0]);
+  LQ.attack_swipe=ls;
+  if(LQ.walk&&!LQ.leap){ var ll=clone(LQ.walk); ll.loop=true; LQ.leap=ll; }
+}
+
+/* ── 鉗子：錘柄 anchor 到 arm_r —— 舊絕對鍵逐幀換算為相對鍵（姿勢精確保留） ── */
+var RT=BOSS_ANIMS.road_tyrant, RTL=BOSS_LAYERS.road_tyrant;
+if(RT&&RTL){
+  var hl=null;
+  for(var i=0;i<RTL.layers.length;i++) if(RTL.layers[i].id==='hammer-h') hl=RTL.layers[i];
+  if(hl&&hl.anchor&&hl.anchor.target==='arm_r'&&!RTL._hammerReparented){
+    for(var an in RT){
+      var A=RT[an];
+      if(!A||!A.keys||!A.keys['hammer-h']||!A.keys.arm_r) continue;
+      var hk=A.keys['hammer-h'], ak=A.keys.arm_r;
+      for(var f=0;f<hk.length;f++){
+        var k=hk[f], ar=ak[Math.min(f,ak.length-1)]||{rot:0,dx:0,dy:0};
+        var Px=400*0.87+4*(k.dx||0), Py=500*0.48+5*(k.dy||0);
+        var Ax=400*0.78+4*(ar.dx||0), Ay=500*0.34+5*(ar.dy||0);
+        var rr=-(ar.rot||0)*Math.PI/180, cs=Math.cos(rr), sn=Math.sin(rr);
+        var ox=(Px-Ax)*cs-(Py-Ay)*sn, oy=(Px-Ax)*sn+(Py-Ay)*cs;
+        k.dx=ox/4; k.dy=oy/5; k.rot=(k.rot||0)-(ar.rot||0);
+      }
+    }
+    RTL._hammerReparented=true;
+  }
+  if(RT.skill_charge&&!RT.skill_smash){
+    var ts=clone(RT.skill_charge); ts.fps=10; ts.loop=false; extend(ts,11);
+    setK(ts,'arm_r','rot',[-12,-25,25.4,48.8,101.6,59.6,28.6,28.6,30,10,-6]);
+    var th=ts.keys['hammer-h'];
+    if(th&&th[7]){ for(var s=8;s<11;s++) th[s]=clone(th[7]); }
+    setK(ts,'torso','rot',[0,0,0,0,0,0,0,0,-4,-7,-5]);
+    RT.skill_smash=ts;
+  }
+  if(RT.walk&&!RT.leap){
+    var tl=clone(RT.walk); tl.loop=true;
+    setK(tl,'leg_r','rot',[24,28,24,20,24,28,24,20]);
+    setK(tl,'leg_l','rot',[-16,-20,-16,-12,-16,-20,-16,-12]);
+    setK(tl,'torso','rot',[-6,-7,-6,-5,-6,-7,-6,-5]);
+    RT.leap=tl;
+  }
+}
+
+/* ── 蝮蛇：撲咬深化（head_3 鏈前突，mouth/eye 走 _hydraFollow） ── */
+var SH=BOSS_ANIMS.swamp_hydra;
+if(SH&&SH.idle&&!SH.attack_swipe){
+  var hs=idle8(SH,12);
+  setK(hs,'neck_3','rot',[-5.8,-2,4,10,-34,-40,-18,-5.8]);
+  setK(hs,'head_3','rot',[0,-4,-8,-14,-42,-48,-22,0]);
+  setK(hs,'head_3','dx',[-5.59,-2,4,10,-52,-56,-24,-5.59]);
+  setK(hs,'head_3','dy',[34.12,33,32,30,24,22,29,34.12]);
+  SH.attack_swipe=hs;
+}
+})();
+/* ===== rev-animatk2:end ===== */

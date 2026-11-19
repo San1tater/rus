@@ -1,27 +1,94 @@
 
 'use strict';
 
+/* rev-boss-world: Boss 戰世界米座標常量 */
+const BOSS_SAFE_ZONE_M = 5;
+const BOSS_WORLD_START = 95;
+const BOSS_DETECT_R = 80;
+const BOSS_ENGAGED_RANGE = 15;
+const PLAYER_MOVE_SPEED_MPS = 5;
+const BOSS_RANGE_M = 4.5;
+const BOSS_RANGE_M_II = 5.5;
+const BOSS_RANGE_M_HYDRA = 7.0;
+const BOSS_SWIPE_RANGE_M = 12;
+const BOSS_MIN_GAP_M = 2.5;
+const BOSS_HALF_WIDTH_M = 2.0;
+const BOSS_NORM_TO_M = 40;
+/* Boss 戰 UI 幾何（寫死；源自人偶繪製比例，不隨動畫 / 頭盔變動）
+   腳底 = H×0.95；裸頭頂 = H×(0.95 − 455.74/386 × CHAR_HEIGHT_FACTOR) = H×0.2652
+   HUD 中心 = 裸頭頂與螢幕頂的中點 = H×0.1326（styles.css .hpbar-wrap top）
+   視覺中心 = (0.2652 + 0.95)/2 = 0.6076（火花 / 飄字 fallback） */
+
+/* rev-boss-world: 覆蓋舊版 */
+function playBossOneshot(animName, opts){
+  if(typeof battle==='undefined'||!battle||!BOSS_ANIMS[battle.bossId]) return;
+  var a=BOSS_ANIMS[battle.bossId][animName]; if(!a) return;
+  if(typeof opts==='number') opts={totalMs:opts}; /* 舊 durationMs 呼叫（alert）相容 */
+  opts=opts||{};
+  if(battle._atkTL&&battle._atkTL.active) return;
+  var cur=BOSS_ANIMS[battle.bossId][battleBossAnim.name];
+  /* rev-animatk: 保護改判 loop===false + cancelFrom，刪名字白名單（熔爐雷射恢復） */
+  if(cur&&cur.loop===false&&battleBossAnim.frame<(battleBossAnim._cancelFrom||cur.frameCount)) return;
+  if(typeof window._bossAttackStart==='function'){
+    window._bossAttackStart({
+      anim:animName, kind:opts.kind||'pose',
+      windupMs:opts.totalMs||opts.windupMs||Math.round(a.frameCount*1000/a.fps),
+      hitFrame:opts.hitFrame, startFrame:opts.startFrame,
+      onContact:opts.onContact, onComplete:opts.onComplete
+    });
+  }
+}
+function isAimPartInRange(){
+  if(typeof battle === 'undefined' || !battle) return false;
+  /* rev-detect: 唯一開火閘門 = 已發現 且 進入射程。
+     發現用中心距 <= R_boss；射程沿用「到 Boss 近邊緣」語義，
+     故把 BOSS_HALF_WIDTH_M 補進射程 —— 否則近戰 0.75m 在
+     BOSS_MIN_GAP_M = 2.5 的限制下永遠打不到 Boss。 */
+  var distC = Math.abs(battle.bossWorldX - battle.playerWorldX);
+  var R = (typeof window._bossDetectableR === 'function') ? window._bossDetectableR(battle.bossId) : 70;
+  var range = (battle.playerWeaponRangeM || 30) + BOSS_HALF_WIDTH_M;
+  return (typeof window.canEngage === 'function') ? window.canEngage(range, R, distC) : (distC <= R && distC <= range);
+}
+function getBossLeftBoundaryN(){
+  if(typeof battle === 'undefined' || !battle) return 0;
+  const sm = battle.sm || { screenRightWorld: 4.2 };
+  const srw = sm.screenRightWorld || 4.2;
+  const px = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  const _bossLeftWX = battle.bossWorldX - BOSS_HALF_WIDTH_M;
+  const _rel = _bossLeftWX - battle.playerWorldX;
+  return px + _rel / srw * (1 - px);
+}
+function getPlayerRightBoundaryN(){
+  if(typeof battle === 'undefined' || !battle) return 0.25;
+  const sm = battle.sm || { screenRightWorld: 4.2 };
+  const srw = sm.screenRightWorld || 4.2;
+  const px = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  const _playerHalfM = 0.3;
+  return px + _playerHalfM / srw * (1 - px);
+}
+
 let battle = null;
 
 /* rev-fix-boss-throw-origin: Boss 戰投雷起點 = attack_melee 釋放幀的手部位置 */
 /* rev-fix-boss-throw-origin: Boss 戰投雷起點 = attack_melee 釋放幀的手部位置
  * 具體計算委託 window.getCharLayerCornerN（與探索模式共用） */
 function _getBossThrowHandPosAtFrame(frameIdx){
+  /* rev-sweepcore: groundY = H×0.95，與探索 _getPlayerHandPos 同基準（腳底在場景 95%） */
   if(!battle) return { x: 0.15, y: 0.5 };
   const fx = document.getElementById('battle-fx');
   const W = fx ? fx.clientWidth : 400;
   const H = fx ? fx.clientHeight : 500;
   if(!W || !H) return { x: battle.px || 0.15, y: (battle.py || 0.75) - 0.2 };
-  const spriteH = (battle && typeof battle.playerCanvasH === 'number' && battle.playerCanvasH > 0) ? battle.playerCanvasH : BATTLE_HERO_SPRITE_H;
-  const scale = (spriteH * CHAR_HEIGHT_FACTOR_BATTLE) / 386;
-  const pxN = (typeof battle.px === 'number') ? battle.px : 0.15;
+  const spriteH = (typeof battle.playerCanvasH === 'number' && battle.playerCanvasH > 0) ? battle.playerCanvasH : BATTLE_HERO_SPRITE_H;
+  const scale = (spriteH * CHAR_HEIGHT_FACTOR) / 386;
+  const pxN = (typeof battle.px === 'number') ? battle.px : 0.25;
   return window.getCharLayerCornerN('front_arm', 1, 0, {
     animName: 'attack_melee',
     frameIdx: frameIdx,
     canvasW: W, canvasH: H,
     scale: scale,
     centerX_px: pxN * W,
-    groundY_px: H
+    groundY_px: H * 0.95
   });
 }
 /* 當前 attack_melee 幀的手部位置（渲染釋放前跟隨用） */
@@ -41,68 +108,7 @@ function _cleanBossFxCanvases(){
 
 /* rev-fix-boss-grenade-arc: 從落點看 Boss 全身/弱點各占多少角度。
  * 復用 _calcFragmentRatio（2·atan((w/2)/d)/π，上半圓）。落點在地面，僅 x 影響。 */
-function _calcBossArcRatios(bossId, landX){
-  const empty = { bossRatio: 0, weakTotalRatio: 0, weakAngles: {}, weakTotalAngle: 0 };
-  const def = BOSS_LAYERS[bossId];
-  const anims = BOSS_ANIMS[bossId];
-  if(!def || !anims || !anims.idle) return empty;
-  const anim = anims.idle;
-  const world = resolveBossWorld(def, anim, 0);
-  const rawWeak = BOSS_WEAKPOINTS[bossId] || [];
-  const aliveWeak = [];
-  for(const wid of rawWeak){
-    if(isBossType(bossId, 'omega') && typeof battle !== 'undefined' && battle && battle.arms){
-      const arm = battle.arms[wid];
-      if(arm && !arm.alive) continue;
-    }
-    aliveWeak.push(wid);
-  }
-  const _fxEl = document.getElementById('battle-fx');
-  const _W_px = _fxEl ? _fxEl.clientWidth : 400;
-  const _ppm = (battle && battle.bgPixelsPerMeter > 0) ? battle.bgPixelsPerMeter : 100;
-  const _dM = Math.max(0.1, Math.abs(landX - battle.bx) * _W_px / _ppm);
-  const layerBounds = {};
-  let bossMinX = Infinity, bossMaxX = -Infinity;
-  for(const L of def.layers){
-    const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][0]) || { rot:0 };
-    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
-    const px = w * L.pivot.x;
-    const wp = world[L.id];
-    if(!wp) continue;
-    const rot = wp.rot * Math.PI / 180;
-    const cos = Math.cos(rot), sin = Math.sin(rot);
-    let lMinX = Infinity, lMaxX = -Infinity;
-    for(const c of [[0,0],[w,0]]){
-      const dx = c[0] - px;
-      const rx = dx*cos + wp.wx;
-      if(rx < lMinX) lMinX = rx;
-      if(rx > lMaxX) lMaxX = rx;
-    }
-    layerBounds[L.id] = { minX: lMinX, maxX: lMaxX };
-    if(lMinX < bossMinX) bossMinX = lMinX;
-    if(lMaxX > bossMaxX) bossMaxX = lMaxX;
-  }
-  if(!isFinite(bossMinX)) return empty;
-  const _sp = document.getElementById('boss-sprite');
-  const _sW = _sp ? _sp.clientWidth : 280;
-  const _sH = _sp ? _sp.clientHeight : 280;
-  const _tf = getBossCanvasTransform(def, bossId, _sW, _sH);
-  const _canvasToM = _tf.sx / _ppm;
-  const W_boss_m = (bossMaxX - bossMinX) * _canvasToM;
-  const bossRatio = window._calcFragmentRatio(W_boss_m, _dM);
-  let weakTotalAngle = 0;
-  const weakAngles = {};
-  for(const wid of aliveWeak){
-    const lb = layerBounds[wid];
-    if(!lb) continue;
-    const w_m = (lb.maxX - lb.minX) * _canvasToM;
-    const angle = 2 * Math.atan((w_m / 2) / _dM);
-    weakAngles[wid] = angle;
-    weakTotalAngle += angle;
-  }
-  const weakTotalRatio = Math.min(1, weakTotalAngle / Math.PI);
-  return { bossRatio, weakTotalRatio, weakAngles, weakTotalAngle };
-}
+
 function stopBattleMovement(){
   if(!battle) return;
   battle.moveDir = 0;
@@ -191,6 +197,7 @@ function _rollSweepLoot(bid){
 }
 
 function _openSweepDialog(bid){
+  if(window._sweepLock) return;
   const sw = _sweepMaxCount(bid);
   if(sw.max <= 0) return;
   const b = BOSSES[bid];
@@ -253,290 +260,282 @@ function _openSweepDialog(bid){
 }
 
 function _executeSweep(bid, count){
-  const sw = _sweepMaxCount(bid);
+  /* rev-sweep-ux: 一趟車 · 結算 N 份。
+     zone1/zone2 只鎖操作（zone2 保持原狀渲染）；zone3 日誌可互動；tabbar 不鎖 —— 切出 = 放棄。 */
+  if(window._sweepLock) return;
+  var sw = _sweepMaxCount(bid);
   if(count < 1 || sw.max < count) return;
-  const b = BOSSES[bid];
-  state.seals[b.seal] = parseInt(state.seals[b.seal] || 0, 10) - count;
+  var b = BOSSES[bid];
+  if(!b) return;
+  if(typeof window._sweepInstall === 'function') window._sweepInstall();
+  state.seals[b.seal] = Math.max(0, parseInt(state.seals[b.seal] || 0, 10) - count);
   if(typeof _consumeLiquorByValue === 'function') _consumeLiquorByValue(sw.perLiquor * count);
   if(typeof _consumeAmmoByValue === 'function') _consumeAmmoByValue(sw.perAmmo * count);
   if(typeof save === 'function') save();
-
-  const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-  const vid = g ? g.currentVehicle : 'btr80';
-  const expTarget = _sweepExpTarget();
-  const level = sw.level;
-
-  const tabbar = document.getElementById('tabbar');
-  const origPointer = tabbar ? tabbar.style.pointerEvents : '';
-  if(tabbar) tabbar.style.pointerEvents = 'none';
-
-  _playOneSweepAnim(bid, vid, count, function(){
-    const allLoot = [];
-    let servantGained = null;
-    for(let i = 0; i < count; i++){
-      const loot = _rollSweepLoot(bid);
-      for(const it of loot) allLoot.push(it);
+  var g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
+  var vid = g ? g.currentVehicle : 'btr80';
+  var expTarget = _sweepExpTarget();
+  var level = sw.level;
+  window._sweepLock = true;
+  var _locks = [];
+  ['zone1','zone2'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){ _locks.push({ el:el, pe:el.style.pointerEvents }); el.style.pointerEvents = 'none'; }
+  });
+  window._sweepUnlock = function(){
+    window._sweepLock = false;
+    for(var i = 0; i < _locks.length; i++){ _locks[i].el.style.pointerEvents = _locks[i].pe; }
+    _locks = [];
+    window._sweepUnlock = null;
+  };
+  function _setTab(t){
+    try{
+      currentTab = t;
+      $$('.tab').forEach(function(x){ x.classList.toggle('active', x.dataset.tab === t); });
+    }catch(e){}
+  }
+  function _finish(){
+    var allLoot = [], servantGained = null;
+    for(var i = 0; i < count; i++){
+      var loot = _rollSweepLoot(bid);
+      for(var j = 0; j < loot.length; j++) allLoot.push(loot[j]);
       if(!servantGained && Math.random() < 0.25){
-        const srv = (typeof grantRandomServant === 'function') ? grantRandomServant() : null;
+        var srv = (typeof grantRandomServant === 'function') ? grantRandomServant() : null;
         if(srv) servantGained = srv;
       }
-      if(typeof _garageAddVehicleExp === 'function'){
-        _garageAddVehicleExp(expTarget, level * 100);
-      } else if(typeof _garageInitState === 'function'){
-        const gg = _garageInitState();
-        if(gg) gg.vehicleExp[expTarget] = (gg.vehicleExp[expTarget] || 0) + level * 100;
-      }
+      if(typeof _garageAddVehicleExp === 'function') _garageAddVehicleExp(expTarget, level * 100);
+      else if(g) g.vehicleExp[expTarget] = (g.vehicleExp[expTarget] || 0) + level * 100;
       state.stats.bossKills = (state.stats.bossKills || 0) + 1;
     }
-    if(tabbar) tabbar.style.pointerEvents = origPointer;
-    _finishBatchSweep(bid, vid, level, count, allLoot, servantGained, expTarget);
+    if(typeof window._sweepUnlock === 'function') window._sweepUnlock();
+    window._sweepLock = false;
+    try{ _finishBatchSweep(bid, vid, level, count, allLoot, servantGained, expTarget); }
+    catch(e){ console.error('[sweep finish]', e); }
+    /* 完成後若玩家已自行切頁，尊重當前頁，不強行拉回 */
+    if(typeof currentTab === 'string' && currentTab === 'combat'){
+      try{ if(typeof renderCurrentTab === 'function') renderCurrentTab(); }catch(e){}
+    }
+  }
+  try{ var b0 = window.BTRSupport; if(b0 && b0.active) b0.stop(); }catch(e){}
+  _setTab('combat');
+  startBossBattle(bid, {
+    sweep: true, vehicleId: vid, index: 1, total: count,
+    onDone: function(){ setTimeout(_finish, 60); }
   });
+  if(typeof window._sweepLog === 'function'){
+    var vn = (typeof VEHICLES !== 'undefined' && VEHICLES[vid]) ? VEHICLES[vid].name : vid;
+    window._sweepLog('<span class="pl">玩家</span> 發起掃蕩 <b>' + b.name + '</b> ×' + count);
+    window._sweepLog('預扣資源：信物×' + count + ' · 私酒等值 ' + (sw.perLiquor * count) + ' · 彈藥等值 ' + (sw.perAmmo * count));
+    window._sweepLog('<span class="run">' + vn + '</span> 出擊，全速前往 Boss');
+  }
 }
 
-function _playOneSweepAnim(bid, vid, totalCount, onComplete){
-  const z1 = document.getElementById('zone1');
-  if(!z1){ onComplete(); return; }
-  z1.innerHTML = '';
-  const ZW = z1.clientWidth || 400;
-  const ZH = z1.clientHeight || 500;
-  const BOSS_START_PCT = 65;
-
-  const PLAYER_SPRITE_H = ZH * 0.4519;
-  const PLAYER_FACTOR = 0.667;
-  const RATIO_EXPLORE = 0.99 / 0.58;
-  const vehH = PLAYER_SPRITE_H * PLAYER_FACTOR * RATIO_EXPLORE;
-  const ann = (window.VEHICLE_ANNOTATIONS && window.VEHICLE_ANNOTATIONS[vid]) ? window.VEHICLE_ANNOTATIONS[vid] : null;
-  const imgW = (ann && ann.imageSize) ? ann.imageSize.w : 640;
-  const imgH = (ann && ann.imageSize) ? ann.imageSize.h : 240;
-  const vehW = vehH * (imgW / imgH);
-  const bossSize = Math.round(ZH * 0.75);
-  const maxHalfW = Math.floor(ZW * Math.min(BOSS_START_PCT / 100, 1 - BOSS_START_PCT / 100) * 0.98);
-  const bossWide = Math.max(bossSize, Math.min(Math.round(bossSize * 1.5), maxHalfW * 2));
-  const BOSS_W = bossWide;
-  const BOSS_H = bossSize;
-
-  const scene = document.createElement('div');
-  scene.style.cssText = 'position:absolute;inset:0;overflow:hidden;background:#0a0605;';
-  const bg = document.createElement('div');
-  bg.style.cssText = "position:absolute;inset:0;background-image:url('" + getBossBgPath(bid) + "');background-size:cover;background-position:center bottom;background-repeat:no-repeat;opacity:0;transition:opacity 0.25s ease-out;";
-  const bossCanvas = document.createElement('canvas');
-  bossCanvas.width = BOSS_W; bossCanvas.height = BOSS_H;
-  bossCanvas.style.cssText = 'position:absolute;bottom:0;left:' + BOSS_START_PCT + '%;transform:translateX(-50%);width:' + BOSS_W + 'px;height:' + BOSS_H + 'px;opacity:0;transition:opacity 0.25s ease-out;will-change:left,transform;';
-  try {
-    const bctx = bossCanvas.getContext('2d');
-    drawBlockBoss(bctx, BOSS_W, BOSS_H, bid, 'idle', 0);
-  } catch(e){}
-  const veh = document.createElement('canvas');
-  veh.width = Math.max(1, Math.floor(vehW));
-  veh.height = Math.max(1, Math.floor(vehH));
-  veh.style.cssText = 'position:absolute;bottom:0;left:-50%;width:' + vehW + 'px;height:' + vehH + 'px;transform:translateX(-50%);will-change:left;';
-  const _vehCtx = veh.getContext('2d');
-  const fireCanvas = document.createElement('canvas');
-  fireCanvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:5;';
-  fireCanvas.width = ZW; fireCanvas.height = ZH;
-  const fcCtx = fireCanvas.getContext('2d');
-  const progress = document.createElement('div');
-  progress.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);color:#e8a33d;font-size:12px;font-weight:bold;background:rgba(14,12,10,.85);border:1px solid #8a5f18;padding:3px 12px;border-radius:10px;z-index:10;white-space:nowrap;';
-  progress.textContent = '掃蕩 ×' + totalCount;
-  scene.appendChild(bg);
-  scene.appendChild(bossCanvas);
-  scene.appendChild(veh);
-  scene.appendChild(fireCanvas);
-  scene.appendChild(progress);
-  z1.appendChild(scene);
-  requestAnimationFrame(function(){ bg.style.opacity = '1'; bossCanvas.style.opacity = '1'; });
-
-  const bossHalfPct = (BOSS_W / ZW) * 50;
-  const vehHalfPct = (vehW / ZW) * 50;
-  const VEH_CONTACT = BOSS_START_PCT - vehHalfPct;
-  const VEH_START = Math.min(-vehHalfPct - 10, VEH_CONTACT - 20);
-  const distBossPct = (105 + bossHalfPct) - BOSS_START_PCT;
-  const distVehPct = 110 + vehHalfPct - VEH_CONTACT;
-  const moveDistPct = Math.max(distBossPct, distVehPct, 40);
-  const VEH_END = VEH_CONTACT + moveDistPct;
-  const BOSS_END = BOSS_START_PCT + moveDistPct;
-
-  const FADE_IN_MS = 250;
-  const SWEEP_SPEED_PX_PER_SEC = 1200;
-  const vehTopY = ZH - vehH;
-  const startTime = performance.now();
-
-  let sweepSmoke = [];
-  let sweepTracers = [];
-  let _sweepErasedMissilePolys = [];
-  let _sweepErasedBaseImg = null;
-  let _sweepMissiles = [];
-
-  const _sweepMuzzles = [];
-  if(ann && ann.muzzles && ann.muzzles.length){
-    for(let mi = 0; mi < ann.muzzles.length; mi++){
-      const md = ann.muzzles[mi];
-      const prof = (typeof window.MUZZLE_PROFILES !== 'undefined' && window.MUZZLE_PROFILES[md.weaponId]) ? window.MUZZLE_PROFILES[md.weaponId] : ((window.MUZZLE_PROFILES && window.MUZZLE_PROFILES.default) || { burst: 3, intervalMs: 100, pauseMs: 300 });
-      if(md.weaponId !== 'atgm'){
-        _sweepMuzzles.push({ weaponId: md.weaponId, mx: md.x, my: md.y, profile: prof, shotsLeft: prof.burst, nextFireAt: 0 });
-      }
+/* rev-worldsweep: 掃蕩 = 探索座標系 × 探索縮放 × 載具全速。
+   載具從世界 0 全速衝向 BOSS_WORLD_START（Boss 世界盡頭），接觸後把 Boss 推出界，車尾越界即結算。 */
+/* rev-sweepcore: 掃蕩載具 = 探索 BTRSupport 同一條繪製管線。
+   dpr 全區 canvas + VehicleRenderer.render + 繼承 BTRSupport.fx，
+   不再自建小 canvas / CSS 縮放（白邊與車輪錯亂根因）。
+   世界米 choreography：車頭從 0 全速衝到 BOSS_WORLD_START，推 Boss 出界。 */
+/* ════════════════════════════════════════════════════════════
+   掃蕩 = 進入 Boss 戰 + 立刻召喚載具。
+   載具走探索同一條 BTRSupport 管線：進場 → 接人 → 調整 → 全速支援 → 開火；
+   沒打死就由 _tickAI 的載具接觸必殺收尾。Boss 一死掃蕩結束，不再另畫動畫。
+   畫面外不強求可見 —— 該出現的特效自然出現，其餘由距離氣泡指示。
+   ════════════════════════════════════════════════════════════ */
+function _sweepBattleTick(now, dt){
+  /* rev-sweep-ux: 玩家層敘事日誌 + 引擎調試分層；support 才開火；擊殺即收尾不等支援結束。 */
+  var b = battle;
+  if(!b) return;
+  var btr = window.BTRSupport;
+  var ph = (btr && btr.active) ? btr.phase : null;
+  var V = (typeof window._vehicleSpeedKmh === 'function') ? window._vehicleSpeedKmh(b.sweep.vid) / 3.6 : 22;
+  var _wt = (typeof getTotalWeight === 'function') ? getTotalWeight() : 0;
+  var walk = (typeof window._walkSpeedMs === 'function') ? window._walkSpeedMs(_wt) : 1.4;
+  var _exiting = !!b.sweepOut;
+  var ts = _exiting ? V : ((ph === 'center' || ph === 'support') ? V : walk);
+  b._worldSpeed += (ts - b._worldSpeed) * Math.min(1, dt * 8);
+  if(Math.abs(b._worldSpeed - ts) < 0.01) b._worldSpeed = ts;
+  b.playerWorldX += b._worldSpeed * dt;
+  var c = window._combat;
+  if(c && c.allies && c.allies[0]) c.allies[0].worldX = b.playerWorldX;
+  /* 掃蕩只打這隻 Boss —— 探索事件敵人不混入 */
+  if(c && Array.isArray(c.enemies)){
+    for(var ei = c.enemies.length - 1; ei >= 0; ei--){
+      if(c.enemies[ei] !== b.bossTarget) c.enemies.splice(ei, 1);
+    }
+    if(b.bossHp > 0 && c.enemies.indexOf(b.bossTarget) < 0) c.enemies.push(b.bossTarget);
+  }
+  var fxEl = document.getElementById('battle-fx');
+  var _W = fxEl ? fxEl.clientWidth : 400, _H = fxEl ? fxEl.clientHeight : 500;
+  b.sm = (typeof computeScreenMetrics === 'function') ? computeScreenMetrics(_W, _H) : { screenRightWorld:4.2, bgPixelsPerMeter:88 };
+  b.px = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  b.bx = b.px + (b.bossWorldX - b.playerWorldX) / (b.sm.screenRightWorld || 4.2) * (1 - b.px);
+  b.bgPixelsPerMeter = b.sm.bgPixelsPerMeter || 88;
+  if(c) c.sm = b.sm;
+  var _bg = document.querySelector('.battle-scene .battle-bg');
+  if(_bg){
+    _bg.style.backgroundPositionX = (-b.playerWorldX * b.bgPixelsPerMeter) + 'px';
+    _bg.style.backgroundSize = 'auto 100%';
+    _bg.style.backgroundRepeat = 'repeat-x';
+  }
+  if(fxEl && _H > 0 && b.lastH !== _H){
+    b.lastH = _H;
+    b.playerCanvasH = _H;
+    b.playerCanvasW = Math.round(_H * 1.2);
+    b.playerSpriteW = b.playerCanvasW;
+    b.playerSpriteH = _H;
+    var _spr = 'position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:' + b.playerCanvasW + 'px;height:' + _H + 'px;';
+    var _hs = document.querySelector('.hero-f .sprite'); if(_hs) _hs.style.cssText = _spr;
+    var _bs = document.getElementById('boss-sprite'); if(_bs) _bs.style.cssText = _spr;
+    var _hc = document.getElementById('hero-battle-canvas');
+    if(_hc){ _hc.style.width='100%'; _hc.style.height='100%'; _hc.style.display='block'; }
+    var _bc = document.getElementById('boss-battle-canvas');
+    if(_bc){ _bc.style.width='100%'; _bc.style.height='100%'; _bc.style.display='block'; }
+  }
+  if(_exiting){
+    var _bf = document.getElementById('fighter-boss'); if(_bf) _bf.style.display = 'none';
+    var _hb = document.getElementById('head-bars'); if(_hb) _hb.style.display = 'none';
+  } else if(!b.settling){
+    var _clip = (btr && btr.active) ? btr.playerClipH : 1;
+    var _want = (_clip > 0.01 && b._worldSpeed > 0.5) ? 'walk' : 'idle';
+    if(battleHeroAnim.name !== _want){
+      battleHeroAnim.name = _want;
+      battleHeroAnim.frame = 0;
+      battleHeroAnim.lastUpdate = now;
+      battleHeroAnim.forcedEnd = 0;
     }
   }
-  if(!_sweepMuzzles.length){
-    _sweepMuzzles.push({ weaponId: '__default__', mx: 0.85, my: 0.17, profile: ((window.MUZZLE_PROFILES && window.MUZZLE_PROFILES.default) || { burst: 3, intervalMs: 100, pauseMs: 300 }), shotsLeft: 3, nextFireAt: 0 });
-  }
-
-  window._sweepDustParticles = [];
-
-  const sweepTex = (function(){
-    const c = document.createElement('canvas'); c.width = 128; c.height = 128;
-    const cx = c.getContext('2d');
-    for(let i = 0; i < 8; i++){
-      const ox = (Math.random()-0.5)*30, oy = (Math.random()-0.5)*30, r = 20+Math.random()*30;
-      const g = cx.createRadialGradient(64+ox, 64+oy, 0, 64+ox, 64+oy, r);
-      g.addColorStop(0, 'rgba(235,235,240,0.7)');
-      g.addColorStop(0.5, 'rgba(220,220,225,0.4)');
-      g.addColorStop(1, 'rgba(200,200,205,0)');
-      cx.fillStyle = g;
-      cx.beginPath(); cx.arc(64+ox, 64+oy, r, 0, Math.PI*2); cx.fill();
-    }
-    return c;
-  })();
-
-  let _sweepDone = false;
-  const _safeDone = function(){ if(_sweepDone) return; _sweepDone = true; onComplete(); };
-  const _safety = setTimeout(_safeDone, 15000);
-
-  function tick(now){
-    try {
-      if(_sweepDone) return;
-      const t = now - startTime;
-      const elapsed = Math.max(0, t - FADE_IN_MS);
-      const totalMovePx = (VEH_END - VEH_START) / 100 * ZW;
-      let totalMoveMs = Math.max(150, totalMovePx / SWEEP_SPEED_PX_PER_SEC * 1000);
-      if(!isFinite(totalMoveMs) || totalMoveMs <= 0) totalMoveMs = 2000;
-      if(elapsed >= totalMoveMs){
-        clearTimeout(_safety);
-        _safeDone();
-        return;
+  updateFighterPos();
+  if(typeof isBossType === 'function' && isBossType(b.bossId, 'hydra')) updateHeadBarsUI();
+  updateBattleHeroAnim(now);
+  updateBattleBossAnim(now);
+  renderBattleHeroCanvas();
+  renderBossBattleCanvas();
+  if(typeof updateBullets === 'function') updateBullets(dt);
+  if(window.MuzzleFX){
+    window.MuzzleFX.update(dt);
+    if(fxEl){
+      var _cvs = document.getElementById('boss-fx-canvas');
+      if(!_cvs){
+        _cvs = document.createElement('canvas');
+        _cvs.id = 'boss-fx-canvas';
+        _cvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:9;';
+        fxEl.appendChild(_cvs);
       }
-      const pTotal = Math.min(1, elapsed / totalMoveMs);
-      const vehX = VEH_START + (VEH_END - VEH_START) * pTotal;
-      const bossX = BOSS_START_PCT;
-      let bossRot = 0;
-      if(vehX > VEH_CONTACT){
-        const pushed = vehX - VEH_CONTACT;
-        const pushTotal = Math.max(0.001, VEH_END - VEH_CONTACT);
-        bossRot = Math.min(1, pushed / pushTotal) * 25;
+      if(_cvs.width !== fxEl.clientWidth || _cvs.height !== fxEl.clientHeight){
+        _cvs.width = fxEl.clientWidth; _cvs.height = fxEl.clientHeight;
       }
-      veh.style.left = vehX + '%';
-      if(typeof window.VehicleRenderer !== 'undefined' && window.VEHICLE_ANNOTATIONS && window.VEHICLE_ANNOTATIONS[vid]){
-        try {
-          _vehCtx.clearRect(0, 0, veh.width, veh.height);
-          const _vehRenderOpts = { trackVel: 300, wheelSpeed: 20, doorOpen: 0, recoils: {} };
-          if(_sweepErasedMissilePolys.length > 0){
-            if(!_sweepErasedBaseImg && typeof window._makeErasedBaseImage === 'function'){
-              _sweepErasedBaseImg = window._makeErasedBaseImage(vid, _sweepErasedMissilePolys);
-            }
-            if(_sweepErasedBaseImg) _vehRenderOpts.baseImage = _sweepErasedBaseImg;
-          }
-          window.VehicleRenderer.render(_vehCtx, vid, 0, 0, veh.width, veh.height, (now - startTime) / 1000, _vehRenderOpts);
-        } catch(e){}
-      }
-      if(vehX > VEH_CONTACT){
-        bossCanvas.style.left = (BOSS_START_PCT + (vehX - VEH_CONTACT)) + '%';
-        bossCanvas.style.transform = 'translateX(-50%) rotate(' + bossRot + 'deg)';
-      }
-
-      const dt = Math.min(0.05, (now - (window._sweepLastTick || now)) / 1000);
-      window._sweepLastTick = now;
-      const vehCenterPx = (vehX / 100) * ZW;
-
-      const worldSpeed = SWEEP_SPEED_PX_PER_SEC;
-      if(t >= FADE_IN_MS && elapsed < totalMoveMs){
-        const _vehLeftPx = vehCenterPx - vehW / 2;
-        const _vehTopPx = ZH - vehH;
-        for(let mi = 0; mi < _sweepMuzzles.length; mi++){
-          const mz = _sweepMuzzles[mi];
-          if(now < mz.nextFireAt) continue;
-          mz.nextFireAt = now + (mz.shotsLeft > 1 ? mz.profile.intervalMs : mz.profile.pauseMs);
-          mz.shotsLeft--;
-          if(mz.shotsLeft <= 0) mz.shotsLeft = mz.profile.burst;
-          const mxPx = _vehLeftPx + mz.mx * vehW;
-          const myPx = _vehTopPx + mz.my * vehH;
-          if(typeof window._vsMakeSmokeJet === 'function'){
-            sweepSmoke.push(window._vsMakeSmokeJet(mxPx, myPx, mz.weaponId));
-            for(let si = 0; si < 4; si++){
-              sweepSmoke.push(window._vsMakeSmokeSpread(mxPx + vehW * 0.04, myPx, mz.weaponId));
-            }
-          }
-          sweepTracers.push({ startX: mxPx, startY: myPx, born: now, speed: 2500, len: 100, width: 3 });
-        }
-      }
-
-      if(typeof window._vsUpdateSmoke === 'function'){
-        window._vsUpdateSmoke(sweepSmoke, dt, worldSpeed);
-      }
-      fcCtx.clearRect(0, 0, ZW, ZH);
-
-      for(let smi = 0; smi < _sweepMissiles.length; smi++){
-        const sm = _sweepMissiles[smi];
-        const smx = sm.x + (now - sm.born) / 1000 * sm.speed;
-        if(smx > ZW + 200) continue;
-        fcCtx.save();
-        fcCtx.translate(smx, sm.y);
-        fcCtx.fillStyle = 'rgba(255, 200, 50, 0.85)';
-        fcCtx.beginPath();
-        fcCtx.moveTo(-15, 0);
-        fcCtx.lineTo(-30 - Math.random()*10, -4);
-        fcCtx.lineTo(-30 - Math.random()*10, 4);
-        fcCtx.closePath();
-        fcCtx.fill();
-        fcCtx.fillStyle = '#eee';
-        fcCtx.beginPath();
-        fcCtx.ellipse(0, 0, 12, 4, 0, 0, Math.PI * 2);
-        fcCtx.fill();
-        fcCtx.restore();
-      }
-      _sweepMissiles = _sweepMissiles.filter(function(m){ return m.x + (now - m.born) / 1000 * m.speed <= ZW + 200; });
-
-      if(!window._sweepDustParticles) window._sweepDustParticles = [];
-      if(ann && elapsed < totalMoveMs && Math.random() < 0.8){
-        const _dustSrc = window.computeVehicleDustSource ? window.computeVehicleDustSource(ann) : null;
-        if(_dustSrc){
-          window.spawnDust(window._sweepDustParticles, vehCenterPx - vehW/2, ZH - vehH, _dustSrc, vehW, vehH, 20);
-        }
-      }
-      window.updateAndDrawDust(fcCtx, window._sweepDustParticles, dt);
-
-      if(typeof window._vsDrawSmoke === 'function'){
-        window._vsDrawSmoke(fcCtx, sweepSmoke);
-      }
-      fcCtx.globalAlpha = 1;
-      fcCtx.save();
-      fcCtx.shadowColor = 'rgba(255,200,50,0.8)';
-      fcCtx.shadowBlur = 10;
-      for(let i = sweepTracers.length - 1; i >= 0; i--){
-        const tr = sweepTracers[i];
-        const tipX = tr.startX + (now - tr.born) / 1000 * tr.speed;
-        if(tipX - tr.len > ZW + 200){ sweepTracers.splice(i, 1); continue; }
-        const tailX = Math.max(tr.startX, tipX - tr.len);
-        const grad = fcCtx.createLinearGradient(tailX, tr.startY, tipX, tr.startY);
-        grad.addColorStop(0, 'rgba(255,200,50,0)');
-        grad.addColorStop(0.8, 'rgba(255,255,200,0.9)');
-        grad.addColorStop(1, '#fff');
-        fcCtx.strokeStyle = grad;
-        fcCtx.lineWidth = tr.width;
-        fcCtx.beginPath();
-        fcCtx.moveTo(tailX, tr.startY);
-        fcCtx.lineTo(tipX, tr.startY);
-        fcCtx.stroke();
-      }
-      fcCtx.restore();
-      requestAnimationFrame(tick);
-    } catch(err){
-      console.error('[sweep tick error]', err);
-      clearTimeout(_safety);
-      _safeDone();
+      var _cx = _cvs.getContext('2d');
+      _cx.clearRect(0, 0, _cvs.width, _cvs.height);
+      window.MuzzleFX.render(_cx, 'boss');
     }
   }
-  requestAnimationFrame(tick);
+  var _bhp = document.getElementById('boss-hp'), _bap = document.getElementById('boss-ap'), _bsh = document.getElementById('boss-shield');
+  if(_bhp) _bhp.style.width = Math.max(0, b.bossHp / b.bossMaxHp * 100) + '%';
+  if(_bap) _bap.style.width = Math.max(0, b.bossArmor / Math.max(1, b.bossMaxArmor) * 100) + '%';
+  if(_bsh && b.shieldMaxHp > 0) _bsh.style.width = Math.max(0, b.shieldHp / b.shieldMaxHp * 100) + '%';
+
+  /* ── 玩家層：狀態條 + 敘事事件 ── */
+  var _dist = Math.max(0, b.bossWorldX - b.playerWorldX);
+  var _tot = Math.max(1, b.bossMaxHp + b.bossMaxArmor + (b.shieldMaxHp || 0));
+  var _cur = Math.max(0, b.bossHp + b.bossArmor + (b.shieldHp || 0));
+  var _pct = Math.round(_cur / _tot * 100);
+  var _phKey = _exiting ? 'sweepOut' : (ph || 'idle');
+  var _phTxt = { enter:'載具進場', arrive:'接人 · 車門開啟', sink:'玩家登車', center:'陣位調整', support:'全速支援 · 開火', sweepOut:'衝出屏幕', idle:'待命' }[_phKey] || _phKey;
+  var _lp = document.getElementById('sweep-live-phase'); if(_lp) _lp.textContent = _phTxt;
+  var _ln = document.getElementById('sweep-live-nums');
+  if(_ln) _ln.textContent = '距離 ' + ((typeof window._fmtDistN === 'function') ? window._fmtDistN(_dist) : Math.round(_dist)) + ' m · ' + Math.round(b._worldSpeed * 3.6) + ' km/h · ×' + b.sweep.total;
+  var _bar = document.getElementById('sweep-boss-bar'); if(_bar) _bar.style.width = _pct + '%';
+  var _bp = document.getElementById('sweep-boss-pct'); if(_bp) _bp.textContent = _pct + '%';
+  if(b._lastPh !== _phKey){
+    b._lastPh = _phKey;
+    var _evt = {
+      enter:'載具進場，駛向玩家',
+      arrive:'車門開啟，準備接人',
+      sink:'玩家登車完畢',
+      center:'載具調整陣位',
+      support:'<span class="run">全速支援開始</span>，車載武器開火',
+      sweepOut:'<span class="run">載具全速衝出屏幕</span>，準備結算'
+    }[_phKey];
+    if(_evt && typeof window._sweepLog === 'function') window._sweepLog(_evt);
+  }
+  var _marks = [0.75, 0.5, 0.25];
+  for(var mi = 0; mi < _marks.length; mi++){
+    if(_cur / _tot <= _marks[mi] && b._hpMark <= mi){
+      b._hpMark = mi + 1;
+      if(typeof window._sweepLog === 'function') window._sweepLog('Boss 剩餘 <b style="color:#ffb300">' + Math.round(_marks[mi] * 100) + '%</b>');
+    }
+  }
+  if(b.shieldMaxHp > 0 && b.shieldBroken && !b._shieldWas){
+    b._shieldWas = true;
+    if(typeof window._sweepLog === 'function') window._sweepLog('Boss <span class="win">護盾擊破</span>');
+  }
+  if(b.bossMaxArmor > 0 && b.bossArmor <= 0 && !b._armorZero){
+    b._armorZero = true;
+    if(typeof window._sweepLog === 'function') window._sweepLog('Boss <span class="win">護甲擊穿</span>');
+  }
+
+  /* ── 引擎調試層（摺疊區，展開時才寫） ── */
+  var _dbg = document.getElementById('sweep-dbg');
+  if(_dbg && _dbg.style.display !== 'none' && (!b._dbgAt || now - b._dbgAt > 200)){
+    b._dbgAt = now;
+    _dbg.textContent =
+      'phase=' + _phKey + '  t=' + ((Date.now() - b.startTime) / 1000).toFixed(1) + 's\n'
+    + 'playerWX=' + b.playerWorldX.toFixed(2) + '  bossWX=' + b.bossWorldX.toFixed(2) + '  dist=' + _dist.toFixed(2) + '\n'
+    + 'worldSpd=' + b._worldSpeed.toFixed(2) + ' m/s  veh=' + V.toFixed(2) + ' m/s\n'
+    + 'bossHP=' + Math.round(b.bossHp) + '  armor=' + Math.round(b.bossArmor) + '  shield=' + Math.round(b.shieldHp || 0) + '\n'
+    + 'btr.x=' + (btr ? (btr.x || 0).toFixed(3) : '-') + '  clipH=' + (btr ? (btr.playerClipH || 0).toFixed(2) : '-') + '\n'
+    + 'combat.enemies=' + (c && c.enemies ? c.enemies.length : 0) + '  bullets=' + (c && c.bullets ? c.bullets.length : 0) + '\n'
+    + 'settling=' + (!!b.settling) + '  sweepOut=' + _exiting + '  lock=' + (!!window._sweepLock);
+  }
+  try{ if(window._bossOffscreenUpdate) window._bossOffscreenUpdate(); }catch(e){}
+
+  /* ── 擊殺 / 撞擊 → 立刻收尾，不等支援結束 ── */
+  if(!b.settling){
+    var _half = (typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(b.sweep.vid) : 3.6;
+    if(b.bossHp <= 0 || b.bossWorldX <= b.playerWorldX + _half){
+      if(b.heads){ for(var hi in b.heads){ b.heads[hi].hp = 0; b.heads[hi].alive = false; } }
+      if(b.arms){ for(var ai in b.arms){ b.arms[ai].hp = 0; b.arms[ai].alive = false; } }
+      b.shieldHp = 0; b.shieldBroken = true; b.bossArmor = 0; b.bossHp = 0;
+      if(typeof endBattle === 'function') endBattle(true);
+    }
+  }
+  if(b.settling){
+    if(b.sweepOut){
+      if(!btr || !btr.active){ if(typeof window._completeSweepBattle === 'function') window._completeSweepBattle(b); }
+    } else {
+      var _an = BOSS_ANIMS[b.bossId], _da = _an && _an.death;
+      if(_da && battleBossAnim.name === 'death' && battleBossAnim.frame >= _da.frameCount - 1 && !b._settleScheduled){
+        b._settleScheduled = true;
+        setTimeout(finishBattleSettle, 160);
+      }
+      if(!b._settleScheduled && Date.now() - (b.startTime || Date.now()) > 20000){
+        b._settleScheduled = true;
+        setTimeout(finishBattleSettle, 50);
+      }
+    }
+    return;
+  }
+  /* 90s 兜底：強制撞擊必殺，保證掃蕩必然收尾 */
+  if(Date.now() - (b.startTime || Date.now()) > 90000 && b.bossHp > 0){
+    b.bossHp = 0;
+    if(typeof endBattle === 'function') endBattle(true);
+  }
 }
+
+window._finishSweepBattle = function(b){
+  /* rev-sweep-rig: 死亡動畫播完 → 不放人，車保持原速向右衝出屏幕，出緣才結算。 */
+  if(!b || b._sweepFinalizing) return;
+  b._sweepFinalizing = true;
+  if(typeof window._sweepInstall === 'function') window._sweepInstall();
+  b.sweepOut = true;
+  var btr = window.BTRSupport;
+  if(btr && btr.active && typeof btr.enterSweepOut === 'function'){
+    btr.enterSweepOut();
+    return;
+  }
+  window._completeSweepBattle(b);
+};
 
 function _finishBatchSweep(bid, vid, level, count, allLoot, servantGained, expTarget){
   const b = BOSSES[bid];
@@ -766,6 +765,7 @@ function renderCombatInfoPanel(z3){
 }
 
 function renderCombat(){
+  if(window._sweepLock) return;
   const z1 = document.getElementById('zone1');
   const z2 = document.getElementById('zone2');
   const z3 = document.getElementById('zone3');
@@ -843,16 +843,30 @@ function renderCombat(){
 /* ============== 戰鬥場景 ============== */
 function renderBattleScene(z1){
   const b = battle;
-  const rLeft = b.px * 100;
-  const rRight = Math.min(1, (b.px + (b.playerWeaponRange || 0.5))) * 100;
-  const rWidth = rRight - rLeft;
+
   /* rev-fix-boss-dmgbar: dmgBar 显示「当前血条已掉比例」，II Boss 回血后进度条回退；
    * 文字「對 Boss 傷害」仍是累计 damageDealt，互不冲突。 */
   const totalHp = b.bossMaxHp + b.bossMaxArmor;
   const _curCurHp = b.bossHp + b.bossArmor;
   const dealtPct = Math.max(0, Math.min(100, (1 - _curCurHp / totalHp) * 100));
 
-  z1.innerHTML = '<div class="battle-scene"><div class="battle-bg" style="background-image:url(\'' + getBossBgPath(b.bossId) + '\')"></div><div class="range-indicator" id="range-indicator" style="left:' + rLeft + '%;width:' + rWidth + '%"></div><div class="fighter boss-f" id="fighter-boss" style="left:' + (b.bx * 100) + '%;top:' + (b.by * 100) + '%"><div class="hpbar-wrap' + ((b.shieldMaxHp > 0 && !b.shieldBroken) ? ' has-shield' : '') + '" id="boss-hpbar-wrap"><div class="nm">' + b.bossName + ((b.bossId.indexOf('_ii') >= 0 && b.bossName.indexOf('II') === -1) ? ' II' : '') + '</div>' + ((b.shieldMaxHp > 0 && !b.shieldBroken) ? '<div class="shield-bar-wrap" id="shield-bar-wrap"><div class="bar"><div class="fill" id="boss-shield" style="width:' + (b.shieldHp / b.shieldMaxHp * 100) + '%"></div></div></div>' : '') + '<div class="bar ap"><div class="fill" id="boss-ap" style="width:' + (b.bossArmor / b.bossMaxArmor * 100) + '%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:' + (b.bossHp / b.bossMaxHp * 100) + '%"></div></div></div><div class="sprite" id="boss-sprite">' + (BOSS_LAYERS[b.bossId] ? '<canvas id="boss-battle-canvas"></canvas>' : bossIcon(b.bossId)) + '</div></div><div class="fighter hero-f" id="fighter-hero" style="left:' + (b.px * 100) + '%;top:' + (b.py * 100) + '%"><div class="hpbar-wrap"><div class="nm">玩家</div><div class="bar ap"><div class="fill" id="hero-ap" style="width:' + (b.playerArmor / b.playerMaxArmor * 100) + '%"></div></div><div class="bar hp"><div class="fill" id="hero-hp" style="width:' + (b.playerHp / b.playerMaxHp * 100) + '%"></div></div></div><div class="sprite" id="hero-sprite"><canvas id="hero-battle-canvas"></canvas></div></div><div class="head-bars" id="head-bars"></div><div id="battle-fx"></div></div>';
+  z1.innerHTML = '<div class="battle-scene"><div class="battle-bg" style="background-image:url(\'' + getBossBgPath(b.bossId) + '\')"></div><div class="fighter boss-f" id="fighter-boss" style="left:' + (b.bx * 100) + '%"><div class="hpbar-wrap' + ((b.shieldMaxHp > 0 && !b.shieldBroken) ? ' has-shield' : '') + '" id="boss-hpbar-wrap"><div class="nm">' + b.bossName + ((b.bossId.indexOf('_ii') >= 0 && b.bossName.indexOf('II') === -1) ? ' II' : '') + '</div>' + ((b.shieldMaxHp > 0 && !b.shieldBroken) ? '<div class="shield-bar-wrap" id="shield-bar-wrap"><div class="bar"><div class="fill" id="boss-shield" style="width:' + (b.shieldHp / b.shieldMaxHp * 100) + '%"></div></div></div>' : '') + '<div class="bar ap"><div class="fill" id="boss-ap" style="width:' + (b.bossArmor / b.bossMaxArmor * 100) + '%"></div></div><div class="bar hp"><div class="fill" id="boss-hp" style="width:' + (b.bossHp / b.bossMaxHp * 100) + '%"></div></div></div><div class="sprite" id="boss-sprite">' + (BOSS_LAYERS[b.bossId] ? '<canvas id="boss-battle-canvas"></canvas>' : bossIcon(b.bossId)) + '</div></div><div class="fighter hero-f" id="fighter-hero" style="left:' + (b.px * 100) + '%"><div class="hpbar-wrap"><div class="nm">玩家</div><div class="bar ap"><div class="fill" id="hero-ap" style="width:' + (b.playerArmor / b.playerMaxArmor * 100) + '%"></div></div><div class="bar hp"><div class="fill" id="hero-hp" style="width:' + (b.playerHp / b.playerMaxHp * 100) + '%"></div></div></div><div class="sprite" id="hero-sprite"><canvas id="hero-battle-canvas"></canvas></div></div><div class="head-bars" id="head-bars"></div><div id="battle-fx"></div></div>';
+
+  {
+    const _z1w = z1.clientWidth || 400;
+    const _z1h = z1.clientHeight || 500;
+    const _sm0 = (typeof computeScreenMetrics === 'function') ? computeScreenMetrics(_z1w, _z1h) : { screenRightWorld: 4.2, bgPixelsPerMeter: 88 };
+    battle.sm = _sm0;
+    battle.px = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+    battle.bx = battle.px + (battle.bossWorldX - battle.playerWorldX) / (_sm0.screenRightWorld || 4.2) * (1 - battle.px);
+    battle.bgPixelsPerMeter = _sm0.bgPixelsPerMeter || 88;
+    const _bgElInit = z1.querySelector('.battle-bg');
+    if(_bgElInit){
+      _bgElInit.style.backgroundPositionX = (-(battle.playerWorldX || 0) * battle.bgPixelsPerMeter) + 'px';
+      _bgElInit.style.backgroundSize = 'auto 100%';
+      _bgElInit.style.backgroundRepeat = 'repeat-x';
+    }
+  }
 
   updateFighterPos();
   requestAnimationFrame(function(){
@@ -1027,7 +1041,7 @@ function refreshBattleControlsLive(){
   if(info) info.innerHTML = buildBattleWeaponInfo();
   const fb = document.getElementById('fire-btn');
   if(fb){
-    const canFire = !battle.reloading && !battle.consuming;
+    const canFire = !battle.reloading && !battle.consuming && (typeof isAimPartInRange !== 'function' || isAimPartInRange()); /* rev-detect: 未發現/超射程即灰掉 */
     fb.classList.toggle('disabled', !canFire);
     fb.textContent = battle.reloading ? '裝填' : (battle.consuming ? '使用中' : '攻擊');
   }
@@ -1058,7 +1072,7 @@ function renderBattleControls(z3){
     return true;
   });
   if(modes.indexOf(battle.fireMode) === -1) battle.fireMode = modes[0] || '點射';
-  const canFire = !battle.reloading && !battle.consuming;
+  const canFire = !battle.reloading && !battle.consuming && (typeof isAimPartInRange !== 'function' || isAimPartInRange()); /* rev-detect: 未發現/超射程即灰掉 */
 
   z3.innerHTML = '<div class="ctrl-wrap"><div class="ammo-info" id="battle-ammo-info">' + buildBattleWeaponInfo() + '</div><div class="fire-modes">' + modes.map(function(m){ return '<div class="fm-btn ' + (m === battle.fireMode ? 'on' : '') + '" data-mode="' + m + '">' + m + '</div>'; }).join('') + '</div><div style="display:flex;gap:4px"><div class="weapon-slot-btn ' + (battle.weaponSlot === 'primary' ? 'on' : '') + '" data-slot="primary" style="flex:1">主武器</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'secondary' ? 'on' : '') + '" data-slot="secondary" style="flex:1">副武器</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'melee' ? 'on' : '') + '" data-slot="melee" style="flex:1">近戰</div><div class="weapon-slot-btn ' + (battle.weaponSlot === 'throwable' ? 'on' : '') + '" data-slot="throwable" style="flex:1">投擲</div></div><div style="flex:1;display:flex;align-items:center;justify-content:center;gap:40px;"><div class="heal-btn" id="heal-btn">✚</div><div class="fire-btn ' + (canFire ? '' : 'disabled') + '" id="fire-btn">' + (battle.reloading ? '裝填' : (battle.consuming ? '使用中' : '攻擊')) + '</div></div><!--rev-fix-remove-dmg-status--></div>';
 
@@ -1113,6 +1127,7 @@ function switchBattleWeapon(slot){
   battle.fireHeld = false;
   battle.burstLeft = 0;
   battle.playerWeaponRange = def.range || 0.5;
+  battle.playerWeaponRangeM = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(def) : (def.range || 30);
   const prevSt = battle.weaponStates[slot];
   if(prevSt){
     battle.ammoInMag = prevSt.ammoInMag || 0;
@@ -1163,12 +1178,7 @@ function startPlayerFire(){
   if(!battle || !battle.active) return;
   if(battle.settling) return;
   if(battle.reloading) return;
-  {
-    const _pr = battle.px + battle.playerWeaponRange;
-    const _bl = getBossLeftBoundaryN();
-    if(_pr < _bl) return;
-    if(!isAimPartInRange()) return;
-  }
+  if(!isAimPartInRange()) return; /* rev-detect: 唯一閘門（發現 + 射程） */
   if(battle.consuming){
     if(battle.healTimer){ clearTimeout(battle.healTimer); battle.healTimer = null; }
     battle._healToken = (battle._healToken || 0) + 1;
@@ -1279,260 +1289,247 @@ function triggerReload(){
   }, _reloadMs);
 }
 
+
 function playerShoot(){
-  if(battle.settling) return false;
-  let w = battle.weapon;
-  if(!w || battle.reloading || battle.consuming) return false;
-  let def = w.def;
-  const playerRightPx = battle.px + battle.playerWeaponRange;
-  const bossLeftPx = getBossLeftBoundaryN();
-  if(playerRightPx < bossLeftPx) return false;
-  if(!isAimPartInRange()) return false;
-  const isMelee = def.slot === 'melee';
-
-  if(def.cal && battle.ammoInMag <= 0){
-    if(!(battle.ammoRef && battle.ammoRef.count > 0)){
-      const switched = autoSwitchOnNoAmmo();
-      if(!switched){
-        battle.firing = false;
-        battle.burstLeft = 0;
-      }
-      return false;
-    }
-  }
-
-  battle.shotLockUntil = performance.now() + 350;
-
-  /* rev-fix-boss-throw-anim: 投擲復用近戰 attack_melee，與探索模式 v4 一致（複用，無新增動畫） */
-  {
-    const _isThrow = (battle.weaponSlot === 'throwable');
-    const _isMelee = (battle.weaponSlot === 'melee');
-    const _amAnim = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.attack_melee) ? GAME_ANIMS.attack_melee : null;
-    const _amDur = _amAnim ? Math.round(_amAnim.frameCount / _amAnim.fps * 1000) : 600;
-    if(battle.weaponSlot === 'secondary'){
-      battleHeroAnim.name = 'fire_secondary';
-      battleHeroAnim.frame = 0;
-      battleHeroAnim.lastUpdate = performance.now();
-      battleHeroAnim.forcedEnd = performance.now() + 350;
-    } else if(_isMelee || _isThrow){
-      battleHeroAnim.name = 'attack_melee';
-      battleHeroAnim.frame = 0;
-      battleHeroAnim.lastUpdate = performance.now();
-      battleHeroAnim.forcedEnd = performance.now() + _amDur;
-    } else {
-      battleHeroAnim.name = 'fire_primary';
-      battleHeroAnim.frame = 0;
-      battleHeroAnim.lastUpdate = performance.now();
-      battleHeroAnim.forcedEnd = performance.now() + 350;
-    }
-  }
-
-  const _effectiveMode = (typeof _getFireChainMode === 'function') ? _getFireChainMode(battle) : (battle.fireMode || '點射');
-
-  const isWeak = isWeakPointHit();
-
-  if(def.cal){
-    if(battle.ammoInMag <= 0){
-      triggerReload();
-      return false;
-    }
-    battle.ammoInMag--;
-    const mz = getPlayerMuzzlePos();
-    const target = getAimTargetPos();
-    
-    /* [v211-fix] 生成槍口煙火 */
-    const _fxElB = document.getElementById('battle-fx');
-    if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x * (_fxElB? _fxElB.clientWidth : 400), mz.y * (_fxElB? _fxElB.clientHeight : 500), w.def.type === '機槍' ? 1.2 : 1.0, false, 'boss');
-    
-    /* [v212] 真實彈速與延遲結算 */
-    const _dist = Math.abs(battle.bx - battle.px); 
-    const _spd = (window.AMMO_SPEED_MS && window.AMMO_SPEED_MS[def.cal]) || 800;
-    const _duration = Math.max(16, _dist * 100 / _spd * 1000);
-
-    const hitRate = getHitRate(def.type, _effectiveMode, def.scopeBonus || 0, def.scope);
-    const ammoPenMM = battle.ammoRef ? (AMMO[battle.ammoRef.id].penMM || 0) : 0;
-    const pellets = battle.ammoRef ? (AMMO[battle.ammoRef.id].pellets || 1) : 1;
-
-    battle.bullets.push({
-      sx: mz.x, sy: mz.y, tx: clamp(target.x, 0, 1), ty: clamp(target.y, 0, 1), 
-      startTime: performance.now(), duration: _duration, player: true,
-      _onHit: function(){
-        for(let p = 0; p < pellets; p++){
-          if(Math.random() * 100 < hitRate){
-            const _d = (typeof _calcAttackDamage === 'function') ? _calcAttackDamage({
-              ammoId: battle.ammoRef ? battle.ammoRef.id : null,
-              ammoRarity: battle.ammoRef ? battle.ammoRef.rarity : '一般',
-              weaponRarity: w.rarity,
-              penMM: ammoPenMM,
-              fallbackDmg: def.dmg || 20
-            }) : { baseDmg: 20, crit: false };
-            let dmg = _d.baseDmg;
-            let isCrit = _d.crit;
-            /* [v217] 瞄準點小型爆炸特效 */
-            if(!battle.aimHitFx) battle.aimHitFx = [];
-            {
-              const _pCount = isCrit ? 8 : 5;
-              const _parts = [];
-              for(let _pi = 0; _pi < _pCount; _pi++){
-                const _ang = Math.random() * Math.PI * 2;
-                const _spd = 20 + Math.random() * 15;
-                _parts.push({ dx: Math.cos(_ang) * _spd, dy: Math.sin(_ang) * _spd, r: 1.5 + Math.random() * 1.5 });
-              }
-              battle.aimHitFx.push({ x: target.x, y: target.y, startTime: performance.now(), crit: isCrit, particles: _parts });
-            }
-            if(isWeak){
-              battle.engaged = true;
-              battle.bossHp = Math.max(0, battle.bossHp - dmg);
-              battle.damageDealt += dmg;
-              spawnHitFx('boss', 0, '-' + dmg + (isCrit ? '!' : ''), (dmg > 0) ? (isCrit ? 'crit' : 'weak') : 'armor', target.x, target.y);
-              if(isBossType(battle.bossId, 'omega') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
-              if(battle.bossHp <= 0){ endBattle(true); return; }
-            } else {
-              applyBossDamage(dmg, isCrit, ammoPenMM);
-              if(battle.bossHp <= 0) return;
-            }
-          }
-        }
-      }
-    });
-  } else {
-    if(def.slot === 'throwable'){
-      if(getThrowableCount() <= 0){
-        if(!ensureThrowableFromBackpack()){
-          battle.firing = false;
-          battle.burstLeft = 0;
-          return false;
-        }
-        const nw = equippedWeapon('throwable');
-        if(nw){ battle.weapon = nw; w = nw; def = nw.def; }
-      }
-      state.player.throwableStock--;
-      battle.ammoInMag = getThrowableCount();
-      if(battle.weaponStates[battle.weaponSlot]) battle.weaponStates[battle.weaponSlot].ammoInMag = battle.ammoInMag;
-      if(state.player.throwableStock <= 0){
-        if(ensureThrowableFromBackpack()){
-          const nw = equippedWeapon('throwable');
-          if(nw){ battle.weapon = nw; w = nw; def = nw.def; }
-          battle.ammoInMag = getThrowableCount();
-          if(battle.weaponStates[battle.weaponSlot]) battle.weaponStates[battle.weaponSlot].ammoInMag = battle.ammoInMag;
-        }
-      }
-    }
-    if(def.slot === 'throwable' && def.explosive && (def.fragments || 0) > 0){
-      const _hitRate = getHitRate(def.type, battle.fireMode) + 10;
-      const _pdB = 0.6 + clamp(Math.floor(state.proficiency[def.type] || 0) / MAX_PROF_LEVEL, 0, 1) * 0.9;
-      const _frags = def.fragments;
-      const _aimForArc = (typeof getAimTargetPos === 'function') ? getAimTargetPos() : { x: battle.bx, y: 0.5 };
-      const _arcA = _calcBossArcRatios(battle.bossId, _aimForArc.x);
-      let _effFrags;
-      if(def.allFragmentsOnSingle){ _effFrags = _frags; }
-      else { _effFrags = Math.max(0, Math.round(_frags * _arcA.bossRatio)); }
-      const _fragsWeak = Math.min(_effFrags, Math.max(0, Math.round(_frags * _arcA.weakTotalRatio)));
-      const _weakPerLayer = {};
-      if(_fragsWeak > 0 && _arcA.weakTotalAngle > 0){
-        let _sumA = 0;
-        for(const _wid in _arcA.weakAngles){
-          _weakPerLayer[_wid] = Math.round(_fragsWeak * _arcA.weakAngles[_wid] / _arcA.weakTotalAngle);
-          _sumA += _weakPerLayer[_wid];
-        }
-        const _diffA = _fragsWeak - _sumA;
-        if(_diffA !== 0){
-          let _mwA = null, _maA = 0;
-          for(const _wid in _arcA.weakAngles){ if(_arcA.weakAngles[_wid] > _maA){ _maA = _arcA.weakAngles[_wid]; _mwA = _wid; } }
-          if(_mwA) _weakPerLayer[_mwA] += _diffA;
-        }
-      }
-      const _weakQueue = [];
-      for(const _wid in _weakPerLayer){ for(let _k = 0; _k < _weakPerLayer[_wid]; _k++) _weakQueue.push(_wid); }
-      const _pieceBaseDmg = (def.fragmentDamage || def.dmg || 0) * (RARITY_MULT[w.rarity] || 1) * _pdB;
-      const _critRate = calcCritRate(w.rarity, '一般');
-      const _critMult = calcCritMult(w.rarity, '一般');
-      const _isWeak = isWeakPointHit();
-      /* rev-fix-boss-throw-origin: 起點 = attack_melee 釋放幀（frame 5）的手部位置；
-       * 動畫先播釋放延遲（約 357ms），到點才離手，前段手雷跟隨手部 */
-      const _amAnim = GAME_ANIMS.attack_melee;
-      const _RELEASE_FRAME = 5;
-      const _releaseDelay = _amAnim ? Math.round(_RELEASE_FRAME / _amAnim.fps * 1000) : 357;
-      const _nowMs2 = performance.now();
-      const _releaseAt = _nowMs2 + _releaseDelay;
-      const _handPos = _getBossThrowHandPosAtFrame(_RELEASE_FRAME);
-      const _target = getAimTargetPos();
-      const _battleRef = battle;
-      battle.bullets.push({
-        sx: _handPos.x, sy: _handPos.y, tx: _target.x, ty: 0.95, t: 0,
-        player: true, big: true, arc: true, isGrenade: true,
-        grenadeId: w.id,
-        startTime: _releaseAt, releaseAt: _releaseAt, duration: 500,
-        _onHit: function(){
-      /* rev-fix-boss-throw-merge: 每个破片不单独弹数字（applyBossDamage 传 skipHitFx=true），
-       * 结算完合并成一个总伤害数字，不含"片"字。弱点路径也累加总伤。 */
-      let _fragHits = 0, _fragCrits = 0, _fragTotalDmg = 0;
-      for(let _fi = 0; _fi < _effFrags; _fi++){
-        if(Math.random() * 100 < _hitRate){
-          let _d = Math.round(_pieceBaseDmg) + rndInt(-2, 2);
-          let _isCrit = false;
-          if(Math.random() < _critRate){ _d = Math.round(_d * _critMult); _isCrit = true; _fragCrits++; }
-          _d = Math.max(1, _d);
-          _fragHits++;
-          _fragTotalDmg += _d;
-          if(_fi < _weakQueue.length){
-            const _layerId = _weakQueue[_fi];
-            _battleRef.engaged = true;
-            _battleRef.bossHp = Math.max(0, _battleRef.bossHp - _d);
-            _battleRef.damageDealt += _d;
-            if(isBossType(_battleRef.bossId, 'omega') && _battleRef.arms) damageOmegaArm(_layerId, _d);
-            if(_battleRef.bossHp <= 0){ endBattle(true); return; }
-          } else {
-            applyBossDamage(_d, _isCrit, def.penMM || 0, true, true, true);
-            if(_battleRef.bossHp <= 0) return;
-          }
-        }
-      }
-      if(_fragHits > 0){
-        spawnHitFx('boss', 0, '-' + _fragTotalDmg + (_fragCrits > 0 ? '!' : ''), (_fragTotalDmg > 0) ? (_fragCrits > 0 ? 'crit' : 'weak') : 'armor', _battleRef.bx, _battleRef.by);
-      }
-    }
-      });
-      addProf(battle.weaponSlot, 0.01);
-      if(def.type) addProf(def.type, 0.01);
-      refreshBattleControlsLive();
-      return true;
-    }
-    const hitRate = getHitRate(def.type, battle.fireMode, def.scopeBonus || 0, def.scope) + 10;
-    const baseDmg = Math.round((def.dmg || 0) * (RARITY_MULT[w.rarity] || 1));
-    const critRate = calcCritRate(w.rarity, '一般');
-    const critMult = calcCritMult(w.rarity, '一般');
-    const mz = getPlayerMuzzlePos();
-    const target = getAimTargetPos();
-    if(!isMelee){
-      const isArc = def.slot === 'throwable';
-      battle.bullets.push({ sx: mz.x, sy: mz.y, tx: target.x, ty: target.y, t: 0, player: true, big: true, arc: isArc });
-    }
-    const hits = isMelee ? getMeleeHits(def.rpm) : 1;
-    for(let i = 0; i < hits; i++){
-      if(Math.random() * 100 < hitRate){
-        let dmg = baseDmg;
-        let isCrit = false;
-        if(Math.random() < critRate){ dmg = Math.round(dmg * critMult); isCrit = true; }
-        if(isWeak){
-          battle.engaged = true;
-          battle.bossHp = Math.max(0, battle.bossHp - dmg);
-          battle.damageDealt += dmg;
-          spawnHitFx('boss', 0, '-' + dmg + (isCrit ? '!' : ''), (dmg > 0) ? (isCrit ? 'crit' : 'weak') : 'armor', target.x, target.y);
-          if(isBossType(battle.bossId, 'omega') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
-          if(battle.bossHp <= 0){ endBattle(true); return true; }
-        } else {
-          applyBossDamage(dmg, isCrit, def.penMM || 0, def.slot === 'throwable');
-          if(battle.bossHp <= 0) return true;
-        }
-      }
-    }
-  }
-  addProf(battle.weaponSlot, 0.01);
-  if(def.type) addProf(def.type, 0.01);
-  refreshBattleControlsLive();
-  return true;
+if(battle.settling) return false;
+let w = battle.weapon;
+if(!w || battle.reloading || battle.consuming) return false;
+let def = w.def;
+if(!isAimPartInRange()) return false; /* rev-detect: 唯一閘門（發現 + 射程） */
+const isMelee = def.slot === 'melee';
+if(def.cal && battle.ammoInMag <= 0){
+if(!(battle.ammoRef && battle.ammoRef.count > 0)){
+const switched = autoSwitchOnNoAmmo();
+if(!switched){ battle.firing = false; battle.burstLeft = 0; }
+return false;
 }
+}
+battle.shotLockUntil = performance.now() + 350;
+/* rev-fix-boss-throw-anim: 投擲復用近戰 attack_melee */
+{
+const _isThrow = (battle.weaponSlot === 'throwable');
+const _isMelee = (battle.weaponSlot === 'melee');
+const _amAnim = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.attack_melee) ? GAME_ANIMS.attack_melee : null;
+const _amDur = _amAnim ? Math.round(_amAnim.frameCount / _amAnim.fps * 1000) : 600;
+if(battle.weaponSlot === 'secondary'){
+battleHeroAnim.name = 'fire_secondary';
+battleHeroAnim.frame = 0;
+battleHeroAnim.lastUpdate = performance.now();
+battleHeroAnim.forcedEnd = performance.now() + 350;
+} else if(_isMelee || _isThrow){
+battleHeroAnim.name = 'attack_melee';
+battleHeroAnim.frame = 0;
+battleHeroAnim.lastUpdate = performance.now();
+battleHeroAnim.forcedEnd = performance.now() + _amDur;
+} else {
+battleHeroAnim.name = 'fire_primary';
+battleHeroAnim.frame = 0;
+battleHeroAnim.lastUpdate = performance.now();
+battleHeroAnim.forcedEnd = performance.now() + 350;
+}
+}
+const _effectiveMode = (typeof _getFireChainMode === 'function') ? _getFireChainMode(battle) : (battle.fireMode || '點射');
+const isWeak = isWeakPointHit();
+/* ═══ rev-bossbox: 槍彈走統一武器核心（aimY/aimZ 幾何瞄準 + 散佈 → 部位） ═══ */
+if(def.cal){
+if(battle.ammoInMag <= 0){ triggerReload(); return false; }
+if(typeof window._weaponFire !== 'function' || !battle.bossTarget) return false;
+battle.ammoInMag--;
+const mz = getPlayerMuzzlePos();
+const _fxElB = document.getElementById('battle-fx');
+if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x*(_fxElB?_fxElB.clientWidth:400), mz.y*(_fxElB?_fxElB.clientHeight:500), w.def.type==='機槍'?1.2:1.0, false, 'boss');
+const _spd = (window.AMMO_SPEED_MS && window.AMMO_SPEED_MS[def.cal]) || 800;
+const hitRate = getHitRate(def.type, _effectiveMode, def.scopeBonus || 0, def.scope);
+const _aRef = battle.ammoRef;
+const ammoPenMM = _aRef ? (AMMO[_aRef.id].penMM || 0) : 0;
+const pellets = _aRef ? (AMMO[_aRef.id].pellets || 1) : 1;
+const _aId = _aRef ? _aRef.id : null;
+const _aRar = _aRef ? _aRef.rarity : '一般';
+const _wRar = w.rarity, _wId = w.id, _fbDmg = def.dmg || 20;
+const _bc = (battle._chainShots || 1);
+const _rng = battle.playerWeaponRangeM || 30;
+const _aimM = (typeof window._bossAimMeters === 'function') ? window._bossAimMeters() : {aimY:0.85,aimZ:0};
+for(let pi = 0; pi < pellets; pi++){
+window._weaponFire({
+owner: battle,
+weaponId: _wId,
+ammoId: _aId,
+target: battle.bossTarget,
+startX: battle.playerWorldX,
+startY: 1.3,
+targetWorldX: battle.bossWorldX,
+targetVx: 0,
+targetY: 0,
+flightSpeed: _spd,
+hr: hitRate,
+burstCount: _bc,
+weaponRange: _rng,
+aimY: _aimM.aimY,
+aimZ: _aimM.aimZ,
+guidanceMode: 'none',
+isEnemyBullet: false,
+onHit: function(hx, hy, tgt, part){
+if(!battle || battle.settling) return;
+const _d = (typeof _calcAttackDamage === 'function') ? _calcAttackDamage({
+ammoId: _aId, ammoRarity: _aRar, weaponRarity: _wRar, penMM: ammoPenMM, fallbackDmg: _fbDmg
+}) : { baseDmg: _fbDmg, crit: false };
+const _sp = (typeof window._bossWorldToScreenN === 'function') ? window._bossWorldToScreenN(hx, hy) : {x:battle.bx,y:0.6};
+const _dmg = _d.baseDmg, _crit = _d.crit;
+if(part && part !== 'body'){
+battle.engaged = true;
+battle.bossHp = Math.max(0, battle.bossHp - _dmg);
+battle.damageDealt += _dmg;
+spawnHitFx('boss', 0, '-' + _dmg + (_crit ? '!' : ''), _crit ? 'crit' : 'weak', _sp.x, _sp.y);
+if(isBossType(battle.bossId, 'omega') && battle.arms) damageOmegaArm(part, _dmg);
+if(battle.bossHp <= 0){ endBattle(true); return; }
+} else {
+applyBossDamage(_dmg, _crit, ammoPenMM, false, false, false, part || 'body');
+}
+},
+onMiss: function(ix, iy){
+if(!battle) return;
+const _sp = (typeof window._bossWorldToScreenN === 'function') ? window._bossWorldToScreenN(ix, Math.max(0, iy)) : {x:battle.bx,y:0.6};
+spawnHitFx('boss', 0, 'MISS', 'miss', _sp.x, _sp.y);
+}
+});
+}
+addProf(battle.weaponSlot, 0.01);
+if(def.type) addProf(def.type, 0.01);
+refreshBattleControlsLive();
+return true;
+}
+/* ═══ 投擲 / 近戰 ═══ */
+if(def.slot === 'throwable'){
+if(getThrowableCount() <= 0){
+if(!ensureThrowableFromBackpack()){
+battle.firing = false;
+battle.burstLeft = 0;
+return false;
+}
+const nw = equippedWeapon('throwable');
+if(nw){ battle.weapon = nw; w = nw; def = nw.def; }
+}
+state.player.throwableStock--;
+battle.ammoInMag = getThrowableCount();
+if(battle.weaponStates[battle.weaponSlot]) battle.weaponStates[battle.weaponSlot].ammoInMag = battle.ammoInMag;
+if(state.player.throwableStock <= 0){
+if(ensureThrowableFromBackpack()){
+const nw = equippedWeapon('throwable');
+if(nw){ battle.weapon = nw; w = nw; def = nw.def; }
+battle.ammoInMag = getThrowableCount();
+if(battle.weaponStates[battle.weaponSlot]) battle.weaponStates[battle.weaponSlot].ammoInMag = battle.ammoInMag;
+}
+}
+}
+/* rev-bossbox: 手雷 = 探索同一條鏈（真實拋物線 + casualtyRadius + 覆蓋引擎） */
+if(def.slot === 'throwable' && def.explosive && (def.fragments || 0) > 0){
+const _hitRate = getHitRate(def.type, battle.fireMode) + 10;
+const _pdB = 0.6 + clamp(Math.floor(state.proficiency[def.type] || 0) / MAX_PROF_LEVEL, 0, 1) * 0.9;
+const _amAnim = GAME_ANIMS.attack_melee;
+const _RELEASE_FRAME = 5;
+const _releaseDelay = _amAnim ? Math.round(_RELEASE_FRAME / _amAnim.fps * 1000) : 357;
+const _releaseAt = performance.now() + _releaseDelay;
+const _hand = _getBossThrowHandPosAtFrame(_RELEASE_FRAME);
+const _m = (typeof window._bossScreenMetrics === 'function') ? window._bossScreenMetrics() : {H:500,ppm:100,px:0.25,srw:4.2};
+const H0 = Math.max(0.2, (1 - _hand.y) * _m.H / _m.ppm);
+const _wsx = battle.playerWorldX + (_hand.x - _m.px) / (1 - _m.px) * _m.srw;
+const _aimM = (typeof window._bossAimMeters === 'function') ? window._bossAimMeters() : {aimWX:battle.bossWorldX};
+const _aimWX = (typeof _aimM.aimWX === 'number') ? _aimM.aimWX : battle.bossWorldX;
+const _dist = Math.max(0.01, Math.abs(_aimWX - _wsx));
+const _params = (typeof _calcGrenadeParams === 'function') ? _calcGrenadeParams(_dist, w.id, H0) : null;
+if(!_params) return false;
+const _dir = (_aimWX >= _wsx) ? 1 : -1;
+const _landWX = _wsx + _dir * _params.vx * _params.T;
+const _txN = _m.px + (_landWX - battle.playerWorldX) / _m.srw * (1 - _m.px);
+const _gDef = def, _gRar = w.rarity || '一般', _gW = w;
+{
+      /* rev-sweepcore: 手雷 = 探索 _playerThrowGrenade 同源資料（_calcGrenadeParams / _handYToH0） */
+      const _hS = _getBossThrowHandPosAtFrame(5);
+      const _mS = (typeof window._bossScreenMetrics === 'function') ? window._bossScreenMetrics() : { H:500, ppm:100, px:0.25, srw:4.2 };
+      const _H0S = (typeof _handYToH0 === 'function') ? _handYToH0(_hS.y) : Math.max(0.05, (0.95 - _hS.y) * _mS.H / _mS.ppm);
+      const _wsxS = battle.playerWorldX + (_hS.x - _mS.px) / (1 - _mS.px) * _mS.srw;
+      const _aimS = (typeof window._bossAimMeters === 'function') ? window._bossAimMeters() : { aimWX: battle.bossWorldX };
+      const _aimWXS = (typeof _aimS.aimWX === 'number') ? _aimS.aimWX : battle.bossWorldX;
+      const _distS = Math.max(0.01, Math.abs(_aimWXS - _wsxS));
+      const _parS = (typeof _calcGrenadeParams === 'function') ? _calcGrenadeParams(_distS, w.id, _H0S) : null;
+      if(_parS){
+        const _dirS = (_aimWXS >= _wsxS) ? 1 : -1;
+        const _landS = _wsxS + _dirS * _parS.vx * _parS.T;
+        const _amS = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.attack_melee) ? GAME_ANIMS.attack_melee : null;
+        const _relS = performance.now() + (_amS ? Math.round(5 / _amS.fps * 1000) : 357);
+        const _hrS = (typeof getHitRate === 'function') ? getHitRate(def.type, battle.fireMode) + 10 : 40;
+        const _pdBS = 0.6 + clamp(Math.floor(state.proficiency[def.type] || 0) / MAX_PROF_LEVEL, 0, 1) * 0.9;
+        const _txS = _mS.px + (_landS - battle.playerWorldX) / _mS.srw * (1 - _mS.px);
+        const _gDS = def, _gRS = w.rarity || '一般', _gWS = w;
+        battle.bullets.push({
+          isGrenade:true, grenadeId:_gWS.id, rarity:_gRS, player:true, big:true, arc:true, hit:true,
+          worldStartX:_wsxS, H0:_H0S, dir:_dirS, vx:_parS.vx, vy:_parS.vy, T:_parS.T,
+          start:_relS, releaseAt:_relS, startTime:_relS, duration:_parS.T * 1000,
+          sx:_hS.x, sy:_hS.y, tx:_txS, ty:0.95, t:0,
+          _onHit: function(){ if(typeof window._bossGrenadeBurst === 'function') window._bossGrenadeBurst(_gDS, _gRS, _hrS, _landS, _gWS, _pdBS); }
+        });
+      }
+    }
+addProf(battle.weaponSlot, 0.01);
+if(def.type) addProf(def.type, 0.01);
+refreshBattleControlsLive();
+return true;
+}
+/* 近戰 / 無破片投擲：保留即時接觸結算 */
+const hitRate = getHitRate(def.type, battle.fireMode, def.scopeBonus || 0, def.scope) + 10;
+const baseDmg = Math.round((def.dmg || 0) * (RARITY_MULT[w.rarity] || 1));
+const critRate = calcCritRate(w.rarity, '一般');
+const critMult = calcCritMult(w.rarity, '一般');
+const mz = getPlayerMuzzlePos();
+const target = getAimTargetPos();
+if(!isMelee){
+const isArc = def.slot === 'throwable';
+battle.bullets.push({ sx: mz.x, sy: mz.y, tx: target.x, ty: target.y, t: 0, player: true, big: true, arc: isArc });
+}
+const hits = isMelee ? getMeleeHits(def.rpm) : 1;
+for(let i = 0; i < hits; i++){
+  /* rev-animatk: 近戰對幀 —— 接觸幀 5（front_arm 最前），hits 分散 [4,5,6]，每下重檢 */
+  (function(_i){
+    var _run = function(){
+      if(!battle || !battle.active || battle.settling) return;
+      if(isMelee){
+        if(battle.weaponSlot !== 'melee') return;
+        var _dN = Math.abs(battle.bossWorldX - battle.playerWorldX);
+        var _rngN = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(def) : 0.75;
+        if(_dN > _rngN + BOSS_HALF_WIDTH_M) return;
+      }
+
+if(Math.random() * 100 < hitRate){
+let dmg = baseDmg;
+let isCrit = false;
+if(Math.random() < critRate){ dmg = Math.round(dmg * critMult); isCrit = true; }
+if(isWeak){
+battle.engaged = true;
+battle.bossHp = Math.max(0, battle.bossHp - dmg);
+battle.damageDealt += dmg;
+spawnHitFx('boss', 0, '-' + dmg + (isCrit ? '!' : ''), (dmg > 0) ? (isCrit ? 'crit' : 'weak') : 'armor', target.x, target.y);
+if(isBossType(battle.bossId, 'omega') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
+if(battle.bossHp <= 0){ endBattle(true); return true; }
+} else {
+applyBossDamage(dmg, isCrit, def.penMM || 0, def.slot === 'throwable');
+if(battle.bossHp <= 0) return true;
+}
+}
+
+    };
+    if(isMelee){
+      var _amA = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.attack_melee) ? GAME_ANIMS.attack_melee : null;
+      var _fdN = _amA ? 1000/_amA.fps : 71.4;
+      setTimeout(_run, Math.round([4,5,6][Math.min(_i,2)] * _fdN));
+    } else { _run(); }
+  })(i);
+}
+addProf(battle.weaponSlot, 0.01);
+if(def.type) addProf(def.type, 0.01);
+refreshBattleControlsLive();
+return true;
+}
+
 
 function manualHeal(){
   if(!battle || !battle.active) return;
@@ -1579,243 +1576,227 @@ function manualHeal(){
 }
 
 function battleLoop(now){
-  if(battle && !battle.settling && battle.weapon && battle.weapon.def && battle.weapon.def.cal){
-    if(!battle.ammoRef || battle.ammoRef.count <= 0){
-      const _rfNext = pickAmmoByPreferenceOrOrder(battle.weapon.def.cal, 'combat');
-      if(_rfNext){
-        battle.ammoRef = { id: _rfNext.id, rarity: _rfNext.rarity, count: _rfNext.count };
-        if(battle.weaponSlot){ battle.weaponStates[battle.weaponSlot] = { ammoInMag: battle.ammoInMag, ammoRef: battle.ammoRef }; }
-        refreshBattleControlsLive();
-      }
-    }
-  }
+if(!battle) return;
+/* 備彈自動補位 / 空匣自動裝填 */
+if(!battle.settling && battle.weapon && battle.weapon.def && battle.weapon.def.cal){
+if(!battle.ammoRef || battle.ammoRef.count <= 0){
+const _rfNext = pickAmmoByPreferenceOrOrder(battle.weapon.def.cal, 'combat');
+if(_rfNext){
+battle.ammoRef = { id: _rfNext.id, rarity: _rfNext.rarity, count: _rfNext.count };
+if(battle.weaponSlot) battle.weaponStates[battle.weaponSlot] = { ammoInMag: battle.ammoInMag, ammoRef: battle.ammoRef };
+refreshBattleControlsLive();
+}
+}
+if(!battle.reloading && !battle.consuming && battle.ammoInMag <= 0 && battle.ammoRef && battle.ammoRef.count > 0){
+triggerReload();
+}
+}
+if(!battle.active) return;
+const dt = Math.min(0.05, (now - battle.lastTime) / 1000);
+battle.lastTime = now;
+if(battle.sweep){ _sweepBattleTick(now, dt); requestAnimationFrame(battleLoop); return; }
+/* 結算中：只播死亡動畫，等 finishBattleSettle */
+if(battle.settling){
+updateBattleBossAnim(now);
+renderBattleHeroCanvas();
+renderBossBattleCanvas();
+const _anims = BOSS_ANIMS[battle.bossId];
+const _death = _anims && _anims.death;
+if(_death && battleBossAnim.name === 'death' && battleBossAnim.frame >= _death.frameCount - 1 && !battle._settleScheduled){
+battle._settleScheduled = true;
+setTimeout(finishBattleSettle, 300);
+}
+try{ if(window._bossOffscreenUpdate) window._bossOffscreenUpdate(); }catch(e){}
+requestAnimationFrame(battleLoop);
+return;
+}
+battle.firing = !battle.reloading && !battle.consuming &&
+((battle.fireHeld && battle.fireMode === '掃射') || battle.burstLeft > 0);
+/* 尺寸唯一擁有者：兩個 sprite / canvas 都撐滿場景高 H。
+   位置不在此寫 —— .fighter 全高零寬錨點、.sprite bottom:0、.hpbar-wrap top:13.26% 全由 CSS 負責。
+   Boss 內容由 getBossCanvasTransform 縮放到與玩家相同視覺高度。 */
+const fxEl = document.getElementById('battle-fx');
+if(fxEl){
+const H = fxEl.clientHeight;
+if(H > 0 && battle.lastH !== H){
+battle.lastH = H;
+battle.playerCanvasH = H;
+battle.playerCanvasW = Math.round(H * 1.2);
+battle.playerSpriteW = battle.playerCanvasW;
+battle.playerSpriteH = H;
+battle.bgPixelsPerMeter = H * CHAR_HEIGHT_FACTOR / PLAYER_HEIGHT_M;
+battle.py = BOSS_UNIT_CENTER;
+battle.by = BOSS_UNIT_CENTER;
+var _sprCss = "position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:" + battle.playerCanvasW + "px;height:" + H + "px;";
+var _hs = document.querySelector(".hero-f .sprite");
+if(_hs) _hs.style.cssText = _sprCss;
+var _bs = document.getElementById("boss-sprite");
+if(_bs) _bs.style.cssText = _sprCss;
+var _hc = document.getElementById("hero-battle-canvas");
+if(_hc){ _hc.style.width = "100%"; _hc.style.height = "100%"; _hc.style.display = "block"; }
+var _bc = document.getElementById("boss-battle-canvas");
+if(_bc){ _bc.style.width = "100%"; _bc.style.height = "100%"; _bc.style.display = "block"; }
+updateFighterPos();
+}
+}
+/* 移動 */
+const hasMoveInput = (battle.moveDir !== 0);
+/* rev-detect: 後退輸入立即取消殘餘連射，避免被 burst 卡住無法後退 */
+if(hasMoveInput && battle.moveDir < 0){ battle.burstLeft = 0; battle.fireHeld = false; }
+if(hasMoveInput && battle.consuming) interruptHeal();
+const canMove = !battle.consuming && !battle.reloading && (battle.moveDir < 0 || (!battle.firing && now >= (battle.shotLockUntil || 0))); /* rev-detect: 後退豁免射擊鎖 */
+if(canMove && hasMoveInput){
+let newPWX = Math.max(0, battle.playerWorldX + battle.moveDir * PLAYER_MOVE_SPEED_MPS * dt);
+const _maxPWX = battle.bossWorldX - BOSS_MIN_GAP_M;
+if(newPWX > _maxPWX) newPWX = Math.max(0, _maxPWX);
+battle.playerWorldX = newPWX;
+}
+/* 相機：玩家固定 25%，背景向左滾 */
+{
+const _fxW = fxEl ? fxEl.clientWidth : 400;
+const _fxH = fxEl ? fxEl.clientHeight : 500;
+battle.sm = (typeof computeScreenMetrics === 'function') ? computeScreenMetrics(_fxW, _fxH) : { screenRightWorld: 4.2, bgPixelsPerMeter: 88 };
+battle.px = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+const _srw = battle.sm.screenRightWorld || 4.2;
+battle.bx = battle.px + (battle.bossWorldX - battle.playerWorldX) / _srw * (1 - battle.px);
+battle.bgPixelsPerMeter = battle.sm.bgPixelsPerMeter || 88;
+const _bgEl = document.querySelector('.battle-scene .battle-bg');
+if(_bgEl){
+_bgEl.style.backgroundPositionX = (-battle.playerWorldX * battle.bgPixelsPerMeter) + 'px';
+_bgEl.style.backgroundSize = 'auto 100%';
+_bgEl.style.backgroundRepeat = 'repeat-x';
+}
+}
+/* 走路幀 */
+if(battle._walkFrame === undefined) battle._walkFrame = 0;
+if(battle._walkTick === undefined) battle._walkTick = now;
+{
+const _walkAnim = GAME_ANIMS.walk;
+const _walkInterval = 1000 / _walkAnim.fps;
+if(canMove && hasMoveInput){
+if(now - battle._walkTick >= _walkInterval){
+battle._walkTick = now;
+battle._walkFrame = (battle._walkFrame + 1) % _walkAnim.frameCount;
+}
+} else {
+battle._walkTick = now;
+}
+}
+/* 玩家動畫優先級：攻擊流程 > 受擊 > 治療 > 移動 > idle */
+{
+let _wantAnim;
+if(battle.reloading) _wantAnim = 'reload';
+else if(battle.firing){
+if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
+else if(battle.weaponSlot === 'melee' || battle.weaponSlot === 'throwable') _wantAnim = 'attack_melee';
+else _wantAnim = 'fire_primary';
+}
+else if((battleHeroAnim.name === 'switch_secondary' || battleHeroAnim.name === 'switch_melee') && battleHeroAnim.forcedEnd > now) _wantAnim = battleHeroAnim.name;
+else if(battleHeroAnim.name === 'attack_melee' && battleHeroAnim.forcedEnd > now) _wantAnim = 'attack_melee';
+else if((battleHeroAnim.name === 'fire_primary' || battleHeroAnim.name === 'fire_secondary') && battleHeroAnim.forcedEnd > now) _wantAnim = battleHeroAnim.name; /* rev-combatfix: 點射單發後播完 forcedEnd 才回 idle */
+else if(battle._hurtUntil && now < battle._hurtUntil) _wantAnim = 'hurt';
+else if(battle.consuming) _wantAnim = 'heal_melee';
+else if(canMove && hasMoveInput) _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
+else _wantAnim = 'idle';
+if(battleHeroAnim.name !== _wantAnim){
+const _prev = battleHeroAnim.name;
+if((_prev === 'walk' || _prev === 'run') && _wantAnim !== 'walk' && _wantAnim !== 'run'){
+battleHeroAnim.legTransitionStart = now;
+battleHeroAnim.legTransitionFrom = battleHeroAnim.frame || 0;
+}
+battleHeroAnim.name = _wantAnim;
+battleHeroAnim.lastUpdate = now;
+battleHeroAnim.frame = (_wantAnim === 'walk' || _wantAnim === 'run') ? battle._walkFrame : 0;
+} else if(_wantAnim === 'walk' || _wantAnim === 'run'){
+battleHeroAnim.frame = battle._walkFrame;
+}
+if(battleHeroAnim.legTransitionStart){
+const _el = now - battleHeroAnim.legTransitionStart;
+if(_el < 150){
+const _t = _el / 150;
+const _wf = battleHeroAnim.legTransitionFrom || 0;
+const _wl = GAME_ANIMS.walk.keys;
+battleHeroAnim.legOverride = {
+right_leg: { rot: (_wl.right_leg[_wf] ? _wl.right_leg[_wf].rot : 0) * (1 - _t) },
+left_leg: { rot: (_wl.left_leg[_wf] ? _wl.left_leg[_wf].rot : 0) * (1 - _t) }
+};
+} else {
+battleHeroAnim.legTransitionStart = null;
+battleHeroAnim.legOverride = null;
+}
+} else {
+battleHeroAnim.legOverride = null;
+}
+}
+if(typeof updateBossAI === 'function') updateBossAI(dt, now);
 
-  if(battle && !battle.settling && !battle.reloading && !battle.consuming
-     && battle.weapon && battle.weapon.def && battle.weapon.def.cal
-     && battle.ammoInMag <= 0
-     && battle.ammoRef && battle.ammoRef.count > 0){
-    triggerReload();
-  }
-
-  if(!battle || !battle.active) return;
-  const dt = Math.min(0.05, (now - battle.lastTime) / 1000);
-  battle.lastTime = now;
-  const moveSpd = 0.35 * dt;
-
-  if(battle.settling){
-    updateBattleBossAnim(now);
-    renderBattleHeroCanvas();
-    renderBossBattleCanvas();
-    const anims = BOSS_ANIMS[battle.bossId];
-    const anim = anims && anims.death;
-    if(anim && battleBossAnim.name === 'death' && battleBossAnim.frame >= anim.frameCount - 1 && !battle._settleScheduled){
-      battle._settleScheduled = true;
-      setTimeout(finishBattleSettle, 300);
-    }
-    requestAnimationFrame(battleLoop);
-    return;
-  }
-
-  battle.firing = !battle.settling && !battle.reloading && !battle.consuming &&
-                  ((battle.fireHeld && battle.fireMode === '掃射') || battle.burstLeft > 0);
-
-  const fxEl = document.getElementById('battle-fx');
-  if(fxEl){
-    const H = fxEl.clientHeight;
-    if(H > 0 && battle.lastH !== H){
-      battle.lastH = H;
-      const bossSprite = document.getElementById('boss-sprite');
-      const bossSize = Math.round(H * BATTLE_BOSS_HEIGHT_RATIO);
-      const fxElW = fxEl ? fxEl.clientWidth : H;
-      const maxHalfW = Math.floor(fxElW * Math.min(battle.bx, 1 - battle.bx) * 0.98);
-      const bossWide = Math.max(bossSize, Math.min(Math.round(bossSize * 1.5), maxHalfW * 2));
-      if(bossSprite){
-        bossSprite.style.width = bossWide + 'px';
-        bossSprite.style.height = bossSize + 'px';
-      }
-      const groundY = BATTLE_GROUND_TOP_RATIO;
-      battle.playerCanvasH = H * 0.4519;
-      battle.playerCanvasW = H * 0.8423;
-      battle.playerSpriteW = H * 0.3370;
-      battle.playerSpriteH = H * 0.4519;
-      battle.bgPixelsPerMeter = battle.playerCanvasH * CHAR_HEIGHT_FACTOR_BATTLE / PLAYER_HEIGHT_M;
-      const playerFootPx = battle.playerCanvasH * 0.95;
-      battle.py = clamp(groundY - playerFootPx / H, 0, 1);
-      {
-        const _hc = document.getElementById('hero-battle-canvas');
-        if(_hc){ _hc.style.width = battle.playerCanvasW + 'px'; _hc.style.height = battle.playerCanvasH + 'px'; }
-        const _hs = document.querySelector('.hero-f .sprite');
-        if(_hs){ _hs.style.width = battle.playerSpriteW + 'px'; _hs.style.height = battle.playerSpriteH + 'px'; }
-        const _hb = document.querySelector('.hero-f .hpbar-wrap');
-        if(_hb){ _hb.style.width = Math.round(battle.playerSpriteW * 0.68) + 'px'; }
-      }
-      battle.by = clamp(groundY - bossSize / H, 0, 1);
-      updateFighterPos();
-    }
-  }
-
-  const hasMoveInput = (battle.moveDir !== 0);
-  if(hasMoveInput && battle.consuming){
-    interruptHeal();
-  }
-
-  const canMove = !battle.firing && !battle.consuming && !battle.reloading && now >= (battle.shotLockUntil || 0);
-
-  if(canMove && hasMoveInput){
-    let newPx = clamp(battle.px + battle.moveDir * moveSpd, 0.05, 0.95);
-    if(newPx > battle.bx) newPx = Math.max(0.05, battle.bx);
-    battle.px = newPx;
-  }
-
-  if(battle._walkFrame === undefined) battle._walkFrame = 0;
-  if(battle._walkTick === undefined) battle._walkTick = performance.now();
-  {
-    const _nowT = performance.now();
-    const _movingNow = canMove && hasMoveInput;
-    const _walkAnim = GAME_ANIMS.walk;
-    const _walkInterval = 1000 / _walkAnim.fps;
-    if(_movingNow && (_nowT - battle._walkTick >= _walkInterval)){
-      battle._walkTick = _nowT;
-      battle._walkFrame = (battle._walkFrame + 1) % _walkAnim.frameCount;
-    } else if(!_movingNow){
-      battle._walkTick = _nowT;
-    }
-  }
-
-  {
-    let _wantAnim;
-    /* rev-fix-boss-anim-priority: 攻擊流程整體 > 受擊 > 治療 > 移動 > idle
-       攻擊流程內部相對順序保持：reloading → firing → switch保持 → attack_melee保持 */
-    if(battle.reloading){
-      _wantAnim = 'reload';
-    } else if(battle.firing){
-      if(battle.weaponSlot === 'secondary') _wantAnim = 'fire_secondary';
-      else if(battle.weaponSlot === 'melee' || battle.weaponSlot === 'throwable') _wantAnim = 'attack_melee';
-      else _wantAnim = 'fire_primary';
-    } else if((battleHeroAnim.name === 'switch_secondary' || battleHeroAnim.name === 'switch_melee') && battleHeroAnim.forcedEnd > now){
-      _wantAnim = battleHeroAnim.name;
-    } else if(battleHeroAnim.name === 'attack_melee' && battleHeroAnim.forcedEnd > now){
-      _wantAnim = 'attack_melee';
-    } else if(battle._hurtUntil && now < battle._hurtUntil){
-      _wantAnim = 'hurt';
-    } else if(battle.consuming){
-      _wantAnim = 'heal_melee';
-    } else if(canMove && hasMoveInput){
-      _wantAnim = (Math.abs(battle.moveDir) > 0.66) ? 'run' : 'walk';
-    } else {
-      _wantAnim = 'idle';
-    }
-    if(battleHeroAnim.name !== _wantAnim){
-      const _prevAnim = battleHeroAnim.name;
-      const _wasMoving = (_prevAnim === 'walk' || _prevAnim === 'run');
-      const _nowStanding = (_wantAnim !== 'walk' && _wantAnim !== 'run');
-      if(_wasMoving && _nowStanding){
-        battleHeroAnim.legTransitionStart = performance.now();
-        battleHeroAnim.legTransitionFrom = battleHeroAnim.frame || 0;
-      }
-      battleHeroAnim.name = _wantAnim;
-      battleHeroAnim.lastUpdate = performance.now();
-      if(_wantAnim === 'walk' || _wantAnim === 'run'){
-        battleHeroAnim.frame = battle._walkFrame;
-      } else {
-        battleHeroAnim.frame = 0;
-      }
-    } else if(_wantAnim === 'walk' || _wantAnim === 'run'){
-      battleHeroAnim.frame = battle._walkFrame;
-    }
-    if(battleHeroAnim.legTransitionStart){
-      const _elapsedT = now - battleHeroAnim.legTransitionStart;
-      if(_elapsedT < 150){
-        const _t = _elapsedT / 150;
-        const _wf = battleHeroAnim.legTransitionFrom || 0;
-        const _walkAnim = GAME_ANIMS.walk;
-        const _wl = _walkAnim.keys;
-        battleHeroAnim.legOverride = {
-          right_leg: { rot: (_wl.right_leg[_wf] ? _wl.right_leg[_wf].rot : 0) * (1 - _t) },
-          left_leg: { rot: (_wl.left_leg[_wf] ? _wl.left_leg[_wf].rot : 0) * (1 - _t) }
-        };
-      } else {
-        battleHeroAnim.legTransitionStart = null;
-        battleHeroAnim.legOverride = null;
-      }
-    } else {
-      battleHeroAnim.legOverride = null;
-    }
-  }
-
-  if(typeof updateBossAI === 'function') updateBossAI(dt, now);
-
-  if(battle.firing){
-    const interval = fireInterval(battle.fireMode, battle.weapon);
-    if(now - battle.lastShot > interval){
-      battle.lastShot = now;
-      const fired = playerShoot();
-      if(fired){ if(battle.burstLeft > 0) battle.burstLeft--; }
-      else battle.burstLeft = 0;
-    }
-  }
-  if(typeof updateBullets === 'function') updateBullets(dt);
-  
-  /* [v211-fix] Boss戰渲染全局煙火 */
-  if(window.MuzzleFX) {
-    window.MuzzleFX.update(dt);
-    const _fxLayer = document.getElementById('battle-fx');
-    if(_fxLayer) {
-      let _cvs = document.getElementById('boss-fx-canvas');
-      if(!_cvs) {
-        _cvs = document.createElement('canvas');
-        _cvs.id = 'boss-fx-canvas';
-        _cvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:9;';
-        _fxLayer.appendChild(_cvs);
-      }
-      if(_cvs.width !== _fxLayer.clientWidth || _cvs.height !== _fxLayer.clientHeight) {
-        _cvs.width = _fxLayer.clientWidth;
-        _cvs.height = _fxLayer.clientHeight;
-      }
-      const _ctx = _cvs.getContext('2d');
-      _ctx.clearRect(0, 0, _cvs.width, _cvs.height);
-      
-            window.MuzzleFX.render(_ctx, 'boss');
-      
-    }
-  }
-
-  updateFighterPos();
-  if(isBossType(battle.bossId, 'hydra')) updateHeadBarsUI();
-  updateBattleHeroAnim(now);
-  updateBattleBossAnim(now);
-  renderBattleHeroCanvas();
-  renderBossBattleCanvas();
-  const heroHp = document.getElementById('hero-hp'), heroAp = document.getElementById('hero-ap'), bossHp = document.getElementById('boss-hp'), bossAp = document.getElementById('boss-ap'), bossShield = document.getElementById('boss-shield');
-  if(heroHp) heroHp.style.width = Math.max(0, battle.playerHp / battle.playerMaxHp * 100) + '%';
-  if(heroAp) heroAp.style.width = Math.max(0, battle.playerArmor / battle.playerMaxArmor * 100) + '%';
-  if(bossHp) bossHp.style.width = Math.max(0, battle.bossHp / battle.bossMaxHp * 100) + '%';
-  if(bossAp) bossAp.style.width = Math.max(0, battle.bossArmor / battle.bossMaxArmor * 100) + '%';
-  if(bossShield && battle.shieldMaxHp > 0) bossShield.style.width = Math.max(0, battle.shieldHp / battle.shieldMaxHp * 100) + '%';
-  requestAnimationFrame(battleLoop);
+if(battle.firing){
+const interval = fireInterval(battle.fireMode, battle.weapon);
+if(now - battle.lastShot > interval){
+battle.lastShot = now;
+if(playerShoot()){ if(battle.burstLeft > 0) battle.burstLeft--; }
+else battle.burstLeft = 0;
+}
+}
+if(typeof updateBullets === 'function') updateBullets(dt);
+/* 全局煙火 */
+if(window.MuzzleFX){
+window.MuzzleFX.update(dt);
+if(fxEl){
+let _cvs = document.getElementById('boss-fx-canvas');
+if(!_cvs){
+_cvs = document.createElement('canvas');
+_cvs.id = 'boss-fx-canvas';
+_cvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:9;';
+fxEl.appendChild(_cvs);
+}
+if(_cvs.width !== fxEl.clientWidth || _cvs.height !== fxEl.clientHeight){
+_cvs.width = fxEl.clientWidth;
+_cvs.height = fxEl.clientHeight;
+}
+const _ctx = _cvs.getContext('2d');
+_ctx.clearRect(0, 0, _cvs.width, _cvs.height);
+window.MuzzleFX.render(_ctx, 'boss');
+}
+}
+updateFighterPos();
+if(isBossType(battle.bossId, 'hydra')) updateHeadBarsUI();
+updateBattleHeroAnim(now);
+updateBattleBossAnim(now);
+renderBattleHeroCanvas();
+renderBossBattleCanvas();
+/* 狀態條寬度 */
+const _hhp = document.getElementById('hero-hp'), _hap = document.getElementById('hero-ap');
+const _bhp = document.getElementById('boss-hp'), _bap = document.getElementById('boss-ap'), _bsh = document.getElementById('boss-shield');
+if(_hhp) _hhp.style.width = Math.max(0, battle.playerHp / battle.playerMaxHp * 100) + '%';
+if(_hap) _hap.style.width = Math.max(0, battle.playerArmor / battle.playerMaxArmor * 100) + '%';
+if(_bhp) _bhp.style.width = Math.max(0, battle.bossHp / battle.bossMaxHp * 100) + '%';
+if(_bap) _bap.style.width = Math.max(0, battle.bossArmor / battle.bossMaxArmor * 100) + '%';
+if(_bsh && battle.shieldMaxHp > 0) _bsh.style.width = Math.max(0, battle.shieldHp / battle.shieldMaxHp * 100) + '%';
+try{ if(window._bossOffscreenUpdate) window._bossOffscreenUpdate(); }catch(e){}
+requestAnimationFrame(battleLoop);
 }
 
-function startBossBattle(bid){
+function startBossBattle(bid, opts){
+  opts = opts || {};
   const b = BOSSES[bid];
   if(!b) return;
-  const seals = Math.max(0, parseInt(state.seals[b.seal] || 0, 10));
-  if(seals <= 0) return;
-  state.seals[b.seal] = seals - 1;
+  if(!opts.sweep){
+    const seals = Math.max(0, parseInt(state.seals[b.seal] || 0, 10));
+    if(seals <= 0) return;
+    state.seals[b.seal] = seals - 1;
+  }
   state.player.hp = state.player.maxHp;
   state.player.armor = state.player.maxArmor;
   refreshPlayerStats();
-
   const _cp = equippedWeapon('primary');
   const _cs = equippedWeapon('secondary');
   const _cm = equippedWeapon('melee');
   const _pick = _cp || _cs || _cm;
   const startSlot = _pick ? _pick.slot : 'melee';
-
   const _isRT = isBossType(bid, 'tyrant');
   const _isCO = isBossType(bid, 'omega');
-  const _hasShield = (_isRT || _isCO);
   const _shieldHp = _isRT ? 12500 : (_isCO ? 30000 : 0);
-
   battle = {
     active: true,
     bossId: bid, bossName: b.name,
@@ -1830,35 +1811,127 @@ function startBossBattle(bid){
     bossRetreat: null,
     playerHp: state.player.hp, playerMaxHp: state.player.maxHp,
     playerArmor: state.player.armor, playerMaxArmor: Math.max(1, state.player.maxArmor),
-    px: 0.15, py: 0.75, bx: 0.75, by: 0.25,
+    px: 0.15, py: BOSS_UNIT_CENTER, bx: 0.75, by: BOSS_UNIT_CENTER,
     moveDir: 0, bullets: [], firing: false, reloading: false, consuming: false,
     lastShot: 0, damageDealt: 0,
     weapon: null, weaponSlot: null, playerWeaponRange: 0.5,
     fireMode: '點射', fireHeld: false, burstLeft: 0,
     ammoRef: null, ammoInMag: 0, weaponStates: {},
-    engaged: false, engagedRange: 0.35, startTime: Date.now(),
+    engaged: false,
+    engagedRange: (typeof window.getEntityDetectableR === 'function') ? window.getEntityDetectableR({ isPlayer:true }) : BOSS_DETECT_R,
+    startTime: Date.now(),
     aimPart: defaultAimPartForBoss(bid), lastManualClick: 0,
     players: [{ id: 'local', isLocal: true }], lastH: 0, aimHitFx: [],
     healDisabledUntil: 0, healTimer: null,
     autoHealing: false, shotLockUntil: 0
   };
-
+  battle.playerWorldX = 0;
+  battle.bossWorldX = BOSS_WORLD_START;
+  battle.ai = null;
+  battle.bossAnimRate = 1;
+  battle._worldSpeed = 0;
+  battle.sweepOut = false;
+  battle.sweep = opts.sweep ? {
+    vid: opts.vehicleId || 'btr80',
+    onDone: (typeof opts.onDone === 'function') ? opts.onDone : null,
+    index: opts.index || 1,
+    total: opts.total || 1
+  } : null;
+  /* rev-sweep-ux: bossTarget 補 setter —— 載具撞擊 / 命中寫 hp、_tickAI 寫 worldX 不再拋錯。
+     掃蕩目標為已知目標：detectableR = Infinity（武器射程閘門保留）。 */
+  battle.bossTarget = {
+    isBoss: true,
+    y: 0,
+    _known: !!opts.sweep,
+    detectableR: opts.sweep ? Infinity : undefined,
+    get bossId(){ return (typeof battle !== 'undefined' && battle) ? battle.bossId : ''; },
+    get worldX(){ return (typeof battle !== 'undefined' && battle) ? battle.bossWorldX : 0; },
+    set worldX(v){ if(typeof battle !== 'undefined' && battle) battle.bossWorldX = v; },
+    get hp(){ return (typeof battle !== 'undefined' && battle) ? battle.bossHp : 0; },
+    set hp(v){ if(typeof battle !== 'undefined' && battle) battle.bossHp = Math.max(0, v); },
+    get armor(){ return (typeof battle !== 'undefined' && battle) ? battle.bossArmor : 0; },
+    set armor(v){ if(typeof battle !== 'undefined' && battle) battle.bossArmor = Math.max(0, v); },
+    get _aabbOverride(){ return (typeof window._bossAABB === 'function') ? window._bossAABB() : { width:4, height:2, centerY:1, depth:4, bodyDepth:1.6 }; }
+  };
+  battle.sm = null;
+  battle.tracers = [];
+  battle.floats = [];
+  battle.playerWeaponRangeM = 30;
   if(isBossType(bid, 'hydra')) initHydraHeads();
   if(isBossType(bid, 'omega')) initOmegaArms();
-
   battleHeroAnim.name = 'idle';
   battleHeroAnim.frame = 0;
   battleHeroAnim.lastUpdate = performance.now();
   battleHeroAnim.forcedEnd = 0;
-
+  battleHeroAnim.eqSlot = null;
+  battleHeroAnim.healItem = null;
   battleBossAnim.name = 'idle';
   battleBossAnim.frame = 0;
   battleBossAnim.lastUpdate = performance.now();
   battleBossAnim.forcedEnd = 0;
-
-  switchBattleWeapon(startSlot);
-  renderCombat();
+  if(battle.sweep){
+    battle.weapon = null; battle.weaponSlot = null;
+    battle.ammoInMag = 0; battle.ammoRef = null;
+    battle._lastPh = null; battle._hpMark = 0;
+    battle._shieldWas = false; battle._armorZero = false; battle._killLogged = false;
+    battle._dbgAt = 0;
+    const _vidS = battle.sweep.vid;
+    const _vdefS = (typeof VEHICLES !== 'undefined' && VEHICLES[_vidS]) ? VEHICLES[_vidS] : null;
+    const _vhS = (_vdefS && _vdefS.hp) ? _vdefS.hp : 500;
+    const _z1 = document.getElementById('zone1');
+    if(_z1) renderBattleScene(_z1);
+    /* rev-sweep-ux: zone2 保持原狀（裝備格 + 屬性 + 電台），外層已 pointer-events:none 屏蔽操作 */
+    const _z2 = document.getElementById('zone2');
+    if(_z2 && typeof renderEquipZone === 'function') renderEquipZone(_z2);
+    /* rev-sweep-ux: zone3 = 玩家敘事層（佔滿）＋ 引擎調試層（摺疊、可展開） */
+    const _z3 = document.getElementById('zone3');
+    if(_z3){
+      _z3.innerHTML =
+        '<div class="z3-head"><div class="z3-title">🧹 掃蕩 ×' + battle.sweep.total + '</div><div class="z3-btn" id="sweep-dbg-btn">調試 ▸</div></div>'
+      + '<div style="flex:0 0 auto;padding:6px 8px;border-bottom:1px solid #2a231c;background:#151210">'
+      +   '<div id="sweep-live-phase" style="font-size:11px;color:#e8a33d;font-weight:bold">載具出擊</div>'
+      +   '<div id="sweep-live-nums" style="font-size:10px;color:#a89a85;margin-top:2px;font-family:Menlo,Consolas,monospace">—</div>'
+      +   '<div style="height:5px;background:#241d16;border:1px solid #2a231c;border-radius:3px;overflow:hidden;margin-top:5px"><div id="sweep-boss-bar" style="height:100%;width:100%;background:linear-gradient(90deg,#e05252,#ff7a4a)"></div></div>'
+      +   '<div style="display:flex;justify-content:space-between;font-size:9px;color:#7a6f60;margin-top:2px"><span>Boss 剩餘</span><span id="sweep-boss-pct">100%</span></div>'
+      + '</div>'
+      + '<div class="logbox" id="sweep-status" style="flex:1;min-height:0"></div>'
+      + '<div id="sweep-dbg" style="display:none;flex:0 0 auto;max-height:36%;overflow-y:auto;border-top:1px dashed #3a2f25;background:#0d0b09;padding:4px 8px;font:9px/1.6 Menlo,Consolas,monospace;color:#6a5f4d;white-space:pre"></div>';
+      const _db = _z3.querySelector('#sweep-dbg-btn');
+      if(_db) _db.onclick = function(){
+        const p = document.getElementById('sweep-dbg');
+        if(!p) return;
+        const on = p.style.display !== 'none';
+        p.style.display = on ? 'none' : 'block';
+        _db.textContent = on ? '調試 ▸' : '調試 ▾';
+        _db.style.color = on ? '' : '#39d7e6';
+      };
+    }
+    battle.lastH = 0;
+    if(typeof window._combatStart === 'function'){
+      window._combatStart({
+        sceneType: 'vehicle', firstSide: 'player', sweep: true,
+        allies: [{ isVehicle:true, vehicleId:_vidS, hp:_vhS, maxHp:_vhS, armorGrid:[30,20,15], armorLevel:5, worldX:0 }],
+        enemies: [battle.bossTarget],
+        onResolve: function(){}
+      });
+      const _cS = window._combat;
+      if(_cS){
+        _cS._sweep = true;
+        /* 掃蕩不使用玩家隨身彈藥：退還 _combatStart 預裝填扣除 */
+        if(_cS._playerMag && _cS._playerMag.ammoRef && _cS._playerMag.inMag > 0){
+          invAdd(_cS._playerMag.ammoRef.id, _cS._playerMag.ammoRef.rarity, _cS._playerMag.inMag);
+        }
+        _cS._playerMag = { inMag:0, ammoRef:null, weaponId:null };
+      }
+    }
+    const _btr = window.BTRSupport;
+    if(_btr && typeof _btr.start === 'function') _btr.start(_vidS);
+  } else {
+    switchBattleWeapon(startSlot);
+    renderCombat();
+  }
   battle.lastTime = performance.now();
+  try{ if(window._bossOffscreenUpdate) window._bossOffscreenUpdate(); }catch(e){}
   requestAnimationFrame(battleLoop);
 }
 
@@ -1870,66 +1943,78 @@ function startBossBattle(bid){
   window._bossFXReuseInstalled = true;
 
   function _bossRenderBullets(now){
-    if(!battle || !battle.active) return;
-    var fxEl = document.getElementById('battle-fx');
-    if(!fxEl) return;
-    var cvs = document.getElementById('boss-bullets-canvas');
-    if(!cvs){
-      cvs = document.createElement('canvas');
-      cvs.id = 'boss-bullets-canvas';
-      cvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:10;';
-      fxEl.appendChild(cvs);
-    }
-    var W = fxEl.clientWidth, H = fxEl.clientHeight;
-    if(!W || !H) return;
-    if(cvs.width !== W || cvs.height !== H){ cvs.width = W; cvs.height = H; }
-    var ctx = cvs.getContext('2d');
-    ctx.clearRect(0, 0, W, H);
-
-    /* 只绘制手雷，普通子弹保持隐形 */
-    for(var i = 0; i < battle.bullets.length; i++){
-      var bb = battle.bullets[i];
-      if(!bb.isGrenade || bb.isFast) continue;
-      var bx, by;
-      if(typeof bb.releaseAt === 'number' && bb.t < 0){
-        /* rev-fix-boss-throw-origin: 釋放前，手雷握在當前 attack_melee 幀的手部位置 */
+  /* rev-float-unify: 手雷 = 探索 _render 同款真實拋物線；
+     傷害飄字改用探索 _float 完全相同的 canvas 繪製參數。 */
+  if(!battle || !battle.active) return;
+  var fxEl = document.getElementById('battle-fx');
+  if(!fxEl) return;
+  var cvs = document.getElementById('boss-bullets-canvas');
+  if(!cvs){
+    cvs = document.createElement('canvas');
+    cvs.id = 'boss-bullets-canvas';
+    cvs.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:10;';
+    fxEl.appendChild(cvs);
+  }
+  var W = fxEl.clientWidth, H = fxEl.clientHeight;
+  if(!W || !H) return;
+  if(cvs.width !== W || cvs.height !== H){ cvs.width = W; cvs.height = H; }
+  var ctx = cvs.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  var nowMs = performance.now();
+  var _chf = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+  var _phm = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+  var _ppm = (typeof battle.bgPixelsPerMeter === 'number' && battle.bgPixelsPerMeter > 0) ? battle.bgPixelsPerMeter : H * _chf / _phm;
+  var _srw = (battle.sm && battle.sm.screenRightWorld > 0) ? battle.sm.screenRightWorld : 4.2;
+  var _pxN = (typeof battle.px === 'number') ? battle.px : 0.25;
+  var _G = (typeof GRENADE_G === 'number') ? GRENADE_G : 9.8;
+  for(var i = 0; i < battle.bullets.length; i++){
+    var bb = battle.bullets[i];
+    if(!bb.isGrenade || bb.isFast) continue;
+    var bx, by, _tD = 0;
+    if(typeof bb.worldStartX === 'number' && typeof bb.vx === 'number' && bb.T > 0){
+      if(bb.releaseAt && nowMs < bb.releaseAt){
         var _hp = _getBossThrowHandPos();
-        bx = _hp.x * W;
-        by = _hp.y * H;
+        bx = _hp.x * W; by = _hp.y * H;
       } else {
-        var drawT = Math.min(1, bb.t);
-        bx = (bb.sx + (bb.tx - bb.sx) * drawT) * W;
-        by = (bb.sy + (bb.ty - bb.sy) * drawT) * H;
-        var _arcT = Math.min(1, bb.t);
-        var _arcH = Math.sin(_arcT * Math.PI) * H * 0.35;
-        by -= _arcH;
+        var _el = Math.max(0, (nowMs - bb.start) / 1000);
+        if(_el > bb.T + 0.5) continue;
+        var _dir = (bb.dir === -1) ? -1 : 1;
+        var _wx = bb.worldStartX + _dir * bb.vx * _el;
+        var _wy = (bb.H0 || 1.3) + bb.vy * _el - 0.5 * _G * _el * _el;
+        var _sxN = _pxN + (_wx - battle.playerWorldX) / _srw * (1 - _pxN);
+        var _syN = 0.95 - (_wy * _ppm) / H;
+        bx = _sxN * W; by = _syN * H;
+        _tD = Math.min(1, _el / bb.T);
       }
-      if(bx < -30 || bx > W + 30 || by < -30 || by > H + 30) continue;
-      var _gimg = (bb.grenadeId && typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(bb.grenadeId)) : null;
-      var _gsize = 20;
-      if(_gimg && _gimg.complete && _gimg.naturalWidth){
-        ctx.save();
-        ctx.translate(bx, by);
-        ctx.rotate(bb.t * Math.PI * 2);
-        ctx.drawImage(_gimg, -_gsize/2, -_gsize/2, _gsize, _gsize);
-        ctx.restore();
-      } else {
-        ctx.save();
-        ctx.fillStyle = '#ffd680';
-        ctx.shadowColor = '#ffb300';
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.arc(bx, by, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
+    } else {
+      var _dt2 = Math.min(1, bb.t || 0);
+      bx = (bb.sx + (bb.tx - bb.sx) * _dt2) * W;
+      by = (bb.sy + (bb.ty - bb.sy) * _dt2) * H - Math.sin(_dt2 * Math.PI) * H * 0.35;
+      _tD = _dt2;
     }
-
-    /* 复用 16-combat.js 的 FX 渲染 */
-    if(typeof _renderBattleFX === 'function'){
-      _renderBattleFX(ctx, battle);
+    if(bx < -30 || bx > W + 30 || by < -30 || by > H + 30) continue;
+    if(typeof window._drawBulletShape === 'function'){
+      window._drawBulletShape(ctx, bx, by, { isGrenade:true, grenadeId:bb.grenadeId, t:_tD, big:true });
+    } else {
+      ctx.save();
+      ctx.fillStyle = '#ffd680'; ctx.shadowColor = '#ffb300'; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(bx, by, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
     }
   }
+  if(typeof _renderBattleFX === 'function') _renderBattleFX(ctx, battle);
+  if(battle.floats && battle.floats.length){
+    for(var fi2 = 0; fi2 < battle.floats.length; fi2++){
+      var ff = battle.floats[fi2];
+      ctx.save();
+      ctx.fillStyle = ff.cls === 'crit' ? '#ff3030' : (ff.cls === 'miss' ? '#a89a85' : (ff.cls === 'armor' ? '#5ab0ff' : '#ffb300'));
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(ff.text, ff.x * W, ff.y * H - ff.age * 40);
+      ctx.restore();
+    }
+  }
+}
 
   /* rev-fix-boss-dmg-num-restore: 移除傷害數字與火花的耦合。
    * spawnHitFx 只負責畫傷害數字；火花如需獨立顯示，應在結算點（applyBossDamage / tryHitPlayer）單獨觸發。 */
@@ -1953,3 +2038,833 @@ function startBossBattle(bid){
   requestAnimationFrame(_raf);
 })();
 
+
+
+/* ============================================================
+   rev-bossbox: Boss = 探索 + 手動瞄準 + 弱點
+   2D AABB = 正面 billboard（L=身體深度, H=視覺高, D=螢幕可見寬）
+   盒尺寸由 idle bounds × getBossCanvasTransform ÷ bgPixelsPerMeter 推導
+   弱點 = billboard 上的 (u,v) 矩形；part='body' 表示非弱點區
+   ============================================================ */
+var _BOSS_IB_CACHE = {};
+window._bossIdleBounds = function(bid){
+if(_BOSS_IB_CACHE[bid]) return _BOSS_IB_CACHE[bid];
+var def = (typeof BOSS_LAYERS !== 'undefined') ? BOSS_LAYERS[bid] : null;
+var anims = (typeof BOSS_ANIMS !== 'undefined') ? BOSS_ANIMS[bid] : null;
+if(!def || !anims || !anims.idle){ _BOSS_IB_CACHE[bid] = null; return null; }
+var anim = anims.idle;
+var world = resolveBossWorld(def, anim, 0);
+var mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
+for(var i=0;i<def.layers.length;i++){
+var L=def.layers[i], wp=world[L.id]; if(!wp) continue;
+var k=(anim.keys&&anim.keys[L.id]&&anim.keys[L.id][0])||{rot:0};
+var w=def.canvas.w*(k.w!==undefined?k.w:L.w), h=def.canvas.h*(k.h!==undefined?k.h:L.h);
+var px=w*L.pivot.x, py=h*L.pivot.y;
+var rot=wp.rot*BOSS_DEG2RAD, cs=Math.cos(rot), sn=Math.sin(rot);
+var co=[[0,0],[w,0],[0,h],[w,h]];
+for(var c=0;c<4;c++){
+var dx=co[c][0]-px, dy=co[c][1]-py;
+var rx=dx*cs-dy*sn+wp.wx, ry=dx*sn+dy*cs+wp.wy;
+if(rx<mnx)mnx=rx; if(rx>mxx)mxx=rx; if(ry<mny)mny=ry; if(ry>mxy)mxy=ry;
+}
+}
+if(!isFinite(mnx)){ _BOSS_IB_CACHE[bid]=null; return null; }
+var o={minX:mnx,maxX:mxx,minY:mny,maxY:mxy};
+_BOSS_IB_CACHE[bid]=o; return o;
+};
+var _BOSS_AABB_CACHE={key:null,val:null};
+window._bossAABB = function(){
+var b=(typeof battle!=='undefined')?battle:null;
+var fb={width:4,height:2,centerY:1,depth:4,bodyDepth:1.6};
+if(!b||!b.bossId) return fb;
+var sp=document.getElementById('boss-sprite');
+var sw=sp?sp.clientWidth:0, sh=sp?sp.clientHeight:0;
+var ppm=(b.bgPixelsPerMeter>0)?b.bgPixelsPerMeter:0;
+var key=b.bossId+'|'+sw+'|'+sh+'|'+ppm.toFixed(3);
+if(_BOSS_AABB_CACHE.key===key) return _BOSS_AABB_CACHE.val;
+var ib=window._bossIdleBounds(b.bossId);
+var Hm=2.0, Dm=4.0;
+if(ib){
+var iw=ib.maxX-ib.minX, ih=ib.maxY-ib.minY;
+if(sw>0&&sh>0&&ppm>0&&typeof getBossCanvasTransform==='function'){
+var tf=getBossCanvasTransform(BOSS_LAYERS[b.bossId],b.bossId,sw,sh);
+Hm=ih*tf.sy/ppm; Dm=iw*tf.sx/ppm;
+} else if(ih>0){
+var K=((typeof PLAYER_HEIGHT_M==='number')?PLAYER_HEIGHT_M:1.7)*(455.74/386);
+Hm=K; Dm=K*iw/ih;
+}
+}
+if(!(Hm>0.2))Hm=2.0;
+if(!(Dm>0.2))Dm=4.0;
+var o={width:Dm,height:Hm,centerY:Hm/2,depth:Dm,bodyDepth:Math.max(0.6,Dm*0.45)};
+_BOSS_AABB_CACHE={key:key,val:o};
+return o;
+};
+/* 當前幀 alive 弱點層 → billboard 正規化矩形（canvas 單位比值，與縮放無關） */
+window._bossWeakMap = function(){
+  /* rev-aim-live: Hydra 弱點 = 當前存活頭部整條鏈（頭 → 頸 → 眼/口），
+     不再依賴 BOSS_WEAKPOINTS 的靜態空陣列 —— 槍彈與近戰判定同源。 */
+  var b = (typeof battle !== 'undefined') ? battle : null;
+  if(!b || !b.bossId) return [];
+  var def = BOSS_LAYERS[b.bossId]; if(!def) return [];
+  var anims = BOSS_ANIMS[b.bossId]; if(!anims) return [];
+  var anim = anims[battleBossAnim.name] || anims.idle; if(!anim) return [];
+  var ib = window._bossIdleBounds(b.bossId); if(!ib) return [];
+  var iw = ib.maxX - ib.minX, ih = ib.maxY - ib.minY;
+  if(!(iw > 0 && ih > 0)) return [];
+  var fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+  var world = resolveBossWorld(def, anim, fi);
+  var isH = (typeof isBossType === 'function') && isBossType(b.bossId, 'hydra');
+  var isO = (typeof isBossType === 'function') && isBossType(b.bossId, 'omega');
+  var weak = (typeof BOSS_WEAKPOINTS !== 'undefined' && BOSS_WEAKPOINTS[b.bossId]) || [];
+  var lids = weak.slice();
+  if(isH && b.heads){
+    lids = [];
+    var hi;
+    for(hi = 0; hi < def.layers.length; hi++){ if(/^head_/.test(def.layers[hi].id)) lids.push(def.layers[hi].id); }
+    for(hi = 0; hi < def.layers.length; hi++){ if(/^neck_/.test(def.layers[hi].id)) lids.push(def.layers[hi].id); }
+    for(hi = 0; hi < def.layers.length; hi++){ if(/^(eye|mouth)/.test(def.layers[hi].id)) lids.push(def.layers[hi].id); }
+  }
+  var out = [];
+  for(var i = 0; i < lids.length; i++){
+    var lid = lids[i], part = lid;
+    if(isH && b.heads){
+      if(typeof HYDRA_NECK_MAP !== 'undefined' && HYDRA_NECK_MAP[lid]) part = HYDRA_NECK_MAP[lid];
+      else if(lid === 'neck_3b') part = 'head_3';
+      else if(/^(eye|mouth)/.test(lid)){
+        var ow = (def._hydraEyeOwner && def._hydraEyeOwner[lid]) || (typeof findNearestHeadForLayer === 'function' ? findNearestHeadForLayer(lid) : null);
+        if(!ow) continue;
+        part = ow;
+      }
+      if(!b.heads[part] || !b.heads[part].alive) continue;
+    }
+    if(isO && b.arms){ if(!b.arms[lid] || !b.arms[lid].alive) continue; }
+    var L = null;
+    for(var j = 0; j < def.layers.length; j++){ if(def.layers[j].id === lid){ L = def.layers[j]; break; } }
+    if(!L) continue;
+    var wp = world[lid]; if(!wp) continue;
+    var k = (anim.keys && anim.keys[lid] && anim.keys[lid][fi]) || { rot:0, dx:0, dy:0 };
+    var w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+    var h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+    if(!(w > 0 && h > 0)) continue;
+    var px = w * L.pivot.x, py = h * L.pivot.y;
+    var rot = wp.rot * BOSS_DEG2RAD, cs = Math.cos(rot), sn = Math.sin(rot);
+    var mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+    var co = [[0,0],[w,0],[0,h],[w,h]];
+    for(var c = 0; c < 4; c++){
+      var dx = co[c][0] - px, dy = co[c][1] - py;
+      var rx = dx * cs - dy * sn + wp.wx, ry = dx * sn + dy * cs + wp.wy;
+      if(rx < mnx) mnx = rx; if(rx > mxx) mxx = rx;
+      if(ry < mny) mny = ry; if(ry > mxy) mxy = ry;
+    }
+    var u0 = Math.max(0, Math.min(1, (mnx - ib.minX) / iw));
+    var u1 = Math.max(0, Math.min(1, (mxx - ib.minX) / iw));
+    var v0 = Math.max(0, Math.min(1, (ib.maxY - mxy) / ih));
+    var v1 = Math.max(0, Math.min(1, (ib.maxY - mny) / ih));
+    if(u1 <= u0 || v1 <= v0) continue;
+    out.push({ part:part, u0:u0, u1:u1, v0:v0, v1:v1 });
+  }
+  return out;
+};
+window._bossPartFromUV = function(tgt,u,v){
+var rects=window._bossWeakMap();
+for(var i=0;i<rects.length;i++){
+var R=rects[i];
+if(u>=R.u0&&u<=R.u1&&v>=R.v0&&v<=R.v1) return R.part;
+}
+return 'body';
+};
+/* Boss 爆炸：只算 billboard 面，面內 2D 網格細分（弱點優先，剩餘 body）
+   Σcell = fu·fv（望遠角可加性），總量守恆；falloff 用邊緣距離 */
+window._bossExplode = function(tgt,P,opts,box){
+var out={hpLost:0,armorLost:0,bands:[],dNear:Infinity,coverage:0};
+var maxR=(typeof opts.maxR==='number'&&opts.maxR>0)?opts.maxR:8;
+var total=(typeof opts.totalDmg==='number'&&opts.totalDmg>0)?opts.totalDmg:0;
+if(total<=0) return out;
+var twx=(typeof tgt.worldX==='number')?tgt.worldX:0;
+var x1=twx-box.L/2, x2=twx+box.L/2;
+var px=(typeof P.x==='number')?P.x:twx;
+var py=(typeof P.y==='number')?P.y:0;
+var pz=(typeof P.z==='number')?P.z:0;
+var n=(px<x1)?(x1-px):((px>x2)?(px-x2):0);
+if(n>=maxR) return out;
+var hz=box.D/2, v0=box.yFoot, v1=box.yFoot+box.H;
+if(!(hz>0)||!(v1>v0)) return out;
+var rho=Math.sqrt(Math.max(0,maxR*maxR-n*n));
+var ua=Math.max(-hz,pz-rho), ub=Math.min(hz,pz+rho);
+var va=Math.max(v0,py-rho), vb=Math.min(v1,py+rho);
+if(ub<=ua||vb<=va) return out;
+var thU=Math.atan2(hz-pz,n)-Math.atan2(-hz-pz,n);
+var thV=Math.atan2(v1-py,n)-Math.atan2(v0-py,n);
+if(!(thU>1e-9)||!(thV>1e-9)) return out;
+var du=Math.max(-hz-pz,0,pz-hz), dv=Math.max(v0-py,0,py-v1);
+var dNear=Math.sqrt(n*n+du*du+dv*dv);
+if(dNear>=maxR) return out;
+out.dNear=dNear;
+var falloff=1-(dNear/maxR)*(dNear/maxR);
+if(falloff<=0) return out;
+var rects=window._bossWeakMap();
+var NU=28, NV=28, us=[], au=[], vs=[], av=[];
+for(var i=0;i<=NU;i++){ var u=ua+(ub-ua)*i/NU; us.push(u); au.push(Math.atan2(u-pz,n)); }
+for(var j=0;j<=NV;j++){ var v=va+(vb-va)*j/NV; vs.push(v); av.push(Math.atan2(v-py,n)); }
+var acc={}, sum=0;
+for(var i=0;i<NU;i++){
+var fu=(au[i+1]-au[i])/thU; if(!(fu>0)) continue;
+var uu=((us[i]+us[i+1])*0.5+hz)/box.D;
+for(var j=0;j<NV;j++){
+var fv=(av[j+1]-av[j])/thV; if(!(fv>0)) continue;
+var vv=((vs[j]+vs[j+1])*0.5-v0)/box.H;
+var part='body';
+for(var r=0;r<rects.length;r++){
+var R=rects[r];
+if(uu>=R.u0&&uu<=R.u1&&vv>=R.v0&&vv<=R.v1){ part=R.part; break; }
+}
+var frac=fu*fv;
+acc[part]=(acc[part]||0)+frac;
+sum+=frac;
+}
+}
+if(!(sum>0)) return out;
+out.coverage=sum;
+var scale=(sum>1)?(1/sum):1;
+for(var key in acc){
+var dmg=total*acc[key]*scale*falloff;
+if(dmg<0.5) continue;
+var pen=(typeof opts.penFor==='function')?opts.penFor(key,dNear,falloff,'x1'):(opts.pen||0);
+var rr=(typeof opts.applyBand==='function')?opts.applyBand(key,dmg,pen,{part:key,face:'x1',frac:acc[key],falloff:falloff,dNear:dNear}):null;
+var hl=(rr&&rr.hpLost)||0, al=(rr&&rr.armorLost)||0;
+out.bands.push({part:key,face:'x1',dmg:dmg,pen:pen,hpLost:hl,armorLost:al});
+out.hpLost+=hl; out.armorLost+=al;
+}
+return out;
+};
+window._bossScreenMetrics = function(){
+var b=(typeof battle!=='undefined')?battle:null;
+var fx=document.getElementById('battle-fx');
+var W=fx?fx.clientWidth:400, H=fx?fx.clientHeight:500;
+var chf=(typeof CHAR_HEIGHT_FACTOR==='number')?CHAR_HEIGHT_FACTOR:0.58;
+var phm=(typeof PLAYER_HEIGHT_M==='number')?PLAYER_HEIGHT_M:1.7;
+var ppm=(b&&b.bgPixelsPerMeter>0)?b.bgPixelsPerMeter:(H*chf/phm);
+var px=(typeof EXPLORE_HERO_X_RATIO==='number')?EXPLORE_HERO_X_RATIO:0.25;
+var srw=(b&&b.sm&&b.sm.screenRightWorld>0)?b.sm.screenRightWorld:4.2;
+return {W:W,H:H,ppm:ppm,px:px,srw:srw};
+};
+window._bossWorldToScreenN = function(wx,wy){
+var b=(typeof battle!=='undefined')?battle:null;
+if(!b) return {x:0.75,y:0.6};
+var m=window._bossScreenMetrics();
+return { x: m.px+((wx-b.playerWorldX)/m.srw)*(1-m.px), y: 0.95-(wy*m.ppm)/m.H };
+};
+/* 手動瞄準點 → 米（aimY 局部高、aimZ billboard 橫向偏移） */
+window._bossAimMeters = function(){
+var b=(typeof battle!=='undefined')?battle:null;
+if(!b) return {aimY:0.85,aimZ:0,aimWX:0};
+var t=(typeof getAimTargetPos==='function')?getAimTargetPos():{x:b.bx,y:0.6};
+var m=window._bossScreenMetrics();
+var aimWX=b.playerWorldX+(t.x-m.px)/(1-m.px)*m.srw;
+var aimY=(0.95-t.y)*m.H/m.ppm;
+var box=(b.bossTarget&&typeof window._getTargetBox==='function')?window._getTargetBox(b.bossTarget):null;
+var Hm=(box&&box.H>0)?box.H:2.0, Dm=(box&&box.D>0)?box.D:4.0;
+aimY=Math.max(0,Math.min(Hm,aimY));
+var aimZ=Math.max(-Dm/2,Math.min(Dm/2,aimWX-b.bossWorldX));
+return {aimY:aimY,aimZ:aimZ,aimWX:aimWX};
+};
+
+;
+/* 手雷結算：與探索同一條鏈（_calcGrenadeParams → _applyExplosionToBox） */
+window._bossGrenadeBurst = function(gDef,gRar,hitRate,landWX,w,pdB){
+var b=(typeof battle!=='undefined')?battle:null;
+if(!b||!b.bossTarget||b.settling) return;
+var frags=gDef.fragments||1;
+var fragDmg=gDef.fragmentDamage||gDef.dmg||0;
+var mult=(typeof RARITY_MULT!=='undefined'&&RARITY_MULT[gRar])||1;
+var hr=Math.min(1,Math.max(0,(hitRate||0)/100));
+var ratio=(typeof gDef.splashRatio==='number')?gDef.splashRatio:((typeof window.GRENADE_SPLASH_RATIO==='number')?window.GRENADE_SPLASH_RATIO:0.08);
+if(gDef.allFragmentsOnSingle) ratio=1;
+var budget=frags*fragDmg*mult*hr*ratio*((typeof pdB==='number')?pdB:1);
+if(!(budget>0)) return;
+var gid=(w&&w.id)||gDef.id;
+var phys=(typeof _getGrenadePhysics==='function')?_getGrenadePhysics(gid):null;
+var maxR=(phys&&phys.casualtyRadius>0)?phys.casualtyRadius:10;
+var critRate=(typeof calcCritRate==='function')?calcCritRate(gRar,'一般'):0.1;
+var critMult=(typeof calcCritMult==='function')?calcCritMult(gRar,'一般'):1.5;
+var isCrit=Math.random()<critRate;
+var total=budget*(isCrit?critMult:1);
+var pen=gDef.penMM||0;
+var sumShown=0;
+window._applyExplosionToBox(b.bossTarget,{x:landWX,y:0,z:0},{
+totalDmg:total,maxR:maxR,pen:pen,
+applyBand:function(part,dmg,pg){
+if(!battle||battle.settling) return {hpLost:0,armorLost:0};
+var h0=battle.bossHp, a0=battle.bossArmor, s0=battle.shieldHp||0;
+var rd=Math.round(dmg);
+if(part&&part!=='body'){
+battle.engaged=true;
+battle.bossHp=Math.max(0,battle.bossHp-rd);
+battle.damageDealt+=rd;
+if(isBossType(battle.bossId,'omega')&&battle.arms) damageOmegaArm(part,rd);
+} else {
+applyBossDamage(dmg,false,pen,false,true,false,part||'body');
+}
+if(!battle) return {hpLost:0,armorLost:0};
+var dh=Math.max(0,h0-battle.bossHp);
+var da=Math.max(0,a0-battle.bossArmor);
+var ds=Math.max(0,s0-(battle.shieldHp||0));
+sumShown+=(dh>0?dh:(da+ds));
+return {hpLost:dh,armorLost:da+ds};
+}
+});
+if(battle&&!battle.settling&&sumShown>0){
+var _pos=(typeof getAimTargetPos==='function')?getAimTargetPos():{x:battle.bx,y:0.6};
+spawnHitFx('boss',0,'-'+Math.round(sumShown)+(isCrit?'!':''),(isCrit?'crit':'weak'),_pos.x,_pos.y);
+}
+if(battle&&!battle.settling&&battle.bossHp<=0) endBattle(true);
+};
+
+/* ===== rev-hudroot:start ===== */
+/* Boss 戰 UI 幾何（寫死；源自人偶繪製比例，不隨動畫 / 頭盔變動）
+   腳底 = H*0.95；裸頭頂 = H*(0.95 - 455.74/386 * CHAR_HEIGHT_FACTOR) = H*0.2652
+   HUD 中心 = 裸頭頂與螢幕頂的中點 = H*0.1326（styles.css .hpbar-wrap top）
+   視覺中心 = (0.2652 + 0.95)/2 = 0.6076 */
+const BOSS_UNIT_HEAD_TOP = 0.2652;
+const BOSS_UNIT_CENTER = 0.6076;
+
+/* 點擊 canvas 座標 -> 設定瞄準部位 + 層內局部座標（sprite 與虛影共用） */
+window._bossSetAimFromCanvas = function(part, canvasX, canvasY){
+if(typeof battle === 'undefined' || !battle || !part) return false;
+var def = (typeof BOSS_LAYERS !== 'undefined') ? BOSS_LAYERS[battle.bossId] : null;
+var anims = (typeof BOSS_ANIMS !== 'undefined') ? BOSS_ANIMS[battle.bossId] : null;
+if(!def || !anims) return false;
+var anim = anims[battleBossAnim.name] || anims.idle;
+if(!anim) return false;
+battle.aimPart = part;
+battle.aimLocal = null;
+var L = null;
+for(var i = 0; i < def.layers.length; i++){ if(def.layers[i].id === part){ L = def.layers[i]; break; } }
+if(!L) return true;
+var fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+var k = (anim.keys && anim.keys[part] && anim.keys[part][fi]) || { rot:0, dx:0, dy:0 };
+var w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+var h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+if(!(w > 0 && h > 0)) return true;
+var world = resolveBossWorld(def, anim, fi);
+var wp = world[part];
+if(!wp) return true;
+var px = w * L.pivot.x, py = h * L.pivot.y;
+var a = -wp.rot * BOSS_DEG2RAD, ca = Math.cos(a), sa = Math.sin(a);
+var dx = canvasX - wp.wx, dy = canvasY - wp.wy;
+var lx = dx * ca - dy * sa + px;
+var ly = dx * sa + dy * ca + py;
+battle.aimLocal = { part: part, u: lx / w, v: ly / h };
+return true;
+};
+
+/* 螢幕外距離氣泡（探索同款）+ 虛影（與實體同尺寸），惰性建立、冪等 */
+window._bossOffscreenMount = function(){
+var scene = document.querySelector('.battle-scene');
+if(!scene) return null;
+var bub = document.getElementById('boss-offscreen');
+if(!bub){
+bub = document.createElement('div');
+bub.id = 'boss-offscreen';
+bub.className = 'boss-offscreen';
+bub.innerHTML = '<div class="bub" id="boss-offscreen-bub"><div class="in"><span class="d" id="boss-offscreen-d">0</span></div></div>';
+scene.appendChild(bub);
+var btn = document.getElementById('boss-offscreen-bub');
+if(btn){
+btn.addEventListener('pointerdown', function(e){
+if(e.button !== undefined && e.button !== 0) return;
+e.preventDefault(); e.stopPropagation();
+if(typeof battle === 'undefined' || !battle) return;
+battle.ghostOpen = !battle.ghostOpen;
+if(typeof window._bossOffscreenUpdate === 'function') window._bossOffscreenUpdate();
+}, { passive:false });
+}
+}
+var gh = document.getElementById('boss-ghost');
+if(!gh){
+gh = document.createElement('div');
+gh.id = 'boss-ghost';
+gh.className = 'boss-ghost';
+gh.innerHTML = '<div class="lbl" id="boss-ghost-lbl">虛影</div><canvas id="boss-ghost-canvas"></canvas><div class="scan"></div><div class="hint">點擊虛影可預先瞄準</div>';
+scene.appendChild(gh);
+gh.addEventListener('pointerdown', function(e){
+if(e.button !== undefined && e.button !== 0) return;
+e.preventDefault(); e.stopPropagation();
+if(typeof battle === 'undefined' || !battle) return;
+var cv = document.getElementById('boss-ghost-canvas');
+var def = (typeof BOSS_LAYERS !== 'undefined') ? BOSS_LAYERS[battle.bossId] : null;
+if(!cv || !def || typeof pickAimPartFromClick !== 'function') return;
+var r = cv.getBoundingClientRect();
+if(!(r.width > 0 && r.height > 0)) return;
+var tf = getBossCanvasTransform(def, battle.bossId, r.width, r.height);
+if(!(tf.sx > 0 && tf.sy > 0)) return;
+var cx = (e.clientX - r.left - tf.ox) / tf.sx;
+var cy = (e.clientY - r.top - tf.oy) / tf.sy;
+var part = pickAimPartFromClick(cx, cy);
+if(!part) return;
+window._bossSetAimFromCanvas(part, cx, cy);
+var mk = document.getElementById('ghost-aim-marker');
+if(!mk){
+mk = document.createElement('div');
+mk.id = 'ghost-aim-marker';
+mk.className = 'aim-marker';
+mk.style.borderColor = '#39c6c0';
+gh.appendChild(mk);
+}
+mk.style.left = (e.clientX - r.left) + 'px';
+mk.style.top = (e.clientY - r.top) + 'px';
+if(mk._t) clearTimeout(mk._t);
+mk._t = setTimeout(function(){ if(mk.parentNode) mk.remove(); }, 1200);
+if(typeof window._bossGhostRender === 'function') window._bossGhostRender();
+}, { passive:false });
+}
+return { bub: bub, gh: gh };
+};
+
+/* 虛影渲染：canvas = playerCanvasW x playerCanvasH，drawBlockBoss 同變換
+   -> 視覺尺寸 / 腳底落地與實體 Boss 完全一致 */
+window._bossGhostRender = function(){
+if(typeof battle === 'undefined' || !battle) return;
+var gh = document.getElementById('boss-ghost');
+var cv = document.getElementById('boss-ghost-canvas');
+var fx = document.getElementById('battle-fx');
+if(!gh || !cv || !fx) return;
+var H = battle.playerCanvasH || fx.clientHeight || 281;
+var W = battle.playerCanvasW || Math.round(H * 1.2);
+gh.style.width = W + 'px';
+gh.style.height = H + 'px';
+if(cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+var ctx = cv.getContext('2d');
+ctx.clearRect(0, 0, W, H);
+ctx.save();
+ctx.globalAlpha = 0.45;
+try { drawBlockBoss(ctx, W, H, battle.bossId, battleBossAnim.name, battleBossAnim.frame); } catch(e){}
+ctx.restore();
+try{
+var def = BOSS_LAYERS[battle.bossId];
+var ib = (typeof window._bossIdleBounds === 'function') ? window._bossIdleBounds(battle.bossId) : null;
+var rects = (typeof window._bossWeakMap === 'function') ? window._bossWeakMap() : [];
+if(def && ib && rects && rects.length){
+var tf = getBossCanvasTransform(def, battle.bossId, W, H);
+var iw = ib.maxX - ib.minX, ih = ib.maxY - ib.minY;
+if(iw > 0 && ih > 0){
+ctx.save();
+ctx.strokeStyle = '#ff4fa0'; ctx.lineWidth = 1.2; ctx.setLineDash([3, 2]);
+for(var i = 0; i < rects.length; i++){
+var R = rects[i];
+var x0 = tf.ox + (ib.minX + R.u0 * iw) * tf.sx;
+var x1 = tf.ox + (ib.minX + R.u1 * iw) * tf.sx;
+var y0 = tf.oy + (ib.maxY - R.v1 * ih) * tf.sy;
+var y1 = tf.oy + (ib.maxY - R.v0 * ih) * tf.sy;
+ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+}
+ctx.restore();
+}
+}
+}catch(e){}
+var lbl = document.getElementById('boss-ghost-lbl');
+if(lbl){
+var d = Math.abs(battle.bossWorldX - battle.playerWorldX);
+lbl.textContent = '虛影 · ' + (typeof window._fmtDistN === 'function' ? window._fmtDistN(d) : (String(Math.round(d)))) + 'm · ' + battle.bossName;
+}
+};
+
+window._bossOffscreenUpdate = function(){
+if(typeof battle === 'undefined' || !battle) return;
+var m = window._bossOffscreenMount();
+if(!m) return;
+var distM = Math.abs(battle.bossWorldX - battle.playerWorldX);
+var off = (battle.bx > 1.02 || battle.bx < -0.02);
+/* rev-detect: 玩家發現 Boss = dist <= R_boss（Boss 自己的可被發現半徑）。
+   與開火閘門無關：看見不代表能打，還要 dist <= 武器射程。
+   不可 OR battle.engaged —— 那是 Boss 發現玩家，方向相反。 */
+var detectR = (typeof window._bossDetectableR === 'function') ? window._bossDetectableR(battle.bossId) : 70;
+var seen = distM <= detectR;
+var show = off && seen && !battle.settling && !!battle.active;
+m.bub.classList.toggle('on', show);
+if(!show) battle.ghostOpen = false;
+m.bub.classList.toggle('open', !!battle.ghostOpen);
+var dEl = document.getElementById('boss-offscreen-d');
+if(dEl) dEl.textContent = (typeof window._fmtDistN === 'function' ? window._fmtDistN(distM) : (String(Math.round(distM))));
+var bEl = document.getElementById('boss-offscreen-bub');
+if(bEl){
+var tot = Math.max(1, (battle.bossMaxHp || 0) + (battle.bossMaxArmor || 0) + (battle.shieldMaxHp || 0));
+var cur = Math.max(0, (battle.bossHp || 0) + (battle.bossArmor || 0) + (battle.shieldHp || 0));
+var arc = Math.round(Math.max(0, Math.min(1, cur / tot)) * 360);
+bEl.style.background = 'conic-gradient(#e05252 0deg ' + arc + 'deg, rgba(20,18,16,0.95) ' + arc + 'deg 360deg)';
+}
+var open = !!battle.ghostOpen && show;
+m.gh.classList.toggle('on', open);
+if(open) window._bossGhostRender();
+};
+/* ===== rev-hudroot:end ===== */
+
+/* ===== rev-detect:start ===== */
+/* ============================================================
+   rev-detect: 術語鎖 —— R_目標 = 該目標「可被發現半徑」，是目標的隱蔽性。
+   A 發現 B  <=>  dist <= R_B（與觀察者是誰無關）
+   A 對 B 開火 <=> dist <= R_B 且 dist <= A 自身射程
+   本專案沒有主動探測距離。
+
+   R_boss 按 Boss 特性給值（非現實換算）：
+   - 全部 < BOSS_WORLD_START(95)：開場 dist=95，雙方皆未發現
+   - II 階除以 1.25（更隱蔽，與 ENEMY_DETECTABLE_R = 225/RARITY_MULT 同向）
+   - 階梯遞減：早期玩家先發現（優勢窗口），後期 Boss 先發現（威脅窗口）
+   ============================================================ */
+const BOSS_DETECTABLE_R = {
+  factory_king: 85,   factory_king_ii: 68,
+  lab_queen: 80,      lab_queen_ii: 64,
+  road_tyrant: 70,    road_tyrant_ii: 56,
+  swamp_hydra: 55,    swamp_hydra_ii: 44,
+  core_omega: 45,     core_omega_ii: 36
+};
+window.BOSS_DETECTABLE_R = BOSS_DETECTABLE_R;
+window._bossDetectableR = function(bid){
+  var id = String(bid || '');
+  if(BOSS_DETECTABLE_R[id] != null) return BOSS_DETECTABLE_R[id];
+  var base = id.replace(/_ii$/, '');
+  var r = BOSS_DETECTABLE_R[base];
+  if(r == null) return 70;
+  return (id.indexOf('_ii') >= 0) ? Math.round(r / 1.25) : r;
+};
+/* ===== rev-detect:end ===== */
+
+/* ===== rev-sweep-rig:start =====
+   掃蕩載具行為全部用執行期 override 安裝 —— 13-render-vehicle.js / 17b-boss-combat.js
+   一行不改。安裝時機 = 第一次發起掃蕩（此時所有腳本已載入）。 */
+(function(){
+  'use strict';
+  function BTR(){ return window.BTRSupport; }
+  function BT(){ return (typeof battle !== 'undefined') ? battle : null; }
+  function vSpeed(vid){
+    return (typeof window._vehicleSpeedKmh === 'function') ? window._vehicleSpeedKmh(vid) / 3.6 : 22;
+  }
+
+  /* Boss proxy 的 hp / armor 原本只有 getter；載具撞擊時 _tickAI 寫 e.hp = 0
+     會在 strict mode 拋 TypeError。補上 setter。 */
+  window._sweepBindTarget = function(){
+    var b = BT();
+    if(!b || !b.bossTarget) return;
+    try{
+      Object.defineProperty(b.bossTarget, 'hp', {
+        configurable: true,
+        get: function(){ var x = BT(); return x ? x.bossHp : 0; },
+        set: function(v){ var x = BT(); if(x) x.bossHp = Math.max(0, v); }
+      });
+      Object.defineProperty(b.bossTarget, 'armor', {
+        configurable: true,
+        get: function(){ var x = BT(); return x ? x.bossArmor : 0; },
+        set: function(v){ var x = BT(); if(x) x.bossArmor = Math.max(0, v); }
+      });
+    }catch(e){ console.warn('[sweep bind]', e); }
+  };
+
+  function rig(){
+    var B = BTR();
+    if(!B || B.__sweepRig) return;
+    B.__sweepRig = true;
+
+    /* (1) 開火閘門：掃蕩只在 support 開火，與探索完全一致。
+           任何提前開火的 hook 在此被中和。 */
+    var _fire = B._fireMuzzle;
+    if(typeof _fire === 'function'){
+      B._fireMuzzle = function(m, now){
+        var b = BT();
+        if(b && b.sweep && this.phase !== 'support'){
+          m.nextFireAt = now + 250;
+          m._preselectedTarget = null;
+          return;
+        }
+        return _fire.apply(this, arguments);
+      };
+    }
+
+    /* (2) sweepOut 相位：不放人、原速向右、出緣收尾 */
+    var _upd = B._update;
+    if(typeof _upd === 'function'){
+      B._update = function(t, now){
+        if(this.phase !== 'sweepOut') return _upd.apply(this, arguments);
+        var dt = Math.min(0.05, (now - (this._sweepOutLast || now)) / 1000);
+        this._sweepOutLast = now;
+        var V = vSpeed(this.vehicleId);
+        var sm = (typeof computeScreenMetrics === 'function') ? computeScreenMetrics(this.width, this.height) : null;
+        var ppm = (sm && sm.bgPixelsPerMeter > 0) ? sm.bgPixelsPerMeter : (this.height * 0.58 / 1.7);
+        this.shakeX = Math.sin(now / 40) * 1.5;
+        this.shakeY = Math.cos(now / 55) * 1.2;
+        this.doorOpen = 0;
+        this.playerClipH = 0;
+        this.playerXOffset = 0;
+        this.x += (V * dt * ppm) / Math.max(1, this.width);
+        if(this.x * this.width > this.width + 24){
+          this._finished = true;
+          this.active = false;
+          this.phase = null;
+          /* 掃蕩已預扣資源，不讓 _cleanup 把車戰彈藥快照寫回 */
+          this._snap = null;
+          this._ammoSnap = null;
+          try{ this._cleanup(); }catch(e){}
+        }
+        return;
+      };
+    }
+
+    /* (3) sweepOut 期間讓 _render 用全速輪速 / 履帶（暫借 support 分支，同步還原） */
+    var _rnd = B._render;
+    if(typeof _rnd === 'function'){
+      B._render = function(now){
+        if(this.phase !== 'sweepOut') return _rnd.apply(this, arguments);
+        var ex = window._explore;
+        var _p = this.phase;
+        var _s = ex ? ex._currentSpeed : 0;
+        this.phase = 'support';
+        if(ex) ex._currentSpeed = vSpeed(this.vehicleId);
+        try{ return _rnd.call(this, now); }
+        finally{ this.phase = _p; if(ex) ex._currentSpeed = _s; }
+      };
+    }
+
+    B.enterSweepOut = function(){
+      if(this.phase === 'sweepOut') return;
+      this.phase = 'sweepOut';
+      this._sweepOutLast = performance.now();
+      this.doorOpen = 0;
+      this.playerClipH = 0;
+      this.playerXOffset = 0;
+      if(this.muzzles){
+        for(var i = 0; i < this.muzzles.length; i++) this.muzzles[i].nextFireAt = Infinity;
+      }
+    };
+  }
+
+  /* (4) 單場收尾：車已出屏 → 清場景 → 回呼 _executeSweep 結算 N 份 */
+  window._completeSweepBattle = function(b){
+    if(!b || b._sweepDone) return;
+    b._sweepDone = true;
+    var cb = b.sweep && b.sweep.onDone;
+    b.active = false;
+    b.settling = false;
+    b.sweepOut = false;
+    try{ var B = BTR(); if(B && B.active) B.stop(); }catch(e){}
+    try{ if(typeof window._combatCleanup === 'function') window._combatCleanup(); }catch(e){}
+    try{ if(typeof _cleanBossFxCanvases === 'function') _cleanBossFxCanvases(); }catch(e){}
+    battle = null;
+    if(typeof cb === 'function') cb();
+  };
+
+  /* (5) endBattle / finishBattleSettle 的掃蕩分支：不發獎、不彈結算，
+         死亡動畫 → sweepOut → 報告。17b 一行不改。 */
+  window._sweepInstall = function(){
+    rig();
+    if(window.__sweepBattleHooks) return;
+    window.__sweepBattleHooks = true;
+    var _end = window.endBattle;
+    if(typeof _end === 'function'){
+      window.endBattle = function(victory){
+        var b = BT();
+        if(b && b.sweep){
+          if(b.settling) return;
+          b.settling = true;
+          b.resultData = { victory: victory };
+          var an = (typeof BOSS_ANIMS !== 'undefined') ? BOSS_ANIMS[b.bossId] : null;
+          var da = an && an.death;
+          if(victory && da){
+            battleBossAnim.name = 'death';
+            battleBossAnim.frame = 0;
+            battleBossAnim.lastUpdate = performance.now();
+            battleBossAnim.forcedEnd = 0;
+            b._settleScheduled = false;
+          } else if(typeof window._finishSweepBattle === 'function'){
+            window._finishSweepBattle(b);
+          }
+          return;
+        }
+        return _end.apply(this, arguments);
+      };
+    }
+    var _fs = window.finishBattleSettle;
+    if(typeof _fs === 'function'){
+      window.finishBattleSettle = function(){
+        var b = BT();
+        if(b && b.sweep){
+          if(typeof window._finishSweepBattle === 'function') window._finishSweepBattle(b);
+          return;
+        }
+        return _fs.apply(this, arguments);
+      };
+    }
+  };
+})();
+/* ===== rev-sweep-rig:end ===== */
+
+/* ===== rev-sweep-ux:start =====
+   掃蕩收尾 / 放棄 / 日誌 helper。13 / 17b / 16 一行不改 —— 執行期 override，首次掃蕩時安裝。 */
+(function(){
+  'use strict';
+  if(window.__sweepUxRig) return;
+  window.__sweepUxRig = true;
+  function BT(){ return (typeof battle !== 'undefined') ? battle : null; }
+
+  window._sweepLog = function(html){
+    var box = document.getElementById('sweep-status');
+    if(!box) return;
+    var d = document.createElement('div');
+    d.className = 'logline';
+    var t = new Date();
+    var ts = ('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2);
+    d.innerHTML = '<span class="tm">'+ts+'</span> ' + html;
+    box.appendChild(d);
+    while(box.children.length > 80) box.removeChild(box.firstChild);
+    box.scrollTop = box.scrollHeight;
+  };
+
+  window._abandonSweep = function(reason){
+    if(!window._sweepLock) return false;
+    var b = BT();
+    var bid = b ? b.bossId : null;
+    var total = (b && b.sweep) ? b.sweep.total : 0;
+    try{
+      var btr = window.BTRSupport;
+      if(btr){ btr._snap = null; btr._ammoSnap = null; if(btr.active) btr.stop(); btr.phase = null; }
+    }catch(e){}
+    try{ if(typeof window._combatCleanup === 'function') window._combatCleanup(); }catch(e){}
+    try{ if(typeof _cleanBossFxCanvases === 'function') _cleanBossFxCanvases(); }catch(e){}
+    try{ if(b && typeof window._clearWeaponBullets === 'function') window._clearWeaponBullets(b); }catch(e){}
+    if(b){ b.active = false; b.sweep = null; b.settling = false; }
+    battle = null;
+    if(typeof window._sweepUnlock === 'function') window._sweepUnlock();
+    window._sweepLock = false;
+    var bn = (bid && typeof BOSSES !== 'undefined' && BOSSES[bid]) ? BOSSES[bid].name : (bid || '');
+    if(typeof pushLog === 'function'){
+      pushLog('<span class="pl">玩家</span> <span class="lose">放棄掃蕩</span> <b>' + bn + '</b>' + (total ? ' ×' + total : '') + '（已消耗資源不退還，無獎勵）', [], 'combat');
+    }
+    if(typeof save === 'function') save();
+    return true;
+  };
+
+  window._sweepInstall = function(){
+    if(window.__sweepUxInstalled) return;
+    window.__sweepUxInstalled = true;
+
+    var _end = window.endBattle;
+    if(typeof _end === 'function'){
+      window.endBattle = function(victory){
+        var b = BT();
+        if(b && b.sweep){
+          if(b.settling) return;
+          b.settling = true;
+          b.resultData = { victory: victory };
+          if(victory){
+            if(!b._killLogged){ b._killLogged = true; if(typeof window._sweepLog === 'function') window._sweepLog('<span class="win">Boss 擊殺！</span>'); }
+            var an = (typeof BOSS_ANIMS !== 'undefined') ? BOSS_ANIMS[b.bossId] : null;
+            var da = an && an.death;
+            if(da && typeof battleBossAnim !== 'undefined'){
+              battleBossAnim.name = 'death'; battleBossAnim.frame = 0;
+              battleBossAnim.lastUpdate = performance.now(); battleBossAnim.forcedEnd = 0;
+            }
+            b._settleScheduled = false;
+          } else if(typeof window._finishSweepBattle === 'function'){
+            window._finishSweepBattle(b);
+          }
+          return;
+        }
+        return _end.apply(this, arguments);
+      };
+    }
+    var _fs = window.finishBattleSettle;
+    if(typeof _fs === 'function'){
+      window.finishBattleSettle = function(){
+        var b = BT();
+        if(b && b.sweep){ if(typeof window._finishSweepBattle === 'function') window._finishSweepBattle(b); return; }
+        return _fs.apply(this, arguments);
+      };
+    }
+    /* Boss 不走敵人擊殺流程（無掉落日誌 / 無經驗 / 無屍體） */
+    var _ok = window._onBTRKillTarget;
+    if(typeof _ok === 'function'){
+      window._onBTRKillTarget = function(target){
+        var b = BT();
+        if(b && b.sweep && target === b.bossTarget) return;
+        return _ok.apply(this, arguments);
+      };
+    }
+    /* 掃蕩期間禁止探索事件敵人混入載具戰 */
+    var _swe = window._syncWorldEnemies;
+    if(typeof _swe === 'function'){
+      window._syncWorldEnemies = function(){
+        if(window._combat && window._combat._sweep) return;
+        return _swe.apply(this, arguments);
+      };
+    }
+
+    var B = window.BTRSupport;
+    if(B && !B.__sweepUx){
+      B.__sweepUx = true;
+      var _fire = B._fireMuzzle;
+      if(typeof _fire === 'function'){
+        B._fireMuzzle = function(m, now){
+          var b = BT();
+          if(b && b.sweep && this.phase !== 'support'){
+            m.nextFireAt = now + 250; m._preselectedTarget = null; return;
+          }
+          return _fire.apply(this, arguments);
+        };
+      }
+      var _upd = B._update;
+      if(typeof _upd === 'function'){
+        B._update = function(t, now){
+          if(this.phase !== 'sweepOut') return _upd.apply(this, arguments);
+          var dt = Math.min(0.05, (now - (this._sweepOutLast || now)) / 1000);
+          this._sweepOutLast = now;
+          var V = (typeof window._vehicleSpeedKmh === 'function') ? window._vehicleSpeedKmh(this.vehicleId) / 3.6 : 22;
+          var sm = (typeof computeScreenMetrics === 'function') ? computeScreenMetrics(this.width, this.height) : null;
+          var ppm = (sm && sm.bgPixelsPerMeter > 0) ? sm.bgPixelsPerMeter : (this.height * 0.58 / 1.7);
+          this.shakeX = Math.sin(now / 40) * 1.5;
+          this.shakeY = Math.cos(now / 55) * 1.2;
+          this.doorOpen = 0; this.playerClipH = 0; this.playerXOffset = 0;
+          this.x += (V * dt * ppm) / Math.max(1, this.width);
+          if(this.x * this.width > this.width + 24){
+            this._finished = true; this.active = false; this.phase = null;
+            this._snap = null; this._ammoSnap = null;
+            try{ this._cleanup(); }catch(e){}
+          }
+        };
+      }
+      var _rnd = B._render;
+      if(typeof _rnd === 'function'){
+        B._render = function(now){
+          if(this.phase !== 'sweepOut') return _rnd.apply(this, arguments);
+          var ex = window._explore, _p = this.phase, _s = ex ? ex._currentSpeed : 0;
+          this.phase = 'support';
+          if(ex) ex._currentSpeed = (typeof window._vehicleSpeedKmh === 'function') ? window._vehicleSpeedKmh(this.vehicleId) / 3.6 : 22;
+          try{ return _rnd.call(this, now); }
+          finally{ this.phase = _p; if(ex) ex._currentSpeed = _s; }
+        };
+      }
+      B.enterSweepOut = function(){
+        if(this.phase === 'sweepOut') return;
+        this.phase = 'sweepOut';
+        this._sweepOutLast = performance.now();
+        this.doorOpen = 0; this.playerClipH = 0; this.playerXOffset = 0;
+        if(this.muzzles){ for(var i = 0; i < this.muzzles.length; i++) this.muzzles[i].nextFireAt = Infinity; }
+      };
+    }
+
+    window._completeSweepBattle = function(b){
+      if(!b || b._sweepDone) return;
+      b._sweepDone = true;
+      var cb = b.sweep && b.sweep.onDone;
+      var total = (b.sweep && b.sweep.total) || 1;
+      b.active = false; b.settling = false; b.sweepOut = false;
+      try{ var B2 = window.BTRSupport; if(B2){ B2._snap = null; B2._ammoSnap = null; if(B2.active) B2.stop(); B2.phase = null; } }catch(e){}
+      try{ if(typeof window._combatCleanup === 'function') window._combatCleanup(); }catch(e){}
+      try{ if(typeof _cleanBossFxCanvases === 'function') _cleanBossFxCanvases(); }catch(e){}
+      battle = null;
+      if(typeof window._sweepUnlock === 'function') window._sweepUnlock();
+      window._sweepLock = false;
+      if(typeof window._sweepLog === 'function') window._sweepLog('結算 <b style="color:#4caf50">×' + total + '</b> 份獎勵');
+      if(typeof cb === 'function') cb();
+    };
+  };
+})();
+/* ===== rev-sweep-ux:end ===== */

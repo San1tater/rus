@@ -114,67 +114,7 @@ function _applyHydraFollowWorld(def, anim, frame, world){
 }
 
 /* ============== Boss 包圍盒 fit ============== */
-function computeBossFit(def, bossId, canvasW, canvasH){
-  if(def._fitCached && def._fitCached.cw === canvasW && def._fitCached.ch === canvasH) return def._fitCached;
-  const cw = def.canvas.w, ch = def.canvas.h;
-  const anims = BOSS_ANIMS[bossId];
-  if(!anims){ def._fitCached = null; return null; }
-  const _isOmega = (isBossType(bossId, 'omega'));
-  let aMinX = Infinity, aMinY = Infinity, aMaxX = -Infinity, aMaxY = -Infinity;
-  let iMinX = Infinity, iMinY = Infinity, iMaxX = -Infinity, iMaxY = -Infinity;
-  for(const animName in anims){
-    if(_isOmega && animName === 'death') continue;
-    const anim = anims[animName];
-    const isIdle = (animName === 'idle');
-    for(let f = 0; f < anim.frameCount; f++){
-      const world = resolveBossWorld(def, anim, f);
-      for(const L of def.layers){
-        const wp = world[L.id];
-        if(!wp) continue;
-        const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][f]) || {rot:0};
-        const w = cw * (k.w !== undefined ? k.w : L.w);
-        const h = ch * (k.h !== undefined ? k.h : L.h);
-        const px = w * L.pivot.x;
-        const py = h * L.pivot.y;
-        const rot = wp.rot * BOSS_DEG2RAD;
-        const cos = Math.cos(rot), sin = Math.sin(rot);
-        for(const c of [[0,0],[w,0],[0,h],[w,h]]){
-          const dx = c[0] - px, dy = c[1] - py;
-          const rx = dx*cos - dy*sin + wp.wx;
-          const ry = dx*sin + dy*cos + wp.wy;
-          if(rx < aMinX) aMinX = rx;
-          if(ry < aMinY) aMinY = ry;
-          if(rx > aMaxX) aMaxX = rx;
-          if(ry > aMaxY) aMaxY = ry;
-          if(isIdle){
-            if(rx < iMinX) iMinX = rx;
-            if(ry < iMinY) iMinY = ry;
-            if(rx > iMaxX) iMaxX = rx;
-            if(ry > iMaxY) iMaxY = ry;
-          }
-        }
-      }
-    }
-  }
-  if(!isFinite(aMinX)){ def._fitCached = null; return null; }
-  if(!isFinite(iMinX)){ iMinX = aMinX; iMinY = aMinY; iMaxX = aMaxX; iMaxY = aMaxY; }
-  const allW = aMaxX - aMinX, allH = aMaxY - aMinY;
-  const idleW = iMaxX - iMinX;
-  const idleH = iMaxY - iMinY;
-  const fitScale = def.forceFit
-    ? Math.min(canvasH / idleH, canvasW / (idleW * 1.2), canvasW / (allW * 0.97))
-    : Math.min(canvasH / idleH, canvasH / allH, canvasW / allW);
-  if(!def.forceFit && fitScale >= 1 && aMinX >= 0 && aMinY >= 0 && aMaxX <= cw && aMaxY <= ch){
-    def._fitCached = null;
-    return null;
-  }
-  const idleCX = (iMinX + iMaxX) / 2;
-  const offsetX = canvasW / 2 - idleCX * fitScale;
-  const offsetY = canvasH - iMaxY * fitScale;
-  const fit = { fitScale, offsetX, offsetY, cw: canvasW, ch: canvasH };
-  def._fitCached = fit;
-  return fit;
-}
+
 
 function computeBossDeathFit(def, bossId, canvasW, canvasH){
   const _ck = 'death|' + canvasW + '|' + canvasH;
@@ -219,14 +159,44 @@ function computeBossDeathFit(def, bossId, canvasW, canvasH){
 }
 
 function getBossCanvasTransform(def, bossId, canvasW, canvasH){
-  const baseSx = canvasW / def.canvas.w;
-  const baseSy = canvasH / def.canvas.h;
-  if(def.autoFit){
-    const fit = computeBossFit(def, bossId, canvasW, canvasH);
-    if(fit) return { sx: fit.fitScale, sy: fit.fitScale, ox: fit.offsetX, oy: fit.offsetY };
-    return { sx: baseSx, sy: baseSy, ox: 0, oy: 0 };
+  const anims = BOSS_ANIMS[bossId];
+  if(anims && anims.idle){
+    const idleAnim = anims.idle;
+    const world = resolveBossWorld(def, idleAnim, 0);
+    let iMinY = Infinity, iMaxY = -Infinity, iMinX = Infinity, iMaxX = -Infinity;
+    for(const L of def.layers){
+      const wp = world[L.id];
+      if(!wp) continue;
+      const k = (idleAnim.keys && idleAnim.keys[L.id] && idleAnim.keys[L.id][0]) || {rot:0};
+      const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+      const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+      const px = w * L.pivot.x, py = h * L.pivot.y;
+      const rot = wp.rot * BOSS_DEG2RAD;
+      const cos = Math.cos(rot), sin = Math.sin(rot);
+      for(const c of [[0,0],[w,0],[0,h],[w,h]]){
+        const dx = c[0] - px, dy = c[1] - py;
+        const rx = dx*cos - dy*sin + wp.wx;
+        const ry = dx*sin + dy*cos + wp.wy;
+        if(ry < iMinY) iMinY = ry;
+        if(ry > iMaxY) iMaxY = ry;
+        if(rx < iMinX) iMinX = rx;
+        if(rx > iMaxX) iMaxX = rx;
+      }
+    }
+    if(isFinite(iMinY)){
+      const idleH = iMaxY - iMinY;
+      /* rev-fix: 玩家实际视觉高度 = H * factor * (515-59.26)/386 ≈ H * factor * 1.1807 */
+      const PLAYER_VISUAL_RATIO = 455.74 / 386;
+      const targetVisualH = canvasH * CHAR_HEIGHT_FACTOR * PLAYER_VISUAL_RATIO;
+      const fitScale = targetVisualH / idleH;
+      const idleCX = (iMinX + iMaxX) / 2;
+      const offsetX = canvasW / 2 - idleCX * fitScale;
+      const groundY = canvasH * 0.95;
+      const offsetY = groundY - iMaxY * fitScale;
+      return { sx: fitScale, sy: fitScale, ox: offsetX, oy: offsetY };
+    }
   }
-  const s = Math.min(baseSx, baseSy);
+  const s = Math.min(canvasW / def.canvas.w, canvasH / def.canvas.h);
   return { sx: s, sy: s, ox: (canvasW - def.canvas.w * s) / 2, oy: canvasH - def.canvas.h * s };
 }
 
@@ -372,131 +342,57 @@ function renderBossBattleCanvas(){
 }
 
 function updateBattleBossAnim(now){
-  const bossId = (typeof battle !== 'undefined' && battle) ? battle.bossId : null;
-  if(!bossId) return;
-  const anims = BOSS_ANIMS[bossId];
-  if(!anims) return;
-  const a = anims[battleBossAnim.name] || anims.idle;
-  if(!a) return;
-  const interval = 1000 / a.fps;
-  if(now - battleBossAnim.lastUpdate >= interval){
-    battleBossAnim.lastUpdate = now;
+  var b=(typeof battle!=='undefined')?battle:null; if(!b) return;
+  var anims=BOSS_ANIMS[b.bossId]; if(!anims) return;
+  /* rev-animatk2: 攻擊時間軸優先 —— 起手拉伸 / 接觸幀事件 / 收招可取消 */
+  var tl=b._atkTL;
+  if(tl&&tl.active&&battleBossAnim.name===tl.anim){
+    window._bossAttackTick(tl,now,anims[tl.anim]);
+    return;
+  }
+  /* 突進飛行：leap 幀由位移進度驅動 */
+  if(b._leapDrive&&b.bossDash&&battleBossAnim.name==='leap'&&anims.leap){
+    var la=anims.leap;
+    battleBossAnim.frame=Math.floor((b.bossDash.flightProgress||0)*la.frameCount)%la.frameCount;
+    return;
+  }
+  var a=anims[battleBossAnim.name]||anims.idle; if(!a) return;
+  var rate=1;
+  if(battleBossAnim.name==='walk'&&typeof b.bossAnimRate==='number'){
+    rate=Math.max(0.4,Math.min(2.6,b.bossAnimRate));
+  }
+  var interval=(1000/a.fps)/rate;
+  if(now-battleBossAnim.lastUpdate>=interval){
+    battleBossAnim.lastUpdate=now;
     if(a.loop){
-      battleBossAnim.frame = (battleBossAnim.frame + 1) % a.frameCount;
+      battleBossAnim.frame=(battleBossAnim.frame+1)%a.frameCount;
     } else {
-      if(battleBossAnim.frame < a.frameCount - 1){
-        battleBossAnim.frame++;
-      } else if(battleBossAnim.forcedEnd && now > battleBossAnim.forcedEnd){
-        battleBossAnim.name = 'idle';
-        battleBossAnim.frame = 0;
-        battleBossAnim.forcedEnd = 0;
+      if(battleBossAnim.frame<a.frameCount-1){ battleBossAnim.frame++; }
+      /* rev-animatk2: forcedEnd 守衛 —— death（forcedEnd=0）停在最後一幀等結算，不強制回 idle */
+      else if(battleBossAnim.forcedEnd&&now>battleBossAnim.forcedEnd){
+        battleBossAnim.name='idle'; battleBossAnim.frame=0; battleBossAnim.forcedEnd=0; battleBossAnim._cancelFrom=0;
       }
     }
   }
 }
 
-function playBossOneshot(animName, durationMs){
-  if(typeof battle === 'undefined' || !battle || !BOSS_ANIMS[battle.bossId]) return;
-  const anims = BOSS_ANIMS[battle.bossId];
-  if(!anims[animName]) return;
-  battleBossAnim.name = animName;
-  battleBossAnim.frame = 0;
-  battleBossAnim.lastUpdate = performance.now();
-  battleBossAnim.forcedEnd = performance.now() + (durationMs || 900);
-}
+
 
 /* ============== 場景 / 邊界 ============== */
-function getSceneW(){
-  const fxEl = document.getElementById('battle-fx');
-  return fxEl ? fxEl.clientWidth : 400;
-}
-function getPlayerSpriteWidthPx(){
-  return (typeof battle !== 'undefined' && battle && battle.playerSpriteW) ? battle.playerSpriteW : 88;
-}
 
-function getBossGfxBounds(){
-  if(typeof battle === 'undefined' || !battle) return null;
-  const def = BOSS_LAYERS[battle.bossId];
-  if(!def) return null;
-  const anims = BOSS_ANIMS[battle.bossId];
-  if(!anims) return null;
-  const anim = anims[battleBossAnim.name] || anims.idle;
-  if(!anim) return null;
-  const sp = document.getElementById('boss-sprite');
-  if(!sp) return null;
-  const spriteW = sp.clientWidth;
-  const spriteH = sp.clientHeight;
-  if(!spriteW || !spriteH) return null;
-  const cacheKey = battle.bossId + '|' + battleBossAnim.name + '|' + battleBossAnim.frame + '|' + spriteW + '|' + spriteH;
-  if(battle._bossGfxBoundsKey === cacheKey && battle._bossGfxBounds) return battle._bossGfxBounds;
-  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  const world = resolveBossWorld(def, anim, fi);
-  let minX = Infinity, maxX = -Infinity;
-  for(const L of def.layers){
-    const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || {rot:0, dx:0, dy:0};
-    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
-    const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
-    const px = w * L.pivot.x;
-    const py = h * L.pivot.y;
-    const wp = world[L.id];
-    if(!wp) continue;
-    const rot = wp.rot * Math.PI / 180;
-    const cos = Math.cos(rot), sin = Math.sin(rot);
-    for(const c of [[0,0],[w,0],[0,h],[w,h]]){
-      const dx = c[0] - px, dy = c[1] - py;
-      const rx = dx*cos - dy*sin + wp.wx;
-      if(rx < minX) minX = rx;
-      if(rx > maxX) maxX = rx;
-    }
-  }
-  if(!isFinite(minX)){ battle._bossGfxBoundsKey = cacheKey; battle._bossGfxBounds = null; return null; }
-  const baseSx = spriteW / def.canvas.w;
-  const baseSy = spriteH / def.canvas.h;
-  let s, ox;
-  if(def.autoFit){
-    const fit = computeBossFit(def, battle.bossId, spriteW, spriteH);
-    if(fit){ s = fit.fitScale; ox = fit.offsetX; }
-    else { s = Math.min(baseSx, baseSy); ox = (spriteW - def.canvas.w * s) / 2; }
-  } else {
-    s = Math.min(baseSx, baseSy);
-    ox = (spriteW - def.canvas.w * s) / 2;
-  }
-  const bounds = { leftPx: ox + minX * s, rightPx: ox + maxX * s, spriteW: spriteW };
-  battle._bossGfxBoundsKey = cacheKey;
-  battle._bossGfxBounds = bounds;
-  return bounds;
-}
 
-function getBossLeftBoundaryN(){
-  const W = getSceneW(); if(!W || typeof battle === 'undefined' || !battle) return 0;
-  const sp = document.getElementById('boss-sprite');
-  const spriteW = sp ? sp.clientWidth : 280;
-  const spriteLeft = battle.bx * W - spriteW / 2;
-  const bounds = getBossGfxBounds();
-  if(!bounds) return spriteLeft / W;
-  return (spriteLeft + bounds.leftPx) / W;
-}
 
-function getBossRightBoundaryN(){
-  const W = getSceneW(); if(!W || typeof battle === 'undefined' || !battle) return 1;
-  const sp = document.getElementById('boss-sprite');
-  const spriteW = sp ? sp.clientWidth : 280;
-  const spriteLeft = battle.bx * W - spriteW / 2;
-  const bounds = getBossGfxBounds();
-  if(!bounds) return (spriteLeft + spriteW) / W;
-  return (spriteLeft + bounds.rightPx) / W;
-}
 
-function getPlayerRightBoundaryN(){
-  const W = getSceneW();
-  if(!W || typeof battle === 'undefined' || !battle) return 1;
-  return battle.px + (getPlayerSpriteWidthPx() / 2) / W;
-}
-function getPlayerLeftBoundaryN(){
-  const W = getSceneW();
-  if(!W || typeof battle === 'undefined' || !battle) return 0;
-  return battle.px - (getPlayerSpriteWidthPx() / 2) / W;
-}
+
+
+
+
+
+
+
+
+
+
 
 /* ============== 部位 / 瞄準 ============== */
 function pickAimPartFromClick(canvasX, canvasY){
@@ -533,258 +429,218 @@ function pickAimPartFromClick(canvasX, canvasY){
   return null;
 }
 
+
 function getAimTargetPos(){
-  if(typeof battle === 'undefined' || !battle) return {x:0.75, y:0.3};
-  const part = battle.aimPart;
-  const def = BOSS_LAYERS[battle.bossId];
-  if(!def || !part) return {x:battle.bx, y:battle.by};
-  const L = def.layers.find(l => l.id === part);
-  if(!L) return {x:battle.bx, y:battle.by};
-  const anims = BOSS_ANIMS[battle.bossId];
-  const anim = anims ? (anims[battleBossAnim.name] || anims.idle) : null;
-  const fi = anim ? (((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount) : 0;
-  const k = (anim && anim.keys && anim.keys[part] && anim.keys[part][fi]) || {rot:0,dx:0,dy:0};
-  const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
-  const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
-  const px = w * L.pivot.x;
-  const py = h * L.pivot.y;
-  const world = anim ? resolveBossWorld(def, anim, fi) : null;
-  const wp = world ? world[part] : null;
-  if(!wp) return {x:battle.bx, y:battle.by};
-  let localX, localY;
-  if(battle.aimLocal && battle.aimLocal.part === part && w > 0 && h > 0){
-    localX = battle.aimLocal.u * w;
-    localY = battle.aimLocal.v * h;
-  } else {
-    localX = w / 2;
-    localY = h / 2;
-  }
-  const offX = localX - px;
-  const offY = localY - py;
-  const angle = wp.rot * BOSS_DEG2RAD;
-  const cosA = Math.cos(angle), sinA = Math.sin(angle);
-  const rotOffX = offX * cosA - offY * sinA;
-  const rotOffY = offX * sinA + offY * cosA;
-  const targetWX = wp.wx + rotOffX;
-  const targetWY = wp.wy + rotOffY;
-  const fxEl = document.getElementById('battle-fx');
-  const W = fxEl ? fxEl.clientWidth : 400;
-  const H = fxEl ? fxEl.clientHeight : 500;
-  const bossSprite = document.getElementById('boss-sprite');
-  const spriteW = bossSprite ? bossSprite.clientWidth : 280;
-  const spriteH = bossSprite ? bossSprite.clientHeight : 280;
-  const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
-  const canvasPx = _tf.ox + targetWX * _tf.sx;
-  const canvasPy = _tf.oy + targetWY * _tf.sy;
-  const spriteLeft = battle.bx * W - spriteW / 2;
-  const spriteTop = battle.by * H;
-  return {
-    x: (spriteLeft + canvasPx) / W,
-    y: (spriteTop + canvasPy) / H
-  };
+/* sprite 為 bottom:0 錨定且高度 = 場景高，頂部不是 battle.by*H —— 用實際 DOM rect */
+if(typeof battle === "undefined" || !battle) return {x:0.75, y:0.6};
+const fxEl = document.getElementById("battle-fx");
+const bossSprite = document.getElementById("boss-sprite");
+if(!fxEl || !bossSprite) return {x:battle.bx, y:0.6};
+const def = (typeof BOSS_LAYERS !== "undefined") ? BOSS_LAYERS[battle.bossId] : null;
+const part = battle.aimPart;
+if(!def || !part) return {x:battle.bx, y:0.6};
+const L = def.layers.find(function(l){ return l.id === part; });
+if(!L) return {x:battle.bx, y:0.6};
+const anims = BOSS_ANIMS[battle.bossId];
+const anim = anims ? (anims[battleBossAnim.name] || anims.idle) : null;
+if(!anim) return {x:battle.bx, y:0.6};
+const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+const world = resolveBossWorld(def, anim, fi);
+const wp = world[part];
+if(!wp) return {x:battle.bx, y:0.6};
+const k = (anim.keys && anim.keys[part] && anim.keys[part][fi]) || {rot:0,dx:0,dy:0};
+const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+const px = w * L.pivot.x, py = h * L.pivot.y;
+let localX, localY;
+if(battle.aimLocal && battle.aimLocal.part === part && w > 0 && h > 0){
+localX = battle.aimLocal.u * w; localY = battle.aimLocal.v * h;
+} else { localX = w / 2; localY = h / 2; }
+const offX = localX - px, offY = localY - py;
+const ang = wp.rot * BOSS_DEG2RAD, cA = Math.cos(ang), sA = Math.sin(ang);
+const tWX = wp.wx + offX * cA - offY * sA;
+const tWY = wp.wy + offX * sA + offY * cA;
+const _tf = getBossCanvasTransform(def, battle.bossId, bossSprite.clientWidth || 280, bossSprite.clientHeight || 280);
+const _fr = fxEl.getBoundingClientRect(), _sr = bossSprite.getBoundingClientRect();
+const W = _fr.width || 1, H = _fr.height || 1;
+return {
+x: ((_sr.left - _fr.left) + _tf.ox + tWX * _tf.sx) / W,
+y: ((_sr.top - _fr.top) + _tf.oy + tWY * _tf.sy) / H
+};
 }
 
+
+/* rev-aim-reset: 弱點（Hydra 頭 / Omega 臂）被摧毀後，瞄準點必須自動回到預設，
+   並清掉 aimLocal 與準星標記 —— 否則準星停在已消失的層上，後續射擊落點全錯。 */
+window._bossLiveAimPart = function(part){
+  if(typeof battle === 'undefined' || !battle || !part) return false;
+  var _isH = (typeof isBossType === 'function') && isBossType(battle.bossId, 'hydra');
+  var _isO = (typeof isBossType === 'function') && isBossType(battle.bossId, 'omega');
+  if(_isH && battle.heads){
+    var owner = null;
+    if(battle.heads[part]) owner = part;
+    else if(typeof HYDRA_NECK_MAP !== 'undefined' && HYDRA_NECK_MAP[part]) owner = HYDRA_NECK_MAP[part];
+    else if(part === 'neck_3b') owner = 'head_3';
+    else if(/^(eye|mouth)/.test(String(part)) && typeof findNearestHeadForLayer === 'function') owner = findNearestHeadForLayer(part);
+    if(!owner) return false;
+    return !!(battle.heads[owner] && battle.heads[owner].alive);
+  }
+  if(_isO && battle.arms){
+    var arm = (typeof getOmegaArmIdOfLayer === 'function') ? getOmegaArmIdOfLayer(part) : null;
+    if(arm) return !!(battle.arms[arm] && battle.arms[arm].alive);
+  }
+  var def = (typeof BOSS_LAYERS !== 'undefined') ? BOSS_LAYERS[battle.bossId] : null;
+  if(!def) return false;
+  for(var i = 0; i < def.layers.length; i++){ if(def.layers[i].id === part) return true; }
+  return false;
+};
+window._bossDefaultAimPart = function(){
+  if(typeof battle === 'undefined' || !battle) return null;
+  if(typeof isBossType === 'function' && isBossType(battle.bossId, 'hydra') && battle.heads && typeof HYDRA_HEAD_IDS !== 'undefined'){
+    for(var i = 0; i < HYDRA_HEAD_IDS.length; i++){
+      var h = battle.heads[HYDRA_HEAD_IDS[i]];
+      if(h && h.alive) return HYDRA_HEAD_IDS[i];
+    }
+  }
+  return (typeof defaultAimPartForBoss === 'function') ? defaultAimPartForBoss(battle.bossId) : null;
+};
+window._bossResetAimIfInvalid = function(){
+  if(typeof battle === 'undefined' || !battle) return false;
+  if(window._bossLiveAimPart(battle.aimPart)) return false;
+  battle.aimPart = window._bossDefaultAimPart();
+  battle.aimLocal = null;
+  var mk = document.getElementById('aim-marker'); if(mk && mk.parentNode) mk.parentNode.removeChild(mk);
+  var gk = document.getElementById('ghost-aim-marker'); if(gk && gk.parentNode) gk.parentNode.removeChild(gk);
+  return true;
+};
 function isWeakPointHit(){
+  /* rev-aim-reset: 弱點判定改讀「當前存活」的弱點矩形，
+     Hydra 的 BOSS_WEAKPOINTS 是空陣列，舊實作導致點頭永遠不算弱點。 */
   if(typeof battle === 'undefined' || !battle) return false;
-  const weak = BOSS_WEAKPOINTS[battle.bossId] || [];
-  return weak.includes(battle.aimPart);
+  var weak = (typeof BOSS_WEAKPOINTS !== 'undefined' && BOSS_WEAKPOINTS[battle.bossId]) || [];
+  if(weak.indexOf(battle.aimPart) >= 0) return true;
+  if(typeof window._bossWeakMap === 'function'){
+    var rects = window._bossWeakMap();
+    for(var i = 0; i < rects.length; i++){ if(rects[i].part === battle.aimPart) return true; }
+  }
+  return false;
 }
 
-function isAimPartInRange(){
-  if(typeof battle === 'undefined' || !battle) return false;
-  const def = BOSS_LAYERS[battle.bossId];
-  if(!def) return true;
-  const part = battle.aimPart;
-  if(!part) return true;
-  const L = def.layers.find(l => l.id === part);
-  if(!L) return true;
-  const anims = BOSS_ANIMS[battle.bossId];
-  const anim = anims ? (anims[battleBossAnim.name] || anims.idle) : null;
-  if(!anim) return true;
-  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  const k = (anim.keys && anim.keys[part] && anim.keys[part][fi]) || {rot:0,dx:0,dy:0};
-  const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
-  const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
-  const px = w * L.pivot.x;
-  const py = h * L.pivot.y;
-  const world = resolveBossWorld(def, anim, fi);
-  const wp = world[part];
-  if(!wp) return true;
-  let localX, localY;
-  if(battle.aimLocal && battle.aimLocal.part === part && w > 0 && h > 0){
-    localX = battle.aimLocal.u * w;
-    localY = battle.aimLocal.v * h;
-  } else {
-    localX = w / 2;
-    localY = h / 2;
-  }
-  const offX = localX - px;
-  const offY = localY - py;
-  const rot = wp.rot * (Math.PI / 180);
-  const cos = Math.cos(rot), sin = Math.sin(rot);
-  const rotOffX = offX * cos - offY * sin;
-  const worldX = wp.wx + rotOffX;
-  const W = getSceneW();
-  const bossSprite = document.getElementById('boss-sprite');
-  const spriteW = bossSprite ? bossSprite.clientWidth : 280;
-  const spriteH = bossSprite ? bossSprite.clientHeight : 280;
-  const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
-  const canvasCenterX = _tf.ox + worldX * _tf.sx;
-  const spriteLeft = battle.bx * W - spriteW / 2;
-  const worldCenterX = (spriteLeft + canvasCenterX) / W;
-  const playerRight = battle.px + battle.playerWeaponRange;
-  return playerRight >= worldCenterX;
-}
+
 
 /* ============== Boss 血條位置 ============== */
-function updateBossHpbarPos(){
-  if(typeof battle === 'undefined' || !battle) return;
-  const sp = document.getElementById('boss-sprite');
-  if(!sp) return;
-  const spriteH = sp.clientHeight;
-  const spriteW = sp.clientWidth;
-  if(!spriteW || !spriteH) return;
-  const def = BOSS_LAYERS[battle.bossId];
-  if(!def) return;
-  const anims = BOSS_ANIMS[battle.bossId];
-  if(!anims || !anims.idle) return;
-  const cacheKey = battle.bossId + '|idle|' + spriteW + '|' + spriteH;
-  let topPx = null;
-  if(battle._bossIdleTopKey === cacheKey){
-    topPx = battle._bossIdleTopPx;
-  } else {
-    const anim = anims.idle;
-    const world = resolveBossWorld(def, anim, 0);
-    let minY = Infinity;
-    for(const L of def.layers){
-      const k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][0]) || {rot:0,dx:0,dy:0};
-      const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
-      const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
-      const px = w * L.pivot.x;
-      const py = h * L.pivot.y;
-      const wp = world[L.id];
-      if(!wp) continue;
-      const rot = wp.rot * Math.PI / 180;
-      const cos = Math.cos(rot), sin = Math.sin(rot);
-      for(const c of [[0,0],[w,0],[0,h],[w,h]]){
-        const dx = c[0] - px, dy = c[1] - py;
-        const ry = dx*sin + dy*cos + wp.wy;
-        if(ry < minY) minY = ry;
-      }
-    }
-    if(!isFinite(minY)) return;
-    const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
-    topPx = _tf.oy + minY * _tf.sy;
-    battle._bossIdleTopKey = cacheKey;
-    battle._bossIdleTopPx = topPx;
-  }
-  if(topPx == null) return;
-  const _hpBottom = Math.max(14, spriteH - topPx + 14);
-  const hpWrap = document.getElementById('boss-hpbar-wrap');
-  if(hpWrap) hpWrap.style.bottom = _hpBottom + 'px';
-}
+
+
+
 
 function updateFighterPos(){
-  if(typeof battle === 'undefined' || !battle) return;
-  const h = document.getElementById('fighter-hero');
-  const b = document.getElementById('fighter-boss');
-  if(h){ h.style.left = (battle.px * 100) + '%'; h.style.top = (battle.py * 100) + '%'; }
-  if(b){ b.style.left = (battle.bx * 100) + '%'; b.style.top = (battle.by * 100) + '%'; }
-  const ri = document.getElementById('range-indicator');
-  if(ri){
-    const r = battle.playerWeaponRange || 0.5;
-    const rLeft = battle.px * 100;
-    const rRight = Math.min(1, (battle.px + r)) * 100;
-    ri.style.left = rLeft + '%';
-    ri.style.width = (rRight - rLeft) + '%';
-  }
-  const dmgBar = document.getElementById('dmg-bar');
-  if(dmgBar){
-    const totalHp = battle.bossMaxHp + battle.bossMaxArmor;
-    const _curCurHp = battle.bossHp + battle.bossArmor;
-    dmgBar.style.width = Math.max(0, Math.min(100, (1 - _curCurHp / totalHp) * 100)) + '%';
-  }
-  const dmgHd = document.querySelector('.damage-header');
-  if(dmgHd){ dmgHd.querySelector('.num').textContent = Math.round(battle.damageDealt); }
-  if(typeof updateBossHpbarPos === 'function') updateBossHpbarPos();
+if(typeof battle === "undefined" || !battle) return;
+/* 只負責水平位置；垂直與 HUD 由 CSS 擁有 */
+const h = document.getElementById("fighter-hero");
+const b = document.getElementById("fighter-boss");
+if(h) h.style.left = (battle.px * 100) + "%";
+if(b) b.style.left = (battle.bx * 100) + "%";
 }
 
 /* ============== 命中 / 特效 ============== */
+/* rev-float-unify: Boss 戰飄字與探索 _float 完全同源 —— 同一組顏色、
+   同一字體（bold 16px sans-serif）、同一上浮速度（age*40）、同一 1.2s 生命。
+   錨點：虛影開啟 → 虛影內容頭頂；Boss 在畫面內 → Boss 內容頭頂；
+   兩者皆無 → 退回 HUD 塊下緣（原行為）。玩家一律用探索的 y=0.12。 */
+function _bossFloatAnchorN(x, y, layer){
+  var b = (typeof battle !== 'undefined') ? battle : null;
+  var W = layer.clientWidth || 400, H = layer.clientHeight || 500;
+  var fr = layer.getBoundingClientRect();
+  function _contentTopN(el){
+    if(!el || !b) return null;
+    var def = (typeof BOSS_LAYERS !== 'undefined') ? BOSS_LAYERS[b.bossId] : null;
+    if(!def || typeof window._bossIdleBounds !== 'function' || typeof getBossCanvasTransform !== 'function') return null;
+    var ib = window._bossIdleBounds(b.bossId); if(!ib) return null;
+    var r = el.getBoundingClientRect();
+    if(!(r.width > 0 && r.height > 0) || !(fr.width > 0 && fr.height > 0)) return null;
+    var tf = getBossCanvasTransform(def, b.bossId, r.width, r.height);
+    if(!(tf && tf.sx > 0 && tf.sy > 0)) return null;
+    var cx = tf.ox + (ib.minX + ib.maxX) * 0.5 * tf.sx;
+    var ty = tf.oy + ib.minY * tf.sy;
+    return { x: (r.left - fr.left + cx) / W, y: (r.top - fr.top + ty) / H };
+  }
+  if(x === 'boss'){
+    var p = null;
+    if(b && b.ghostOpen) p = _contentTopN(document.getElementById('boss-ghost-canvas'));
+    if(!p && b){
+      var onScreen = (typeof b.bx === 'number') && b.bx > -0.02 && b.bx < 1.02;
+      if(onScreen) p = _contentTopN(document.getElementById('boss-sprite'));
+    }
+    if(!p){
+      var hp = document.querySelector('.fighter.boss-f .hpbar-wrap');
+      if(hp && fr.width > 0 && fr.height > 0){
+        var hr = hp.getBoundingClientRect();
+        if(hr.width > 0) p = { x: (hr.left - fr.left + hr.width / 2) / W, y: (hr.bottom - fr.top + 8) / H + 0.03 };
+      }
+    }
+    if(!p) p = { x: (b && typeof b.bx === 'number') ? b.bx : 0.75, y: 0.15 };
+    return { x: Math.max(0.04, Math.min(0.96, p.x)), y: Math.max(0.05, Math.min(0.90, p.y - 0.03)) };
+  }
+  if(x === 'player'){
+    return { x: (b && typeof b.px === 'number') ? b.px : 0.25, y: 0.12 };
+  }
+  return { x: (typeof x === 'number') ? x : 0.5, y: (typeof y === 'number') ? y : 0.12 };
+}
 function spawnHitFx(x, y, txt, cls, sparkX, sparkY){
-  const layer = document.getElementById('battle-fx');
+  var layer = document.getElementById('battle-fx');
   if(!layer) return;
-  let _nx = x, _ny = y;
-  const _isNamebar = (x === 'boss' || x === 'player');
-  if(_isNamebar){
-    const _sel = (x === 'boss') ? '.fighter.boss-f' : '.fighter.hero-f';
-    const _fighter = document.querySelector(_sel);
-    const _hpbar = _fighter ? _fighter.querySelector('.hpbar-wrap') : null;
-    _nx = (x === 'boss') ? 0.75 : 0.15;
-    _ny = 0.2;
-    if(_hpbar){
-      const _fr = layer.getBoundingClientRect();
-      const _hr = _hpbar.getBoundingClientRect();
-      if(_fr.width && _fr.height && _hr.width){
-        _nx = Math.max(0.02, Math.min(0.98, (_hr.left - _fr.left + _hr.width / 2) / _fr.width));
-        _ny = Math.max(0.02, (_hr.top - _fr.top - 24) / _fr.height);
-      }
-    }
-  }
-  /* rev-fix-hitfx-spark-v2: 火花 —— MISS/治疗跳过；sparkX/sparkY 显式提供时用它们；
-   * 否则数字坐标（'boss'/'player'）不画火花。cls 必须完整传给 _spawnHitSpark（第 5 参数） */
-  const _isMiss = (String(txt).toUpperCase() === 'MISS');
+  var b = (typeof battle !== 'undefined') ? battle : null;
+  var _isMiss = (String(txt).toUpperCase() === 'MISS');
   if(!_isMiss && cls !== 'miss' && cls !== 'heal' && typeof window._spawnHitSpark === 'function'){
-    let _sx = null, _sy = null;
-    if(typeof sparkX === 'number' && typeof sparkY === 'number'){
-      _sx = sparkX; _sy = sparkY;
-    } else if(typeof x === 'number' && typeof y === 'number'){
-      _sx = x; _sy = y;
-    }
-    if(_sx !== null && _sy !== null){
-      const _w = layer.clientWidth || 400, _h = layer.clientHeight || 500;
-      let _owner = null;
-      try { _owner = (typeof battle !== 'undefined' && battle) ? battle : null; } catch(e){}
-      if(_owner){
-        /* 关键：cls 作为第 5 参数完整传入 */
-        window._spawnHitSpark(_owner, _sx * _w, _sy * _h, cls === 'crit', cls);
-      }
+    var _sx = null, _sy = null;
+    if(typeof sparkX === 'number' && typeof sparkY === 'number'){ _sx = sparkX; _sy = sparkY; }
+    else if(typeof x === 'number' && typeof y === 'number'){ _sx = x; _sy = y; }
+    if(_sx !== null && _sy !== null && b){
+      window._spawnHitSpark(b, _sx * (layer.clientWidth || 400), _sy * (layer.clientHeight || 500), cls === 'crit', cls);
     }
   }
-  const e = document.createElement('div');
-  e.className = 'hit-fx' + (cls ? ' ' + cls : '');
-  e.textContent = txt;
-  e.style.left = (_nx * 100) + '%';
-  e.style.top = (_ny * 100) + '%';
-  layer.appendChild(e);
-  setTimeout(()=>e.remove(), 1100);
+  if(!b) return;
+  if(!Array.isArray(b.floats)) b.floats = [];
+  var a = _bossFloatAnchorN(x, y, layer);
+  b.floats.push({ text: String(txt), cls: cls || '', age: 0, x: a.x, y: a.y });
 }
 
+
 function playShieldShatterFx(){
-  const layer = document.getElementById('battle-fx');
-  if(!layer || typeof battle === 'undefined' || !battle) return;
-  const fx = document.createElement('div');
-  fx.className = 'shield-shatter-fx';
-  fx.style.left = (battle.bx * 100) + '%';
-  fx.style.top  = (battle.by * 100) + '%';
-  const glow = document.createElement('div');
-  glow.className = 'glow';
-  fx.appendChild(glow);
-  for(let i = 0; i < 14; i++){
-    const frag = document.createElement('div');
-    frag.className = 'frag';
-    const ang = (i / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-    const dist = 30 + Math.random() * 50;
-    const dx = Math.cos(ang) * dist;
-    const dy = Math.sin(ang) * dist;
-    frag.animate([
-      {transform:'translate(0,0) scale(1) rotate(0deg)', opacity:1},
-      {transform:`translate(${dx}px,${dy}px) scale(0.4) rotate(${Math.random()*360-180}deg)`, opacity:0}
-    ], {duration: 500+Math.random()*200, easing:'cubic-bezier(.2,.8,.4,1)', fill:'forwards'});
-    fx.appendChild(frag);
-  }
-  layer.appendChild(fx);
-  setTimeout(()=>fx.remove(), 800);
+const layer = document.getElementById("battle-fx");
+if(!layer || typeof battle === "undefined" || !battle) return;
+let _cx = battle.bx * 100, _cy = 60;
+const _sp = document.getElementById("boss-sprite");
+if(_sp){
+const _fr = layer.getBoundingClientRect(), _sr = _sp.getBoundingClientRect();
+if(_fr.width > 0 && _fr.height > 0){
+_cx = ((_sr.left - _fr.left) + _sr.width * 0.5) / _fr.width * 100;
+_cy = ((_sr.top - _fr.top) + _sr.height * 0.62) / _fr.height * 100;
 }
+}
+const fx = document.createElement("div");
+fx.className = "shield-shatter-fx";
+fx.style.left = _cx + "%";
+fx.style.top  = _cy + "%";
+const glow = document.createElement("div");
+glow.className = "glow";
+fx.appendChild(glow);
+for(let i = 0; i < 14; i++){
+const frag = document.createElement("div");
+frag.className = "frag";
+const ang = (i / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+const dist = 30 + Math.random() * 50;
+const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist;
+frag.animate([
+{transform:"translate(0,0) scale(1) rotate(0deg)", opacity:1},
+{transform:"translate(" + dx + "px," + dy + "px) scale(0.4) rotate(" + (Math.random()*360-180) + "deg)", opacity:0}
+], {duration: 500 + Math.random()*200, easing:"cubic-bezier(.2,.8,.4,1)", fill:"forwards"});
+fx.appendChild(frag);
+}
+layer.appendChild(fx);
+setTimeout(function(){ fx.remove(); }, 800);
+}
+
 
 function breakBossShield(){
   if(typeof battle === 'undefined' || !battle || battle.shieldBroken) return;
@@ -796,21 +652,32 @@ function breakBossShield(){
   playShieldShatterFx();
 }
 
+
 function showBossTelegraph(sk){
-  const layer = document.getElementById('battle-fx');
-  if(!layer || typeof battle === 'undefined' || !battle) return;
-  const W = layer.clientWidth || 400;
-  const ratio = sk.telegraphRatio || sk.range;
-  const diameterPx = Math.round(W * ratio * 2);
-  const t = document.createElement('div');
-  t.className = 'boss-telegraph' + (sk.aoe ? ' aoe' : '');
-  t.style.left = (battle.bx * 100) + '%';
-  t.style.top  = (battle.by * 100) + '%';
-  t.style.width  = diameterPx + 'px';
-  t.style.height = diameterPx + 'px';
-  layer.appendChild(t);
-  setTimeout(()=>t.remove(), (sk.totalTime||1500) + 100);
+const layer = document.getElementById("battle-fx");
+if(!layer || typeof battle === "undefined" || !battle) return;
+const W = layer.clientWidth || 400;
+const ratio = sk.telegraphRatio || sk.range;
+const diameterPx = Math.round(W * ratio * 2);
+let _cx = battle.bx * 100, _cy = 60;
+const _sp = document.getElementById("boss-sprite");
+if(_sp){
+const _fr = layer.getBoundingClientRect(), _sr = _sp.getBoundingClientRect();
+if(_fr.width > 0 && _fr.height > 0){
+_cx = ((_sr.left - _fr.left) + _sr.width * 0.5) / _fr.width * 100;
+_cy = ((_sr.top - _fr.top) + _sr.height * 0.62) / _fr.height * 100;
 }
+}
+const t = document.createElement("div");
+t.className = "boss-telegraph" + (sk.aoe ? " aoe" : "");
+t.style.left = _cx + "%";
+t.style.top  = _cy + "%";
+t.style.width  = diameterPx + "px";
+t.style.height = diameterPx + "px";
+layer.appendChild(t);
+setTimeout(function(){ t.remove(); }, (sk.totalTime || 1500) + 100);
+}
+
 
 function getBossMuzzlePos(){
   if(typeof battle === 'undefined' || !battle) return {x:0.75, y:0.3};
@@ -841,45 +708,53 @@ function spawnBossProjectile(sk){
   }
 }
 
+
 function spawnSingleProjectile(fx, type, sx, sy){
-  if(typeof battle === 'undefined' || !battle) return;
-  const tx = clamp(battle.px + (Math.random() - 0.5) * 0.05, 0.05, 0.95);
-  const ty = clamp(battle.py + (Math.random() - 0.5) * 0.05, 0.05, 0.95);
-  const wrap = document.createElement('div');
-  wrap.className = 'boss-proj-wrap';
-  wrap.style.left = (sx * 100) + '%';
-  wrap.style.top  = (sy * 100) + '%';
-  wrap.style.transition = 'left .5s cubic-bezier(.25,.8,.4,1), top .5s cubic-bezier(.25,.8,.4,1)';
-  fx.appendChild(wrap);
-  const inner = document.createElement('div');
-  if(type === 'web'){
-    inner.className = 'boss-proj web';
-    const W = fx.clientWidth  || 400;
-    const H = fx.clientHeight || 500;
-    const dxPx = (tx - sx) * W;
-    const dyPx = (ty - sy) * H;
-    const ang = Math.atan2(dyPx, dxPx) * 180 / Math.PI;
-    inner.style.transform = 'rotate(' + ang + 'deg)';
-  } else {
-    inner.className = 'boss-proj acid';
-  }
-  wrap.appendChild(inner);
-  requestAnimationFrame(() => {
-    wrap.style.left = (tx * 100) + '%';
-    wrap.style.top  = (ty * 100) + '%';
-  });
-  setTimeout(() => {
-    if(type === 'acid'){
-      inner.style.transition = 'opacity .18s, transform .18s';
-      inner.style.opacity = '0';
-      inner.style.transform = (inner.style.transform || '') + ' scale(1.5)';
-    } else {
-      inner.style.transition = 'opacity .15s';
-      inner.style.opacity = '0';
-    }
-    setTimeout(() => wrap.remove(), 200);
-  }, 520);
+if(typeof battle === "undefined" || !battle) return;
+let tx = clamp(battle.px + (Math.random() - 0.5) * 0.05, 0.05, 0.95);
+let ty = 0.62;
+const _hs = document.getElementById("hero-sprite");
+if(_hs){
+const _fr = fx.getBoundingClientRect(), _hr = _hs.getBoundingClientRect();
+if(_fr.width > 0 && _fr.height > 0){
+tx = clamp(((_hr.left - _fr.left) + _hr.width * 0.5) / _fr.width + (Math.random() - 0.5) * 0.04, 0.05, 0.95);
+ty = clamp(((_hr.top - _fr.top) + _hr.height * 0.62) / _fr.height, 0.05, 0.95);
 }
+}
+const wrap = document.createElement("div");
+wrap.className = "boss-proj-wrap";
+wrap.style.left = (sx * 100) + "%";
+wrap.style.top  = (sy * 100) + "%";
+wrap.style.transition = "left .5s cubic-bezier(.25,.8,.4,1), top .5s cubic-bezier(.25,.8,.4,1)";
+fx.appendChild(wrap);
+const inner = document.createElement("div");
+if(type === "web"){
+inner.className = "boss-proj web";
+const W = fx.clientWidth || 400, H = fx.clientHeight || 500;
+const dxPx = (tx - sx) * W, dyPx = (ty - sy) * H;
+const ang = Math.atan2(dyPx, dxPx) * 180 / Math.PI;
+inner.style.transform = "rotate(" + ang + "deg)";
+} else {
+inner.className = "boss-proj acid";
+}
+wrap.appendChild(inner);
+requestAnimationFrame(function(){
+wrap.style.left = (tx * 100) + "%";
+wrap.style.top  = (ty * 100) + "%";
+});
+setTimeout(function(){
+if(type === "acid"){
+inner.style.transition = "opacity .18s, transform .18s";
+inner.style.opacity = "0";
+inner.style.transform = (inner.style.transform || "") + " scale(1.5)";
+} else {
+inner.style.transition = "opacity .15s";
+inner.style.opacity = "0";
+}
+setTimeout(function(){ wrap.remove(); }, 200);
+}, 520);
+}
+
 
 /* ============== Hydra 頭部 ============== */
 function initHydraHeads(){
@@ -977,30 +852,27 @@ function getHydraTargets(aimPart){
   return HYDRA_HEAD_IDS.filter(h => battle.heads[h].alive);
 }
 
+
 function getHeadScreenPos(headId){
-  if(typeof battle === 'undefined' || !battle) return null;
-  const def = BOSS_LAYERS[battle.bossId]; if(!def) return null;
-  const anims = BOSS_ANIMS[battle.bossId]; if(!anims) return null;
-  const anim = anims[battleBossAnim.name] || anims.idle; if(!anim) return null;
-  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  const world = resolveBossWorld(def, anim, fi);
-  const wp = world[headId]; if(!wp) return null;
-  const bossSprite = document.getElementById('boss-sprite');
-  const fxEl = document.getElementById('battle-fx');
-  if(!bossSprite || !fxEl) return null;
-  const W = fxEl.clientWidth, H = fxEl.clientHeight;
-  const spriteW = bossSprite.clientWidth || 280;
-  const spriteH = bossSprite.clientHeight || 280;
-  const spriteLeft = battle.bx * W - spriteW / 2;
-  const spriteTop = battle.by * H;
-  const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
-  const canvasX = _tf.ox + wp.wx * _tf.sx;
-  const canvasY = _tf.oy + wp.wy * _tf.sy;
-  return {
-    x: (spriteLeft + canvasX) / W,
-    y: (spriteTop + canvasY) / H
-  };
+if(typeof battle === "undefined" || !battle) return null;
+const def = BOSS_LAYERS[battle.bossId]; if(!def) return null;
+const anims = BOSS_ANIMS[battle.bossId]; if(!anims) return null;
+const anim = anims[battleBossAnim.name] || anims.idle; if(!anim) return null;
+const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+const world = resolveBossWorld(def, anim, fi);
+const wp = world[headId]; if(!wp) return null;
+const bossSprite = document.getElementById("boss-sprite");
+const fxEl = document.getElementById("battle-fx");
+if(!bossSprite || !fxEl) return null;
+const _tf = getBossCanvasTransform(def, battle.bossId, bossSprite.clientWidth || 280, bossSprite.clientHeight || 280);
+const _fr = fxEl.getBoundingClientRect(), _sr = bossSprite.getBoundingClientRect();
+const W = _fr.width || 1, H = _fr.height || 1;
+return {
+x: ((_sr.left - _fr.left) + _tf.ox + wp.wx * _tf.sx) / W,
+y: ((_sr.top - _fr.top) + _tf.oy + wp.wy * _tf.sy) / H
+};
 }
+
 
 function playHeadBreakFx(headId){
   const layer = document.getElementById('battle-fx');
@@ -1030,63 +902,53 @@ function playHeadBreakFx(headId){
   if(bar) bar.remove();
 }
 
+
 function updateHeadBarsUI(){
-  if(typeof battle === 'undefined' || !battle) return;
-  if(!isBossType(battle.bossId, 'hydra') || !battle.heads) return;
-  const container = document.getElementById('head-bars'); if(!container) return;
-  const def = BOSS_LAYERS[battle.bossId]; if(!def) return;
-  const anims = BOSS_ANIMS[battle.bossId];
-  const anim = anims ? (anims[battleBossAnim.name] || anims.idle) : null; if(!anim) return;
-  const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  const world = resolveBossWorld(def, anim, fi);
-  const bossSprite = document.getElementById('boss-sprite');
-  const fxEl = document.getElementById('battle-fx');
-  if(!bossSprite || !fxEl) return;
-  const W = fxEl.clientWidth, H = fxEl.clientHeight;
-  const spriteW = bossSprite.clientWidth || 280;
-  const spriteH = bossSprite.clientHeight || 280;
-  const spriteLeft = battle.bx * W - spriteW / 2;
-  const spriteTop = battle.by * H;
-  const _tf = getBossCanvasTransform(def, battle.bossId, spriteW, spriteH);
-  for(let i = 1; i <= 7; i++){
-    const headId = 'head_' + i;
-    const head = battle.heads[headId]; if(!head) continue;
-    let bar = document.getElementById('head-bar-' + i);
-    if(!head.alive){ if(bar) bar.remove(); continue; }
-    const L = def.layers.find(l => l.id === headId); if(!L) continue;
-    const k = (anim.keys && anim.keys[headId] && anim.keys[headId][fi]) || {rot:0,dx:0,dy:0};
-    const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
-    const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
-    const px = w * L.pivot.x;
-    const py = h * L.pivot.y;
-    const wp = world[headId]; if(!wp) continue;
-    const topLocalX = w / 2;
-    const topLocalY = 0;
-    const dxx = topLocalX - px;
-    const dyy = topLocalY - py;
-    const rot = wp.rot * Math.PI / 180;
-    const cos = Math.cos(rot), sin = Math.sin(rot);
-    const rotX = dxx * cos - dyy * sin;
-    const rotY = dxx * sin + dyy * cos;
-    const topWX = wp.wx + rotX;
-    const topWY = wp.wy + rotY;
-    const canvasPx = _tf.ox + topWX * _tf.sx;
-    const canvasPy = _tf.oy + topWY * _tf.sy;
-    const screenX = spriteLeft + canvasPx;
-    const screenY = spriteTop + canvasPy - 6;
-    if(!bar){
-      bar = document.createElement('div');
-      bar.id = 'head-bar-' + i;
-      bar.className = 'head-bar';
-      bar.innerHTML = '<div class="bar"><div class="fill"></div></div>';
-      container.appendChild(bar);
-    }
-    bar.style.left = screenX + 'px';
-    bar.style.top = screenY + 'px';
-    const fill = bar.querySelector('.fill');
-    if(fill) fill.style.width = Math.max(0, head.hp / head.max * 100) + '%';
-  }
+if(typeof battle === "undefined" || !battle) return;
+if(!isBossType(battle.bossId, "hydra") || !battle.heads) return;
+const container = document.getElementById("head-bars"); if(!container) return;
+const def = BOSS_LAYERS[battle.bossId]; if(!def) return;
+const anims = BOSS_ANIMS[battle.bossId];
+const anim = anims ? (anims[battleBossAnim.name] || anims.idle) : null; if(!anim) return;
+const fi = ((battleBossAnim.frame % anim.frameCount) + anim.frameCount) % anim.frameCount;
+const world = resolveBossWorld(def, anim, fi);
+const bossSprite = document.getElementById("boss-sprite");
+const fxEl = document.getElementById("battle-fx");
+if(!bossSprite || !fxEl) return;
+const _tf = getBossCanvasTransform(def, battle.bossId, bossSprite.clientWidth || 280, bossSprite.clientHeight || 280);
+const _fr = fxEl.getBoundingClientRect(), _sr = bossSprite.getBoundingClientRect();
+const spriteLeft = _sr.left - _fr.left, spriteTop = _sr.top - _fr.top;
+for(let i = 1; i <= 7; i++){
+const headId = "head_" + i;
+const head = battle.heads[headId]; if(!head) continue;
+let bar = document.getElementById("head-bar-" + i);
+if(!head.alive){ if(bar) bar.remove(); continue; }
+const L = def.layers.find(function(l){ return l.id === headId; }); if(!L) continue;
+const k = (anim.keys && anim.keys[headId] && anim.keys[headId][fi]) || {rot:0,dx:0,dy:0};
+const w = def.canvas.w * (k.w !== undefined ? k.w : L.w);
+const h = def.canvas.h * (k.h !== undefined ? k.h : L.h);
+const px = w * L.pivot.x, py = h * L.pivot.y;
+const wp = world[headId]; if(!wp) continue;
+const dxx = w / 2 - px, dyy = 0 - py;
+const rot = wp.rot * BOSS_DEG2RAD, cos = Math.cos(rot), sin = Math.sin(rot);
+const topWX = wp.wx + dxx * cos - dyy * sin;
+const topWY = wp.wy + dxx * sin + dyy * cos;
+const screenX = spriteLeft + _tf.ox + topWX * _tf.sx;
+const screenY = spriteTop + _tf.oy + topWY * _tf.sy - 6;
+if(!bar){
+bar = document.createElement("div");
+bar.id = "head-bar-" + i;
+bar.className = "head-bar";
+bar.innerHTML = "<div class=\"bar\"><div class=\"fill\"></div></div>";
+container.appendChild(bar);
 }
+bar.style.left = screenX + "px";
+bar.style.top = screenY + "px";
+const fill = bar.querySelector(".fill");
+if(fill) fill.style.width = Math.max(0, head.hp / head.max * 100) + "%";
+}
+}
+
 
 /* ============== Omega 四臂 ============== */
 function initOmegaArms(){
@@ -1109,6 +971,7 @@ function damageOmegaArm(armId, dmg){
   arm.hp = Math.max(0, arm.hp - dmg);
   if(arm.hp <= 0){
     arm.alive = false;
+      if(typeof window._bossResetAimIfInvalid === 'function') window._bossResetAimIfInvalid(); /* rev-aim-reset */
     playHeadBreakFx(armId);
     if(battle.aimPart === armId){
       battle.aimPart = (typeof defaultAimPartForBoss === 'function')
@@ -1130,3 +993,238 @@ function isOmegaSkillDisabled(sk){
   if(!sk.armRequired) return false;
   return isOmegaArmBroken(sk.armRequired);
 }
+
+/* ===== rev-animatk2:start ===== */
+/* rev-animatk2: 攻擊時間軸 + 武器幾何（唯一量測入口，自帶 idle bounds fallback）
+   畫布 → 戰鬥米：X 以 BOSS_HALF_WIDTH_M / 視覺半寬 校準（與玩家射程判定同一 footprint），
+   Y 用真實米。reach 供 AI 出手決策，掃掠矩形供接觸判定。 */
+function _bossBaseId(bid){ return String(bid||'').replace(/_ii$/,''); }
+function _bossAtkMeta(bid,animName){
+  var M=window.BOSS_ATTACK_META||{};
+  var t=M[_bossBaseId(bid)]||{};
+  return t[animName]||null;
+}
+window._bossAtkMeta=_bossAtkMeta;
+var _BOSS_IB_LOCAL={};
+function _bossIdleBoundsSafe(bid){
+  if(typeof window._bossIdleBounds==='function'){ var r=window._bossIdleBounds(bid); if(r) return r; }
+  if(_BOSS_IB_LOCAL[bid]) return _BOSS_IB_LOCAL[bid];
+  var def=BOSS_LAYERS[bid], anims=BOSS_ANIMS[bid];
+  if(!def||!anims||!anims.idle) return null;
+  var a=anims.idle, world=resolveBossWorld(def,a,0);
+  var mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
+  for(var i=0;i<def.layers.length;i++){
+    var L=def.layers[i], wp=world[L.id]; if(!wp) continue;
+    var k=(a.keys&&a.keys[L.id]&&a.keys[L.id][0])||{};
+    var w=def.canvas.w*(k.w!==undefined?k.w:L.w), h=def.canvas.h*(k.h!==undefined?k.h:L.h);
+    var px=w*L.pivot.x, py=h*L.pivot.y;
+    var rot=wp.rot*BOSS_DEG2RAD, cs=Math.cos(rot), sn=Math.sin(rot);
+    var co=[[0,0],[w,0],[0,h],[w,h]];
+    for(var c=0;c<4;c++){
+      var dx=co[c][0]-px, dy=co[c][1]-py;
+      var rx=dx*cs-dy*sn+wp.wx, ry=dx*sn+dy*cs+wp.wy;
+      if(rx<mnx)mnx=rx; if(rx>mxx)mxx=rx; if(ry<mny)mny=ry; if(ry>mxy)mxy=ry;
+    }
+  }
+  if(!isFinite(mnx)) return null;
+  var o={minX:mnx,maxX:mxx,minY:mny,maxY:mxy};
+  _BOSS_IB_LOCAL[bid]=o; return o;
+}
+function _bossLayerRectC(bid,animName,frame,layerId){
+  var def=BOSS_LAYERS[bid], anims=BOSS_ANIMS[bid];
+  if(!def||!anims) return null;
+  var a=anims[animName]; if(!a) return null;
+  var L=null;
+  for(var i=0;i<def.layers.length;i++) if(def.layers[i].id===layerId){L=def.layers[i];break;}
+  if(!L) return null;
+  var fi=((frame%a.frameCount)+a.frameCount)%a.frameCount;
+  var world=resolveBossWorld(def,a,fi);
+  var wp=world[layerId]; if(!wp) return null;
+  var k=(a.keys&&a.keys[layerId]&&a.keys[layerId][fi])||{};
+  var w=def.canvas.w*(k.w!==undefined?k.w:L.w);
+  var h=def.canvas.h*(k.h!==undefined?k.h:L.h);
+  var px=w*L.pivot.x, py=h*L.pivot.y;
+  var rot=wp.rot*BOSS_DEG2RAD, cs=Math.cos(rot), sn=Math.sin(rot);
+  var x1=Infinity,x2=-Infinity,y1=Infinity,y2=-Infinity;
+  var co=[[0,0],[w,0],[0,h],[w,h]];
+  for(var c=0;c<4;c++){
+    var dx=co[c][0]-px, dy=co[c][1]-py;
+    var rx=dx*cs-dy*sn+wp.wx, ry=dx*sn+dy*cs+wp.wy;
+    if(rx<x1)x1=rx; if(rx>x2)x2=rx; if(ry<y1)y1=ry; if(ry>y2)y2=ry;
+  }
+  return {x1:x1,x2:x2,y1:y1,y2:y2};
+}
+window._bossLayerRectC=_bossLayerRectC;
+var _BOSS_CONV_CACHE={};
+window._bossConvM=function(bid){
+  var b=(typeof battle!=='undefined')?battle:null;
+  var sp=document.getElementById('boss-sprite');
+  var sw=sp?sp.clientWidth:0, sh=sp?sp.clientHeight:0;
+  var live=(sw>0&&sh>0);
+  if(!live){ sw=600; sh=500; } /* 戰鬥外量測用虛擬視窗 */
+  var key=bid+'|'+sw+'|'+sh;
+  if(_BOSS_CONV_CACHE[key]) return _BOSS_CONV_CACHE[key];
+  var ib=_bossIdleBoundsSafe(bid);
+  var def=BOSS_LAYERS[bid];
+  if(!ib||!def) return null;
+  var tf=getBossCanvasTransform(def,bid,sw,sh);
+  var ppm=(live&&b&&b.bgPixelsPerMeter>0)?b.bgPixelsPerMeter:(sh*CHAR_HEIGHT_FACTOR/PLAYER_HEIGHT_M);
+  var visHalf=(ib.maxX-ib.minX)*0.5*tf.sx/ppm;
+  var halfM=(typeof BOSS_HALF_WIDTH_M==='number')?BOSS_HALF_WIDTH_M:2.0;
+  var scale=(visHalf>0.05)?(halfM/visHalf)*(tf.sx/ppm):(tf.sx/ppm);
+  var o={cx:(ib.minX+ib.maxX)*0.5,scale:scale,tf:tf,ppm:ppm,sh:sh,groundY:sh*0.95,visHalf:visHalf};
+  _BOSS_CONV_CACHE[key]=o; return o;
+};
+var _BOSS_REACH_CACHE={};
+window._bossAttackReachM=function(bid,animName){
+  var meta=_bossAtkMeta(bid,animName); if(!meta) return null;
+  var conv=window._bossConvM(bid); if(!conv) return null;
+  var sp=document.getElementById('boss-sprite');
+  var key=bid+'|'+animName+'|'+(sp?sp.clientWidth:0)+'|'+(sp?sp.clientHeight:0);
+  if(_BOSS_REACH_CACHE[key]!=null) return _BOSS_REACH_CACHE[key];
+  var af=meta.activeFrames||[meta.hitFrame,meta.hitFrame];
+  var best=0;
+  for(var f=af[0];f<=af[1];f++){
+    var r=_bossLayerRectC(bid,animName,f,meta.weapon); if(!r) continue;
+    var reach=(conv.cx-r.x1)*conv.scale;
+    if(reach>best)best=reach;
+  }
+  var out=best>0?best:null;
+  _BOSS_REACH_CACHE[key]=out; return out;
+};
+window._bossAttackStart=function(cfg){
+  var b=(typeof battle!=='undefined')?battle:null; if(!b) return null;
+  var anims=BOSS_ANIMS[b.bossId];
+  var a=anims&&anims[cfg.anim]; if(!a) return null;
+  var meta=_bossAtkMeta(b.bossId,cfg.anim)||{};
+  var kind=cfg.kind||'pose';
+  var hitF=(typeof cfg.hitFrame==='number')?cfg.hitFrame:(typeof meta.hitFrame==='number'?meta.hitFrame:a.frameCount-1);
+  var cancelF=(typeof meta.cancelFrom==="number")?meta.cancelFrom:a.frameCount;
+  if(kind==='pose'){ hitF=a.frameCount-1; cancelF=a.frameCount-1; }
+  hitF=Math.max(1,Math.min(hitF,a.frameCount-1));
+  var startF=Math.max(0,Math.min(cfg.startFrame||0,hitF-1));
+  var nativeWind=Math.round((hitF-startF)*1000/a.fps);
+  var tl={
+    anim:cfg.anim, kind:kind, active:true,
+    hitFrame:hitF, startFrame:startF, cancelFrom:Math.max(cancelF,hitF),
+    windupMs:Math.max(50,cfg.windupMs||nativeWind),
+    frameDur:1000/a.fps,
+    onContact:cfg.onContact||null, onComplete:cfg.onComplete||null,
+    lunge:cfg.lunge||null, sk:cfg.sk||null,
+    contactDone:false, phase:'windup', phaseAt:performance.now(), lastNow:performance.now()
+  };
+  b._atkTL=tl;
+  battleBossAnim.name=cfg.anim;
+  battleBossAnim.frame=startF;
+  battleBossAnim.lastUpdate=performance.now();
+  battleBossAnim._cancelFrom=tl.cancelFrom;
+  battleBossAnim.forcedEnd=performance.now()+tl.windupMs+(a.frameCount-startF)*tl.frameDur+500;
+  return tl;
+};
+function _bossAttackEnd(tl,finished){
+  tl.active=false;
+  if(typeof battle!=='undefined'&&battle&&battle._atkTL===tl) battle._atkTL=null;
+  if(finished){
+    battleBossAnim.name='idle'; battleBossAnim.frame=0;
+    battleBossAnim.forcedEnd=0; battleBossAnim._cancelFrom=0;
+  } else {
+    battleBossAnim._cancelFrom=tl.cancelFrom; /* 收招尾巴：可被 walk/idle 接手 */
+  }
+  if(tl.onComplete){ try{tl.onComplete(tl,finished);}catch(e){console.warn("[atkComplete]",e);} }
+}
+window._bossAttackTick=function(tl,now,a){
+  var b=(typeof battle!=='undefined')?battle:null;
+  if(!b||!a){ _bossAttackEnd(tl,true); return; }
+  var dt=Math.min(0.05,(now-tl.lastNow)/1000); tl.lastNow=now;
+  /* 突步：只在接觸前，預算封頂，不推擠玩家 */
+  if(tl.lunge&&!tl.contactDone){
+    var lg=tl.lunge;
+    var dx=lg.targetX-b.bossWorldX;
+    var dir=dx>0?1:-1;
+    var step=Math.min(Math.abs(dx),lg.speed*dt,Math.max(0,lg.budget-lg.spent));
+    if(step>0.0005){ b.bossWorldX+=dir*step; lg.spent+=step; }
+  }
+  if(tl.phase==='windup'){
+    var n=Math.max(1,tl.hitFrame-tl.startFrame);
+    var pf=tl.windupMs/n;
+    /* rev-animatk2: tl.startFrame（v1 誤植 tl.startF → NaN → 永不接觸） */
+    var f=tl.startFrame+Math.floor((now-tl.phaseAt)/pf);
+    if(f>=tl.hitFrame){
+      battleBossAnim.frame=tl.hitFrame;
+      tl.phase='tail'; tl.phaseAt=now;
+      if(!tl.contactDone){
+        tl.contactDone=true;
+        if(tl.onContact){ try{tl.onContact(tl);}catch(e){console.warn("[atkContact]",e);} }
+      }
+    } else {
+      battleBossAnim.frame=Math.max(tl.startFrame,f);
+    }
+    return;
+  }
+  var f2=tl.hitFrame+Math.floor((now-tl.phaseAt)/tl.frameDur);
+  if(f2>=a.frameCount){ _bossAttackEnd(tl,true); return; }
+  battleBossAnim.frame=f2;
+  if(f2>=tl.cancelFrom){ _bossAttackEnd(tl,false); return; }
+};
+/* 近戰接觸結算：武器掃掠（前一幀 ∪ 接觸幀）∩ 玩家盒；高度 → 部位；whiff = MISS */
+window._bossMeleeResolve=function(tl,dmg,pen){
+  var b=(typeof battle!=='undefined')?battle:null;
+  if(!b||!b.active||b.settling) return;
+  var meta=_bossAtkMeta(b.bossId,tl.anim); if(!meta) return;
+  var conv=window._bossConvM(b.bossId); if(!conv) return;
+  var r1=_bossLayerRectC(b.bossId,tl.anim,tl.hitFrame-1,meta.weapon);
+  var r2=_bossLayerRectC(b.bossId,tl.anim,tl.hitFrame,meta.weapon);
+  if(!r2) return;
+  var rx1=Math.min(r1?r1.x1:r2.x1,r2.x1);
+  var rx2=Math.max(r1?r1.x2:r2.x2,r2.x2);
+  var tipWX=b.bossWorldX-(conv.cx-rx1)*conv.scale;
+  var farWX=b.bossWorldX-(conv.cx-rx2)*conv.scale;
+  var pHalf=0.25;
+  var pL=b.playerWorldX-pHalf, pR=b.playerWorldX+pHalf;
+  var overlapX=(tipWX<=pR&&farWX>=pL);
+  var wyTop=(conv.groundY-(conv.tf.oy+r2.y1*conv.tf.sy))/conv.ppm;
+  var wyBot=(conv.groundY-(conv.tf.oy+r2.y2*conv.tf.sy))/conv.ppm;
+  var overlapY=(wyTop>=0&&wyBot<=1.7)||(wyTop>=0&&wyTop<=1.7)||(wyBot>=0&&wyBot<=1.7)||(wyBot<0&&wyTop>1.7);
+  if(!overlapX||!overlapY){
+    if(typeof spawnHitFx==='function') spawnHitFx('player',0,'MISS','armor');
+    return;
+  }
+  var hitY=(wyTop+wyBot)/2;
+  hitY=Math.max(0.05,Math.min(1.65,hitY));
+  var part=(typeof window._partFromYRatio==='function')?window._partFromYRatio(hitY/1.7):'top';
+  var prev=window._hitCtx;
+  window._hitCtx={target:null,part:part,x:b.playerWorldX,y:hitY,z:0,isDirect:true};
+  try{ if(typeof tryHitPlayer==='function') tryHitPlayer(dmg,pen); }
+  finally{ window._hitCtx=prev; }
+  /* 接觸反饋：60ms 鏡頭震 + 武器尖端火花（無 hitstop） */
+  var sc=document.querySelector('.battle-scene');
+  if(sc){
+    sc.style.transform='translate(2px,1px)';
+    setTimeout(function(){ if(sc) sc.style.transform=''; },60);
+  }
+  if(typeof window._spawnHitSpark==='function'&&typeof window._bossWorldToScreenN==='function'){
+    var sp=window._bossWorldToScreenN(Math.max(tipWX,pL),hitY);
+    var fx=document.getElementById('battle-fx');
+    if(fx) window._spawnHitSpark(b,sp.x*fx.clientWidth,sp.y*fx.clientHeight,false,'enemy');
+  }
+};
+/* Boss 受擊反饋：非攻擊中 + 單次 >2% maxHp 或暴擊 + 900ms 冷卻 */
+window._bossHurtFlash=function(shown,isCrit){
+  var b=(typeof battle!=='undefined')?battle:null;
+  if(!b||b.settling) return;
+  if(b._atkTL&&b._atkTL.active) return;
+  if(b.bossDash) return;
+  var now=performance.now();
+  if(now<(b._hurtAnimCdUntil||0)) return;
+  var thr=Math.max(1,(b.bossMaxHp||1)*0.02);
+  if(!isCrit&&shown<thr) return;
+  var anims=BOSS_ANIMS[b.bossId];
+  if(!anims||!anims.hurt) return;
+  var cur=anims[battleBossAnim.name];
+  if(cur&&cur.loop===false&&battleBossAnim.frame<(battleBossAnim._cancelFrom||cur.frameCount)) return;
+  battleBossAnim.name='hurt'; battleBossAnim.frame=0; battleBossAnim.lastUpdate=now;
+  battleBossAnim._cancelFrom=anims.hurt.frameCount;
+  battleBossAnim.forcedEnd=now+anims.hurt.frameCount*1000/anims.hurt.fps;
+  b._hurtAnimCdUntil=now+900;
+};
+/* ===== rev-animatk2:end ===== */

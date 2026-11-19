@@ -67,7 +67,7 @@ function _genMap(region, pi){
       let t = 'empty';
       if(r < 0.6) t = 'combat';
       else if(r < 0.85) t = 'search';
-      const e = { worldX: pos, type: t, cleared: false, content: null };
+      const e = { worldX: pos, type: t, cleared: false, content: null, region: region };
       if(t === 'combat'){
         const tier = region.endsWith('II') ? 2 : 1;
         const n = (window._enemyCountForRegion ? window._enemyCountForRegion(region) : (1 + Math.floor(Math.random() * 3)));
@@ -104,6 +104,17 @@ function _ensureES(region, ri){
     const m = _genMap(region, ri);
     ex = { nodes: m.nodes, totalLen: m.totalLen, worldX: 0, routeIdx: ri };
     state.explore[k] = ex;
+  }
+  /* 舊存檔的事件沒有 region → _lootVictory / _settleVehicleEventIfCleared 讀不到，信物永不掉落。回填。 */
+  if(ex && Array.isArray(ex.nodes)){
+    for(var _ni = 0; _ni < ex.nodes.length; _ni++){
+      var _nd = ex.nodes[_ni];
+      if(!_nd || !Array.isArray(_nd.events)) continue;
+      for(var _ei = 0; _ei < _nd.events.length; _ei++){
+        var _ev = _nd.events[_ei];
+        if(_ev && !_ev.region) _ev.region = _nd.region || region;
+      }
+    }
   }
   return ex;
 }
@@ -886,13 +897,18 @@ function _renderPass(now){
       if(!item.srv) return false;
       if(item._retreating) return false;
       if(_checkDown(item)) return false;
-      return item.screenX < -0.05;
+      if(item.screenX >= -0.05) return false;
+      /* rev-detect: 左側載員氣泡同樣受 R_載員 約束（與 16 的 combat-frames-left 同規則） */
+      var _sR = (typeof SERVANT_DETECTABLE_R !== 'undefined') ? SERVANT_DETECTABLE_R : 80;
+      var _srwS = (typeof sm !== 'undefined' && sm && sm.screenRightWorld) ? sm.screenRightWorld : 2;
+      var _dS = (typeof item.worldX === 'number') ? Math.abs(item.worldX - ex.worldX) : Math.abs((item.screenX - EXPLORE_HERO_X_RATIO) * _srwS / (1 - EXPLORE_HERO_X_RATIO));
+      return _dS <= _sR;
     });
     let _lhtml = '';
     for(let _j = 0; _j < _outside.length; _j++){
       const _item = _outside[_j];
       const _d = Math.abs((_item.screenX - EXPLORE_HERO_X_RATIO) * 10);
-      const _dTxt = _d < 1 ? _d.toFixed(1) : Math.round(_d);
+      const _dTxt = (typeof window._fmtDistN === 'function' ? window._fmtDistN(_d) : (_d < 1 ? _d.toFixed(1) : String(Math.round(_d))));
       const _maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(_item.srv) : 100;
       let _hp = (typeof _item.srv.hp === 'number') ? _item.srv.hp : _maxHp;
       if(_hp < 0) _hp = 0;
@@ -986,6 +1002,8 @@ function _lootSearch(ev){
 }
 
 function _lootVictory(events){
+  /* rev-sweep-bossfix2: 車戰已結算事件整體跳過（撞擊不掉落 / 直擊已 roll）；
+     未結算事件逐敵 _lootDone 去重，信物每事件一次。 */
   if(!events) return;
   if(!Array.isArray(events)) events = [events];
   const got = [];
@@ -993,16 +1011,19 @@ function _lootVictory(events){
   const _sealsRegion = {};
   for(const ev of events){
     if(!ev || !ev.content) continue;
+    if(ev._settled) continue;
     for(let i = 0; i < ev.content.length; i++){
-      const lo = (typeof rollEnemyLoot === 'function') ? rollEnemyLoot(ev.content[i]) : [];
+      const en = ev.content[i];
+      if(!en || en._lootDone) continue;
+      en._lootDone = true;
+      const lo = (typeof rollEnemyLoot === 'function') ? rollEnemyLoot(en) : [];
       for(let j = 0; j < lo.length; j++){
         invAdd(lo[j].id, lo[j].rarity, lo[j].count);
         got.push(lo[j]);
       }
-      /* [v195c] 每敵人撿屍給 3 玩家經驗。addExp 內升級自動 pushLog。 */
       if(typeof addExp === 'function') addExp(3);
     }
-    /* [v195c] 每事件點撿屍 roll 一次信物，機率取 REGIONS[region].sealRate。 */
+    ev._settled = true;
     const _R = (ev.region && typeof REGIONS !== 'undefined') ? REGIONS[ev.region] : null;
     if(_R && _R.sealRate && _R.seal && Math.random() < _R.sealRate){
       state.seals[_R.seal] = Math.max(0, parseInt(state.seals[_R.seal] || 0, 10)) + 1;
@@ -1261,44 +1282,12 @@ function _startCombat(ev, first){
       /* rev-fix-heal-after-win: 勝利後若受傷，自動使用醫療包補血，等待治療過程 1200ms（參考 Boss 戰 manualHeal） */
       /* [v240] 殉爆时 hp=0，不补血 */
       if(!_isVNow && state.player.hp > 0 && state.player.hp < state.player.maxHp){
-        var _healUsed = [];
-        var _medbayLvW = (typeof getBuildingLv === 'function') ? getBuildingLv('medbay') : 0;
-        while(state.player.hp < state.player.maxHp){
-          var _hc = (typeof findNextConsumable === 'function') ? findNextConsumable() : null;
-          if(!_hc) break;
-          var _hHeal = (typeof calcConsumableHeal === 'function') ? calcConsumableHeal(_hc, _medbayLvW) : 0;
-          if(_hHeal <= 0) break;
-          invRemove(_hc.id, _hc.rarity, 1);
-          state.player.hp = Math.min(state.player.maxHp, state.player.hp + _hHeal);
-          _healUsed.push(_hc);
-        }
-        if(_healUsed.length > 0){
-          if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
-          ex.mode = 'healing';
-          ex._healCdUntil = performance.now() + 2000;
-          if(typeof heroAnim !== 'undefined'){
-            /* rev-fix-heal-melee-loop: 治療動畫循環 2s */
-            heroAnim.name = 'heal_melee';
-            heroAnim.frame = 0;
-            heroAnim.lastUpdate = performance.now();
-            heroAnim.animStart = null;
-            heroAnim.forcedEnd = performance.now() + 2100;
-            heroAnim.eqSlot = '__hidden__';
-            heroAnim.healItem = (_healUsed.length > 0) ? _healUsed[0].id : null;
-            /* rev-fix-preload-heal-item: 預先載入圖標，避免首幀空白 */
-            if(heroAnim.healItem && typeof getHeroImg === 'function'){
-              try { getHeroImg(window.getItemIconPath(heroAnim.healItem)); } catch(e){}
-            }
-          }
-          if(typeof pushLog === 'function'){
-            pushLog('<span class="pl">玩家</span> 使用 ' + _healUsed.map(function(u){ return fmtItemSpan(u.id, u.rarity, 1); }).join('、') + ' 恢復至 ' + Math.round(state.player.hp) + ' 生命', [], 'explore');
-          }
-        } else if(state.player.hp < state.player.maxHp){
-          if(typeof pushLog === 'function'){
-            pushLog('<span class="pl">玩家</span> <span class="lose">受傷</span>（無醫療包），HP ' + Math.round(state.player.hp) + '/' + state.player.maxHp, [], 'explore');
-          }
-        }
-      }
+/* rev-combatfix: 勝利後不再瞬間補滿 —— 交由 _tick 治療觸發逐次 2s 治療 */
+var _hcW = (typeof findNextConsumable === 'function') ? findNextConsumable() : null;
+if(!_hcW && typeof pushLog === 'function'){
+pushLog('<span class="pl">玩家</span> <span class="lose">受傷</span>（無醫療包），HP ' + Math.round(state.player.hp) + '/' + state.player.maxHp, [], 'explore');
+}
+}
       if(typeof save === 'function') save();
       return;
     }
@@ -1461,59 +1450,51 @@ function _tickAlliesPositions(now){
 function _tick(now){
   const ex = window._explore;
   if(!ex.active) return;
+if(window._sweepLock) return; /* rev-sweep-freeze */
+if(window.BossModule && window.BossModule.battle && window.BossModule.battle.sweep) return; /* rev-sweep-bossfix2 */
   const _fg = (typeof currentTab === 'undefined') || currentTab === 'explore';
   if(typeof _cleanupDeadEvents === 'function') _cleanupDeadEvents();
   /* 治療期間完全停止，不執行任何移動/載員邏輯 */
   if(ex.mode === 'healing'){
-    /* rev-fix-heal-interrupt-by-hurt: 受擊打斷治療，立刻退出 healing 模式 */
-    if(window._combat && window._combat._hurtUntil && now < window._combat._hurtUntil){
-      ex.mode = 'walk';
-      ex._healCdUntil = 0;
-      if(typeof heroAnim !== 'undefined'){
-        heroAnim.name = 'hurt';
-        heroAnim.frame = 0;
-        heroAnim.lastUpdate = now;
-        heroAnim.eqSlot = null;
-        heroAnim.healItem = null;
-        heroAnim.forcedEnd = window._combat._hurtUntil;
-        heroAnim.animStart = null;
-      }
-      /* 不 return，fallthrough 到下方正常移動/戰鬥邏輯 */
-    } else {
-      ex._currentSpeed = 0;
-      if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'heal_melee'){
-        heroAnim.name = 'heal_melee';
-        heroAnim.frame = 0;
-        heroAnim.lastUpdate = now;
-        heroAnim.forcedEnd = now + 2100;
-        heroAnim.eqSlot = '__hidden__';
-        heroAnim.animStart = null;
-      }
-      if(now >= ex._healCdUntil){
-        ex.mode = 'walk';
-        ex._healCdUntil = 0;
-        if(typeof heroAnim !== 'undefined'){
-          heroAnim.name = 'walk';
-          heroAnim.frame = 0;
-          heroAnim.lastUpdate = now;
-          heroAnim.eqSlot = null;
-          heroAnim.forcedEnd = 0;
-          heroAnim.animStart = null;
-          heroAnim.healItem = null;
-        }
-      }
-      /* [v187 H34] healing 时仍跑 _tickAlliesPositions（世界推进）+ _renderPass（视觉，前台才跑） */
-      if(window._combat && window._combat.active && window._combat.sceneType === 'foot'){
-        _tickAlliesPositions(now);
-      }
-      if(_fg){
-        if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
-        _updateBgTransform();
-        _updateCorpsesLayout();
-      }
-      return;
-    }
-  }
+/* rev-combatfix: 觸發戰鬥（敵人進入被發現距離）或受擊 -> 打斷，CD 重置，不消耗 */
+var _cH = window._combat;
+var _hurtH = !!(_cH && _cH._hurtUntil && now < _cH._hurtUntil);
+var _engageH = false;
+if(_cH && _cH.active && !_cH.resolved && _cH.sceneType === 'foot' && _cH.allies && _cH.allies[0]){
+var _pH = _cH.allies[0];
+var _rH = (typeof PLAYER_DETECTABLE_R !== 'undefined') ? (PLAYER_DETECTABLE_R[state.preferences.actionMode] || 80) : 80;
+for(var _eiH = 0; _eiH < _cH.enemies.length; _eiH++){
+var _enH = _cH.enemies[_eiH];
+if(_enH && _enH.hp > 0 && Math.abs(_enH.worldX - _pH.worldX) <= _rH){ _engageH = true; break; }
+}
+}
+if(_hurtH || _engageH){
+window._exHealInterrupt(now, _hurtH);
+/* fallthrough 到下方正常移動 / 戰鬥邏輯 */
+} else {
+ex._currentSpeed = 0;
+if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'heal_melee'){
+heroAnim.name = 'heal_melee';
+heroAnim.frame = 0;
+heroAnim.lastUpdate = now;
+heroAnim.forcedEnd = now + 2100;
+heroAnim.eqSlot = 'hidden';
+heroAnim.animStart = null;
+}
+if(now >= (ex._healCdUntil || 0)){
+window._exHealComplete(now);
+}
+if(window._combat && window._combat.active && window._combat.sceneType === 'foot'){
+_tickAlliesPositions(now);
+}
+if(_fg){
+if(ex.passengersFollowing && ex.passengersFollowing.length) _renderPass(now);
+_updateBgTransform();
+_updateCorpsesLayout();
+}
+return;
+}
+}
 
   const b = window.BTRSupport;
   const ph = (b && b.active) ? b.phase : null;
@@ -1590,34 +1571,18 @@ function _tick(now){
   }
   const _btrActiveH = !!(b && b.active && (b.phase === 'support' || b.phase === 'center'));
   const _healMode = (ex.mode === 'walk' || ex.mode === 'combat') && !_btrActiveH;
-  if(_healMode && !_inEngageH && state.player.hp > 0 && state.player.hp < state.player.maxHp){
-    const _hc = (typeof findNextConsumable === 'function') ? findNextConsumable() : null;
-    if(_hc){
-      const _medbayLv = (typeof getBuildingLv === 'function') ? getBuildingLv('medbay') : 0;
-      const _heal = (typeof calcConsumableHeal === 'function') ? calcConsumableHeal(_hc, _medbayLv) : 0;
-      if(_heal > 0){
-        invRemove(_hc.id, _hc.rarity, 1);
-        state.player.hp = Math.min(state.player.maxHp, state.player.hp + _heal);
-        if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
-        ex.mode = 'healing';
-        ex._healCdUntil = now + 2000;
-        ex._currentSpeed = 0;
-        if(typeof heroAnim !== 'undefined'){
-          heroAnim.name = 'heal_melee';
-          heroAnim.frame = 0;
-          heroAnim.lastUpdate = now;
-          heroAnim.animStart = null;
-          heroAnim.forcedEnd = now + 2100;
-          heroAnim.eqSlot = '__hidden__';
-          heroAnim.healItem = _hc.id;
-        }
-        if(typeof pushLog === 'function'){
-          pushLog('<span class="pl">玩家</span> 使用 ' + fmtItemSpan(_hc.id, _hc.rarity, 1) + ' 恢復至 ' + Math.round(state.player.hp) + ' 生命', [], 'explore');
-        }
-        return;
-      }
-    }
-  }
+  if(_healMode && !_inEngageH && now >= (ex._healBlockedUntil || 0) && state.player.hp > 0 && state.player.hp < state.player.maxHp){
+/* rev-combatfix: 先進入治療，2s CD 完整結束才消耗 + 生效 */
+const _hc = (typeof findNextConsumable === 'function') ? findNextConsumable() : null;
+if(_hc){
+const _medbayLv = (typeof getBuildingLv === 'function') ? getBuildingLv('medbay') : 0;
+const _heal = (typeof calcConsumableHeal === 'function') ? calcConsumableHeal(_hc, _medbayLv) : 0;
+if(_heal > 0){
+window._exHealBegin([{ id:_hc.id, rarity:_hc.rarity, heal:_heal }], now);
+return;
+}
+}
+}
 
   const dt = Math.min(0.1, (now - (ex.lastTick || now)) / 1000);
   ex.lastTick = now;
@@ -1780,8 +1745,8 @@ function _tick(now){
     const _isVMode = (ex.mode === 'vehicle');
     let _maxRange = Infinity;
     if(!_isVMode){
-      const _pw = _getPW();
-      _maxRange = (_pw && _pw.def && typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(_pw.def) : 15;
+      /* rev-sweep-bossfix2: 觸發＝發現判定，與武器射程無關 */
+      _maxRange = Infinity; /* 射程閘門留给 canEngage */
     }
     let _bestEv = null, _bestD = Infinity;
     for(let _ni = 0; _ni < ex.nodes.length; _ni++){
@@ -2197,3 +2162,126 @@ window._enemyCountForRegion = function(region){
   }
   return w.length;
 };
+
+/* ===== rev-combatfix:start ===== */
+/* rev-combatfix: 探索治療統一 —— 效果只在 CD 完整結束後套用；
+   觸發戰鬥 / 受擊立即打斷，CD 重置、物品不消耗；
+   完成時同步戰鬥代理 hp，避免「補滿了卻被打倒」。 */
+window._exHealBegin = function(items, now){
+var ex = window._explore;
+if(!ex || !items || !items.length) return false;
+ex._healToken = (ex._healToken || 0) + 1;
+ex._healPending = items.slice();
+ex._healCdUntil = now + 2000;
+ex._currentSpeed = 0;
+ex.mode = 'healing';
+if(typeof heroAnim !== 'undefined'){
+heroAnim.name = 'heal_melee';
+heroAnim.frame = 0;
+heroAnim.lastUpdate = now;
+heroAnim.animStart = null;
+heroAnim.forcedEnd = now + 2100;
+heroAnim.eqSlot = 'hidden';
+heroAnim.healItem = items[0].id;
+if(typeof getHeroImg === 'function'){ try { getHeroImg(window.getItemIconPath(items[0].id)); } catch(e){} }
+}
+return true;
+};
+window._exHealInterrupt = function(now, hurt){
+var ex = window._explore;
+if(!ex || ex.mode !== 'healing') return false;
+ex._healToken = (ex._healToken || 0) + 1;
+ex._healPending = null;
+ex._healCdUntil = 0;
+ex._healBlockedUntil = now + 600;
+ex.mode = 'walk';
+if(typeof heroAnim !== 'undefined'){
+heroAnim.healItem = null;
+heroAnim.eqSlot = null;
+heroAnim.animStart = null;
+if(hurt){
+heroAnim.name = 'hurt';
+heroAnim.frame = 0;
+heroAnim.lastUpdate = now;
+heroAnim.forcedEnd = (window._combat && window._combat._hurtUntil) || (now + 300);
+} else {
+heroAnim.name = 'walk';
+heroAnim.frame = 0;
+heroAnim.lastUpdate = now;
+heroAnim.forcedEnd = 0;
+}
+}
+return true;
+};
+window._exHealComplete = function(now){
+var ex = window._explore;
+if(!ex || ex.mode !== 'healing' || !ex._healPending) return;
+var items = ex._healPending;
+ex._healPending = null;
+ex._healCdUntil = 0;
+ex._healToken = (ex._healToken || 0) + 1;
+var used = [], total = 0;
+for(var i = 0; i < items.length; i++){
+var it = items[i];
+if(typeof invCount === 'function' && invCount(it.id, it.rarity) <= 0) continue;
+if(typeof invRemove === 'function') invRemove(it.id, it.rarity, 1);
+used.push(it);
+total += it.heal || 0;
+}
+if(total > 0){
+state.player.hp = Math.min(state.player.maxHp, state.player.hp + total);
+var c = window._combat;
+if(c && c.active && c.allies && c.allies[0] && c.allies[0].isPlayer){
+c.allies[0].hp = state.player.hp;
+}
+if(typeof refreshPlayerStats === 'function') refreshPlayerStats();
+if(typeof pushLog === 'function' && used.length){
+pushLog('<span class="pl">玩家</span> 使用 ' + used.map(function(u){ return fmtItemSpan(u.id, u.rarity, 1); }).join('、') + ' 恢復至 ' + Math.round(state.player.hp) + ' 生命', [], 'explore');
+}
+}
+ex.mode = 'walk';
+if(typeof heroAnim !== 'undefined'){
+heroAnim.name = 'walk';
+heroAnim.frame = 0;
+heroAnim.lastUpdate = now;
+heroAnim.eqSlot = null;
+heroAnim.forcedEnd = 0;
+heroAnim.animStart = null;
+heroAnim.healItem = null;
+}
+if(typeof save === 'function') save();
+};
+/* ===== rev-combatfix:end ===== */
+
+/* ===== rev-follow-anim-rig:start =====
+   載員跟隨動畫基線維護（非戰鬥）：
+   _renderPass 的 walk/idle 判定讀 _renderPrevWX，但 run / 等待 / 戰鬥 / 撤退分支
+   不更新它 → 切換瞬間用陳舊基線 → idle/walk 閃幀；首幀基線缺失 → 誤判 idle。
+   本 rig 每幀在 tick 前補齊 / 刷新基線，不改 _renderPass 本體。 */
+(function(){
+'use strict';
+if(window.__followAnimRig) return;
+window.__followAnimRig = true;
+var _tick = window._exploreTick;
+window._exploreTick = function(now){
+  try{
+    var ex = window._explore;
+    if(ex && Array.isArray(ex.passengersFollowing)){
+      var inCombat = !!(window._combat && window._combat.active);
+      var nowMs = Date.now();
+      for(var i = 0; i < ex.passengersFollowing.length; i++){
+        var it = ex.passengersFollowing[i];
+        if(!it) continue;
+        var cur = (typeof it.worldX === 'number') ? it.worldX : ex.worldX;
+        if(typeof it._renderPrevWX !== 'number') it._renderPrevWX = cur;
+        var down = !!(it.srv && (it.srv._injuredDown || (it.srv.injuredUntil && it.srv.injuredUntil > nowMs)));
+        if(it._retreating || inCombat || it._forceRunAnim || it._standingWait || down){
+          it._renderPrevWX = cur;
+        }
+      }
+    }
+  }catch(e){}
+  return _tick.apply(this, arguments);
+};
+})();
+/* ===== rev-follow-anim-rig:end ===== */

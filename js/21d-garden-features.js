@@ -741,32 +741,23 @@ function _gardenTowerInit(plot){
 
 
 function _gardenTowerNormalizeEq(cfg){
+  /* rev-eq-coexist: 守衛裝備 = 引用，與玩家 / 載員同時存在。
+     不因「不在庫存」被卸下；只有物品定義消失才清空；同型號自動升級為最高稀有度。 */
   if(!cfg || !cfg.eq) return;
-  const _slots = ['head','top','primary','secondary'];
-  for(const _slot of _slots){
-    const _id = cfg.eq[_slot];
-    if(!_id) continue;
-    const _rar = cfg.eqRarity[_slot] || '一般';
-    let _exists = (state.inventory[_id + '@' + _rar] || 0) > 0;
-    if(!_exists){
-      for(const _s in state.player.equipped){
-        if(state.player.equipped[_s] === _id && (state.player.equippedRarity[_s] || '一般') === _rar){ _exists = true; break; }
-      }
-    }
-    if(_exists) continue;
-    let _bestRar = null, _bestIdx = -1;
-    for(const _k in state.inventory){
-      const _p = _k.split('@');
-      if(_p[0] !== _id) continue;
-      if(!state.inventory[_k] || state.inventory[_k] <= 0) continue;
-      const _i = RARITY_ORDER.indexOf(_p[1]);
-      if(_i > _bestIdx){ _bestIdx = _i; _bestRar = _p[1]; }
-    }
-    if(_bestRar){
-      cfg.eqRarity[_slot] = _bestRar;
-    } else {
-      cfg.eq[_slot] = null;
-      delete cfg.eqRarity[_slot];
+  if(!cfg.eqRarity || typeof cfg.eqRarity !== 'object') cfg.eqRarity = {};
+  var slots = ['head','top','primary','secondary'];
+  for(var i = 0; i < slots.length; i++){
+    var slot = slots[i];
+    var id = cfg.eq[slot];
+    if(!id) continue;
+    if(!ALL_ITEMS[id]){ cfg.eq[slot] = null; delete cfg.eqRarity[slot]; continue; }
+    var b = (typeof _weaponBaseId === 'function') ? _weaponBaseId(id) : null;
+    var best = (b && typeof _weaponBest === 'function') ? _weaponBest(b) : null;
+    if(best && ALL_ITEMS[best.id]){
+      cfg.eq[slot] = best.id;
+      cfg.eqRarity[slot] = best.rar || '一般';
+    } else if(!cfg.eqRarity[slot]){
+      cfg.eqRarity[slot] = '一般';
     }
   }
 }
@@ -891,64 +882,35 @@ function _gardenTowerOpen(idx){
 
 
 function _gardenTowerPickEquip(idx, slot){
+  /* rev-eq-coexist: 候選 = 每型號一列最高稀有度，與玩家 / 載員同源。裝備 = 寫引用。 */
   const plots = _gardenGetPlots();
   const plot = plots[idx];
   if(!plot) return;
   const cfg = _gardenTowerInit(plot);
   const curId = cfg.eq[slot];
-  if(!state.unlockedEquip) state.unlockedEquip = {};
-  for(const k in state.inventory){
-    const p = k.split('@');
-    if(p.length !== 2) continue;
-    const d = itemDef(p[0]);
-    if(d && d.slot) state.unlockedEquip[k] = true;
-  }
-  for(const s in state.player.equipped){
-    const id = state.player.equipped[s];
-    if(!id) continue;
-    const rar = state.player.equippedRarity[s] || '一般';
-    const d = itemDef(id);
-    if(d && d.slot) state.unlockedEquip[id + '@' + rar] = true;
-  }
-  const list = [];
-  const seen = {};
-  for(const key in state.unlockedEquip){
-    const p = key.split('@');
-    const id = p[0], rar = p[1];
-    const d = itemDef(id);
-    if(!d || !d.slot) continue;
-    if(d.slot !== slot) continue;
-    if(seen[key]) continue;
-    seen[key] = true;
-    list.push({ id: id, rarity: rar, def: d });
-  }
-  list.sort(function(a, b){
-    const ra = sortByRarityDesc(a, b);
-    if(ra !== 0) return ra;
-    return (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
-  });
+  const list = (typeof window._equipCandidates === 'function') ? window._equipCandidates(slot) : [];
   let body = '';
   if(curId){
-    body += '<div class="item-row" data-act="unequip"><div class="icon">✕</div><div class="info"><div class="nm">卸下</div><div class="sub">不消耗背包</div></div></div>';
+    body += '<div class="item-row" data-act="unequip"><div class="icon">✕</div><div class="info"><div class="nm">卸下</div><div class="sub">不影響其它位置</div></div></div>';
   }
-  if(!list.length && !curId){
-    body += '<div class="empty-hint">尚未解鎖此類裝備</div>';
-  }
+  if(!list.length && !curId) body += '<div class="empty-hint">尚未擁有此類裝備</div>';
   for(const it of list){
-    body += '<div class="item-row" data-eid="' + it.id + '" data-erar="' + it.rarity + '">';
-    body += '<div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div>';
-    body += '<div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + '</div>';
-    body += '<div class="sub">' + it.rarity + '</div></div></div>';
+    const _ac = (it.def.armor != null && it.def.level) ? _armorClassWithSub(it.def) : '';
+    const _acHtml = _ac ? ' <span class="armor-class">' + _ac + '</span>' : '';
+    const _now = (curId === it.id && (cfg.eqRarity[slot] || '一般') === it.rarity);
+    body += '<div class="item-row" data-eid="' + it.id + '" data-erar="' + it.rarity + '">'
+      + '<div class="icon" style="background:' + rarityBg(it.rarity) + '">' + itemIcon(it.id, 30) + '</div>'
+      + '<div class="info"><div class="nm ' + rarityClass(it.rarity) + '">' + it.def.name + _acHtml + '</div>'
+      + '<div class="sub">' + it.rarity + '</div></div>'
+      + (_now ? '<div class="cnt">使用中</div>' : '') + '</div>';
   }
   const bd = openModal({ title: '選擇裝備（' + slot + '）', body: body, onClose: function(){ _gardenTowerOpen(idx); } });
-  const unequipBtn = bd.querySelector('[data-act="unequip"]');
-  if(unequipBtn){
-    unequipBtn.onclick = function(){
+  const un = bd.querySelector('[data-act="unequip"]');
+  if(un){
+    un.onclick = function(){
       cfg.eq[slot] = null;
       delete cfg.eqRarity[slot];
-      save();
-      closeModal();
-      _gardenTowerOpen(idx);
+      save(); closeModal(); _gardenTowerOpen(idx);
     };
   }
   const rows = bd.querySelectorAll('.item-row[data-eid]');
@@ -962,9 +924,7 @@ function _gardenTowerPickEquip(idx, slot){
         cfg.eq[slot] = eid;
         cfg.eqRarity[slot] = erar;
         if(slot === 'primary' || slot === 'secondary'){ cfg.ammoId = null; cfg.maxShots = 'inf'; }
-        save();
-        closeModal();
-        _gardenTowerOpen(idx);
+        save(); closeModal(); _gardenTowerOpen(idx);
       };
     })(rows[i]);
   }

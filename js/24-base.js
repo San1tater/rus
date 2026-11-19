@@ -555,31 +555,36 @@ function renderRegionArea(z3){
 }
 
 function setActionMode(mode){
-  const oldMode=state.preferences.actionMode;if(oldMode===mode)return;
-  if(mode==='stealth'){
-    state.stashedWeapons=state.stashedWeapons||{};
+  /* rev-eq-coexist: 潛行收槍 / 恢復 = 只改自己的持有位，不進出庫存。
+     舊版 invAdd / invRemove 配合唯一化會分解並產出材料（刷材料漏洞）。 */
+  const oldMode = state.preferences.actionMode;
+  if(oldMode === mode) return;
+  if(mode === 'stealth'){
+    state.stashedWeapons = state.stashedWeapons || {};
     for(const slot of ['primary','secondary']){
-      const id=state.player.equipped[slot];
-      if(id){const _r=state.player.equippedRarity[slot]||'一般';state.stashedWeapons[slot]={id,rarity:_r};state.player.equipped[slot]=null;delete state.player.equippedRarity[slot];invAdd(id,_r,1);}
+      const id = state.player.equipped[slot];
+      if(id){
+        state.stashedWeapons[slot] = { id:id, rarity:(state.player.equippedRarity[slot] || '一般') };
+        state.player.equipped[slot] = null;
+        delete state.player.equippedRarity[slot];
+      }
     }
   } else {
     if(state.stashedWeapons){
       for(const slot of ['primary','secondary']){
-        if(state.stashedWeapons[slot]){
-          const {id,rarity}=state.stashedWeapons[slot];
-          const curId=state.player.equipped[slot];
-          const curRarity=state.player.equippedRarity[slot];
-          if(curId&&(curId!==id||curRarity!==rarity)){invAddRaw(curId,curRarity||'一般',1);}
-          let taken=false;
-          if(invCount(id,rarity)>0){invRemove(id,rarity,1);state.player.equipped[slot]=id;state.player.equippedRarity[slot]=rarity;taken=true;}
-          else{for(const k in state.inventory){const [iid,irar]=k.split('@');if(iid===id){invRemove(iid,irar,1);state.player.equipped[slot]=iid;state.player.equippedRarity[slot]=irar;taken=true;break;}}}
+        const st = state.stashedWeapons[slot];
+        if(st){
+          if(!state.player.equipped[slot]){
+            state.player.equipped[slot] = st.id;
+            state.player.equippedRarity[slot] = st.rarity || '一般';
+          }
           delete state.stashedWeapons[slot];
         }
       }
     }
   }
-  state.preferences.actionMode=mode;
-  refreshPlayerStats();save();renderCurrentTab();
+  state.preferences.actionMode = mode;
+  refreshPlayerStats(); save(); renderCurrentTab();
 }
 
 function onBuildCell(i){
@@ -783,9 +788,9 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
     if(rules.scopes&&rules.scopes.length){
       const _scopesRaw = rules.scopes.slice();
       _scopesRaw.sort((a,b)=>{
-        const ia = SCOPE_BONUS[a] || 0;
-        const ib = SCOPE_BONUS[b] || 0;
-        if(ia !== ib) return ib - ia;
+        const ia = (typeof window._scopeRangeBonus === "function") ? window._scopeRangeBonus(a) : 0; /* rev-scope-sort */
+        const ib = (typeof window._scopeRangeBonus === "function") ? window._scopeRangeBonus(b) : 0; /* rev-scope-sort */
+        if(ia !== ib) return ia - ib; /* rev-scope-sort */
         return (SCOPE_NAME[a] || a).localeCompare(SCOPE_NAME[b] || b, 'zh-Hant');
       });
       const sortedScopes = _scopesRaw;
@@ -953,104 +958,100 @@ function _wkRarityColor(r){
 }
 
 function _wkGetCandidates(){
-  var out = [];
-  /* rev-fix-busy-candidate: 改造隊列中的 baseId 不可再選（避免改造期間撿到同型號武器被二次改造） */
-  var _busyBaseIds = {};
-  (state.crafting || []).forEach(function(c){
-    if(c.type === 'mod' && c.modInfo && c.modInfo.baseId){ _busyBaseIds[c.modInfo.baseId] = true; }
-  });
-  var _gs = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
-  var _gl = {};
-  for(var _gk in _gs) _gl[_gs[_gk]] = _gk;
+  /* rev-eq-canon: 改造目錄按型號去重 —— 一個型號只有一列。
+     玩家 / 載員 / 守衛只是「這把武器現在被誰使用」，位置合併成標籤；
+     庫存不是位置（擁有權記錄），沒有持有位時顯示「未裝備」。 */
+  var out = [], byBase = {};
+  var _busy = {};
+  (state.crafting || []).forEach(function(c){ if(c.type === 'mod' && c.modInfo && c.modInfo.baseId) _busy[c.modInfo.baseId] = true; });
+  var _gs = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1':'g' };
+  var _gl = {}; for(var gk in _gs) _gl[_gs[gk]] = gk;
   var _ss = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87':'c','PSO-1':'l','PS320':'l','1P59':'l' };
-  var _sl = {};
-  for(var _sk in _ss){ if(!_sl[_ss[_sk]]) _sl[_ss[_sk]] = []; _sl[_ss[_sk]].push(_sk); }
-
-  function _parseNid(nid){
-    var p = nid.split('_');
+  var _sl = {}; for(var sk in _ss){ if(!_sl[_ss[sk]]) _sl[_ss[sk]] = []; _sl[_ss[sk]].push(sk); }
+  function _parse(nid){
+    var p = String(nid).split('_');
     if(p.length < 4) return { mag:null, scope:null, grip:null };
-    var baseId = p[0];
-    var _rules = WEAPON_MOD_RULES[baseId] || {};
-    var _validScopes = _rules.scopes || [];
-    var _scopeShort = p[2];
-    var _scopeLong = null;
-    if(_scopeShort !== 'x'){
-      if(_validScopes.indexOf(_scopeShort) >= 0){ _scopeLong = _scopeShort; }
+    var rules = WEAPON_MOD_RULES[p[0]] || {};
+    var valid = rules.scopes || [];
+    var sc = p[2], long = null;
+    if(sc !== 'x'){
+      if(valid.indexOf(sc) >= 0) long = sc;
       else {
-        var _cands = _sl[_scopeShort] || [];
-        for(var _ci = 0; _ci < _cands.length; _ci++){
-          if(_validScopes.indexOf(_cands[_ci]) >= 0){ _scopeLong = _cands[_ci]; break; }
-        }
-        if(!_scopeLong && _cands.length > 0) _scopeLong = _cands[0];
+        var cd = _sl[sc] || [];
+        for(var i = 0; i < cd.length; i++){ if(valid.indexOf(cd[i]) >= 0){ long = cd[i]; break; } }
+        if(!long && cd.length) long = cd[0];
       }
     }
-    return {
-      mag: p[1] === 'x' ? null : parseInt(p[1], 10),
-      scope: _scopeLong,
-      grip: p[3] === 'x' ? null : (_gl[p[3]] || p[3])
-    };
+    return { mag:(p[1] === 'x' ? null : parseInt(p[1], 10)), scope:long, grip:(p[3] === 'x' ? null : (_gl[p[3]] || p[3])) };
   }
-  function _add(rawId, rar, loc, locData, extra){
-    var def = itemDef(rawId);
-    if(!def) return;
-    var _baseId;
-    if(def.named){
-      _baseId = def.baseId;
-      if(!_baseId || !WEAPONS[_baseId]) return;
-    } else {
-      _baseId = rawId;
-      if(!WEAPONS[_baseId]) return;
+  function _tag(slot){ return slot === 'secondary' ? '·副' : (slot === 'primary' ? '·主' : ''); }
+  function _add(rawId, rar, loc, locData, slot){
+    var def = itemDef(rawId); if(!def) return;
+    if(def.slot !== 'primary' && def.slot !== 'secondary') return;
+    var baseId = def.named ? def.baseId : rawId;
+    if(!baseId || !WEAPONS[baseId]) return;
+    var rules = WEAPON_MOD_RULES[baseId]; if(!rules) return;
+    var lm = (typeof _getModOptionsFromLayout === 'function') ? _getModOptionsFromLayout(baseId).mags : [];
+    if(!(lm.length || (rules.scopes && rules.scopes.length) || (rules.grips && rules.grips.length))) return;
+    var cur = def.named ? _parse(rawId) : { mag:null, scope:null, grip:null };
+    var pri = (rar === '具名') ? 3 : ((rar === '傳奇') ? 2 : 1);
+    var lp = (loc === 'equipped') ? 3 : ((loc === 'guard' || loc === 'passenger') ? 2 : 0);
+    var lbl = null;
+    if(loc === 'equipped') lbl = '玩家' + _tag(slot);
+    else if(loc === 'passenger') lbl = '載員#' + ((locData && locData.passengerIdx != null) ? (locData.passengerIdx + 1) : '?') + _tag(slot);
+    else if(loc === 'guard'){
+      var ti = (locData && locData.towerIdx != null) ? locData.towerIdx : -1;
+      lbl = '守衛 ' + ((typeof plotCoordName === 'function' && ti >= 0) ? plotCoordName(ti) : ('#' + (ti + 1))) + _tag(slot);
     }
-    var rules = WEAPON_MOD_RULES[_baseId];
-    if(!rules) return;
-    var _layoutMagsC = (typeof _getModOptionsFromLayout === 'function') ? _getModOptionsFromLayout(_baseId).mags : [];
-    var hasAny = (_layoutMagsC.length > 0) || (rules.scopes && rules.scopes.length) || (rules.grips && rules.grips.length);
-    if(!hasAny) return;
-    var _cur = def.named ? _parseNid(rawId) : { mag:null, scope:null, grip:null };
-    out.push(Object.assign({
-      rawId: rawId, baseId: _baseId, rarity: rar, location: loc, locData: locData || null,
-      type: (WEAPONS[_baseId] && WEAPONS[_baseId].type) || '',
-      curMag: _cur.mag, curScope: _cur.scope, curGrip: _cur.grip,
-      isNamed: !!def.named,
-      busy: !!_busyBaseIds[_baseId]
-    }, extra || {}));
+    var prev = byBase[baseId];
+    if(prev){
+      if(lbl && prev.locs.indexOf(lbl) < 0) prev.locs.push(lbl);
+      prev.locationLabel = prev.locs.length ? prev.locs.join(' · ') : '未裝備';
+      if(pri > prev._pri || (pri === prev._pri && lp > prev._lp)){
+        prev.rawId = rawId; prev.rarity = rar; prev._pri = pri; prev._lp = lp;
+        prev.curMag = cur.mag; prev.curScope = cur.scope; prev.curGrip = cur.grip;
+        prev.isNamed = !!def.named; prev.location = loc; prev.locData = locData || null;
+        prev.slot = slot || prev.slot;
+      }
+      return;
+    }
+    var rec = { rawId:rawId, baseId:baseId, rarity:rar, _pri:pri, _lp:lp,
+      location:loc, locData:locData || null, locs:(lbl ? [lbl] : []), locationLabel:(lbl || '未裝備'),
+      type:(WEAPONS[baseId] && WEAPONS[baseId].type) || '',
+      curMag:cur.mag, curScope:cur.scope, curGrip:cur.grip,
+      isNamed:!!def.named, busy:!!_busy[baseId], slot:slot || null, count:1 };
+    byBase[baseId] = rec; out.push(rec);
   }
-  ['primary','secondary','melee'].forEach(function(slot){
-    var id = state.player.equipped[slot];
-    if(!id) return;
+  ['primary','secondary'].forEach(function(slot){
+    var id = state.player.equipped[slot]; if(!id) return;
     var rar = state.player.equippedRarity[slot] || '一般';
     if(rar !== '傳奇' && rar !== '具名') return;
-    _add(id, rar, 'equipped', { slot: slot }, { slot: slot });
+    _add(id, rar, 'equipped', { slot:slot }, slot);
   });
+  var ps = (state.station && state.station.passengers) || [];
+  for(var i = 0; i < ps.length; i++){
+    var pp = ps[i]; if(!pp) continue;
+    if(pp.primaryWeapon && (pp.primaryWeaponRarity === '傳奇' || pp.primaryWeaponRarity === '具名'))
+      _add(pp.primaryWeapon, pp.primaryWeaponRarity, 'passenger', { passengerIdx:i, slot:'primary' }, 'primary');
+    if(pp.secondaryWeapon && (pp.secondaryWeaponRarity === '傳奇' || pp.secondaryWeaponRarity === '具名'))
+      _add(pp.secondaryWeapon, pp.secondaryWeaponRarity, 'passenger', { passengerIdx:i, slot:'secondary' }, 'secondary');
+  }
+  var pl = (state.garden && state.garden.plots) || [];
+  for(var j = 0; j < pl.length; j++){
+    var tc = pl[j] && pl[j].towerConfig;
+    if(!tc || !tc.eq) continue;
+    var er = tc.eqRarity || {};
+    if(tc.eq.primary && (er.primary === '傳奇' || er.primary === '具名'))
+      _add(tc.eq.primary, er.primary, 'guard', { towerIdx:j, slot:'primary' }, 'primary');
+    if(tc.eq.secondary && (er.secondary === '傳奇' || er.secondary === '具名'))
+      _add(tc.eq.secondary, er.secondary, 'guard', { towerIdx:j, slot:'secondary' }, 'secondary');
+  }
   for(var k in state.inventory){
     var p = k.split('@');
+    if(p.length !== 2) continue;
     if(p[1] !== '傳奇' && p[1] !== '具名') continue;
-    _add(p[0], p[1], 'inventory', null, { count: state.inventory[k] });
-  }
-  /* rev-fix-named-in-station-guard: 载员 / 守卫装备的具名武器 */
-  var _passengers = (state.station && state.station.passengers) || [];
-  for(var _pi = 0; _pi < _passengers.length; _pi++){
-    var _pp = _passengers[_pi];
-    if(!_pp) continue;
-    if(_pp.primaryWeapon && typeof isNamedWeaponId === 'function' && isNamedWeaponId(_pp.primaryWeapon)){
-      _add(_pp.primaryWeapon, _pp.primaryWeaponRarity || '具名', 'passenger', { passengerIdx: _pi, slot: 'primary' });
-    }
-    if(_pp.secondaryWeapon && typeof isNamedWeaponId === 'function' && isNamedWeaponId(_pp.secondaryWeapon)){
-      _add(_pp.secondaryWeapon, _pp.secondaryWeaponRarity || '具名', 'passenger', { passengerIdx: _pi, slot: 'secondary' });
-    }
-  }
-  var _plots = (state.garden && state.garden.plots) || [];
-  for(var _ti = 0; _ti < _plots.length; _ti++){
-    var _plot = _plots[_ti];
-    if(!_plot || _plot.type !== 'tower' || !_plot.towerConfig || !_plot.towerConfig.eq) continue;
-    var _eq = _plot.towerConfig.eq;
-    var _eqR = _plot.towerConfig.eqRarity || {};
-    if(_eq.primary && typeof isNamedWeaponId === 'function' && isNamedWeaponId(_eq.primary)){
-      _add(_eq.primary, _eqR.primary || '具名', 'guard', { towerIdx: _ti, slot: 'primary' });
-    }
-    if(_eq.secondary && typeof isNamedWeaponId === 'function' && isNamedWeaponId(_eq.secondary)){
-      _add(_eq.secondary, _eqR.secondary || '具名', 'guard', { towerIdx: _ti, slot: 'secondary' });
-    }
+    if((state.inventory[k] || 0) <= 0) continue;
+    _add(p[0], p[1], 'inventory', null, null);
   }
   return out;
 }
@@ -1314,12 +1315,12 @@ function _wkBind(p){
 }
 
 function _wkOpenWeaponPicker(){
+  /* rev-wk-noloc: 選擇武器只顯示型號/類型 —— 裝備位置對「選哪把來改」毫無意義，移除。 */
   var candidates = _wkGetCandidates();
   if(!candidates.length) return;
   var s = window._wkState;
   var filterType = '全部';
   var TYPES = ['全部','突擊步槍','機槍','狙擊槍','衝鋒槍','霰彈槍'];
-
   var bodyEl = document.createElement('div');
   function _buildHTML(){
     var filtered = candidates.filter(function(c){
@@ -1333,7 +1334,7 @@ function _wkOpenWeaponPicker(){
     });
     var filterHtml = '<div class="wk-filter-row">';
     TYPES.forEach(function(t){
-      filterHtml += '<div class="wk-filter ' + (filterType === t ? 'on' : '') + '" data-ft="' + t + '">' + t + '</div>';
+      filterHtml += '<div class="wk-filter' + (filterType === t ? ' on' : '') + '" data-ft="' + t + '">' + t + '</div>';
     });
     filterHtml += '</div>';
     var listHtml = '';
@@ -1347,7 +1348,6 @@ function _wkOpenWeaponPicker(){
         var _subType = c.type || ((WEAPONS[c.baseId] && WEAPONS[c.baseId].type) || '?');
         var isCur = c.rawId === s.selectedRawId;
         var _c = _wkRarityColor(c.rarity);
-        /* rev-fix-picker-busy: busy 项灰掉 + 不可点 */
         var _isBusy = !!c.busy;
         var _styleAttr;
         if(_isBusy){ _styleAttr = 'opacity:0.4;cursor:not-allowed;'; }
@@ -1357,22 +1357,21 @@ function _wkOpenWeaponPicker(){
         if(_isBusy){ _badge = '<div class="cnt" style="color:#e8a33d;font-size:9px">改造中</div>'; }
         else if(isCur){ _badge = '<div class="cnt">✓</div>'; }
         else { _badge = ''; }
-        var _locTxt = (c.location === 'equipped' ? '已裝備' : (c.location === 'inventory' ? '背包' : (c.location === 'passenger' ? '載員' : (c.location === 'guard' ? '守衛' : c.location))));
-        listHtml += '<div class="item-row' + (_isBusy ? ' disabled' : '') + '" data-rawid="' + c.rawId + '" data-busy="' + (_isBusy ? '1' : '0') + '" style="' + _styleAttr + '"><div class="info"><div class="nm" style="color:' + _c + '">' + nm + '</div><div class="sub">' + _subType + ' · ' + _locTxt + '</div></div>' + _badge + '</div>';
+        listHtml += '<div class="item-row' + (_isBusy ? ' disabled' : '') + '" data-rawid="' + c.rawId + '" data-busy="' + (_isBusy ? '1' : '0') + '" style="' + _styleAttr + '">'
+          + '<div class="info"><div class="nm" style="color:' + _c + '">' + nm + '</div>'
+          + '<div class="sub">' + _subType + '</div></div>' + _badge + '</div>';
       }
     }
     return filterHtml + listHtml;
   }
   bodyEl.innerHTML = _buildHTML();
   var bd = openModal({ title: '選擇武器', body: bodyEl });
-
   function _bind(){
     bd.querySelectorAll('[data-ft]').forEach(function(el){
       el.onclick = function(){ filterType = el.getAttribute('data-ft'); bodyEl.innerHTML = _buildHTML(); _bind(); };
     });
     bd.querySelectorAll('[data-rawid]').forEach(function(el){
       el.onclick = function(){
-        /* rev-fix-picker-busy-click: busy 项点击拒绝 */
         if(el.getAttribute('data-busy') === '1'){
           if(typeof toast === 'function') toast('該型號武器正在改造中，完成後才能再次改造', 'err');
           return;
@@ -1419,7 +1418,7 @@ function _wkOpenPicker(slot){
   } else if(slot === 'scope'){
     options.push({ label: '不安裝瞄具', val: null });
     var scopes = (rules.scopes || []).slice().sort(function(a, b){
-      return (SCOPE_BONUS[a] || 0) - (SCOPE_BONUS[b] || 0);
+      return (typeof window._sortScopesAsc === "function") ? window._sortScopesAsc(a, b) : 0; /* rev-scope-sort */
     });
     for(var j = 0; j < scopes.length; j++){
       var _rg = Math.round((SCOPE_RANGE_BONUS[scopes[j]] || 0) * 100);

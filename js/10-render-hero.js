@@ -956,6 +956,12 @@ window.preloadStaticAssets = preloadStaticAssets;
 
 const heroAnim = { name:'walk', frame:0, lastUpdate:0, forcedEnd:0, eqSlot:null };
 const battleHeroAnim = { name:'idle', frame:0, lastUpdate:0, forcedEnd:0 };
+/* rev-eqslot: 哪些動畫「擁有」eqSlot / healItem。
+   原本各處守衛寫死 name !== 'heal_melee' 就清 eqSlot，
+   導致投擲（attack_melee）想隱藏武器也立刻被清掉 → 手上仍畫步槍。
+   改為通用集合：動作動畫期間保留，切回 walk / idle 才清。 */
+window._HERO_EQ_HOLD = ['heal_melee','attack_melee','fire_primary','fire_secondary','reload','switch_secondary','switch_melee','hurt'];
+window._heroEqHolds = function(name){ return window._HERO_EQ_HOLD.indexOf(name) >= 0; };
 
 /* rev-fix-hero-death-anim: 玩家倒地动画统一入口。记录 _deathStart 供渲染端计算 fallProgress。
  * 幂等：已在 dead 状态则不动，避免重生后立刻死亡时误重置。 */
@@ -1111,7 +1117,7 @@ function getPlayerMuzzlePos(){
 
   const ORIG_FOOT_X = 200;
   const ORIG_FOOT_Y = 515;
-  const scale = (spriteH * CHAR_HEIGHT_FACTOR_BATTLE) / 386;
+  const scale = (spriteH * CHAR_HEIGHT_FACTOR) / 386;
   const groundY_local = spriteH * 0.95;
   const centerX_local = spriteW / 2;
 
@@ -1139,7 +1145,7 @@ function getPlayerMuzzlePos(){
   const py = (typeof battle !== 'undefined' && battle) ? battle.py : 0.75;
   return {
     x: (px * W - spriteW / 2 + localX) / W,
-    y: (py * H + localY) / H
+    y: localY / H
   };
 }
 
@@ -1220,35 +1226,26 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
   const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
   const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
   const factor = charHFactor || CHAR_HEIGHT_FACTOR;
-
   const B = { x: 30, y: 30, w: 340, h: 460 };
   const ORIG_CHAR_H = 386;
   const ORIG_FOOT_X = 200;
   const ORIG_FOOT_Y = 515;
-
   const targetCharH = canvasH * factor;
   const scale = targetCharH / ORIG_CHAR_H;
   const groundY = canvasH * 0.95;
   const ratio = (centerXRatio != null) ? centerXRatio : 0.5;
   const centerX = canvasW * ratio;
-
   ctx.save();
   ctx.translate(centerX, groundY);
-  /* rev-fix-hero-death-rotate: dead 用 fallProgress 渐进旋转 0→90°，无过渡时默认 1（完全倒地） */
   if(animName === 'dead'){
     const _fp = Math.min(1, (typeof fallProgress === 'number') ? fallProgress : 1);
     ctx.rotate(_fp * Math.PI / 2);
   }
   ctx.scale(scale, scale);
   ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
-
   const units = [];
-  for(const L of GAME_LAYERS){
-    units.push({ z: L.z, kind:'layer', layer: L });
-  }
-
+  for(const L of GAME_LAYERS){ units.push({ z: L.z, kind:'layer', layer: L }); }
   const eq = state.player.equipped;
-
   if(eq.head){
     const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
     const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
@@ -1257,7 +1254,6 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
       units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
     }
   }
-
   if(eq.top){
     const cfg = getTopCfg(eq.top);
     const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
@@ -1266,18 +1262,27 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
       units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
     }
   }
-
+  /* rev-hands: 手持物由「當前動作」唯一決定 —— 這是唯一權威判斷點。
+     治療（heal_melee / 有 healItem）與投擲手上沒有槍；
+     任何呼叫端漏傳 override 也不會退回 eq.primary 把步槍畫回來。
+     非治療 / 投擲時優先用 explicit override，其次動畫自身的 showEq
+     （fire_secondary 因此真的畫副武器，而不是回退成主武器）。 */
   let wpSlot = null, wpId = null;
-  if(weaponSlotOverride === '__hidden__'){
-    /* rev-fix-heal-anim: 治療動畫隱藏武器 */
+  const _showEq = anim.showEq || null;
+  const _handsEmpty = (weaponSlotOverride === 'hidden')
+    || (weaponSlotOverride === 'throwable')
+    || (animName === 'heal_melee')
+    || !!healItemId;
+  if(_handsEmpty){
+    wpSlot = null; wpId = null;
   } else if(weaponSlotOverride && eq[weaponSlotOverride]){
-    wpSlot = weaponSlotOverride;
-    wpId = eq[weaponSlotOverride];
+    wpSlot = weaponSlotOverride; wpId = eq[weaponSlotOverride];
+  } else if(_showEq && _showEq !== 'context' && eq[_showEq]){
+    wpSlot = _showEq; wpId = eq[_showEq];
   } else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
   else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
   else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
-
-  if(wpSlot && wpId){ /* rev-fix-ammo-box-block */
+  if(wpSlot && wpId){
     if(typeof AMMO !== 'undefined' && AMMO[wpId]){
       const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
       if(_fa){
@@ -1295,8 +1300,6 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
       }
     }
   }
-
-  /* rev-fix-heal-item-render: 治療時前側手下方顯示消耗品圖標 */
   if(healItemId){
     const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
     if(_fa){
@@ -1304,9 +1307,7 @@ function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOver
       units.push({ z: _fa.z - 0.4, kind:'eq', layerId: 'front_arm', ox: 0.88, oy: 0.15, scale: 0.35, rotation: 45, img: _hImg, _fitMax: true });
     }
   }
-
   units.sort((a,b)=>a.z - b.z);
-
   for(const u of units){
     if(u.kind === 'layer'){
       let _rotOverride;
@@ -1324,7 +1325,7 @@ function renderExploreHeroCanvas(){
   if(typeof currentTab === 'undefined' || currentTab !== 'explore') return;
   /* [v187 H33] 渲染层兜底：非 heal_melee 时清 eqSlot / healItem。
      即使 H32 因某种原因没跑（比如 tick 循环挂了），渲染层也保证不残留。 */
-  if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'heal_melee'){
+  if(typeof heroAnim !== 'undefined' && !(window._heroEqHolds && window._heroEqHolds(heroAnim.name))){
     if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
     if(heroAnim.healItem) heroAnim.healItem = null;
   }
@@ -1352,8 +1353,8 @@ function renderExploreHeroCanvas(){
     /* [v184b H19-C] 只在 heal_melee 时传 eqSlot / healItem。
        v180 F6e 只改了 healItem，没改 eqSlot——healing 被打断后
        eqSlot='__hidden__' 残留，导致武器一直不显示。 */
-    const _eqSlotH19 = (heroAnim.name === 'heal_melee') ? (heroAnim.eqSlot || null) : null;
-    const _healItemH19 = (heroAnim.name === 'heal_melee') ? (heroAnim.healItem || null) : null;
+    const _eqSlotH19 = heroAnim.eqSlot || null; /* rev-eqslot */
+    const _healItemH19 = heroAnim.healItem || null; /* rev-eqslot */
     /* rev-fix-hero-death-progress: dead 状态基于 _deathStart 计算倒地进度 0→1（350ms） */
     let _fallProgressH = 1;
     if(heroAnim.name === 'dead' && heroAnim._deathStart){
@@ -1365,6 +1366,7 @@ function renderExploreHeroCanvas(){
 }
 
 function renderBattleHeroCanvas(){
+  /* rev-hands: 治療 / 投擲不畫武器；上車依 playerClipH 裁切，完全登車則連 HUD 整塊隱藏 */
   if(typeof battle === 'undefined' || !battle) return;
   const canvas = document.getElementById('hero-battle-canvas');
   if(!canvas) return;
@@ -1373,9 +1375,25 @@ function renderBattleHeroCanvas(){
   if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
-  /* rev-fix-boss-heal-anim: 治療中隱藏武器 */
-  const overrideSlot = battle.consuming ? '__hidden__' : ((battle.weaponSlot === 'throwable') ? null : battle.weaponSlot);
-  drawBlockHero(ctx, w, h, battleHeroAnim.name, battleHeroAnim.frame, overrideSlot, CHAR_HEIGHT_FACTOR_BATTLE, 0.5, battleHeroAnim.legOverride || null, battleHeroAnim.healItem || null);
+  const btr = window.BTRSupport;
+  const _onBoard = !!(btr && btr.active);
+  const _isWreck = !!(_onBoard && (btr.phase === 'wreck' || btr.phase === 'wreckPause'));
+  const clipH = _onBoard ? btr.playerClipH : 1.0;
+  const _hpw = document.querySelector('.hero-f .hpbar-wrap');
+  if(_hpw) _hpw.style.display = (clipH <= 0.01) ? 'none' : '';
+  if(clipH <= 0.001) return;
+  const offsetX = (_onBoard && !_isWreck) ? (btr.playerXOffset || 0) : 0;
+  const overrideSlot = battle.consuming ? 'hidden'
+    : (battleHeroAnim.eqSlot || ((battle.weaponSlot === 'throwable') ? 'hidden' : battle.weaponSlot));
+  if(clipH < 1.0){
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h * clipH);
+    ctx.clip();
+  }
+  drawBlockHero(ctx, w, h, battleHeroAnim.name, battleHeroAnim.frame, overrideSlot,
+    CHAR_HEIGHT_FACTOR, 0.5 + offsetX, battleHeroAnim.legOverride || null, battleHeroAnim.healItem || null);
+  if(clipH < 1.0) ctx.restore();
 }
 
 function renderZone2Silhouette(){
