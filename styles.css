@@ -130,19 +130,30 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .damage-header .num{color:#ffb300}
 .damage-header .bar{width:180px;height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-top:4px}
 .damage-header .bar .fill{height:100%;background:linear-gradient(90deg,#e05252,#ffb300);transition:width .2s}
-.fighter{position:absolute;transform:translateX(-50%);z-index:3}
+/* Boss 戰單位錨點：零寬、全高。垂直百分比（HUD / 警告）以此為基準；
+   sprite 用 bottom:0 貼場景底。不可再設 height:0，否則 top:% 會算成 0。 */
+/* Boss 戰單位錨點：零寬、全高。
+   HUD / 警告的垂直百分比以此為基準；sprite 用 bottom:0 貼場景底。
+   不可再設 height:0 —— 否則子元素 top:% 會算成 0、top:px 從場景底往下算。 */
+.fighter{position:absolute;top:0;bottom:0;width:0;transform:translateX(-50%);z-index:3}
 .fighter .sprite{border-radius:6px;position:relative;cursor:crosshair;background-size:contain;background-position:center;background-repeat:no-repeat}
 .hero-f .sprite{width:88px;height:118px;background-image:none;position:relative;overflow:visible}
 .hero-f .sprite canvas{width:100%;height:100%;display:block}
 .boss-f .sprite{width:280px;height:280px}
 .boss-f .sprite img{width:100%;height:100%;object-fit:contain;display:block}
-.boss-f .hpbar-wrap{width:min(50%,200px);z-index:2}
-.hpbar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:60px;bottom:calc(100% + 4px)}
-.hpbar-wrap .bar{height:4px;background:#2a1a1a;border-radius:2px;overflow:hidden;margin-bottom:2px;position:relative}
+.boss-f .hpbar-wrap{width:200px}
+/* HUD：姓名 + 狀態條為一個緊湊流式塊。
+   中心線 13.26% = 人偶裸頭頂 26.52% 與螢幕頂的中點（寫死）。
+   寬度：玩家 60px；Boss 200px 由 .boss-f .hpbar-wrap 覆蓋。 */
+/* HUD：姓名 + 狀態條為一個緊湊流式塊。
+   中心線 13.26% = 人偶裸頭頂 26.52% 與螢幕頂的中點（寫死，不隨動畫 / 頭盔變動）。
+   寬度：玩家 60px；Boss 由 .boss-f .hpbar-wrap 覆蓋為 200px。 */
+.hpbar-wrap{position:absolute;left:50%;top:13.26%;bottom:auto;transform:translate(-50%,-50%);width:60px;display:flex;flex-direction:column;align-items:stretch;gap:2px;margin:0;padding:0;z-index:20}
+.hpbar-wrap .bar{height:4px;width:100%;background:#2a1a1a;border-radius:2px;overflow:hidden;position:relative;margin:0}
 .hpbar-wrap .bar .fill{height:100%}
 .hpbar-wrap .bar.hp .fill{background:#e05252}
 .hpbar-wrap .bar.ap .fill{background:#4a90d9}
-.hpbar-wrap .nm{font-size:8px;color:var(--c-accent);text-align:center;white-space:nowrap;text-shadow:0 0 3px #000;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%)}
+.hpbar-wrap .nm{position:static;left:auto;right:auto;top:auto;bottom:auto;transform:none;width:100%;font-size:8px;line-height:1.35;color:var(--c-accent);text-align:center;white-space:nowrap;text-shadow:0 0 3px #000}
 .bullet{position:absolute;width:5px;height:5px;background:#ffe08a;border-radius:50%;box-shadow:0 0 6px #ffb300;transform:translate(-50%,-50%)}
 .bullet.enemy{background:#ff5252;box-shadow:0 0 6px #e05252}
 .boss-proj-wrap{
@@ -250,18 +261,12 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .boss-telegraph.aoe{border-color:#ff8800;background:radial-gradient(circle, rgba(255,136,0,0.42) 0%, rgba(255,136,0,0.1) 70%, transparent 100%);animation:telegraphPulseAoe 0.4s ease-in-out infinite;box-shadow:0 0 32px rgba(255,136,0,0.7), inset 0 0 32px rgba(255,136,0,0.5);}
 @keyframes telegraphPulse{0%,100%{transform:translate(-50%,-50%) scale(0.85);opacity:.6}50%{transform:translate(-50%,-50%) scale(1.08);opacity:1}}
 @keyframes telegraphPulseAoe{0%,100%{transform:translate(-50%,-50%) scale(0.9);opacity:.65}50%{transform:translate(-50%,-50%) scale(1.18);opacity:1}}
-.boss-warning{
-  position:absolute;left:50%;
-  bottom:calc(100% + 28px);
-  transform:translateX(-50%);
-  font-size:26px;line-height:1;font-weight:900;
-  color:#ff3030;text-shadow:0 0 8px #ff3030,0 0 14px #ff6060,0 0 2px #000;
-  pointer-events:none;z-index:1;
-  animation:bossWarningPulse .42s ease-in-out infinite;
-}
-@keyframes bossWarningPulse{0%,100%{transform:translateX(-50%) scale(.85);opacity:.7}50%{transform:translateX(-50%) scale(1.25);opacity:1}}
-.shield-bar-wrap{position:absolute;left:50%;transform:translateX(-50%);width:min(50%,200px);bottom:calc(100% + 22px);z-index:3}
-.shield-bar-wrap .nm{font-size:8px;color:#7a7a7a;text-align:center;margin-bottom:2px;text-shadow:0 0 3px #000;letter-spacing:1px}
+/* 突進警告：貼在 Boss 裸頭頂（26.52%）上方 */
+/* 突進警告：貼在 Boss 裸頭頂（26.52%）上方，全高錨點下用 top 而非 bottom */
+.boss-warning{position:absolute;left:50%;top:26.52%;bottom:auto;transform:translate(-50%,-100%);font-size:26px;line-height:1;font-weight:900;color:#ff3030;text-shadow:0 0 8px #ff3030,0 0 14px #ff6060,0 0 2px #000;pointer-events:none;z-index:21;animation:bossWarningPulse .42s ease-in-out infinite}
+@keyframes bossWarningPulse{0%,100%{transform:translate(-50%,-100%) scale(.85);opacity:.7}50%{transform:translate(-50%,-100%) scale(1.25);opacity:1}}
+.shield-bar-wrap{position:static;left:auto;right:auto;top:auto;bottom:auto;transform:none;width:100%;z-index:auto}
+
 .shield-bar-wrap .bar{height:3px;background:#1a1a1a;border-radius:2px;overflow:hidden}
 .shield-bar-wrap .bar .fill{height:100%;background:#666}
 .shield-shatter-fx{position:absolute;pointer-events:none;z-index:30;width:0;height:0;transform:translate(-50%,-50%)}
@@ -715,27 +720,10 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .gp-header .gp-food-info:active{
   opacity: 1 !important;
 }
-.fighter.boss-f .hpbar-wrap{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  width:min(50%,200px);
-}
-.fighter.boss-f .hpbar-wrap .nm{
-  position:static;
-  transform:none;
-  bottom:auto;
-  text-align:center;
-}
-.fighter.boss-f .hpbar-wrap .shield-bar-wrap{
-  position:static;
-  transform:none;
-  bottom:auto;
-  width:100%;
-}
-.fighter.boss-f .hpbar-wrap .bar{
-  margin-bottom:0;
-}
+
+
+
+
 .radio-btn{position:absolute;background:rgba(30,25,20,.85);border:1.5px solid #3a2f25;border-radius:5px;color:var(--c-accent);font-weight:bold;cursor:pointer;user-select:none;z-index:4;box-sizing:border-box;display:flex;justify-content:center;align-items:center;text-align:center;padding:0}
 .radio-btn:active{transform:scale(0.94)}
 .radio-btn[data-mode="sweep"]{border-color:#a45ede;color:#a45ede;background:rgba(30,20,40,.85)}
@@ -772,8 +760,12 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .garage-bottom{flex:0 0 auto;display:flex;gap:6px}
 .garage-bottom-left{flex:1 1 0;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:5px 8px}
 .garage-bottom-right{flex:0 0 44%;min-width:0;background:#1a1510;border:1px solid #2a231c;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:3px;justify-content:center}
-.garage-stat-row{display:flex;justify-content:space-between;gap:6px;padding:1px 0;font-size:10px;line-height:1.5;min-width:0}
-.garage-stat-row .k{flex:0 0 auto;color:#7a6f60}
+.garage-stat-row{display:flex;align-items:center;gap:6px;padding:1px 0;font-size:10px;line-height:1.5;min-width:0}
+.garage-stat-row .k{flex:0 0 56px;color:#7a6f60;white-space:nowrap}
+.garage-stat-row .v-cur,.garage-stat-row .v-new,.garage-stat-row .v-cur-only{flex:1 1 0;min-width:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garage-stat-row .v-arrow{flex:0 0 auto;color:#5a5040;text-align:center}
+.garage-stat-row .v-new.up{color:#4caf50}
+.garage-stat-row .v-new.down{color:#e05252}
 .garage-research-empty{font-size:11px;color:#5a5040;line-height:1.4;padding:2px 0}
 .garage-research-bar{height:6px;background:#0e0c0a;border-radius:3px;overflow:hidden;border:1px solid #2a231c}
 .garage-research-bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,var(--c-accent),#ffd680);transition:width .2s}
@@ -1605,3 +1597,21 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
 }
+
+/* ===== rev-hudroot:start ===== */
+/* ── Boss 螢幕外距離氣泡（探索模式 _renderFrames 同款：44px 圓環 + 僅數字） ── */
+.boss-offscreen{position:absolute;top:36px;right:8px;width:48px;z-index:24;display:none;flex-direction:column;gap:5px;pointer-events:none}
+.boss-offscreen.on{display:flex}
+.boss-offscreen .bub{width:44px;height:44px;border-radius:50%;box-sizing:border-box;position:relative;cursor:pointer;border:2px solid #ffb300;pointer-events:auto;transition:transform .12s,box-shadow .16s}
+.boss-offscreen .bub:active{transform:scale(.92)}
+.boss-offscreen .bub .in{position:absolute;inset:4px;border-radius:50%;background:rgba(14,12,10,.95);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;color:#ffb300}
+.boss-offscreen.open .bub{box-shadow:0 0 0 2px #39c6c0,0 0 12px rgba(57,198,192,.55)}
+/* ── Boss 虛影：canvas 尺寸 = 實體 sprite（playerCanvasW x playerCanvasH），同變換同落地 ── */
+/* rev-ghost-hit: 必須高於 .fighter(3) 與 .head-bars(4)，否则玩家 sprite 覆蓋全屏攔截指針 */
+.boss-ghost{position:absolute;right:0;bottom:0;display:none;z-index:7;cursor:crosshair;pointer-events:auto;touch-action:none}
+.boss-ghost.on{display:block}
+.boss-ghost canvas{display:block;width:100%;height:100%}
+.boss-ghost .scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(57,198,192,.07) 0 1px,transparent 1px 4px)}
+.boss-ghost .lbl{position:absolute;left:50%;top:6px;transform:translateX(-50%);font-size:9px;color:#39c6c0;background:rgba(10,14,14,.88);border:1px solid rgba(57,198,192,.4);border-radius:6px;padding:2px 7px;white-space:nowrap;text-shadow:0 0 4px #000;pointer-events:none}
+.boss-ghost .hint{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font-size:8px;color:#7a6f60;white-space:nowrap;pointer-events:none}
+/* ===== rev-hudroot:end ===== */
