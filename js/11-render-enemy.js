@@ -154,101 +154,51 @@ function _tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
 
 /* 完整版 `_drawHumanCorpse`：含 melee 判斷、bodyBottomY 對齊、front_arm 下移 */
 function _drawHumanCorpse(ctx, drawId, s, ox, oy, def, anim, fi, eqD, isDeath){
-  var cw = def.canvas.w, ch = def.canvas.h, eq = eqD || null, dM = isDeath !== false;
-  if(eq && eq.primary && _isMeleeWeapon(eq.primary)) eq = {head:eq.head, top:eq.top, primary:null};
-  var rr = (anim.rootRot && anim.rootRot[fi]) || 0, rrd = rr * Math.PI / 180;
-  var rDy = (anim.rootDy && anim.rootDy[fi]) || 0;
-  var rp = anim.rootPivot || {x:0.5, y:0.95};
-  var pcx = cw * rp.x, pcy = ch * rp.y;
-  var cosR = Math.cos(rrd), sinR = Math.sin(rrd);
-  var faCx = null, faCy = null;
-
-  if(dM){
-    var bBot = -Infinity;
-    for(var i = 0; i < def.layers.length; i++){
-      var L = def.layers[i];
-      if(L.id === 'front_arm' || L.id === 'back_arm') continue;
-      var y = _measureLayerMaxY(def, anim, fi, L.id);
-      if(y != null && y > bBot) bBot = y;
-    }
-    var faL = def.layers.find(function(l){ return l.id === 'front_arm'; });
-    if(faL && isFinite(bBot)){
-      var k = (anim.keys && anim.keys.front_arm && anim.keys.front_arm[fi]) || {rot:0, dx:0, dy:0};
-      var lwf = cw * faL.w, lhf = ch * faL.h;
-      var cx = cw * faL.x + cw * (k.dx || 0) * 0.01;
-      var cy = ch * faL.y + ch * (k.dy || 0) * 0.01;
-      var pxf = lwf * faL.pivot.x, pyf = lhf * faL.pivot.y;
-      var lR = -rrd, cL = Math.cos(lR), sL = Math.sin(lR);
-      var cmY = -Infinity;
-      var cs = [[0,0],[lwf,0],[0,lhf],[lwf,lhf]];
-      for(var ci = 0; ci < 4; ci++){
-        var u = cs[ci][0], v = cs[ci][1];
-        var Lx = cx + (u-pxf)*cL - (v-pyf)*sL;
-        var Ly = cy + (u-pxf)*sL + (v-pyf)*cL;
-        var Wy = pcy + (Lx-pcx)*sinR + (Ly-pcy)*cosR + ch*rDy;
-        if(Wy > cmY) cmY = Wy;
-      }
-      var dy = bBot - cmY;
-      cx += dy * sinR;
-      cy += dy * cosR;
-      faCx = cx;
-      faCy = cy;
-    }
-  }
-
-  ctx.save();
-  ctx.translate(ox, oy);
-  ctx.scale(s, s);
-  ctx.translate(0, ch * rDy);
-  ctx.translate(pcx, pcy);
-  ctx.rotate(rrd);
-  ctx.translate(-pcx, -pcy);
-
-  var units = [];
-  for(var li = 0; li < def.layers.length; li++){
-    var LL = def.layers[li];
-    if(dM && LL.id === 'back_arm') continue;
-    if(LL.id === 'front_arm' && eq && eq.primary && !_isMeleeWeapon(eq.primary)){
-      units.push({z:LL.z-0.5, kind:'weapon', layer:LL, weaponId:eq.primary});
-    }
-    units.push({z:LL.z, kind:'layer', layer:LL});
-    if(LL.id === 'head' && eq && eq.head){
-      units.push({z:LL.z+0.5, kind:'armor', layer:LL, armorId:eq.head});
-    }
-    if(LL.id === 'torso' && eq && eq.top){
-      units.push({z:LL.z+0.5, kind:'armor', layer:LL, armorId:eq.top});
-    }
-  }
-  units.sort(function(a,b){ return a.z - b.z; });
-
-  for(var ui = 0; ui < units.length; ui++){
-    var uu = units[ui], Lu = uu.layer;
-    var ku = (anim.keys && anim.keys[Lu.id] && anim.keys[Lu.id][fi]) || {rot:0, dx:0, dy:0};
-    var lwu = cw * Lu.w, lhu = ch * Lu.h, cxu, cyu;
-    if(Lu.id === 'front_arm' && faCx != null){ cxu = faCx; cyu = faCy; }
-    else {
-      cxu = cw * Lu.x + cw * (ku.dx || 0) * 0.01;
-      cyu = ch * Lu.y + ch * (ku.dy || 0) * 0.01;
-    }
-    var pxu = lwu * Lu.pivot.x, pyu = lhu * Lu.pivot.y, lRR;
-    if(dM && Lu.id === 'front_arm') lRR = -rrd;
-    else lRR = ((Lu.rot || 0) + (ku.rot || 0)) * Math.PI / 180;
-    ctx.save();
-    ctx.translate(cxu, cyu);
-    ctx.rotate(lRR);
-    ctx.translate(-pxu, -pyu);
-    if(uu.kind === 'layer'){
-      var col = (def.colors && def.colors[Lu.id]) || _DEF_COLORS[Lu.id] || Lu.color || '#5a4a3a';
-      ctx.fillStyle = col;
-      ctx.fillRect(0, 0, lwu, lhu);
-      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(1, 1, lwu-2, lhu-2);
-    } else if(uu.kind === 'armor') _tryDrawArmorAtLayer(ctx, uu.armorId, lwu, lhu, pxu, pyu);
-    else if(uu.kind === 'weapon') _tryDrawWeaponAtLayer(ctx, uu.weaponId, lwu, lhu, pxu, pyu);
-    ctx.restore();
-  }
-  ctx.restore();
+/* rev-arm45: 敵人與玩家同構。武器掛 back_arm（右手），z = front_arm.z-0.5
+   → back_arm 55 被槍遮擋、front_arm 62 蓋槍。
+   刪除舊 dM 反向旋轉 / bodyBottomY 對齊 / 跳過 back_arm 補丁；
+   武器與 back_arm 共用同一 keys（含倒地 -110°），自然跟著手擺動。 */
+var cw = def.canvas.w, ch = def.canvas.h, eq = eqD || null;
+if(eq && eq.primary && _isMeleeWeapon(eq.primary)) eq = {head:eq.head, top:eq.top, primary:null};
+var rr = (anim.rootRot && anim.rootRot[fi]) || 0;
+var rDy = (anim.rootDy && anim.rootDy[fi]) || 0;
+var rp = anim.rootPivot || {x:0.5, y:0.95};
+var pcx = cw*rp.x, pcy = ch*rp.y;
+var faZ = 62;
+for(var zi=0; zi<def.layers.length; zi++){ if(def.layers[zi].id==='front_arm'){ faZ = def.layers[zi].z; break; } }
+ctx.save();
+ctx.translate(ox, oy); ctx.scale(s, s);
+ctx.translate(0, ch*rDy);
+ctx.translate(pcx, pcy); ctx.rotate(rr*Math.PI/180); ctx.translate(-pcx, -pcy);
+var units = [];
+for(var li=0; li<def.layers.length; li++){
+var LL = def.layers[li];
+if(LL.id === 'back_arm' && eq && eq.primary && !_isMeleeWeapon(eq.primary))
+units.push({z:faZ-0.5, kind:'weapon', layer:LL, weaponId:eq.primary});
+units.push({z:LL.z, kind:'layer', layer:LL});
+if(LL.id === 'head' && eq && eq.head) units.push({z:LL.z+0.5, kind:'armor', layer:LL, armorId:eq.head});
+if(LL.id === 'torso' && eq && eq.top) units.push({z:LL.z+0.5, kind:'armor', layer:LL, armorId:eq.top});
+}
+units.sort(function(a,b){return a.z-b.z;});
+for(var ui=0; ui<units.length; ui++){
+var uu = units[ui], Lu = uu.layer;
+var ku = (anim.keys && anim.keys[Lu.id] && anim.keys[Lu.id][fi]) || {rot:0,dx:0,dy:0};
+var lwu = cw*Lu.w, lhu = ch*Lu.h;
+var cxu = cw*Lu.x + cw*(ku.dx||0)*0.01;
+var cyu = ch*Lu.y + ch*(ku.dy||0)*0.01;
+var pxu = lwu*Lu.pivot.x, pyu = lhu*Lu.pivot.y;
+var lRR = ((Lu.rot||0)+(ku.rot||0))*Math.PI/180;
+ctx.save();
+ctx.translate(cxu, cyu); ctx.rotate(lRR); ctx.translate(-pxu, -pyu);
+if(uu.kind === 'layer'){
+var col = (def.colors && def.colors[Lu.id]) || _DEF_COLORS[Lu.id] || Lu.color || '#5a4a3a';
+ctx.fillStyle = col; ctx.fillRect(0,0,lwu,lhu);
+ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.lineWidth = 2; ctx.strokeRect(1,1,lwu-2,lhu-2);
+} else if(uu.kind === 'armor') _tryDrawArmorAtLayer(ctx, uu.armorId, lwu, lhu, pxu, pyu);
+else if(uu.kind === 'weapon') _tryDrawWeaponAtLayer(ctx, uu.weaponId, lwu, lhu, pxu, pyu);
+ctx.restore();
+}
+ctx.restore();
 }
 
 /* 兼容別名：08b 的 _raidDrawEnemy 使用 _rev506_drawHumanCorpse */
@@ -308,9 +258,7 @@ function _renderEnemyCorpseCanvas(enemy, fxH){
   var isH = (def.kind === 'human');
   var charPx = fxH * CHAR_HEIGHT_FACTOR;
   var sc = charPx / 386;
-  var amY = isH ? _measureLayerMaxY(def, dA, lf, 'torso') : null;
   var cHU = bb.h;
-  if(amY !== null && amY < bb.maxY) cHU = amY - bb.minY;
   var eq = null;
   if(isH){
     /* [v182 G13] 装备缓存到 enemy._corpseEquip。
@@ -333,7 +281,7 @@ function _renderEnemyCorpseCanvas(enemy, fxH){
     eq = enemy._corpseEquip;
   }
   var pL = 0, pR = 0, pT = 0;
-  if(isH){ pL = 60; pR = 60; if(eq.primary) pT = Math.round(386 * 0.2); }
+  if(isH){ pL = 110; pR = 110; if(eq.primary) pT = Math.round(386 * 0.30); }
   cHU += pT;
   var dW = (bb.w + pL + pR) * sc, dH = cHU * sc;
   var cvs = document.createElement('canvas');

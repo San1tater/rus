@@ -51,7 +51,7 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
     const critMult = servantCritMult(g.weaponRarity, ammoRarity);
     const magCap = (g.weaponDef && g.weaponDef.mag) || 30;
     const stock = ammoId ? invCount(ammoId, ammoRarity) : 0;
-    const ms = (g.towerCfg && g.towerCfg.maxShots) || 'inf';
+    const ms = (g.towerCfg && 'inf') || 'inf';
     let budget;
     if(ms === 'skip') budget = 0;
     else if(ms === 'mag') budget = Math.min(stock, magCap);
@@ -132,7 +132,6 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
       _hrVal = 55 * _modeMult;
     }
     _simTime += SIM_SHOT_INTERVAL_MS;
-    _simTime += SIM_SHOT_INTERVAL_MS;
 /* 幾何判定：與線上同一套（aimY + 連射累積 + Y/Z 散佈 → 高度段部位）
    不再用額外 random 判命中 —— scatter3D 已按 hr 標定通過率。 */
 var _raidPart = "top";
@@ -143,9 +142,7 @@ var _DR = (_boxR && _boxR.D > 0) ? _boxR.D : 0.5;
 var _widR = fromU.weaponId || (fromU.weaponDef && fromU.weaponDef.id) || null;
 var _bfR = (typeof window._getWeaponBurstFactor === "function") ? window._getWeaponBurstFactor(_widR, null) : 0.08;
 var _aimR = (typeof window._getWeaponAimY === "function") ? window._getWeaponAimY(_widR, fromU.ammoId, null) : 0.85;
-var _scR = (typeof window._calcWeaponScatter3D === "function")
-? window._calcWeaponScatter3D(15, _hrVal, _cn, _bfR, { H:_HR, D:_DR }, 1)
-: { sy:0, sz:0 };
+var _scR = window._calcWeaponScatter3D(15, _hrVal, _cn, _bfR, { H:_HR, D:_DR }, 1);
 var _yR = _aimR + (_scR.sy || 0);
 var _zR = _scR.sz || 0;
 if(_yR < 0 || _yR > _HR || Math.abs(_zR) > _DR / 2) return;
@@ -293,6 +290,8 @@ function _gardenRaidCollectGuards(){
       if(s.type !== 'guard') continue;
       if(!s.assignedPlots || s.assignedPlots.indexOf(i) === -1) continue;
       if((s.stamina || 0) <= 0) continue;
+if(s.injuredUntil && s.injuredUntil > Date.now()) continue;
+if(typeof s.hp === 'number' && s.hp <= 0) continue;
       result.push({
         srv: s,
         towerIdx: i,
@@ -389,31 +388,20 @@ function _gardenTowerResolveAmmo(cfg, wDef){
 
 /* ===== 守衛槍口世界座標 ===== */
 function _getRaidMuzzleWorld(u, scale){
-/* rev-raid-muzzle-fix: 守衛由 21c 的 actor canvas 繪製，不是 23 的 raid canvas。
-   三個錯位來源：
-   (1) scale 傳的是 23 的 CHAR_PX（40~74），實際繪製是 21c 的 56。
-       實測 wrapH=294.7 → 23 用 53 → Δy=+2.7px（偏下）、Δx=−2.2px（偏左）。
-   (2) u.animName / u.animFrame 是上一幀回寫的 idle 姿勢；_fireAnim* 在
-       spawnBullet 尾端才設。fire_primary fps16 → frame0 涵蓋 0~62.5ms，
-       正好對上 60ms 槍口焰，故固定取開火第 0 幀。
-   (3) u.x / u.y 是開戰當下從 actor 複製的快照，actor 之後仍以 SPEED*0.3 走位。
-   改為：演員即時位置 + 21c 發布的實際字高 + 開火第 0 幀。 */
+/* rev-arm45v3: 守衛槍口跟右手；actor 即時位置 + 21c 發布的 56px 字高；鏡像符號正確。 */
 if(!u || !u.equipped || !u.weaponSlot) return null;
 var wpId = u.equipped[u.weaponSlot];
-if(!wpId) return null;
-if(typeof window.getCharWeaponMuzzleLocal !== 'function') return null;
+if(!wpId || typeof window.getCharWeaponMuzzleLocal !== 'function') return null;
 var act = u._actor || null;
 var px = (act && typeof act.x === 'number') ? act.x : u.x;
 var py = (act && typeof act.y === 'number') ? act.y : u.y;
 if(typeof px !== 'number' || typeof py !== 'number') return null;
-var sc = (typeof window._gardenActorCharPx === 'number' && window._gardenActorCharPx > 0)
-? (window._gardenActorCharPx / 386)
-: scale;
+var sc = (typeof window._gardenActorCharPx === 'number' && window._gardenActorCharPx > 0) ? (window._gardenActorCharPx/386) : scale;
 if(!(sc > 0)) return null;
-var an = (u.weaponSlot === 'secondary') ? 'fire_secondary' : 'fire_primary';
-var mz = window.getCharWeaponMuzzleLocal(u.weaponSlot, wpId, an, 0);
+var fx = !!u._facingLeft;
+var mz = window.getCharWeaponMuzzleLocal(u.weaponSlot, wpId, u.animName, u.animFrame, fx);
 if(!mz) return null;
-return { x: px + sc * (mz.x - 200), y: py + sc * (mz.y - 515) };
+return { x: px + (fx ? -1 : 1)*sc*(mz.x - 200), y: py + sc*(mz.y - 515) };
 }
 
 /* ===== 啟動防禦戰 ===== */
@@ -715,7 +703,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
       const critMult = (typeof servantCritMult === 'function') ? servantCritMult(g.weaponRarity, ammoRarity) : 1.5;
       const magCap = g.weaponDef.mag || 30;
       const stock = ammoId ? invCount(ammoId, ammoRarity) : 0;
-      const ms = cfg.maxShots || 'inf';
+      const ms = 'inf' || 'inf';
       let budget;
       if(ms === 'skip') budget = 0;
       else if(ms === 'mag') budget = Math.min(stock, magCap);
@@ -1025,25 +1013,6 @@ function drawBullet(b){
       }
       if(!window._raidTracers) window._raidTracers = [];
       window._raidTracers.push({ sx: sx, sy: sy, tx: _tx, ty: _ty, born: performance.now(), dur: 200, color: _color, hit: _pred });
-    }
-  } else {
-    /* 極舊環境後備：無統一核心時退回 2D 散佈 + bullets 陣列 */
-    const _aabb = (typeof window._getTargetAABB === "function") ? (window._getTargetAABB(toU) || { width:0.5, height:1.7, centerY:0.85 }) : { width:0.5, height:1.7, centerY:0.85 };
-    const _fd = Math.max(0.016, Math.abs(_fromWX - _toWX) / _spd);
-    const _px = (typeof window._predictTargetPoint === "function") ? window._predictTargetPoint(_toWX, toU._vx || 0, _fd) : _toWX;
-    const _bf = (typeof window._getWeaponBurstFactor === "function") ? window._getWeaponBurstFactor(_wid, null) : 0.08;
-    const _sc = (typeof window._calcWeaponScatter === "function") ? window._calcWeaponScatter(_rangeM, hr, fromU._chainShots || 1, _bf, _aabb) : { sx:0, sy:0 };
-    const _iwx = _px + _sc.sx;
-    const _iwy = (_aabb.centerY != null ? _aabb.centerY : _aabb.height / 2) + _sc.sy;
-    const _hit = (_iwy >= 0 && _iwy <= _aabb.height);
-    const _tx2 = wrapW * 0.5 + _iwx * _PX_PER_M;
-    const _ty2 = toU.y - _iwy * _PX_PER_M;
-    bullets.push({ sx: sx, sy: sy, tx: _tx2, ty: _ty2, x: sx, y: sy, startTime: performance.now(),
-      duration: Math.max(16, _fd * 1000), hit: _hit, isEnemy: !!isEnemy, fromU: fromU, toU: toU,
-      rarity: _rar, isFast: true, color: _color, impactWY: _iwy });
-    if(isEnemy){
-      if(!window._raidTracers) window._raidTracers = [];
-      window._raidTracers.push({ sx: sx, sy: sy, tx: _tx2, ty: _ty2, born: performance.now(), dur: 200, color: _color, hit: _hit });
     }
   }
 

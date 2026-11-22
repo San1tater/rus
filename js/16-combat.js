@@ -374,7 +374,7 @@ sweep: !!cfg.sweep,
 
   /* rev-fix-preswap: 战斗开始时预装填（主优先，主无弹则副） */
   (function(){
-    if(cfg.sweep) return;
+    if(cfg.sweep || cfg.sceneType === 'vehicle') return;
 const _slots = ['primary', 'secondary'];
     for(const _s of _slots){
       const _id = state.player.equipped[_s];
@@ -411,6 +411,12 @@ const _slots = ['primary', 'secondary'];
 function _setupCanvas(){
   const z1 = document.getElementById('zone1');
   if(!z1) return;
+  /* rev-fx-dpr: 戰鬥 FX 畫布補 devicePixelRatio —— 與載具畫布一致。
+     背板 = CSS × dpr + setTransform(dpr)；繪製與判定一律用邏輯（CSS）座標。
+     原本背板 = CSS（1×），0.8px 金色火花被瀏覽器放大 dpr 倍 → 糊成一團。 */
+  const dpr = window.devicePixelRatio || 1;
+  const w = z1.clientWidth, h = z1.clientHeight;
+  const bw = Math.max(1, Math.floor(w * dpr)), bh = Math.max(1, Math.floor(h * dpr));
   let c = document.getElementById('combat-overlay');
   if(!c){
     c = document.createElement('canvas');
@@ -418,12 +424,14 @@ function _setupCanvas(){
     c.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:6;';
     z1.appendChild(c);
   }
-  const w = z1.clientWidth, h = z1.clientHeight;
-  if(c.width !== w) c.width = w;
-  if(c.height !== h) c.height = h;
+  if(c.width !== bw) c.width = bw;
+  if(c.height !== bh) c.height = bh;
+  if(c.style.width !== w + 'px') c.style.width = w + 'px';
+  if(c.style.height !== h + 'px') c.style.height = h + 'px';
   window._combat.playerCanvas = c;
   window._combat.playerCtx = c.getContext('2d');
-  /* rev-fix-bullet-zlayer: 頂層 canvas 只畫打載員的子彈/曳光，z-index 高於載員 */
+  window._combat.playerCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  /* rev-fix-bullet-zlayer: 頂層 canvas 只畫打載員的子彈/曳光 */
   let cTop = document.getElementById('combat-overlay-top');
   if(!cTop){
     cTop = document.createElement('canvas');
@@ -431,12 +439,15 @@ function _setupCanvas(){
     cTop.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:12;';
     z1.appendChild(cTop);
   }
-  if(cTop.width !== w) cTop.width = w;
-  if(cTop.height !== h) cTop.height = h;
+  if(cTop.width !== bw) cTop.width = bw;
+  if(cTop.height !== bh) cTop.height = bh;
+  if(cTop.style.width !== w + 'px') cTop.style.width = w + 'px';
+  if(cTop.style.height !== h + 'px') cTop.style.height = h + 'px';
   window._combat.playerCanvasTop = cTop;
   window._combat.playerCtxTop = cTop.getContext('2d');
+  window._combat.playerCtxTop.setTransform(dpr, 0, 0, dpr, 0, 0);
+  window._combat.dpr = dpr;
   window._combat.sm = computeScreenMetrics(w, h);
-
   let fr = document.getElementById('combat-frames');
   if(!fr){
     fr = document.createElement('div');
@@ -454,13 +465,12 @@ function _setupCanvas(){
 }
 
 /* [v272] 全局战斗粒子 FX */
-window._spawnHitSpark = function(owner, sx, sy, crit, cls, isTop){
+window._spawnHitSpark = function(owner, sx, sy, crit, cls, isTop, followTarget){
   if(!owner) return;
   if(!owner.sparks) owner.sparks = [];
-  /* rev-fix-spark-tier-v2: 三档视觉 —— cls 是唯一判定依据，crit 只做击穿内加码。
-   * 未击穿（cls === 'armor'/'miss'/'heal'）：4 粒 / 0.8 小 / 金
-   * 击穿（cls 其他字符串，含 '' / 'weak' / 'enemy' / 'crit'）：7 粒 / 1.2 中 / 红
-   * 暴击（cls === 'crit'）：10 粒 / 1.8 大 / 深红 */
+  /* rev-fix-spark-tier-v2: 三檔視覺 —— cls 是唯一判定依據，crit 只做擊穿內加碼。
+     未擊穿（armor/miss/heal）：4 粒 / 0.8 / 金
+     擊穿：7 粒 / 1.2 / 紅；暴擊：10 粒 / 1.8 / 深紅 */
   var _blocked = (cls === 'armor' || cls === 'miss' || cls === 'heal');
   var n, baseSpd, baseSz, color;
   if(_blocked){
@@ -470,19 +480,39 @@ window._spawnHitSpark = function(owner, sx, sy, crit, cls, isTop){
   } else {
     n = 7; baseSpd = 40; baseSz = 1.2; color = '#ff5030';
   }
+  /* rev-spark-follow: 火花是命中目標的特效 → 跟目標移動。
+     存相對目標的世界偏移（米）+ 世界速度，渲染時經當前相機投影。
+     無目標（後院等舊呼叫端）→ 退回螢幕座標，行為不變。 */
+  var _cmb = window._combat;
+  var _W = window._fxViewW(_cmb && _cmb.playerCanvas);
+  var _sr = (_cmb && _cmb.sm && _cmb.sm.screenRightWorld) || 2;
+  var _hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  var _invD = 1 / Math.max(0.05, 1 - _hr);
+  var _cam = (_cmb && _cmb.allies && _cmb.allies[0] && typeof _cmb.allies[0].worldX === 'number') ? _cmb.allies[0].worldX : 0;
+  var _follow = !!(followTarget && typeof followTarget.worldX === 'number');
+  var _fdx0 = _follow ? ((sx / _W - _hr) * _invD * _sr - (followTarget.worldX - _cam)) : 0;
   for(var i = 0; i < n; i++){
     var ang = Math.random() * Math.PI * 2;
     var spd = baseSpd + Math.random() * 30;
-    owner.sparks.push({
+    var _vx = Math.cos(ang) * spd;
+    var p = {
       x: sx, y: sy,
-      vx: Math.cos(ang) * spd,
+      vx: _vx,
       vy: Math.sin(ang) * spd - 12,
       life: 0.15 + Math.random() * 0.15,
       maxLife: 0.3,
       size: baseSz,
       color: color,
+      _blk: _blocked,
       _top: !!isTop
-    });
+    };
+    if(_follow){
+      p._ft = followTarget;
+      p._fdx = _fdx0;
+      p._wvx = _vx / _W * _invD * _sr;
+      p.x = 0; p.vx = 0;
+    }
+    owner.sparks.push(p);
   }
 };
 window._spawnExplosionSmoke = function(owner, sx, sy, radiusPx){
@@ -514,7 +544,8 @@ window._spawnExplosionSmoke = function(owner, sx, sy, radiusPx){
  *   t=0     碎片    (0~0.9s)  土黄细小颗粒，抛物线下落
  *   t=0.05  火星    (0~1.2s)  红色亮点随机漂移
  * radPx 是视觉半径（px），由调用方按屏幕宽度决定。 */
-window._spawnRPGImpactFx = function(owner, sx, sy, radPx){
+window._spawnRPGImpactFx = function(owner, sx, sy, radPx, noDelay){
+var _st0 = (owner && owner.explosions) ? owner.explosions.length : 0;
   if(!owner) return;
   if(!owner.explosions) owner.explosions = [];
   var _r = (typeof radPx === 'number' && radPx > 0) ? radPx : 60;
@@ -678,25 +709,47 @@ window._spawnRPGImpactFx = function(owner, sx, sy, radPx){
       delay: Math.random() * 0.06
     });
   }
+/* rev-fx-nodelay: 車體命中 / APS 的可見窗口只有 33~140ms（世界 19.4 m/s 掠過 477px 畫布）。
+   黑煙生成延遲 0~160ms → 主煙一半、次煙幾乎全部在出生前就已掠出畫面。
+   此情境歸零延遲；顆數 / 尺寸 / 顏色 / 壽命全不動。 */
+if(noDelay && owner && owner.explosions){
+for(var _di = _st0; _di < owner.explosions.length; _di++){ owner.explosions[_di].delay = 0; }
+}
 };
 
 /* rev-world-anchor: 把刚生成的爆炸粒子从屏幕 px 转成世界米 _wx / _wvx，之后动画永远锚定世界位置。
  * 手雷 / RPG / APS 拦截统一走这个，之前不转导致跟屏幕静止。 */
-window._applyWorldAnchor = function(owner, startIdx, camWX, sm){
+window._applyWorldAnchor = function(owner, startIdx, camWX, sm, followTarget){
   if(!owner || !owner.explosions) return;
   if(startIdx >= owner.explosions.length) return;
   var _cmb = window._combat;
-  var W = (_cmb && _cmb.playerCanvas && _cmb.playerCanvas.width) || 400;
+  var W = window._fxViewW(_cmb && _cmb.playerCanvas);
+  var _ppm = (sm && sm.bgPixelsPerMeter) ? sm.bgPixelsPerMeter : ((_cmb && _cmb.sm && _cmb.sm.bgPixelsPerMeter) || 1);
   var _sr = (sm && sm.screenRightWorld) || 2;
   var _hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
   var _invD = 1 / (1 - _hr);
   for(var i = startIdx; i < owner.explosions.length; i++){
     var q = owner.explosions[i];
-    if(q._wx !== undefined) continue;
+    if(q._wx !== undefined || q._ft) continue;
     if(!isFinite(q.x)) continue;
     var _relM = (q.x / W - _hr) * _invD * _sr;
-    q._wx = camWX + _relM;
-    q._wvx = q.vx / W * _invD * _sr;
+    var _wv = q.vx / W * _invD * _sr;
+    /* rev-fx-frame-all: 命中目標 → 整套粒子跟目標（火光 / 黑煙 / 碎片 / 火星）；
+       沒有目標（地面爆 / 空中攔截）→ 整套錨世界爆點。歸屬只看有無目標，不看 kind。
+       世界錨定者的可見窗只有數十毫秒，生成延遲會讓煙在出生前就掠出畫面 → 歸零。 */
+    if(followTarget){
+      q._ft = followTarget;
+      q._fdx = _relM;
+    } else {
+      q._wx = camWX + _relM;
+      q.delay = 0;
+    }
+    q._wvx = _wv;
+    /* rev-fx-seed-prev: 出生即帶前幀投影，首幀就有拖影 */
+    q._fxPrevPx = q.x;
+    q._wm = true;
+    q.size = q.size / _ppm;
+    q.growth = (q.growth || 0) / _ppm;
     q.x = 0;
     q.vx = 0;
   }
@@ -707,7 +760,14 @@ window._tickBattleFX = function(owner, dt){
   if(owner.sparks){
     for(var i = owner.sparks.length - 1; i >= 0; i--){
       var p = owner.sparks[i];
-      p.x += p.vx * dt;
+      /* rev-spark-follow: 跟目標的火花推進「相對目標的世界偏移」，不是螢幕 x */
+      if(p._ft){
+        p._fdx += (p._wvx || 0) * dt;
+        p._wvx = (p._wvx || 0) * 0.95;
+      } else {
+        p.x += p.vx * dt;
+        p.vx *= 0.95;
+      }
       p.y += p.vy * dt;
       p.vy += 180 * dt;
       p.life -= dt;
@@ -717,10 +777,13 @@ window._tickBattleFX = function(owner, dt){
   if(owner.explosions){
     for(var j = owner.explosions.length - 1; j >= 0; j--){
       var q = owner.explosions[j];
-      /* rev-fix-fx-delay: 延迟生成期间不动、不缩、不消失 */
+      /* rev-fix-fx-delay: 延遲生成期間不動、不縮、不消失 */
       if(q.delay && q.delay > 0){ q.delay -= dt; if(q.delay < 0) q.delay = 0; continue; }
-      /* rev-world-anchor: _wx 粒子走世界静止，其他走屏幕 */
-      if(q._wx !== undefined){
+      /* rev-world-anchor: 跟目標 / 世界靜止 / 螢幕座標三種歸屬 */
+      if(q._ft){
+        q._fdx += (q._wvx || 0) * dt;
+        q._wvx = (q._wvx || 0) * 0.95;
+      } else if(q._wx !== undefined){
         q._wx += q._wvx * dt;
         q._wvx *= 0.95;
       } else {
@@ -728,7 +791,7 @@ window._tickBattleFX = function(owner, dt){
         q.vx *= 0.95;
       }
       q.y += q.vy * dt;
-      /* rev-fix-fx-gravity: 碎片/火星等受重力，需在摩擦前累加，摩擦只衰减速度 */
+      /* rev-fix-fx-gravity: 碎片/火星受重力，需在摩擦前累加 */
       if(q.gravity) q.vy += q.gravity * dt;
       q.vy *= 0.95;
       q.life -= dt;
@@ -783,18 +846,34 @@ window._drawBulletShape = function(ctx, px, py, opts){
 
 window._renderBattleFX = function(ctx, owner, ctxTop){
   if(!owner) return;
+  /* rev-fx-logical-view: 投影 / 裁切用邏輯寬（背板可能是 CSS×dpr） */
+  var _cmb = window._combat;
+  var _WrR = window._fxViewW(ctx.canvas);
+  var _ppmX = (_cmb && _cmb.sm && _cmb.sm.bgPixelsPerMeter) ? _cmb.sm.bgPixelsPerMeter : 1;
   if(owner.sparks){
+    /* rev-spark-render: 跟目標的火花每幀重新投影；螢幕外不畫。
+       未擊穿是金點，落在淺色裝甲上對比不足 → 深色接觸影讓它讀得出來。
+       火花本身顆數 / 半徑 / 顏色不變。 */
     for(var i = 0; i < owner.sparks.length; i++){
       var p = owner.sparks[i];
       var a = Math.max(0, Math.min(1, p.life / p.maxLife * 1.6));
       var _c = (p._top && ctxTop) ? ctxTop : ctx;
+      var _pxs = (p._ft || p._wx !== undefined) ? window._fxProjectPx(p, _WrR) : p.x;
+      if(!isFinite(_pxs) || _pxs < -20 || _pxs > _WrR + 20) continue;
       _c.save();
+      if(p._blk){
+        _c.globalAlpha = a * 0.6;
+        _c.fillStyle = 'rgba(20,14,8,1)';
+        _c.beginPath();
+        _c.arc(_pxs, p.y, p.size * 2.0, 0, Math.PI * 2);
+        _c.fill();
+      }
       _c.globalAlpha = a;
       _c.fillStyle = p.color;
       _c.shadowColor = p.color;
       _c.shadowBlur = 6;
       _c.beginPath();
-      _c.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      _c.arc(_pxs, p.y, p.size, 0, Math.PI * 2);
       _c.fill();
       _c.restore();
     }
@@ -802,34 +881,41 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
   if(owner.explosions){
     for(var j = 0; j < owner.explosions.length; j++){
       var q = owner.explosions[j];
-      /* rev-fix-fx-delay-render: 延迟期不绘制 */
-      if(q.delay && q.delay > 0) continue;
-      /* rev-fix-fx-alpha: flash / ember_hot 单独提高，其余保持 0.55 */
+      /* rev-fx-prev-delay: 延遲期不繪製，但先記錄投影位置，
+         出生首幀才有前幀位置可畫拖影 */
+      if(q.delay && q.delay > 0){
+        q._fxPrevPx = window._fxProjectPx(q, _WrR);
+        continue;
+      }
+      /* rev-fix-fx-alpha: flash / ember_hot 單獨提高，其餘 0.55 */
       var _aBase = 0.55;
       if(q.kind === 'flash') _aBase = 0.95;
       else if(q.kind === 'flash2') _aBase = 0.80;
       else if(q.kind === 'ember_hot') _aBase = 0.80;
       var a2 = Math.max(0, Math.min(1, q.life / q.maxLife)) * _aBase;
       var _c2 = (q._top && ctxTop) ? ctxTop : ctx;
-      /* rev-fx-guard: NaN/负 size 直接跳过 */
-      if(!isFinite(q.size) || q.size <= 0) continue;
-      /* rev-world-anchor: _wx 粒子按当前相机换算屏幕 x，屏幕外跳过 */
-      var _px = q.x;
-      if(q._wx !== undefined){
-        var _cmb = window._combat;
-        var _camWX = (_cmb && _cmb.allies && _cmb.allies[0]) ? _cmb.allies[0].worldX : 0;
-        var _smR = (_cmb && _cmb.sm) || { screenRightWorld: 2 };
-        var _srR = _smR.screenRightWorld || 2;
-        var _hrR = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
-        var _WrR = ctx.canvas.width;
-        _px = (_hrR + (q._wx - _camWX) / _srR * (1 - _hrR)) * _WrR;
+      /* _wm：尺寸存世界米，經 ppm 換算 → 各裝置物理尺寸一致 */
+      var _szPx = q._wm ? (q.size * _ppmX) : q.size;
+      if(!isFinite(_szPx) || _szPx <= 0) continue;
+      var _px = window._fxProjectPx(q, _WrR);
+      var _pxPrev = (typeof q._fxPrevPx === 'number') ? q._fxPrevPx : null;
+      /* rev-fx-prev-keep: 前幀位置一律保留 —— 裁切時清空會讓粒子
+         重新入框的首幀沒有拖影，那一幀正是最關鍵的可見幀 */
+      q._fxPrevPx = _px;
+      if(q._ft || q._wx !== undefined){
         if(_px < -_WrR * 0.5 || _px > _WrR * 1.5) continue;
       }
       if(!isFinite(_px) || !isFinite(q.y)) continue;
       _c2.save();
       _c2.globalAlpha = a2;
-      var g = _c2.createRadialGradient(_px, q.y, 0, _px, q.y, q.size);
-      /* rev-fix-fx-kinds: 按 kind 分派渐变（默认走手雷灰） */
+      /* rev-fx-streak: 高速掠過快門的粒子以拖影光柵化。
+         位置 / 壽命 / 顆數 / 濃度全不改，只改「怎麼把移動掃描到畫面上」。 */
+      var _stDx = (_pxPrev != null && !q._ft) ? (_px - _pxPrev) : 0;
+      var _rxSt = _szPx + Math.abs(_stDx) * 0.5;
+      _c2.translate(_px - _stDx * 0.5, q.y);
+      _c2.scale(_rxSt / Math.max(0.001, _szPx), 1);
+      var g = _c2.createRadialGradient(0, 0, 0, 0, 0, _szPx);
+      /* rev-fix-fx-kinds: 按 kind 分派漸變（預設走手雷灰） */
       if(q.kind === 'flash'){
         g.addColorStop(0, 'rgba(255,255,255,1)');
         g.addColorStop(0.3, 'rgba(255,242,180,0.9)');
@@ -845,7 +931,7 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
         g.addColorStop(0.5, 'rgba(28,24,20,0.55)');
         g.addColorStop(1, 'rgba(10,8,6,0)');
       } else if(q.kind === 'smoke_light'){
-        /* rev-aps-smoke: APS 拦截残留烟云，浅灰/白，轻薄快速消散 */
+        /* rev-aps-smoke: APS 攔截殘留煙雲，淺灰/白 */
         g.addColorStop(0, 'rgba(220,220,225,0.75)');
         g.addColorStop(0.5, 'rgba(200,200,210,0.35)');
         g.addColorStop(1, 'rgba(180,180,190,0)');
@@ -865,7 +951,6 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
         g.addColorStop(0.4, 'rgba(255,200,90,0.9)');
         g.addColorStop(1, 'rgba(180,40,0,0)');
       } else {
-        /* 默认（手雷灰色） */
         g.addColorStop(0, 'rgba(180,180,180,0.9)');
         g.addColorStop(0.5, 'rgba(140,140,140,0.4)');
         g.addColorStop(1, 'rgba(100,100,100,0)');
@@ -873,9 +958,9 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
       _c2.fillStyle = g;
       _c2.beginPath();
       if(q.isGround){
-        _c2.ellipse(_px, q.y, q.size, q.size * 0.18, 0, 0, Math.PI * 2);
+        _c2.ellipse(0, 0, _szPx, _szPx * 0.18, 0, 0, Math.PI * 2);
       } else {
-        _c2.arc(_px, q.y, q.size, 0, Math.PI * 2);
+        _c2.arc(0, 0, _szPx, 0, Math.PI * 2);
       }
       _c2.fill();
       _c2.restore();
@@ -884,19 +969,22 @@ window._renderBattleFX = function(ctx, owner, ctxTop){
 };
 
 function _cleanup(){
-  window._combatActive = false;
-  window._combat = null;
-  const c = document.getElementById('combat-overlay');
-  if(c) c.remove();
-  const f = document.getElementById('combat-frames');
-  if(f) f.remove();
-  const fl = document.getElementById('combat-frames-left');
-  if(fl) fl.remove();
-  if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'walk' && heroAnim.name !== 'idle'){
-    heroAnim.name = 'walk';
-    heroAnim.frame = 0;
-    heroAnim.lastUpdate = performance.now();
-  }
+/* rev-arm45: 不清除 dead —— 舊版把倒地重置成 walk，玩家/守衛會「站著不動」。 */
+window._combatActive = false;
+window._combat = null;
+const c = document.getElementById('combat-overlay');
+if(c) c.remove();
+const ct = document.getElementById('combat-overlay-top');
+if(ct) ct.remove();
+const f = document.getElementById('combat-frames');
+if(f) f.remove();
+const fl = document.getElementById('combat-frames-left');
+if(fl) fl.remove();
+if(typeof heroAnim !== 'undefined' && heroAnim.name !== 'walk' && heroAnim.name !== 'idle' && heroAnim.name !== 'dead'){
+heroAnim.name = 'walk';
+heroAnim.frame = 0;
+heroAnim.lastUpdate = performance.now();
+}
 }
 
 window._combatCleanup = _cleanup;
@@ -1011,42 +1099,43 @@ function _playHurt(now){
 }
 
 function _updatePAnim(now){
-  const c = window._combat;
-  if(!c || typeof heroAnim === 'undefined' || c.sceneType === 'vehicle') return;
-  const p = c.allies[0];
-  if(!p || !p.isPlayer) return;
-  /* 治療中保持 heal_melee，不被 walk/idle 覆蓋（否則 frame 永遠停在 0） */
-  const _exHeal = window._explore;
-  if(_exHeal && _exHeal.mode === 'healing') return;
-
-  /* [v180 F6d] 非 heal_melee 狀態下，清治療殘留。
-     避免手持醫療包行走 + eqSlot='__hidden__' 導致武器被隱藏。 */
-  if(!(window._heroEqHolds && window._heroEqHolds(heroAnim.name)) && heroAnim.healItem){ /* rev-hands-combat */
-    heroAnim.healItem = null;
-    if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
-  }
-
-  /* rev-fix-updatepanim-priority: 攻擊流程（reload → switch → fire 保持原相對順序）整體 > 受擊 > walk/idle
-     攻擊流程包含開火、換彈、換武器——全部是攻擊的一部分，不得被受擊打斷 */
-  if(now < c._playerReloadEnd){
-    if(heroAnim.name !== 'reload'){ heroAnim.name = 'reload'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
-    return;
-  }
-  if(now < c._playerSwitchEnd && c._switchAnim){
-    if(heroAnim.name !== c._switchAnim){ heroAnim.name = c._switchAnim; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
-    return;
-  }
-  if(now < c._playerAnimUntil && c._fireAnim){
-    if(heroAnim.name !== c._fireAnim) heroAnim.name = c._fireAnim;
-    return;
-  }
-  if(now < c._hurtUntil){
-    if(heroAnim.name !== 'hurt'){ heroAnim.name = 'hurt'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
-    return;
-  }
-  const ex = window._explore;
-  const want = (ex && ex._currentSpeed > 0.5) ? 'walk' : 'idle';
-  if(heroAnim.name !== want){ heroAnim.name = want; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
+/* rev-weapon-restore: 治療 / 手雷 / 換彈結束後強制恢復武器顯示，
+   不再讓 eqSlot='hidden' 或 healItem 殘留導致武器消失。 */
+const c = window._combat;
+if(!c || typeof heroAnim === 'undefined' || c.sceneType === 'vehicle') return;
+const p = c.allies[0];
+if(!p || !p.isPlayer) return;
+const ex = window._explore;
+const _healing = !!(ex && ex.mode === 'healing');
+/* 非治療中一律清治療殘留（含手雷 / 換彈 / 受擊路徑） */
+if(!_healing && heroAnim.name !== 'heal_melee'){
+if(heroAnim.eqSlot === 'hidden') heroAnim.eqSlot = null;
+if(heroAnim.healItem) heroAnim.healItem = null;
+}
+if(_healing) return;
+if(heroAnim.name === 'dead') return;
+if(now < (c._playerReloadEnd || 0)){
+if(heroAnim.name !== 'reload'){ heroAnim.name = 'reload'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
+return;
+}
+if(now < (c._playerSwitchEnd || 0) && c._switchAnim){
+if(heroAnim.name !== c._switchAnim){ heroAnim.name = c._switchAnim; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
+return;
+}
+if(now < (c._playerAnimUntil || 0) && c._fireAnim){
+if(heroAnim.name !== c._fireAnim) heroAnim.name = c._fireAnim;
+return;
+}
+/* 動作視窗已過期 → 清殘留並回移動 / 待機 */
+if(c._fireAnim){ c._fireAnim = null; c._playerAnimUntil = 0; }
+if(heroAnim.eqSlot === 'hidden') heroAnim.eqSlot = null;
+if(heroAnim.healItem) heroAnim.healItem = null;
+if(now < (c._hurtUntil || 0)){
+if(heroAnim.name !== 'hurt'){ heroAnim.name = 'hurt'; heroAnim.frame = 0; heroAnim.lastUpdate = now; }
+return;
+}
+const want = (ex && ex._currentSpeed > 0.5) ? 'walk' : 'idle';
+if(heroAnim.name !== want){ heroAnim.name = want; heroAnim.frame = 0; heroAnim.lastUpdate = now; heroAnim.forcedEnd = 0; heroAnim.animStart = null; }
 }
 
 function _playFire(now, isPrimary){
@@ -1149,7 +1238,6 @@ function _syncWorldEnemies(now){
       if(ev.cleared) continue;
       if(ev.type !== 'combat') continue;
       if(!ev.content || !ev.content.length) continue;
-      if(isV && ev.worldX <= ex.worldX) continue;
       for(let j = 0; j < ev.content.length; j++){
         const en = ev.content[j];
         if(!en || en.hp <= 0) continue;
@@ -1157,7 +1245,7 @@ function _syncWorldEnemies(now){
         if(!_isDiscovered(en, ev.worldX, isV, _p, ex)) continue;
         en.worldX = ev.worldX + (j - (ev.content.length - 1) / 2) * 1.5;
         en._initWorldX = en.worldX;
-        en._eventRef = ev;
+        window._setEnemyEvent(en, ev);
         en._nextFireAt = now + REACTION_SECOND_MS;
         c.enemies.push(en);
         _activeSet.add(en);
@@ -1202,20 +1290,7 @@ function _tickAI(dt, now){
         }
         continue;
       }
-      /* Boss 目標：不跑步兵 AI（Boss 有自己的狀態機）。
-         載具接觸即必殺 —— 與探索 roadkill 同一條「車頭越過目標近緣」判定。 */
-      if(e.isBoss){
-        if(_isVeh){
-          var _hlB = (typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(p.vehicleId) : 3.6;
-          var _boxB = (typeof window._getTargetBox === 'function') ? window._getTargetBox(e) : null;
-          var _bHalf = (_boxB && _boxB.L > 0) ? _boxB.L / 2 : 2; /* rev-sweep-bossfix2 */
-          if(e.worldX - _bHalf <= p.worldX + _hlB){
-            c.enemies.splice(i, 1);
-            if(typeof window._bossVehicleRoadkill === 'function') window._bossVehicleRoadkill();
-          }
-        }
-        continue;
-      }
+      
     if(_isVeh && (!isFinite(e.worldX) || e.worldX <= p.worldX + ((typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(p.vehicleId) : 3.6))){
       e.hp = 0;
       e.gone = true;
@@ -1276,7 +1351,7 @@ function _autoFireFoot(now){
 
   /* 問題 3：車門開啟後玩家不射擊，由載具承傷 */
   const _btr = window.BTRSupport;
-  const _btrPlayerProtected = !!(_btr && _btr.active && (_btr.phase === 'arrive' || _btr.phase === 'sink' || _btr.phase === 'center' || _btr.phase === 'support'));
+  const _btrPlayerProtected = (typeof window._isPlayerMounted === 'function' ? window._isPlayerMounted() : false);
   if(p.isPlayer && !_btrPlayerProtected && p.hp > 0 && now >= (p._nextFireAt || 0) && !(window._explore && window._explore.mode === "healing")){ /* rev-combatfix */
     /* rev-fix-player-grenade-branch: 10% 概率優先投雷 */
     let _threw = false;
@@ -1500,54 +1575,28 @@ function _getPassengerMuzzlePos(a){
 }
 
 function _getEnemyMuzzlePos(e, p, isRPG){
-  const fx = document.getElementById('combat-overlay');
-  const W = fx ? fx.clientWidth : 400;
-  const H = fx ? fx.clientHeight : 500;
-  const c = window._combat;
-  if(!c) return { x: 1.05, y: 0.55 };
-  const sm = c.sm;
-  const relRaw = e.worldX - p.worldX;
-  const rel = isRPG ? (relRaw + 0.5) : relRaw;
-
-  let sxPx = (EXPLORE_HERO_X_RATIO + (rel / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO)) * W;
-  if(rel <= 0) {
-    sxPx = 0.02 * W;
-  }
-
-  const _wid = (isRPG && e.hasRPG) ? 'rpg'
-             : (e.primaryWeapon && e.primaryWeapon.id) ? e.primaryWeapon.id
-             : (e.secondaryWeapon && e.secondaryWeapon.id) ? e.secondaryWeapon.id
-             : null;
-  if(!_wid || typeof getWeaponCfg !== 'function' || typeof computeWeaponCharLayout !== 'function'){
-    return { x: sxPx / W, y: 0.55 };
-  }
-  const _slot = (_wid === 'rpg') ? 'primary' : ((e.primaryWeapon && e.primaryWeapon.id === _wid) ? 'primary' : 'secondary');
-  const cfg = getWeaponCfg(_slot, _wid);
-  if(!cfg) return { x: sxPx / W, y: 0.55 };
-  const layout = computeWeaponCharLayout(cfg);
-  if(!layout) return { x: sxPx / W, y: 0.55 };
-  const _wm = (typeof WEAPON_MUZZLE !== 'undefined') ? WEAPON_MUZZLE[resolveIconId(_wid)] : null;
-  const _tr = cfg.trim;
-  const sc = (H * CHAR_HEIGHT_FACTOR) / 386;
-  const fy = H * 0.95;
-  const ORIG_FOOT_X = 200;
-  const ORIG_FOOT_Y = 515;
-  let _localX, _localY;
-  if(_wm && _tr && _tr.w > 0 && _tr.h > 0 && layout.isTrimMode){
-    const _baseW = layout.baseW;
-    const _baseH = _tr.h * (cfg.scale || 1.0);
-    const _mzLocalX = layout.anchorX + (_wm.x / _tr.w) * _baseW;
-    const _mzLocalY = layout.anchorY - _baseH / 2 + (_wm.y / _tr.h) * _baseH;
-    _localX = sc * (_mzLocalX - ORIG_FOOT_X);
-    _localY = sc * (_mzLocalY - ORIG_FOOT_Y);
-  } else {
-    _localX = sc * (layout.rightX - ORIG_FOOT_X);
-    _localY = sc * (layout.anchorY - ORIG_FOOT_Y);
-  }
-  return {
-    x: (sxPx - _localX) / W,
-    y: (fy + _localY) / H
-  };
+/* rev-arm45: 敵槍口委派共用函數（flipX=true → 右手=back_arm + 互換 keys）。 */
+const fx = document.getElementById('combat-overlay');
+const W = fx ? fx.clientWidth : 400, H = fx ? fx.clientHeight : 500;
+const c = window._combat;
+if(!c) return {x:1.05, y:0.55};
+const sm = c.sm || {screenRightWorld:2};
+const relRaw = e.worldX - p.worldX;
+const rel = isRPG ? (relRaw + 0.5) : relRaw;
+let sxPx = (EXPLORE_HERO_X_RATIO + (rel/(sm.screenRightWorld||2))*(1-EXPLORE_HERO_X_RATIO))*W;
+if(rel <= 0) sxPx = 0.02*W;
+const _wid = (isRPG && e.hasRPG) ? 'rpg'
+: (e.primaryWeapon && e.primaryWeapon.id) ? e.primaryWeapon.id
+: (e.secondaryWeapon && e.secondaryWeapon.id) ? e.secondaryWeapon.id : null;
+if(!_wid || typeof window.getCharWeaponMuzzleLocal !== 'function') return {x:sxPx/W, y:0.55};
+const _slot = (isRPG && e.hasRPG) ? 'primary' : ((e.primaryWeapon && e.primaryWeapon.id === _wid) ? 'primary' : 'secondary');
+const _now = performance.now();
+const _as = (typeof getUnitAnimState === 'function') ? getUnitAnimState(e, _now) : {name:'idle', startTime:_now};
+const _fi = (typeof computeAnimFrame === 'function') ? computeAnimFrame(_as.name, _as.startTime, _now) : 0;
+const mz = window.getCharWeaponMuzzleLocal(_slot, _wid, _as.name, _fi, true);
+if(!mz) return {x:sxPx/W, y:0.55};
+const sc = (H*CHAR_HEIGHT_FACTOR)/386;
+return { x: (sxPx + sc*(200 - mz.x))/W, y: (H*0.95 + sc*(mz.y - 515))/H };
 }
 
 
@@ -1849,7 +1898,8 @@ function _firePassenger(a, t, now, w){
             if(p.id === firstAmmo.id && p.rarity === firstAmmo.rarity && p.cal === def.cal && p.count > 0){
               p.count--;
               if(p._src) p._src.count = p.count;
-              taken++;
+              if(p._isAmmoHandlerBox && p._ownerP) p._ownerP.primaryWeaponBoxCount = p.count;
+taken++;
               _found = true;
               break;
             }
@@ -1956,7 +2006,7 @@ function _enemyFire(e, now){
   if(!c) return;
   if(e._reloadEnd && now < e._reloadEnd) return;
   const _btr = window.BTRSupport;
-  const _btrProtect = !!(_btr && _btr.active && (_btr.phase === 'arrive' || _btr.phase === 'sink' || _btr.phase === 'center' || _btr.phase === 'support'));
+  const _btrProtect = (typeof window._isPlayerMounted === 'function' ? window._isPlayerMounted() : false);
   const _eRange142 = _eRange(e);
   const aliveAllies = [];
   for(let i = 0; i < c.allies.length; i++){
@@ -2470,7 +2520,7 @@ function _enemyFireRPG(e, p, now){
     const rarR2 = e.rpgRarity || e.rarity;
     const dmgR2 = e.rpgDmg || (100 * (RARITY_MULT[rarR2] || 1));
     const penMMR2 = e.rpgPenMM || 600;
-    const spdR2 = 280;
+    const spdR2 = window._rpg27Spd();
     const hrR2 = Math.round((e.hitBase || 0.6) * 100);
     window._weaponFire({
       owner: c,
@@ -2499,11 +2549,16 @@ var _p0R = c.allies[0] ? c.allies[0].worldX : 0;
 var _hrR = (typeof EXPLORE_HERO_X_RATIO === "number") ? EXPLORE_HERO_X_RATIO : 0.25;
 var _sxR = _hrR + (hitX - _p0R) / c.sm.screenRightWorld * (1 - _hrR);
 var _syR = 0.95 - hitY * ((typeof CHAR_HEIGHT_FACTOR === "number" ? CHAR_HEIGHT_FACTOR : 0.58) / (typeof PLAYER_HEIGHT_M === "number" ? PLAYER_HEIGHT_M : 1.7));
-if(_sxR >= 0 && _sxR <= 1){
-var _stR = c.explosions ? c.explosions.length : 0;
-if(typeof window._spawnRPGImpactFx === "function") window._spawnRPGImpactFx(c, _sxR * _WR, _syR * _HR, _WR * 0.18);
-if(typeof window._applyWorldAnchor === "function") window._applyWorldAnchor(c, _stR, _p0R, c.sm);
-}
+var _doRpgFx = function(){
+if(!(_sxR >= 0 && _sxR <= 1)) return;
+if(!c.explosions) return;
+var _stR = c.explosions.length;
+if(typeof window._spawnRPGImpactFx === 'function') window._spawnRPGImpactFx(c, _sxR * _WR, _syR * _HR, _WR * 0.18, !!(tgt && tgt.isVehicle));
+if(typeof window._applyWorldAnchor === 'function') window._applyWorldAnchor(c, _stR, _p0R, c.sm, tgt || null);
+};
+/* rev-fx-aps-order: 攔截成功不該出現裝甲命中爆炸 → 載具目標先判定再繪製。
+   彈著螢幕位置沿用既有 0.25 妥協（砲管外伸，實繪車體不在判定盒前緣）。 */
+if(!(tgt && tgt.isVehicle)) _doRpgFx();
 } catch(e){}
 
         if(!tgt || tgt.hp <= 0) return;
@@ -2515,7 +2570,8 @@ if(typeof window._applyWorldAnchor === "function") window._applyWorldAnchor(c, _
         if(tgt.isVehicle){
           if(typeof window._vHitVehicle === 'function'){
             const _eNameR2 = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
-            window._vHitVehicle(tgt, baseDmgR2, penMMR2, 'atgm', _eNameR2, 'RPG', rarR2, e.rarity || '一般', spdR2, 85);
+            var _vResR2 = window._vHitVehicle(tgt, baseDmgR2, penMMR2, 'atgm', _eNameR2, 'RPG', rarR2, e.rarity || '一般', spdR2, window._rpg27Cal());
+if(!(_vResR2 && _vResR2.intercepted) && typeof _doRpgFx === 'function') _doRpgFx();
           }
         }
         if(tgt.isPlayer){
@@ -2641,7 +2697,7 @@ if(typeof window._applyWorldAnchor === "function") window._applyWorldAnchor(c, _
   const penMM = e.rpgPenMM || 600;
 
   const _approachPx = Math.max(0, (window._explore && window._explore._currentSpeed) || 0) * c.sm.bgPixelsPerMeter;
-  const duration = Math.max(16, (Math.abs(p.worldX - e.worldX) / 280) * 1000);
+  const duration = Math.max(16, (Math.abs(p.worldX - e.worldX) / window._rpg27Spd()) * 1000);
   const _tx = hit ? tx : ((tx < mz.x) ? -0.5 : 1.5);
 
   /* rev-fix-vehicle-hit-pos: 载具目标 → 载具视觉中心 */
@@ -2671,8 +2727,8 @@ if(typeof window._applyWorldAnchor === "function") window._applyWorldAnchor(c, _
       if(p.isVehicle){
         if(typeof window._vHitVehicle === 'function'){
           const _eNameR = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
-          /* rev-arena: RPG 弹速 280 m/s，口径 85mm（PG-7V 弹头） */
-          window._vHitVehicle(p, baseDmg, penMM, 'atgm', _eNameR, 'RPG', rar, e.rarity || '一般', 280, 85);
+          /* rev-rpg27-note: RPG-27 / PG-27 —— 105mm，初速 130 m/s（筒內燃盡，無續燃） */
+          window._vHitVehicle(p, baseDmg, penMM, 'atgm', _eNameR, 'RPG', rar, e.rarity || '一般', window._rpg27Spd(), window._rpg27Cal());
         }
       }
 
@@ -2802,39 +2858,63 @@ if(typeof window._applyWorldAnchor === "function") window._applyWorldAnchor(c, _
 const GRENADE_SPLASH_RATIO = 0.08;
 window.GRENADE_SPLASH_RATIO = GRENADE_SPLASH_RATIO;
 function _applyGrenadeToTargets(targets, gDef, gRar, hitRate, penMM, armorProviderFn, centerWorldX, casualtyRadius){
-if(typeof centerWorldX !== 'number' || !isFinite(centerWorldX)) return [];
-var fragments = gDef.fragments || 1;
-var fragDmg = gDef.fragmentDamage || gDef.dmg || 0;
-var gDmg = fragDmg * (RARITY_MULT[gRar] || 1);
-var radius = (typeof casualtyRadius === 'number' && casualtyRadius > 0) ? casualtyRadius : 10;
-var hr = Math.min(1, Math.max(0, hitRate || 0));
-var ratio = (typeof gDef.splashRatio === 'number') ? gDef.splashRatio : GRENADE_SPLASH_RATIO;
-var budget = fragments * gDmg * hr * ratio;
-if(!(budget > 0)) return [];
-var critRate = (typeof calcCritRate === 'function') ? calcCritRate(gRar, gRar) : 0.1;
-var critMult = (typeof calcCritMult === 'function') ? calcCritMult(gRar, gRar) : 1.5;
-var P = { x:centerWorldX, y:0, z:0 };
-var results = [];
-for(var i = 0; i < targets.length; i++){
-var t = targets[i];
-if(!t || t.hp <= 0 || typeof t.worldX !== 'number') continue;
-var box = window._getTargetBox(t);
-if(!box) continue;
-var x1 = t.worldX - box.L / 2, x2 = t.worldX + box.L / 2;
-var ddx = (centerWorldX < x1) ? (x1 - centerWorldX) : ((centerWorldX > x2) ? (centerWorldX - x2) : 0);
-if(ddx >= radius) continue;
-var ap = armorProviderFn ? armorProviderFn(t) : null;
-var isCrit = Math.random() < critRate;
-var proxy = { hp:t.hp, armor:t.armor || 0 };
-var res = window._applyExplosionToBox(t, P, {
-totalDmg: budget * (isCrit ? critMult : 1), maxR: radius, pen: penMM || 0,
-applyBand: function(part, dmg, pen){ return applyDamage(proxy, dmg, pen, ap ? { part:part, armorProvider:ap } : { part:part }); }
-});
-t.hp = proxy.hp; t.armor = proxy.armor;
-var hpL = res ? res.hpLost : 0, arL = res ? res.armorLost : 0;
-results.push({ target:t, hits:(hpL > 0 || arL > 0) ? 1 : 0, hpLost:hpL, armorLost:arL, crit:isCrit });
-}
-return results;
+  if(typeof centerWorldX !== 'number' || !isFinite(centerWorldX)) return [];
+  var fragments = gDef.fragments || 1;
+  var fragDmg = gDef.fragmentDamage || gDef.dmg || 0;
+  var gDmg = fragDmg * (RARITY_MULT[gRar] || 1);
+  var radius = (typeof casualtyRadius === 'number' && casualtyRadius > 0) ? casualtyRadius : 10;
+  var hr = Math.min(1, Math.max(0, hitRate || 0));
+  var ratio = (typeof gDef.splashRatio === 'number') ? gDef.splashRatio : GRENADE_SPLASH_RATIO;
+  var budget = fragments * gDmg * hr * ratio;
+  if(!(budget > 0)) return [];
+  var critRate = (typeof calcCritRate === 'function') ? calcCritRate(gRar, gRar) : 0.1;
+  var critMult = (typeof calcCritMult === 'function') ? calcCritMult(gRar, gRar) : 1.5;
+  var P = { x:centerWorldX, y:0, z:0 };
+  var results = [];
+  for(var i = 0; i < targets.length; i++){
+    var t = targets[i];
+    if(!t || t.hp <= 0 || typeof t.worldX !== 'number') continue;
+    var box = window._getTargetBox(t);
+    if(!box) continue;
+    var x1 = t.worldX - box.L / 2, x2 = t.worldX + box.L / 2;
+    var ddx = (centerWorldX < x1) ? (x1 - centerWorldX) : ((centerWorldX > x2) ? (centerWorldX - x2) : 0);
+    if(ddx >= radius) continue;
+    /* 暴擊判定必須在使用之前 —— 原本 var isCrit 宣告在載具分支之後，
+       var hoisting 讓載具分支讀到 undefined，手雷對載具永遠不暴擊。 */
+    var isCrit = Math.random() < critRate;
+    /* rev-veh-grenade: 載具走統一委派，不寫幽靈 veh.hp
+       （幽靈 HP 歸零會使全場停止把載具當目標）。 */
+    if(t.isVehicle){
+      if(typeof window._vApplyExplosionToVehicle === 'function'){
+        var _vres = window._vApplyExplosionToVehicle(t, P, {
+          totalDmg: budget * (isCrit ? critMult : 1), maxR: radius,
+          penFor: function(){ return penMM || 0; },
+          ammoId: 'frag', attackerName: '手榴彈', weaponName: '手榴彈',
+          weaponRarity: gRar, attackerRarity: gRar
+        });
+        var _vdmg = 0;
+        if(_vres && _vres.bands){
+          for(var _vi = 0; _vi < _vres.bands.length; _vi++){
+            var _vb = _vres.bands[_vi];
+            if(_vb.result && _vb.result.penetrated) _vdmg += (_vb.dmg || 0);
+          }
+        }
+        _vdmg = Math.round(_vdmg);
+        results.push({ target:t, hits:_vdmg > 0 ? 1 : 0, hpLost:0, armorLost:_vdmg, crit:isCrit });
+      }
+      continue;
+    }
+    var ap = armorProviderFn ? armorProviderFn(t) : null;
+    var proxy = { hp:t.hp, armor:t.armor || 0 };
+    var res = window._applyExplosionToBox(t, P, {
+      totalDmg: budget * (isCrit ? critMult : 1), maxR: radius, pen: penMM || 0,
+      applyBand: function(part, dmg, pen){ return applyDamage(proxy, dmg, pen, ap ? { part:part, armorProvider:ap } : { part:part }); }
+    });
+    t.hp = proxy.hp; t.armor = proxy.armor;
+    var hpL = res ? res.hpLost : 0, arL = res ? res.armorLost : 0;
+    results.push({ target:t, hits:(hpL > 0 || arL > 0) ? 1 : 0, hpLost:hpL, armorLost:arL, crit:isCrit });
+  }
+  return results;
 }
 
 /* rev-fix-throw-physics-v4: 速度隨距離變化 + 含 H₀ 高抛解 */
@@ -3208,9 +3288,13 @@ function _tickBullets(dt){
   }
 
   for(let k = c.rpgSmoke.length - 1; k >= 0; k--){
-    c.rpgSmoke[k].age += dt;
-    if(c.rpgSmoke[k].age > 1.2) c.rpgSmoke.splice(k, 1);
-  }
+const _sp = c.rpgSmoke[k];
+_sp.age += dt;
+/* rev-smoke-rise: 熱浮力 —— 煙團緩慢上升（世界米） */
+if(typeof _sp._wy === 'number' && typeof _sp.vy === 'number') _sp._wy += _sp.vy * dt;
+const _lfA = (typeof _sp.life === 'number' && _sp.life > 0) ? _sp.life : 1.2;
+if(_sp.age > _lfA) c.rpgSmoke.splice(k, 1);
+}
   for(let j = c.floats.length - 1; j >= 0; j--){
     c.floats[j].age += dt;
     if(c.floats[j].age > 1.2) c.floats.splice(j, 1);
@@ -3225,8 +3309,8 @@ function _tickBullets(dt){
   _tickBattleFX(c, dt);
   /* rev-weapon-core: 新武器子弹碰撞与制导 */
   if(typeof window._tickWeaponBullets === 'function'){
-    if(c.enemies && c.enemies.length) window._tickWeaponBullets(c, dt, c.enemies);
-    if(c.allies && c.allies.length > 1) window._tickWeaponBullets(c, dt, c.allies);
+    window._tickWeaponBullets(c, dt, c.enemies);
+window._tickWeaponBullets(c, dt, c.allies);
   }
 }
 function _float(t, text, cls, opts){
@@ -3236,15 +3320,20 @@ function _float(t, text, cls, opts){
   var fxEl = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
   var W = fxEl ? fxEl.clientWidth : 400;
   var H = fxEl ? fxEl.clientHeight : 500;
-  /* rev-float-hitpos: opts.hitWorldX/Y 提供真实落点时，直接按世界坐标映射屏幕位置 */
+  /* rev-spark-bullet-only: 命中火花只屬於子彈命中。
+     RPG 直擊 / 破片 / 手雷不畫 —— 它們有自己的爆炸特效。
+     近戰無 _hitCtx → 保留火花。判定只用既有資料，不新增欄位。 */
+  var _hcS = window._hitCtx;
+  var _noSpark = !!(_hcS && (_hcS.isDirect === false || (_hcS.bullet && (_hcS.bullet.isRPG || _hcS.bullet.isGrenade))));
+  /* rev-float-hitpos: opts.hitWorldX/Y 提供真實落點時，按世界座標映射螢幕位置 */
   if(opts && typeof opts.hitWorldX === 'number' && typeof opts.hitWorldY === 'number'){
-    /* rev-float-passenger-screenx: 载员用其实际 screenX（世界映射不准），其它用世界映射 */
+    /* rev-float-passenger-screenx: 載員用其實際 screenX，其它用世界映射 */
     var sxRawH;
     if(t && t.isPassenger && t.srv){
       var _pfArrH = (window._explore && window._explore.passengersFollowing) || [];
       var _foundH = false;
       for(var _iH = 0; _iH < _pfArrH.length; _iH++){
-        if(_pfArrH[_iH].srv && _pfArrH[_iH].srv.id === t.srv.id){ sxRawH = _pfArrH[_iH].screenX; _foundH = true; break; }
+        if(_pfArrH[_iH].srv && t.srv && _pfArrH[_iH].srv.id === t.srv.id){ sxRawH = _pfArrH[_iH].screenX; _foundH = true; break; }
       }
       if(!_foundH){
         var _p0hA = (c.allies && c.allies[0]) ? c.allies[0].worldX : 0;
@@ -3259,8 +3348,8 @@ function _float(t, text, cls, opts){
     var _syN = 0.95 - opts.hitWorldY * (_chf / _phm);
     if(_syN < 0.02) _syN = 0.02;
     if(_syN > 0.98) _syN = 0.98;
-    if(cls !== 'miss' && cls !== 'heal' && typeof _spawnHitSpark === 'function'){
-      _spawnHitSpark(c, sxRawH * W, _syN * H, cls === 'crit', cls, !!(t && t.isPassenger));
+    if(!_noSpark && cls !== 'miss' && cls !== 'heal' && typeof window._spawnHitSpark === 'function'){
+      window._spawnHitSpark(c, sxRawH * W, _syN * H, cls === 'crit', cls, !!(t && t.isPassenger), t);
     }
     var _floatXH = Math.max(0.05, Math.min(0.95, sxRawH));
     c.floats.push({ text: text, cls: cls || '', age: 0, x: _floatXH, y: 0.12, _top: !!(t && t.isPassenger) });
@@ -3272,7 +3361,7 @@ function _float(t, text, cls, opts){
     var _pfArr = (window._explore && window._explore.passengersFollowing) || [];
     var _foundP = false;
     for(var i = 0; i < _pfArr.length; i++){
-      if(_pfArr[i].srv && _pfArr[i].srv.id === t.srv.id){ sxRaw = _pfArr[i].screenX; _foundP = true; break; }
+      if(_pfArr[i].srv && t.srv && _pfArr[i].srv.id === t.srv.id){ sxRaw = _pfArr[i].screenX; _foundP = true; break; }
     }
     if(!_foundP){
       var p0 = c.allies[0], px0 = p0 ? p0.worldX : 0;
@@ -3284,14 +3373,12 @@ function _float(t, text, cls, opts){
     var rel1 = t.worldX - px1;
     sxRaw = EXPLORE_HERO_X_RATIO + (rel1 / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
   } else { sxRaw = EXPLORE_HERO_X_RATIO; }
-
   var _b = window._lastBullet;
   var sparkYN = 0.6;
   if(_b && typeof _b.ty === 'number' && !_b.isGrenade){ sparkYN = _b.ty; }
-  if(cls !== 'miss' && cls !== 'heal' && typeof _spawnHitSpark === 'function'){
-    _spawnHitSpark(c, sxRaw * W, sparkYN * H, cls === 'crit', cls, !!(t && t.isPassenger));
+  if(!_noSpark && cls !== 'miss' && cls !== 'heal' && typeof window._spawnHitSpark === 'function'){
+    window._spawnHitSpark(c, sxRaw * W, sparkYN * H, cls === 'crit', cls, !!(t && t.isPassenger), t);
   }
-
   var _floatX = Math.max(0.05, Math.min(0.95, sxRaw));
   c.floats.push({ text: text, cls: cls || '', age: 0, x: _floatX, y: 0.12, _top: !!(t && t.isPassenger) });
 }
@@ -3349,7 +3436,7 @@ function _render(){
 
   const ctxTop = c.playerCtxTop || null; /* rev-fix-bullet-split */
   const ctx = c.playerCtx;
-  const W = c.playerCanvas.width, H = c.playerCanvas.height;
+  const W = window._fxViewW(c.playerCanvas), H = window._fxViewH(c.playerCanvas);
   ctx.clearRect(0, 0, W, H);
   if(ctxTop) ctxTop.clearRect(0, 0, W, H);
 
@@ -3377,7 +3464,7 @@ const rel = e.worldX - px;
         try {
           if(typeof _startCorpses === 'function' && window._explore){
             const _px = c.allies[0] ? c.allies[0].worldX : 0;
-            _startCorpses([e], [e.worldX - _px], e._eventRef);
+            _startCorpses([e], [e.worldX - _px], window._getEnemyEvent(e));
           } else { e._corpseFailed = true; }
         } catch(err){ e._corpseFailed = true; }
       }
@@ -3402,26 +3489,8 @@ const rel = e.worldX - px;
     ctx.restore();
   }
 
-  if(c.rpgSmoke){
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter'; // 加色混合，徹底消除圓形邊界
-    for(let si = 0; si < c.rpgSmoke.length; si++){
-      const s = c.rpgSmoke[si];
-      const sa = 1 - s.age / 1.2;
-      if(sa <= 0) continue;
-      const sr = s.size * W * (1 + s.age * 1.5);
-      ctx.globalAlpha = sa * 0.15; // 進一步降低單粒子濃度，避免過曝
-      const sg = ctx.createRadialGradient(s.x * W, s.y * H, 0, s.x * W, s.y * H, sr);
-      sg.addColorStop(0, 'rgba(230,230,235,0.9)');
-      sg.addColorStop(0.6, 'rgba(200,200,210,0.2)');
-      sg.addColorStop(1, 'rgba(180,180,190,0)');
-      ctx.fillStyle = sg;
-      ctx.beginPath(); ctx.arc(s.x * W, s.y * H, sr, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  if(window.MuzzleFX) window.MuzzleFX.render(ctx, 'explore');
+  if(typeof window._renderTrailSmoke === 'function') window._renderTrailSmoke(ctx, c, W, H);
+if(window.MuzzleFX) window.MuzzleFX.render(ctx, 'explore');
   if(typeof _renderTracers === 'function'){
     _renderTracers(c, ctx, W, H, 'bottom');
     if(ctxTop) _renderTracers(c, ctxTop, W, H, 'top');
@@ -3474,21 +3543,62 @@ const rel = e.worldX - px;
   }
 
   /* rev-combatfix: 新核心 RPG 火箭本體, 尾煙由引擎生成 */
-if(typeof window._getWeaponBullets === "function"){
-var _wbR = window._getWeaponBullets(c);
-for(var _wiR = 0; _wiR < _wbR.length; _wiR++){
-var _wb = _wbR[_wiR];
-if(!_wb.isRPG || _wb._resolved) continue;
-var _prR = Math.min(1, ((performance.now() - _wb.startTime) / 1000) / _wb.flightTimeSec);
-var _wxR = _wb.startX + (_wb.impactX - _wb.startX) * _prR;
-var _wyR = _wb.startY + (_wb.impactY - _wb.startY) * _prR;
-var _p0R2 = c.allies[0] ? c.allies[0].worldX : 0;
-var _hrR2 = (typeof EXPLORE_HERO_X_RATIO === "number") ? EXPLORE_HERO_X_RATIO : 0.25;
-var _sxR2 = _hrR2 + (_wxR - _p0R2) / c.sm.screenRightWorld * (1 - _hrR2);
-var _syR2 = 0.95 - _wyR * ((typeof CHAR_HEIGHT_FACTOR === "number" ? CHAR_HEIGHT_FACTOR : 0.58) / (typeof PLAYER_HEIGHT_M === "number" ? PLAYER_HEIGHT_M : 1.7));
-var _ctxR2 = (_wb.target && _wb.target.isPassenger && ctxTop) ? ctxTop : ctx;
-window._drawBulletShape(_ctxR2, _sxR2 * W, _syR2 * H, { rpg:true, isEnemy:true, rarity:(_wb.tracerRarity || "一般"), t:_prR });
-}
+/* rev-missile-icon-render: 導彈/火箭以真實 icon 繪製（正確比例/出膛/飛行）；
+   9m14 保留車體裁切視覺；煙由統一世界沉積負責。 */
+if(typeof window._getWeaponBullets === 'function'){
+  /* rev-missile-emerge: 導彈/火箭以真實 icon 繪製。
+     鼻端錨定 + 炮口半平面裁切 → 出膛時從不可見到完整出現；
+     首幀把前幀位置播種為炮口投影，掃描段與畫面求交（非中心點裁切），
+     高速一幀穿屏也畫得出完整抹影。9m14 保留車體裁切視覺。 */
+  var _wbR = window._getWeaponBullets(c);
+  var _epm = (c.sm && c.sm.bgPixelsPerMeter ? c.sm.bgPixelsPerMeter : (H * 0.58 / 1.7)) * (455.74 / 386);
+  var _hrR2 = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  var _chfR2 = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+  var _phmR2 = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+  var _srwR2 = (c.sm && c.sm.screenRightWorld) || 2;
+  var _p0R2 = c.allies[0] ? c.allies[0].worldX : 0;
+  var _nowR2 = performance.now();
+  var _kxR2 = (1 - _hrR2) / _srwR2, _kyR2 = _chfR2 / _phmR2;
+  for(var _wiR = 0; _wiR < _wbR.length; _wiR++){
+    var _wb = _wbR[_wiR];
+    if(!_wb || _wb._resolved) continue;
+    var _mv = (window.MISSILE_VISUAL && _wb.ammoId) ? window.MISSILE_VISUAL[_wb.ammoId] : null;
+    if(!_mv || !_mv.icon || _wb.ammoId === '9m14') continue;
+    if(!(_wb.flightTimeSec > 0) || !isFinite(_wb.startX) || !isFinite(_wb.impactX)) continue;
+    var _prR = Math.min(1, ((_nowR2 - _wb.startTime) / 1000) / _wb.flightTimeSec);
+    var _wxR = _wb.startX + (_wb.impactX - _wb.startX) * _prR;
+    var _wyR = _wb.startY + (_wb.impactY - _wb.startY) * _prR;
+    var _px = (_hrR2 + (_wxR - _p0R2) * _kxR2) * W;
+    var _py = (0.95 - _wyR * _kyR2) * H;
+    var _mx = (_hrR2 + (_wb.startX - _p0R2) * _kxR2) * W;
+    var _my = (0.95 - _wb.startY * _kyR2) * H;
+    var _lenPx = (_mv.len || 0.9) * _epm;
+    if(typeof _wb._mvPrevX !== 'number'){ _wb._mvPrevX = _mx; _wb._mvPrevY = _my; }
+    var _pvX = _wb._mvPrevX, _pvY = _wb._mvPrevY;
+    _wb._mvPrevX = _px; _wb._mvPrevY = _py;
+    var _dx = _px - _pvX, _dy = _py - _pvY;
+    var _dirRad;
+    if(_dx * _dx + _dy * _dy > 0.25){ _dirRad = Math.atan2(_dy, _dx); }
+    else {
+      var _bx = (_hrR2 + (_wb.impactX - _p0R2) * _kxR2) * W;
+      var _by = (0.95 - _wb.impactY * _kyR2) * H;
+      _dirRad = Math.atan2(_by - _my, _bx - _mx);
+    }
+    var _pad = _lenPx + 40;
+    if((_px < -_pad && _pvX < -_pad) || (_px > W + _pad && _pvX > W + _pad) ||
+       (_py < -_pad && _pvY < -_pad) || (_py > H + _pad && _pvY > H + _pad)) continue;
+    var _ctxR2 = (_wb.target && _wb.target.isPassenger && ctxTop) ? ctxTop : ctx;
+    var _dist = Math.sqrt(_dx * _dx + _dy * _dy);
+    var _n = Math.max(1, Math.min(10, Math.ceil(_dist / Math.max(1, _lenPx * 0.45))));
+    _ctxR2.save();
+    if(typeof window._vsClipAtMuzzle === 'function') window._vsClipAtMuzzle(_ctxR2, _mx, _my, _dirRad);
+    for(var _s = 0; _s < _n; _s++){
+      var _t = (_n === 1) ? 1 : (_s + 1) / _n;
+      window._drawMissileIcon(_ctxR2, _wb.ammoId, _pvX + _dx * _t, _pvY + _dy * _t,
+        _dirRad + Math.PI / 2, _lenPx, (_n === 1 ? 1 : 0.55), true);
+    }
+    _ctxR2.restore();
+  }
 }
 for(let f = 0; f < c.floats.length; f++){
     const ff = c.floats[f];
@@ -3521,7 +3631,6 @@ if(c.sweep){ if(layerR) layerR.innerHTML = ''; if(layerL) layerL.innerHTML = '';
     for(let j = 0; j < alive.length; j++){
       const e = alive[j];
       if(e.isBoss) continue;
-if(e.isBoss) continue;
 const d = Math.abs(e.worldX - px);
       /* rev-detect: 氣泡 = 已發現（dist <= R_敵人）且 螢幕外。
          不可用 _isDiscovered 的 OR —— 那是參戰名單。
@@ -3565,7 +3674,7 @@ const d = Math.abs(e.worldX - px);
     let html = '';
     for(let j = 0; j < outside.length; j++){
       const item = outside[j];
-      const d = Math.abs((item.screenX - EXPLORE_HERO_X_RATIO) * 10);
+      const d = Math.abs((typeof item.worldX === 'number' ? item.worldX : px) - px);
       const dTxt = (typeof window._fmtDistN === 'function' ? window._fmtDistN(d) : (d < 1 ? d.toFixed(1) : String(Math.round(d))));
       const _maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(item.srv) : 100;
       let _hp = (typeof item.srv.hp === 'number') ? item.srv.hp : _maxHp;
@@ -3667,11 +3776,7 @@ window._playerShouldStandStill = function(){
     if(window.canEngage(r, c.enemies[i], Math.abs(c.enemies[i].worldX - p.worldX))) return true;
   }
   /* 載員 firing 時，玩家也站定，避免載員滑行 */
-  for(let _ai = 1; _ai < c.allies.length; _ai++){
-    const _a = c.allies[_ai];
-    if(_a.hp <= 0 || _a._retreating) continue;
-    if(_a._mode === 'firing') return true;
-  }
+  /* rev-player-autonomy: 玩家前進只由玩家自身狀態與自身射程內敵人決定；載員是隨從，不拖停玩家 */
   return false;
 };
 

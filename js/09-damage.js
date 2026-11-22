@@ -73,6 +73,11 @@ function getPassengerArmorMMForPart(passenger, part){
   return 0;
 }
 
+/* rev-veh-faction: 我方單位唯一判準（含載具）。
+   逐幀碰撞與飛行結束兜底共用，避免兩處列舉漂移导致載具被敵彈跳過。 */
+window._isAllyUnit = function(t){
+  return !!(t && (t.isPlayer || t.isPassenger || t.isGuard || t.isVehicle));
+};
 function applyDamage(target, rawDmg, penetration, armorOpts){
 let armorLevel = 0, armorMMOverride = null, armorProvider = null, optPart = null;
 if(armorOpts && typeof armorOpts === 'object'){
@@ -184,26 +189,31 @@ window._getTargetAABB = function(tgt){
    Boss：2D AABB = 正面 billboard，D = 螢幕寬，L = 身體深度
    ============================================================ */
 window._getTargetBox = function(tgt){
-if(!tgt) return null;
-var a = window._getTargetAABB(tgt);
-if(!a) return null;
-var L = (typeof a.width === 'number' && a.width > 0) ? a.width : 0.5;
-var H = (typeof a.height === 'number' && a.height > 0) ? a.height : 1.7;
-var D = (typeof a.depth === 'number' && a.depth > 0) ? a.depth : 0;
-if(tgt.isVehicle){
-var vd = (typeof window.VEHICLE_DIM !== 'undefined') ? window.VEHICLE_DIM[tgt.vehicleId] : null;
-if(vd){ if(vd.height > 0) H = vd.height; if(vd.frontWidth > 0) D = vd.frontWidth; }
-if(!(D > 0)) D = 3.0;
-if(typeof window.getVehicleHalfLengthWorld === 'function'){
-L = 2 * window.getVehicleHalfLengthWorld(tgt.vehicleId);
-}
-} else if(tgt.isBoss){
-if(!(D > 0)) D = L;
-L = (typeof a.bodyDepth === 'number' && a.bodyDepth > 0) ? a.bodyDepth : D;
-} else {
-if(!(D > 0)) D = L;
-}
-return { L:L, H:H, D:D, yFoot:(typeof tgt.y === 'number' ? tgt.y : 0) };
+  if(!tgt) return null;
+  var a = window._getTargetAABB(tgt);
+  if(!a) return null;
+  var L = (typeof a.width === 'number' && a.width > 0) ? a.width : 0.5;
+  var H = (typeof a.height === 'number' && a.height > 0) ? a.height : 1.7;
+  var D = (typeof a.depth === 'number' && a.depth > 0) ? a.depth : 0;
+  /* rev-scatter-box: Boss 是正面 billboard，部位由 (u,v) 決定。
+     若套用人形標定的 σ，命中率會趨近 100% 且落點擠在中心 → 弱點機制失效。
+     標記 _selfCal，scatter 對它維持「按自身盒自校準」。 */
+  var _selfCal = false;
+  if(tgt.isVehicle){
+    var vd = (typeof window.VEHICLE_DIM !== 'undefined') ? window.VEHICLE_DIM[tgt.vehicleId] : null;
+    if(vd){ if(vd.height > 0) H = vd.height; if(vd.frontWidth > 0) D = vd.frontWidth; }
+    if(!(D > 0)) D = 3.0;
+    if(typeof window.getVehicleHalfLengthWorld === 'function'){
+      L = 2 * window.getVehicleHalfLengthWorld(tgt.vehicleId);
+    }
+  } else if(tgt.isBoss){
+    if(!(D > 0)) D = L;
+    L = (typeof a.bodyDepth === 'number' && a.bodyDepth > 0) ? a.bodyDepth : D;
+    _selfCal = true;
+  } else {
+    if(!(D > 0)) D = L;
+  }
+  return { L:L, H:H, D:D, yFoot:(typeof tgt.y === 'number' ? tgt.y : 0), _selfCal:_selfCal };
 };
 /* 標準正態反函數（Acklam 有理近似），取代舊分檔表 */
 function _normInv(p){
@@ -221,20 +231,55 @@ return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b
 /* 3D 散佈：Y / Z 雙軸獨立，聯合通過率 ≈ hr（P_y = P_z = √hr）
    tFace = 近邊緣距離 / 總距離 —— 在近邊緣平面標定，保證名義命中率不隨距離漂移
    連射 accum 同時作用 Y 與 Z（舊模型只作用 Y） */
+/* ===== rev-scatter-iso: 各向同性散佈 —— 散佈屬於射手，不屬於目標 =====
+   舊式 sY=box.H/(2z), sZ=box.D/(2z)：分子是目標自己的尺寸 → 大目標配大散佈，
+   通過率恆為 [2Φ(z)−1]²，H/D 完全對消，車大車小一樣難打中（違反物理直覺）。
+   新式：σ 只由 hr 決定，對參考人形盒（H=1.7, D=0.5）標定，使
+       [2Φ(H/(2σ))−1] · [2Φ(D/(2σ))−1] = hr
+   → 步兵命中率守恆；載具迎彈面大 → 命中率自然升高。
+   下表於 patch 時二分求解並逐點回代驗證（maxErr < 1e-4），執行期 O(1) 查表。
+   索引 0 ↔ hr=1%，索引 98 ↔ hr=99%。單位：米。 */
+window._SCATTER_SIGMA_M = [
+  3.660214,2.575433,2.092356,1.802887,1.604302,1.456928,1.341765,1.24842,1.170663,
+  1.104504,1.047252,0.997016,0.952424,0.912453,0.876322,0.843423,0.813275,0.785491,
+  0.759757,0.735813,0.713444,0.692469,0.672735,0.65411,0.636483,0.619756,0.603844,
+  0.588674,0.574181,0.560308,0.547004,0.534223,0.521926,0.510077,0.498643,0.487595,
+  0.476906,0.466554,0.456517,0.446775,0.437311,0.428108,0.419153,0.410432,0.401933,
+  0.393644,0.385557,0.377662,0.369952,0.362417,0.355052,0.347851,0.340807,0.333916,
+  0.327173,0.320573,0.314111,0.307785,0.30159,0.295523,0.289579,0.283756,0.278049,
+  0.272456,0.266973,0.261595,0.256319,0.251141,0.246058,0.241064,0.236157,0.23133,
+  0.226581,0.221904,0.217294,0.212746,0.208256,0.203817,0.199424,0.195071,0.190752,
+  0.18646,0.182188,0.177926,0.173667,0.1694,0.165114,0.160795,0.156427,0.151989,
+  0.147458,0.142801,0.137976,0.132923,0.127553,0.121729,0.115203,0.107465,0.097056
+];
+window._scatterSigmaM = function(hrN){
+  var T = window._SCATTER_SIGMA_M;
+  var p = Math.min(99, Math.max(1, hrN * 100));
+  var lo = Math.max(1, Math.min(98, Math.floor(p)));
+  var f = Math.max(0, Math.min(1, p - lo));
+  return T[lo-1] + (T[lo] - T[lo-1]) * f;
+};
 window._calcWeaponScatter3D = function(weaponRange, hr, burstCount, burstFactor, box, tFace){
-var hrN = Math.min(0.99, Math.max(0.01, (hr || 50) / 100));
-var z = _normInv((1 + Math.sqrt(hrN)) / 2);
-if(!(z > 0.05)) z = 0.05;
-var bf = burstFactor || 0;
-var accum = Math.min(1 + ((burstCount || 1) - 1) * bf, 1 + bf * 10);
-var tf = (typeof tFace === 'number' && tFace > 0.05) ? Math.min(1, tFace) : 1;
-if(box && box.H > 0 && box.D > 0){
-var sY = box.H / (2 * z * tf);
-var sZ = box.D / (2 * z * tf);
-return { sx:0, sy:_gaussRand()*sY*accum, sz:_gaussRand()*sZ*accum, baseScatter:sZ, accum:accum };
-}
-var bs = (weaponRange || 15) * (1 - hrN) / 2;
-return { sx:0, sy:(Math.random()*2-1)*bs*accum, sz:(Math.random()*2-1)*bs*accum, baseScatter:bs, accum:accum };
+  var hrN = Math.min(0.99, Math.max(0.01, (hr || 50) / 100));
+  var bf = burstFactor || 0;
+  var accum = Math.min(1 + ((burstCount || 1) - 1) * bf, 1 + bf * 10);
+  /* tf 僅作近緣平面投影補償：sy·tf 後對消 → 距離軸維持關閉 */
+  var tf = (typeof tFace === 'number' && tFace > 0.05) ? Math.min(1, tFace) : 1;
+  if(box && box.H > 0 && box.D > 0){
+    if(box._selfCal){
+      /* Boss：按自身盒自校準，保弱點 UV 分佈 */
+      var z = _normInv((1 + Math.sqrt(hrN)) / 2);
+      if(!(z > 0.05)) z = 0.05;
+      var sY = box.H / (2 * z * tf);
+      var sZ = box.D / (2 * z * tf);
+      return { sx:0, sy:_gaussRand()*sY*accum, sz:_gaussRand()*sZ*accum, baseScatter:sZ, accum:accum };
+    }
+    /* rev-scatter-iso: 各向同性 σ（與 box.H / box.D 無關）→ 尺寸決定命中率 */
+    var sig = window._scatterSigmaM(hrN) / tf;
+    return { sx:0, sy:_gaussRand()*sig*accum, sz:_gaussRand()*sig*accum, baseScatter:sig, accum:accum };
+  }
+  var bs = (weaponRange || 15) * (1 - hrN) / 2;
+  return { sx:0, sy:(Math.random()*2-1)*bs*accum, sz:(Math.random()*2-1)*bs*accum, baseScatter:bs, accum:accum };
 };;
 
 /* 瞄準點 Y（目標局部座標，腳底=0） */
@@ -282,41 +327,7 @@ function _gaussRand(){
   return Math.max(-3, Math.min(3, g));
 }
 
-/* XY 偏移（米）— AABB 基準 + 正態分布
- * 保證「落點落在目標 AABB 內的概率 ≈ hr」
- * sigmaX = W / (2 × z)，z = Φ⁻¹((1 + hr)/2)
- * 濺射武器（無具體 targetAABB）退化為均勻分布，用 weaponRange 推算 fallback */
-window._calcWeaponScatter = function(weaponRange, hr, burstCount, burstFactor, targetAABB){
-  var hrN = Math.min(0.99, Math.max(0.01, (hr || 50) / 100));
-  /* z = Φ⁻¹((1 + hr)/2) 分檔近似 */
-  var z;
-  if(hrN < 0.10) z = 0.126;
-  else if(hrN < 0.20) z = 0.253;
-  else if(hrN < 0.30) z = 0.385;
-  else if(hrN < 0.40) z = 0.524;
-  else if(hrN < 0.50) z = 0.674;
-  else if(hrN < 0.60) z = 0.842;
-  else if(hrN < 0.70) z = 1.036;
-  else if(hrN < 0.80) z = 1.282;
-  else if(hrN < 0.90) z = 1.645;
-  else z = 2.326;
 
-  var accumCap = (burstFactor || 0) * 10;
-  var accum = Math.min(1 + ((burstCount || 1) - 1) * (burstFactor || 0), 1 + accumCap);
-
-  if(targetAABB && targetAABB.width && targetAABB.height){
-    var sigmaX = targetAABB.width / (2 * z);
-    var sigmaY = targetAABB.height / (2 * z);
-    var sx = _gaussRand() * sigmaX;
-    var sy = _gaussRand() * sigmaY * accum;
-    return { sx: sx, sy: sy, baseScatter: sigmaX, accum: accum };
-  }
-  /* 濺射武器 / 無 AABB：退回舊公式（以射程為基準） */
-  var baseScatter = (weaponRange || 15) * (1 - hrN) / 2;
-  var sx2 = (Math.random() * 2 - 1) * baseScatter;
-  var sy2 = (Math.random() * 2 - 1) * baseScatter * accum;
-  return { sx: sx2, sy: sy2, baseScatter: baseScatter, accum: accum };
-};
 
 /* 預判點 */
 window._predictTargetPoint = function(tgtWorldX, tgtVx, flightSec){
@@ -343,7 +354,17 @@ window._weaponFire = function(cfg){
   var _halfL = (_box && _box.L > 0) ? _box.L / 2 : 0;
   if(_dist - _halfL > _rngGate) return null;
   var _spd  = cfg.flightSpeed || 800;
-  var _flightSec = Math.max(0.016, _dist / _spd);
+/* rev-flight-closing: 飛行時間 = 實際路徑長 / 彈速。
+   終點是預判點，故用閉合速度求解 T = |dx| / (spd - sign(dx)*vx)，
+   與 impactX 同一分母 —— 否則抵達閘門會系統性偏移。
+   目標逃逸快於彈速時退回舊式（不會永遠追不上）。 */
+var _dx0 = _twx - (cfg.startX || 0);
+var _sgn0 = (_dx0 < 0) ? -1 : 1;
+var _tvx0 = (typeof _tvx === 'number' && isFinite(_tvx)) ? _tvx : 0;
+var _close0 = _spd - _sgn0 * _tvx0;
+var _flightSec = (_close0 > 1)
+? Math.max(0.016, Math.abs(_dx0) / _close0)
+: Math.max(0.016, _dist / _spd);
   var _predictX = window._predictTargetPoint(_twx, _tvx, _flightSec);
   var _bf = (typeof cfg.burstFactor === 'number') ? cfg.burstFactor : window._getWeaponBurstFactor(cfg.weaponId, cfg.vid);
   var _tFace = 1;
@@ -412,7 +433,8 @@ var _dist = Math.abs((_t.worldX || 0) - (b.startX || 0));
 var _tFace = 1;
 if(_box && _dist > 0.01) _tFace = Math.max(0.05, (_dist - _box.L / 2) / _dist);
 var _scat = window._calcWeaponScatter3D(b.weaponRange, b.hr, b.burstCount, b.burstFactor, _box, _tFace);
-var _aimYLocal = window._getWeaponAimY(b.weaponId, b.ammoId, null);
+/* rev-guided-aim-center: 制導更新與首發同一瞄準基準（載具＝判定盒幾何中心） */
+var _aimYLocal = (_t.isVehicle && _box && _box.H > 0) ? _box.H / 2 : window._getWeaponAimY(b.weaponId, b.ammoId, null);
 var _ty = (typeof _t.y === 'number') ? _t.y : b.targetSnapshotY;
 b.targetBox = _box;
 b.impactX = _predictX;
@@ -487,165 +509,166 @@ return _partFromYRatio(r);
 
 /* 每幀檢測碰撞 + 結算 */
 window._tickWeaponBullets = function(owner, dt, allTargets){
-var _bullets = _wbsGet(owner);
-if(!_bullets.length) return;
-var now = performance.now();
-/* rev-box3d: 命中結算集中在此，_hitCtx 同步傳遞部位/落點給場景層 */
-function _settle(b, tgt, box, hit){
-b._resolved = true; b._hitDetected = true;
-var _r = (hit.y - box.yFoot) / box.H;
-var _part = _partFromHit(tgt, box, _r, hit.face, hit.z);
-window._hitCtx = { target:tgt, part:_part, x:hit.x, y:hit.y, z:hit.z, face:hit.face, isDirect:true, bullet:b };
-var _vh = (typeof window._getTargetHitVisualWorld === 'function') ? window._getTargetHitVisualWorld(tgt) : null;
-var _dxT = b.impactX - b.startX;
-var _tC = 0.5;
-if(Math.abs(_dxT) > 1e-6){
-_tC = ((typeof tgt.worldX === 'number' ? tgt.worldX : hit.x) - b.startX) / _dxT;
-if(!isFinite(_tC)) _tC = 0.5;
-if(_tC < 0) _tC = 0; if(_tC > 3) _tC = 3;
-}
-/* 特效/曳光仍在軀幹中心，Z 不投影（AABB 內有透明空間） */
-var _tracerX = _vh ? _vh.wx : (b.startX + _dxT * _tC);
-var _tracerY = _vh ? _vh.wy : (b.startY + (b.impactY - b.startY) * _tC);
-window._hitCtx = { target:tgt, part:_part, x:hit.x, y:hit.y, z:hit.z, face:hit.face, isDirect:true, bullet:b };
-if(typeof b.onTracer === 'function'){
-try { b.onTracer(_tracerX, _tracerY, tgt, _part); } catch(e){ console.warn('[wpTrace]', e); }
-}
-if(b.isEnemyBullet && !b.isRPG){
-var _ccE = (owner && owner.tracers) ? owner : window._combat;
-if(_ccE && _ccE.sm && _ccE.tracers){
-var _pWXe = (_ccE.allies && _ccE.allies[0]) ? _ccE.allies[0].worldX : 0;
-var _chfe = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
-var _phme = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
-var _srcXe = (b.muzzleN && typeof b.muzzleN.x === 'number') ? b.muzzleN.x : EXPLORE_HERO_X_RATIO + ((b.startX || 0) - _pWXe) / _ccE.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO);
-var _srcYe = (b.muzzleN && typeof b.muzzleN.y === 'number') ? b.muzzleN.y : 0.95 - (b.startY || 1.3) * (_chfe / _phme);
-var _tipXe;
-if(tgt && tgt.isPassenger && tgt.srv){
-var _pfArrE = (window._explore && window._explore.passengersFollowing) || [];
-var _foundE = false;
-for(var _iE = 0; _iE < _pfArrE.length; _iE++){
-if(_pfArrE[_iE].srv && _pfArrE[_iE].srv.id === tgt.srv.id){ _tipXe = _pfArrE[_iE].screenX; _foundE = true; break; }
-}
-if(!_foundE){ _tipXe = EXPLORE_HERO_X_RATIO + (_tracerX - _pWXe) / _ccE.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO); }
-} else {
-_tipXe = EXPLORE_HERO_X_RATIO + (_tracerX - _pWXe) / _ccE.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO);
-}
-var _tipYe = 0.95 - _tracerY * (_chfe / _phme);
-_ccE.tracers.push({ sx:_srcXe, sy:_srcYe, tx:_tipXe, ty:_tipYe, born:performance.now(), dur:200, color:(b.tracerColor || '#ffb300'), hit:true, _target:tgt });
-}
-}
-if(typeof b.onHit === 'function'){
-try { b.onHit(_tracerX, _tracerY, tgt, _part, { x:hit.x, y:hit.y, z:hit.z, face:hit.face }); }
-catch(e){ console.warn('[wpHit]', e); }
-}
-window._hitCtx = null;
-}
-for(var i = _bullets.length - 1; i >= 0; i--){
-var b = _bullets[i];
-if(b._resolved){ _bullets.splice(i, 1); continue; }
-if(b.guidanceMode !== 'none') window._updateGuidedBullet(b, now);
-var _elapsed = (now - b.startTime) / 1000;
-var _progress = Math.min(1, _elapsed / b.flightTimeSec);
-/* rev-combatfix: RPG 尾煙 —— 按本幀飛過距離插值生成（與舊 c.bullets 尾煙同密度） */
-if(b.isRPG){
-var _ccT = (owner && owner.sm) ? owner : window._combat;
-if(_ccT && _ccT.sm){
-if(!_ccT.rpgSmoke) _ccT.rpgSmoke = [];
-var _p0T = (_ccT.allies && _ccT.allies[0]) ? _ccT.allies[0].worldX : 0;
-var _chfT = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
-var _phmT = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
-var _t1T = Math.min(1, _elapsed / b.flightTimeSec);
-var _t0T = (typeof b._trailT === 'number') ? b._trailT : 0;
-var _spanT = _t1T - _t0T;
-if(_spanT > 0){
-var _stepsT = Math.max(1, Math.ceil(_spanT * 300));
-for(var _kT = 0; _kT < _stepsT; _kT++){
-var _ktT = _t0T + _spanT * (_kT / _stepsT);
-var _wxT = b.startX + (b.impactX - b.startX) * _ktT;
-var _wyT = b.startY + (b.impactY - b.startY) * _ktT;
-_ccT.rpgSmoke.push({ x: EXPLORE_HERO_X_RATIO + (_wxT - _p0T) / _ccT.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO), y: 0.95 - _wyT * (_chfT / _phmT), age: 0, size: 0.015 + Math.random() * 0.010 });
-}
-}
-b._trailT = _t1T;
-}
-}
-var _sz = (typeof b.startZ === 'number') ? b.startZ : 0;
-var _ez = (typeof b.impactZ === 'number') ? b.impactZ : 0;
-if(!b.isGrenade && allTargets && allTargets.length){
-var _best = null, _bestTgt = null, _bestBox = null;
-for(var ti = 0; ti < allTargets.length; ti++){
-var tgt = allTargets[ti];
-if(!tgt || tgt.hp <= 0) continue;
-var _tgtIsAlly = !!(tgt.isPlayer || tgt.isPassenger || tgt.isGuard);
-if(b.isEnemyBullet){ if(!_tgtIsAlly) continue; } else { if(_tgtIsAlly) continue; }
-var box = (tgt === b.target && b.targetBox) ? b.targetBox : window._getTargetBox(tgt);
-if(!box) continue;
-var twx = (typeof tgt.worldX === 'number') ? tgt.worldX : 0;
-var hit = _raySegFrontFace(b.startX, b.startY, _sz, b.impactX, b.impactY, _ez, twx, box);
-if(hit && (!_best || hit.t < _best.t)){ _best = hit; _bestTgt = tgt; _bestBox = box; }
-}
-if(_best){ _settle(b, _bestTgt, _bestBox, _best); _bullets.splice(i, 1); continue; }
-}
-if(_progress >= 1){
-/* 兜底：場景未傳 allTargets 時仍對主目標做一次平面判定 */
-var _ft = b.target, _fDone = false;
-if(!b.isGrenade && _ft && _ft.hp > 0){
-var _fa = !!( _ft.isPlayer || _ft.isPassenger || _ft.isGuard );
-var _okF = b.isEnemyBullet ? _fa : !_fa;
-if(_okF){
-var _fb = b.targetBox || window._getTargetBox(_ft);
-if(_fb){
-var _fh = _raySegFrontFace(b.startX, b.startY, _sz, b.impactX, b.impactY, _ez, (typeof _ft.worldX === 'number' ? _ft.worldX : 0), _fb);
-if(_fh){ _settle(b, _ft, _fb, _fh); _fDone = true; }
-}
-}
-}
-if(!_fDone){
-b._resolved = true;
-window._hitCtx = { target:b.target, part:null, x:b.impactX, y:b.impactY, z:_ez, isDirect:false, bullet:b };
-if(typeof b.onMiss === 'function'){
-try { b.onMiss(b.impactX, b.impactY, _ez, b); } catch(e){ console.warn('[wpMiss]', e); }
-}
-window._hitCtx = null;
-var _groundX = b.impactX, _groundY = b.impactY;
-var _sxM = (typeof b.startX === 'number') ? b.startX : 0;
-var _syM = (typeof b.startY === 'number') ? b.startY : 1.3;
-var _dxM2 = b.impactX - _sxM, _dyM2 = b.impactY - _syM;
-/* rev-combatfix: 射失曳光統一延長 = min(屏幕邊緣, 地面)，不再分下墜/水平兩套；左緣按 hero ratio 推導 */
-var _ccMM = (owner && owner.sm) ? owner : window._combat;
-var _pWXMM = (_ccMM && _ccMM.allies && _ccMM.allies[0]) ? _ccMM.allies[0].worldX : 0;
-var _srwMM = (_ccMM && _ccMM.sm) ? _ccMM.sm.screenRightWorld : 2;
-var _hrMM = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
-var _rightWX = _pWXMM + _srwMM;
-var _leftWX = _pWXMM - _srwMM * _hrMM / Math.max(0.05, 1 - _hrMM);
-var _tEdge = 200;
-if(Math.abs(_dxM2) > 1e-6){
-_tEdge = (_dxM2 > 0) ? ((_rightWX - _sxM) / _dxM2) : ((_leftWX - _sxM) / _dxM2);
-if(!isFinite(_tEdge) || _tEdge < 1) _tEdge = 200;
-if(_tEdge > 200) _tEdge = 200;
-}
-var _tGround2 = Infinity;
-if(_dyM2 < -1e-6 && _syM > 0) _tGround2 = _syM / (-_dyM2);
-var _tAct = Math.min(_tEdge, _tGround2);
-_groundX = _sxM + _dxM2 * _tAct;
-_groundY = Math.max(0, _syM + _dyM2 * _tAct);
-if(b.isEnemyBullet && !b.isRPG){
-var _ccM = (owner && owner.tracers) ? owner : window._combat;
-if(_ccM && _ccM.sm && _ccM.tracers){
-var _pWXm = (_ccM.allies && _ccM.allies[0]) ? _ccM.allies[0].worldX : 0;
-var _chfm = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
-var _phmm = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
-var _srcXm = (b.muzzleN && typeof b.muzzleN.x === 'number') ? b.muzzleN.x : EXPLORE_HERO_X_RATIO + ((b.startX || 0) - _pWXm) / _ccM.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO);
-var _srcYm = (b.muzzleN && typeof b.muzzleN.y === 'number') ? b.muzzleN.y : 0.95 - (b.startY || 1.3) * (_chfm / _phmm);
-var _tipXm = EXPLORE_HERO_X_RATIO + (_groundX - _pWXm) / _ccM.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO);
-var _tipYm = 0.95 - _groundY * (_chfm / _phmm);
-_ccM.tracers.push({ sx:_srcXm, sy:_srcYm, tx:_tipXm, ty:_tipYm, born:performance.now(), dur:200, color:(b.tracerColor || '#ffb300'), hit:false, _target:null });
-}
-}
-}
-_bullets.splice(i, 1);
-}
-}
+  var _bullets = _wbsGet(owner);
+  if(!_bullets.length) return;
+  var now = performance.now();
+  /* rev-box3d: 命中結算集中在此，_hitCtx 同步傳遞部位/落點給場景層 */
+  function _settle(b, tgt, box, hit){
+    b._resolved = true; b._hitDetected = true;
+    var _r = (hit.y - box.yFoot) / box.H;
+    var _part = _partFromHit(tgt, box, _r, hit.face, hit.z);
+    window._hitCtx = { target:tgt, part:_part, x:hit.x, y:hit.y, z:hit.z, face:hit.face, isDirect:true, bullet:b };
+    var _vh = (typeof window._getTargetHitVisualWorld === 'function') ? window._getTargetHitVisualWorld(tgt) : null;
+    var _dxT = b.impactX - b.startX;
+    var _tC = 0.5;
+    if(Math.abs(_dxT) > 1e-6){
+      _tC = ((typeof tgt.worldX === 'number' ? tgt.worldX : hit.x) - b.startX) / _dxT;
+      if(!isFinite(_tC)) _tC = 0.5;
+      if(_tC < 0) _tC = 0; if(_tC > 3) _tC = 3;
+    }
+    var _tracerX = _vh ? _vh.wx : (b.startX + _dxT * _tC);
+    var _tracerY = _vh ? _vh.wy : (b.startY + (b.impactY - b.startY) * _tC);
+    window._hitCtx = { target:tgt, part:_part, x:hit.x, y:hit.y, z:hit.z, face:hit.face, isDirect:true, bullet:b };
+    if(typeof b.onTracer === 'function'){
+      try { b.onTracer(_tracerX, _tracerY, tgt, _part); } catch(e){ console.warn('[wpTrace]', e); }
+    }
+    if(b.isEnemyBullet && !b.isRPG){
+      var _ccE = (owner && owner.tracers) ? owner : window._combat;
+      if(_ccE && _ccE.sm && _ccE.tracers){
+        var _pWXe = (_ccE.allies && _ccE.allies[0]) ? _ccE.allies[0].worldX : 0;
+        var _chfe = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+        var _phme = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+        var _srcXe = (b.muzzleN && typeof b.muzzleN.x === 'number') ? b.muzzleN.x : EXPLORE_HERO_X_RATIO + ((b.startX || 0) - _pWXe) / _ccE.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO);
+        var _srcYe = (b.muzzleN && typeof b.muzzleN.y === 'number') ? b.muzzleN.y : 0.95 - (b.startY || 1.3) * (_chfe / _phme);
+        var _tipXe;
+        if(tgt && tgt.isPassenger && tgt.srv){
+          var _pfArrE = (window._explore && window._explore.passengersFollowing) || [];
+          var _foundE = false;
+          for(var _iE = 0; _iE < _pfArrE.length; _iE++){
+            if(_pfArrE[_iE].srv && _pfArrE[_iE].srv.id === tgt.srv.id){ _tipXe = _pfArrE[_iE].screenX; _foundE = true; break; }
+          }
+          if(!_foundE){ _tipXe = EXPLORE_HERO_X_RATIO + (_tracerX - _pWXe) / _ccE.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO); }
+        } else {
+          _tipXe = EXPLORE_HERO_X_RATIO + (_tracerX - _pWXe) / _ccE.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO);
+        }
+        var _tipYe = 0.95 - _tracerY * (_chfe / _phme);
+        _ccE.tracers.push({ sx:_srcXe, sy:_srcYe, tx:_tipXe, ty:_tipYe, born:performance.now(), dur:200, color:(b.tracerColor || '#ffb300'), hit:true, _target:tgt });
+      }
+    }
+    if(typeof b.onHit === 'function'){
+      try { b.onHit(_tracerX, _tracerY, tgt, _part, { x:hit.x, y:hit.y, z:hit.z, face:hit.face }); }
+      catch(e){ console.warn('[wpHit]', e); }
+    }
+    window._hitCtx = null;
+  }
+  for(var i = _bullets.length - 1; i >= 0; i--){
+    var b = _bullets[i];
+    if(b._resolved){ _bullets.splice(i, 1); continue; }
+    if(b.guidanceMode !== 'none') window._updateGuidedBullet(b, now);
+    var _elapsed = (now - b.startTime) / 1000;
+    var _progress = Math.min(1, _elapsed / b.flightTimeSec);
+    var _sz = (typeof b.startZ === 'number') ? b.startZ : 0;
+    var _ez = (typeof b.impactZ === 'number') ? b.impactZ : 0;
+    /* rev-aps-pre-decide: 幾何相交（與 progress 無關）即決策。
+       攔截面在車頭前 2m、比 hit.t 早；若等 progress>=hit.t 才決策，
+       中間幀尾煙已噴過攔截面。決策只一次，結果快取在彈體。 */
+    var _rayHit = null, _rayTgt = null, _rayBox = null;
+    if(!b.isGrenade){
+      var _cand = [];
+      if(allTargets && allTargets.length){
+        for(var ti = 0; ti < allTargets.length; ti++) _cand.push(allTargets[ti]);
+      }
+      if(b.target && _cand.indexOf(b.target) < 0) _cand.push(b.target);
+      for(var ci = 0; ci < _cand.length; ci++){
+        var tgt = _cand[ci];
+        if(!tgt || tgt.hp <= 0) continue;
+        var _tgtIsAlly = window._isAllyUnit(tgt);
+        if(b.isEnemyBullet){ if(!_tgtIsAlly) continue; } else { if(_tgtIsAlly) continue; }
+        var box = (tgt === b.target && b.targetBox) ? b.targetBox : window._getTargetBox(tgt);
+        if(!box) continue;
+        var twx = (typeof tgt.worldX === 'number') ? tgt.worldX : 0;
+        var hit = _raySegFrontFace(b.startX, b.startY, _sz, b.impactX, b.impactY, _ez, twx, box);
+        if(hit && (!_rayHit || hit.t < _rayHit.t)){ _rayHit = hit; _rayTgt = tgt; _rayBox = box; }
+      }
+    }
+    var _aps = null;
+    if(_rayHit && _rayTgt === b.target && _rayTgt.isVehicle){
+      if(b._apsDone){ _aps = b._apsHit ? { t:b._apsT, wx:b._apsWX } : null; }
+      else if(typeof window._apsDecide === 'function'){
+        try { _aps = window._apsDecide(b, _rayHit); } catch(e){ _aps = null; }
+      }
+    }
+    var _best = (_rayHit && _progress >= _rayHit.t) ? _rayHit : null;
+    /* rev-trail-stop-at-impact: 尾煙上限 = 終端事件（攔截面優先於車頭面） */
+    var _tEnd = (_aps && typeof _aps.t === 'number') ? Math.min(_progress, _aps.t)
+              : (_best ? Math.min(_progress, _best.t) : _progress);
+    var _mvD = (window.MISSILE_VISUAL && b.ammoId) ? window.MISSILE_VISUAL[b.ammoId] : null;
+    if(_mvD && b.ammoId !== '9m14'){
+      var _ccT = (owner && owner.sm) ? owner : window._combat;
+      if(_ccT && _ccT.sm){
+        var _t0T = (typeof b._trailT === 'number') ? b._trailT : 0;
+        var _PD = (_mvD.smoke === 'tracer') ? window._RPG27 : window.MISSILE_TRAIL;
+        if(typeof window._rpgTrailDeposit === 'function') window._rpgTrailDeposit(_ccT, b, _t0T, _tEnd, _PD);
+        b._trailT = _tEnd;
+      }
+    }
+    /* 攔截成立：以攔截面上的虛擬命中走原結算鏈（onHit → _vHitVehicle 讀快取 → 攔截日誌） */
+    if(_aps && typeof _aps.t === 'number' && _progress >= _aps.t){
+      var _ftA = _aps.t;
+      _settle(b, _rayTgt, _rayBox, {
+        t: _ftA,
+        x: _aps.wx,
+        y: b.startY + (b.impactY - b.startY) * _ftA,
+        z: _sz + (_ez - _sz) * _ftA,
+        face: _rayHit.face
+      });
+      _bullets.splice(i, 1); continue;
+    }
+    if(_best){ _settle(b, _rayTgt, _rayBox, _best); _bullets.splice(i, 1); continue; }
+    if(_progress >= 1){
+      b._resolved = true;
+      window._hitCtx = { target:b.target, part:null, x:b.impactX, y:b.impactY, z:_ez, isDirect:false, bullet:b };
+      if(typeof b.onMiss === 'function'){
+        try { b.onMiss(b.impactX, b.impactY, _ez, b); } catch(e){ console.warn('[wpMiss]', e); }
+      }
+      window._hitCtx = null;
+      var _groundX = b.impactX, _groundY = b.impactY;
+      var _sxM = (typeof b.startX === 'number') ? b.startX : 0;
+      var _syM = (typeof b.startY === 'number') ? b.startY : 1.3;
+      var _dxM2 = b.impactX - _sxM, _dyM2 = b.impactY - _syM;
+      var _ccMM = (owner && owner.sm) ? owner : window._combat;
+      var _pWXMM = (_ccMM && _ccMM.allies && _ccMM.allies[0]) ? _ccMM.allies[0].worldX : 0;
+      var _srwMM = (_ccMM && _ccMM.sm) ? _ccMM.sm.screenRightWorld : 2;
+      var _hrMM = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+      var _rightWX = _pWXMM + _srwMM;
+      var _leftWX = _pWXMM - _srwMM * _hrMM / Math.max(0.05, 1 - _hrMM);
+      var _tEdge = 200;
+      if(Math.abs(_dxM2) > 1e-6){
+        _tEdge = (_dxM2 > 0) ? ((_rightWX - _sxM) / _dxM2) : ((_leftWX - _sxM) / _dxM2);
+        if(!isFinite(_tEdge) || _tEdge < 1) _tEdge = 200;
+        if(_tEdge > 200) _tEdge = 200;
+      }
+      var _tGround2 = Infinity;
+      if(_dyM2 < -1e-6 && _syM > 0) _tGround2 = _syM / (-_dyM2);
+      var _tAct = Math.min(_tEdge, _tGround2);
+      _groundX = _sxM + _dxM2 * _tAct;
+      _groundY = Math.max(0, _syM + _dyM2 * _tAct);
+      if(b.isEnemyBullet && !b.isRPG){
+        var _ccM = (owner && owner.tracers) ? owner : window._combat;
+        if(_ccM && _ccM.sm && _ccM.tracers){
+          var _pWXm = (_ccM.allies && _ccM.allies[0]) ? _ccM.allies[0].worldX : 0;
+          var _chfm = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+          var _phmm = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+          var _srcXm = (b.muzzleN && typeof b.muzzleN.x === 'number') ? b.muzzleN.x : EXPLORE_HERO_X_RATIO + ((b.startX || 0) - _pWXm) / _ccM.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO);
+          var _srcYm = (b.muzzleN && typeof b.muzzleN.y === 'number') ? b.muzzleN.y : 0.95 - (b.startY || 1.3) * (_chfm / _phmm);
+          var _tipXm = EXPLORE_HERO_X_RATIO + (_groundX - _pWXm) / _ccM.sm.screenRightWorld * (1 - EXPLORE_HERO_X_RATIO);
+          var _tipYm = 0.95 - _groundY * (_chfm / _phmm);
+          _ccM.tracers.push({ sx:_srcXm, sy:_srcYm, tx:_tipXm, ty:_tipYm, born:performance.now(), dur:200, color:(b.tracerColor || '#ffb300'), hit:false, _target:null });
+        }
+      }
+      _bullets.splice(i, 1);
+    }
+  }
 };;
 
 /* 清空子彈（場景切換用） */
@@ -677,11 +700,30 @@ window._getTargetHitVisualWorld = function(target){
     return { wx: _wx + _hz, wy: _hy };
   }
   if(target.isVehicle){
-    var _ay = (typeof window._vehicleAimWorldY === 'function') ? window._vehicleAimWorldY() : null;
-    if(_ay != null) return { wx: _wx, wy: _footY + _ay };
-    var _aabb = (typeof window.getVehicleAABB === 'function') ? window.getVehicleAABB(target.vehicleId) : null;
-    return { wx: _wx, wy: _footY + ((_aabb && _aabb.centerY) ? _aabb.centerY : 1.2) };
-  }
+/* rev-veh-hit-visual: 載具命中視覺 = 實繪車體在該命中高度的右側像素邊緣。
+   判定盒車頭（worldX + 半車長）恆在畫面外，整圖 bbox 右緣是砲管尖，兩者都不是彈著點。
+   取實繪螢幕位置後反投影回世界米，下游曳光 / 爆炸沿用既有公式即落在同一點。
+   步兵分支不受影響；飄字位置不經此函式，亦不受影響。 */
+var _hpV = (typeof window._vehicleHitScreenPos === 'function')
+? window._vehicleHitScreenPos(target.vehicleId, (window._hitCtx && typeof window._hitCtx.y === 'number') ? window._hitCtx.y : null)
+: null;
+if(_hpV){
+var _cV = window._combat;
+var _camV = (_cV && _cV.allies && _cV.allies[0] && typeof _cV.allies[0].worldX === 'number') ? _cV.allies[0].worldX : _wx;
+var _srV = (_cV && _cV.sm && _cV.sm.screenRightWorld) || 2;
+var _hrV = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+var _chfV = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+var _phmV = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+return {
+wx: _camV + (_hpV.nx - _hrV) / Math.max(0.05, 1 - _hrV) * _srV,
+wy: _footY + (0.95 - _hpV.ny) * _phmV / _chfV
+};
+}
+var _ay = (typeof window._vehicleAimWorldY === 'function') ? window._vehicleAimWorldY() : null;
+if(_ay != null) return { wx: _wx, wy: _footY + _ay };
+var _aabb = (typeof window.getVehicleAABB === 'function') ? window.getVehicleAABB(target.vehicleId) : null;
+return { wx: _wx, wy: _footY + ((_aabb && _aabb.centerY) ? _aabb.centerY : 1.2) };
+}
   return { wx: _wx, wy: _footY + 1.163 };
 };;
 ;
@@ -744,7 +786,7 @@ var frac = fu * (Math.atan2(bb - py, n) - Math.atan2(ba - py, n)) / thV;
 if(!(frac > 0)) continue;
 var amt = total * frac * falloff;
 if(amt <= 0) continue;
-raw.push({ part:B.part, face:F.face, frac:frac, falloff:falloff, dNear:dNear, dmg:amt });
+raw.push({ part:B.part, face:F.face, frac:frac, falloff:falloff, dNear:dNear, dmg:amt, yLo:ba, yHi:bb });
 sum += amt;
 }
 }
@@ -778,8 +820,15 @@ window._weaponFire = function(cfg){
   if(cfg){
     if(cfg.weaponId === 'rpg' && !cfg.isRPG) cfg.isRPG = true;
     if(cfg.target && cfg.target.isVehicle && typeof cfg.aimY !== 'number'){
-      var ay = (typeof window._vehicleAimWorldY === 'function') ? window._vehicleAimWorldY() : null;
-      if(ay != null) cfg.aimY = ay;
+      /* rev-aim-box-center: 物理瞄準點 = 判定盒幾何中心 H/2。
+         舊版 _vehicleAimWorldY() 走角色 ppm（與載具 ppm 差 18%）+ sinkOffset，
+         瞄點偏低約 0.3m。視覺落點由 _hitCtx.y → _vehicleHitScreenPos 決定，與瞄準點解耦。 */
+      var _bxA = (typeof window._getTargetBox === 'function') ? window._getTargetBox(cfg.target) : null;
+      if(_bxA && _bxA.H > 0){ cfg.aimY = _bxA.H / 2; }
+      else {
+        var ay = (typeof window._vehicleAimWorldY === 'function') ? window._vehicleAimWorldY() : null;
+        if(ay != null) cfg.aimY = ay;
+      }
     }
   }
   return _wf.apply(this, arguments);

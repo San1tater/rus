@@ -185,3 +185,234 @@ window._fmtDistN = function(d){
   return v < 1 ? v.toFixed(1) : String(Math.round(v));
 };
 /* ===== rev-unify:end ===== */
+
+/* ===== 事件歸屬（執行期索引，不進存檔物件圖） =====
+   敵人 → 事件 的反向參考掛在敵人身上會與 event.content 形成 JSON 循環，
+   使 JSON.stringify(state) 拋錯、存檔靜默失敗。改以 WeakMap 側表保存。 */
+const _enemyEventRef = new WeakMap();
+window._setEnemyEvent = function(en, ev){
+  if(!en || typeof en !== 'object') return;
+  if(ev) _enemyEventRef.set(en, ev); else _enemyEventRef.delete(en);
+};
+window._getEnemyEvent = function(en){
+  if(!en || typeof en !== 'object') return null;
+  return _enemyEventRef.get(en) || null;
+};
+
+/* ===== 載員戰位（世界米，唯一真相源） =====
+   顯式戰位表：前兩名拉開大空隙讓出玩家（+0.7 / -0.8，中間 1.5m），
+   其後每名間距 0.6m（>= 身體寬 0.5m，不重疊）。
+   螢幕外的載員不硬塞進畫面 —— 由左側氣泡 + 倒地補位機制補償。
+   targetX 一律回到玩家錨點，screenX 完全由 worldX 決定；
+   追趕 / 補位 / 氣泡距離全讀同一表。 */
+window._PT_SLOT_DX = [0.7, -0.8, -1.4, -2.0, -2.6, -3.2, -3.8, -4.4];
+window._ptSyncSlots = function(ex){
+  if(!ex || !Array.isArray(ex.passengersFollowing)) return;
+  var hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  var T = window._PT_SLOT_DX;
+  var L = ex.passengersFollowing;
+  for(var i = 0; i < L.length; i++){
+    var it = L[i];
+    if(!it || it._retreating) continue;
+    var tx = (typeof it.targetX === 'number') ? it.targetX : hr;
+    /* targetX 由 _updatePT 按存活順位寫入：0.35→0、0.15→1、-0.12-0.12*(j-2)→j。
+       倒地者 targetX 停在 hr，rank=-1 → 保留原戰位（屍體随背景左移）。 */
+    var rank = -1;
+    if(Math.abs(tx - 0.35) < 1e-6) rank = 0;
+    else if(Math.abs(tx - 0.15) < 1e-6) rank = 1;
+    else if(tx < -0.12 + 1e-6) rank = 2 + Math.round((-0.12 - tx) / 0.12);
+    if(rank >= 0){
+      it._slotDX = (rank < T.length) ? T[rank] : (T[T.length-1] - 0.6 * (rank - T.length + 1));
+    } else if(typeof it._slotDX !== 'number'){
+      it._slotDX = 0;
+    }
+    it.targetX = hr;
+  }
+  var c = window._combat;
+  if(c && Array.isArray(c.allies)){
+    for(var j = 1; j < c.allies.length; j++){
+      var a = c.allies[j];
+      if(!a || !a.isPassenger || !a.srv) continue;
+      for(var q = 0; q < L.length; q++){
+        if(L[q].srv && L[q].srv.id === a.srv.id){ a._slotDX = L[q]._slotDX || 0; break; }
+      }
+    }
+  }
+};
+
+/* ===== rev-rpg27-trail: RPG-27（105mm 一次性反坦克火箭）尾煙物理參數 =====
+   口徑 0.105m；尾流初始直徑 ≈ 2×口徑，随湍流線性擴散。
+   沉積採固定世界間距（不是按幀、也不是按飛行進度比例）：
+   間距 0.12m < 直徑 0.21m → 相鄰煙團恆重疊 → 連續煙柱而非分離點。
+   半徑 / 高度一律存世界米，渲染時經 ppm 換算 → 任何裝置物理尺寸一致。
+   煙留在空氣裡：世界座標固定，由相機前進把它掃入畫面。 */
+/* rev-rpg27-plume-v2: 尾流 = 發動機排焰羽流，初始直徑 ~0.5m（r0 0.25），
+   非 2×口徑。間距 0.12 < 有效半徑 → 連續煙柱。alpha 0.18 配合壓平漸變。 */
+/* rev-rpg27-data: RPG-27「Tavolga」/ PG-27 唯一數據源。
+   105mm 拋棄式無後座筒 —— 發射藥在筒內燃盡，飛行段無續燃發動機，
+   所以沒有排焰羽流；可見尾跡是曳光煙，尺度回到口徑級。
+   speed 供彈道與 APS 閘門；caliberMM 供 APS 口徑閘門（>=40 通過）。
+   r0 = 1×口徑半徑（直徑 2×口徑）；grow 收斂，1.2s 末約 3.4×口徑。
+   間距 0.12m < 有效直徑 → 連續；alpha 由沉積端再乘隨機，製造斑駁。 */
+/* rev-missile-rpg27: RPG-27 唯一數據源（105mm/130m/s，筒內燃盡無續燃→曳光煙） */
+window._RPG27 = {
+  caliber: 0.105, caliberMM: 105, speed: 130,
+  r0: 0.105, grow: 0.06, spacing: 0.12, life: 1.2, alpha: 0.30, rise: 0.10
+};
+window._rpg27Spd = function(){ return (window._RPG27 && window._RPG27.speed) || 130; };
+window._rpg27Cal = function(){ return (window._RPG27 && window._RPG27.caliberMM) || 105; };
+
+/* 世界錨定粒子的螢幕投影（爆炸 / 尾煙共用，避免各處各寫一份） */
+window._fxProjectPx = function(q, W){
+  if(!q) return null;
+  if(!q._ft && q._wx === undefined) return (typeof q.x === 'number') ? q.x : null;
+  var c = window._combat;
+  var cam = (c && c.allies && c.allies[0] && typeof c.allies[0].worldX === 'number') ? c.allies[0].worldX : 0;
+  var sr = (c && c.sm && c.sm.screenRightWorld) || 2;
+  var hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+  var awx = q._ft ? ((q._ft.worldX || 0) + (q._fdx || 0)) : q._wx;
+  return (hr + (awx - cam) / sr * (1 - hr)) * W;
+};
+
+/* 沿本幀飛過的路徑沉積尾煙。只沉積「壽命內有機會進入畫面」的區段：
+   相機在 life 秒內前進 spd*life，加上可視右半窗 srw，即為可達距離。
+   更遠的煙在相機抵達前就已消散，沉積它們只是浪費。 */
+window._rpgTrailDeposit = function(owner, b, t0, t1, P){
+if(!owner || !b || !(t1 > t0)) return;
+P = P || window._RPG27; if(!P) return;
+if(!owner.rpgSmoke) owner.rpgSmoke = [];
+if(owner.rpgSmoke.length > 900) return;
+var c = window._combat;
+var cam = (c && c.allies && c.allies[0] && typeof c.allies[0].worldX === 'number') ? c.allies[0].worldX : 0;
+var srw = (c && c.sm && c.sm.screenRightWorld) || 2;
+var spd = (typeof window._currentWorldSpeed === 'function') ? Math.abs(window._currentWorldSpeed()) : 0;
+var reach = srw + spd * P.life + 0.5;
+var dx = b.impactX - b.startX, dy = b.impactY - b.startY;
+var pathLen = Math.abs(dx);
+if(!(pathLen > 0.01)) return;
+var spacing = P.spacing || 0.12;
+var steps = Math.ceil(pathLen * (t1 - t0) / spacing);
+if(steps < 1) steps = 1; if(steps > 400) steps = 400;
+for(var i = 1; i <= steps; i++){
+var t = t0 + (t1 - t0) * (i / steps);
+var wx = b.startX + dx * t;
+if(wx - cam > reach) continue;
+var wy = b.startY + dy * t;
+owner.rpgSmoke.push({
+_wx: wx, _wy: wy + (Math.random() - 0.5) * 0.06,
+age: 0, life: P.life,
+r0: P.r0 * (0.85 + Math.random() * 0.3),
+grow: P.grow * (0.8 + Math.random() * 0.5),
+vy: (P.rise || 0.10) * (0.5 + Math.random()),
+alpha: P.alpha * (0.7 + Math.random() * 0.6)
+});
+}
+}
+
+/* ===== rev-fx-logical-view: 畫布邏輯尺寸唯一出口 =====
+   战斗 FX 畫布背板 = CSS × dpr（與載具畫布一致），ctx 帶 dpr 變換，
+   因此所有繪製 / 裁切 / 投影都必須用 CSS（邏輯）座標，不能用 canvas.width。
+   clientWidth 即佈局寬；未設 CSS 尺寸時它等於 width 屬性，故對舊畫布同樣安全。 */
+window._fxViewW = function(cv){ return (cv && (cv.clientWidth || cv.width)) || 400; };
+window._fxViewH = function(cv){ return (cv && (cv.clientHeight || cv.height)) || 500; };
+
+
+/* ===== rev-missile-visual: 導彈/火箭 icon 渲染數據（彈體長=飛行部分，不含藥筒/發射筒） ===== */
+window.MISSILE_VISUAL = {
+  'rpg':     { icon:'pg27',    len:0.90,  smoke:'tracer' },
+  '9m112':   { icon:'9m112',   len:0.96,  smoke:'rocket' },
+  '9m119m':  { icon:'9m119m',  len:0.695, smoke:'rocket' },
+  '9m117m1': { icon:'9m117m1', len:1.11,  smoke:'rocket' },
+  '9m113':   { icon:'9m113',   len:1.165, smoke:'rocket' },
+  '9m14':    { icon:null,      len:null,  smoke:'rocket', crop:true }
+};
+/* 火箭排焰煙（續燃/排氣）與曳光煙（RPG-27）分參數；間距統一 */
+window.MISSILE_TRAIL = { r0:0.12, grow:0.25, spacing:0.12, life:2.0, alpha:0.30, rise:0.15 };
+window._mvIconCache = window._mvIconCache || {};
+window._missileIconInfo = function(id){
+  /* 自帶 loader：getHeroImg 不載 rounds/ 路徑（實測 214 次呼叫全回 null）。
+     結果快取（含失敗），避免每幀重建 canvas + getImageData。
+     量測失敗（tainted canvas 等）退回整圖矩形，icon 仍然畫得出來。 */
+  var v = window.MISSILE_VISUAL && window.MISSILE_VISUAL[id];
+  if(!v || !v.icon) return null;
+  var C = window._mvIconCache;
+  if(C[id] === null) return null;
+  var e = C[id];
+  if(!e){
+    var path = 'icons/vehicle-ammo/rounds/' + v.icon + '.png';
+    var suf = (typeof assetSuffix === 'function') ? assetSuffix(path) : '';
+    var img = new Image();
+    e = C[id] = { img: img, ready: false, bounds: null };
+    img.onerror = function(){ C[id] = null; };
+    img.src = path + suf;
+  }
+  if(e.ready) return e.bounds;
+  var im = e.img;
+  if(!im.complete || !im.naturalWidth) return null;
+  var w = im.naturalWidth, h = im.naturalHeight;
+  var b = { img: im, sx: 0, sy: 0, sw: w, sh: h };
+  try{
+    var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    var cx = cv.getContext('2d'); cx.drawImage(im, 0, 0);
+    var d = cx.getImageData(0, 0, w, h).data;
+    var minX = w, maxX = -1, minY = h, maxY = -1;
+    for(var y = 0; y < h; y++){
+      var off = y * w * 4;
+      for(var x = 0; x < w; x++){
+        if(d[off + x * 4 + 3] > 10){
+          if(x < minX) minX = x;
+          if(x > maxX) maxX = x;
+          if(y < minY) minY = y;
+          if(y > maxY) maxY = y;
+        }
+      }
+    }
+    if(maxX >= 0){ b.sx = minX; b.sy = minY; b.sw = maxX - minX + 1; b.sh = maxY - minY + 1; }
+  }catch(err){}
+  e.bounds = b; e.ready = true;
+  return b;
+}
+/* 鼻端朝上 icon：內容高→lenPx，旋轉 ang=atan2(ux,-uy) 使鼻端對準速度向量 */
+window._drawMissileIcon = function(ctx, id, px, py, ang, lenPx, alpha, noseAnchor){
+  /* 鼻端朝上 icon：內容高 → lenPx。noseAnchor=true 時鼻端對齊 (px,py)，
+     彈體向後延伸 —— 配合炮口半平面裁切即為「從不可見到完整出現」。 */
+  var info = window._missileIconInfo(id);
+  if(!info || !(lenPx > 0) || !(info.sh > 0)) return false;
+  var sc = lenPx / info.sh, dw = info.sw * sc, dh = lenPx;
+  ctx.save();
+  ctx.globalAlpha = (alpha == null ? 1 : alpha);
+  ctx.translate(px, py);
+  ctx.rotate(ang);
+  ctx.drawImage(info.img, info.sx, info.sy, info.sw, info.sh, -dw / 2, noseAnchor ? 0 : -dh / 2, dw, dh);
+  ctx.restore();
+  return true;
+}
+/* 統一尾煙渲染：世界米 + source-over + 壓平漸變 + 拖影 */
+window._renderTrailSmoke = function(ctx,c,W,H){
+  if(!c||!c.rpgSmoke||!c.rpgSmoke.length)return;
+  var ppm=(c.sm&&c.sm.bgPixelsPerMeter)?c.sm.bgPixelsPerMeter:(H*0.58/1.7);
+  ctx.save();ctx.globalCompositeOperation='source-over';
+  for(var i=0;i<c.rpgSmoke.length;i++){
+    var s=c.rpgSmoke[i];
+    var lf=(typeof s.life==='number'&&s.life>0)?s.life:1.2;
+    var raw=1-s.age/lf;if(raw<=0)continue;
+    var sa=Math.pow(raw,0.7);
+    var rM=(typeof s.r0==='number')?(s.r0+(s.grow||0)*s.age):((s.size||0.02)*W/ppm);
+    var sr=Math.max(0.5,rM*ppm);
+    var sy=(typeof s._wy==='number')?(H*0.95-s._wy*ppm):(s.y*H);
+    var sx=(typeof s._wx==='number')?window._fxProjectPx(s,W):(s.x*W);
+    var pv=(typeof s._pvPx==='number')?s._pvPx:null;s._pvPx=sx;
+    if(!isFinite(sx)||sx<-W*0.5||sx>W*1.5)continue;
+    var tdx=(pv!=null)?(sx-pv):0, trx=sr+Math.abs(tdx)*0.5;
+    ctx.save();
+    ctx.globalAlpha=sa*(typeof s.alpha==='number'?s.alpha:0.30);
+    ctx.translate(sx-tdx*0.5,sy);ctx.scale(trx/Math.max(0.001,sr),1);
+    var g=ctx.createRadialGradient(0,0,0,0,0,sr);
+    g.addColorStop(0,'rgba(238,238,242,0.92)');
+    g.addColorStop(0.7,'rgba(198,198,206,0.55)');
+    g.addColorStop(1,'rgba(170,170,180,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,sr,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+};

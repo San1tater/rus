@@ -143,8 +143,16 @@ function servantAddExp(srv, n){
   srv.exp = (srv.exp || 0) + n;
   while(srv.lv < SERVANT_MAX_LV && srv.exp >= servantExpNeed(srv.lv)){
     srv.exp -= servantExpNeed(srv.lv);
+    var _mhOld = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
     srv.lv++;
-    const def = SERVANT_TYPES[srv.type] || {name:'僕人'};
+    var _mhNew = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
+    /* 升級加血：只加多出來的那一截，保留原有損傷；重傷中不復活 */
+    var _down = (srv.injuredUntil && srv.injuredUntil > Date.now())
+      || srv._injuredDown || (typeof srv.hp === 'number' && srv.hp <= 0);
+    if(!_down){
+      var _cur = (typeof srv.hp === 'number') ? srv.hp : _mhOld;
+      srv.hp = Math.max(0, Math.min(_mhNew, _cur + Math.max(0, _mhNew - _mhOld)));
+    }
     if(typeof awakenTalent === 'function') awakenTalent(srv);
   }
   if(srv.lv >= SERVANT_MAX_LV) srv.exp = 0;
@@ -580,7 +588,6 @@ if(a.stamina <= 0){
                 if(_eff >= 1){
                   tsrv.stamina = Math.max(1, Math.round(_eff * GARDEN_WAKEUP_RECOVER));
                   if(a._srv) a._srv.stamina = Math.max(0, (a._srv.stamina || 0) - 20);
-                  if(a._srv) a._srv.stamina = Math.max(0, (a._srv.stamina || 0) - 20);
                   var _fmName = a._srv ? ('<span class="r-' + a._srv.rarity + '">' + servantLabel(a._srv) + '</span>') : '監工';
                   var _tgName = '<span class="r-' + tsrv.rarity + '">' + servantLabel(tsrv) + '</span>';
                   _gardenLog(_fmName + ' 叫醒 ' + _tgName, 'work');
@@ -757,181 +764,188 @@ function _gardenGetActorCanvas(){
 
 
 function _gardenRenderActors(now){
-  const p = document.getElementById('garden-page');
-  if(!p) return;
-  const wrap = p.querySelector('.gp-grid-wrap');
-  if(!wrap) return;
-  const canvas = _gardenGetActorCanvas();
-  if(!canvas) return;
-  const wr = wrap.getBoundingClientRect();
-  const w = wr.width || 320, h = wr.height || 320;
-  const dpr = window.devicePixelRatio || 1;
-  const dw = Math.floor(w * dpr), dh = Math.floor(h * dpr);
-  if(canvas.width !== dw || canvas.height !== dh){
-    canvas.width = dw; canvas.height = dh;
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
-  }
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  if(typeof _raidDrawHuman !== 'function') return;
-  const CHAR_PX = 56; window._gardenActorCharPx = CHAR_PX; /* rev-raid-muzzle-scale: 發布守衛實際繪製字高，供 23 槍口對位 */
-  const SCALE = CHAR_PX / 386;
-  const plots = _gardenGetPlots();
-  const SPEED = 55;
-  const _sortedActors = _gardenActors.slice().sort(function(a, b){ return (a.y || 0) - (b.y || 0); });
-  for(const a of _sortedActors){
-    if(!a.initialized) continue;
-    /* rev-fix-raid-guard-actor-v2: 守衛在 actor canvas 上繪製（不跳過） */
-    if(typeof a.tx !== 'number'){ a.tx = a.x || 0; a.ty = a.y || 0; }
-    if(typeof a.x !== 'number'){ a.x = a.tx; a.y = a.ty; }
-    if(typeof a._lastRenderTime !== 'number') a._lastRenderTime = now;
-    const dt = Math.min(0.1, (now - a._lastRenderTime) / 1000);
-    a._lastRenderTime = now;
-    let didMove = false;
-    const dx = a.tx - a.x, dy = a.ty - a.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if(dist > 0.5){
-      const _actorSpeed = (a.type === 'guard') ? SPEED * 0.3 : SPEED;
-      const step = Math.min(dist, _actorSpeed * dt);
-      a.x += (dx / dist) * step;
-      a.y += (dy / dist) * step;
-      didMove = true;
-    } else {
-      a.x = a.tx; a.y = a.ty;
-    }
-    let animName = 'idle';
-    let animStart = now;
-    /* rev-fix-injured-guard-death-anim-v2: 重伤守卫 _injuredAnimStart 存到 srv 对象上，不被 sync 清空 */
-    const _srvRef = (state.servants || []).find(function(s){ return s.id === a.id; });
-    const _guardInjured = (a.type === 'guard' && _srvRef && _srvRef.injuredUntil && _srvRef.injuredUntil > Date.now());
-    if(_guardInjured){
-      animName = 'dead';
-      /* rev-fix-injured-anim-start-v3: 用 performance.now() 基准 */
-      if(!_srvRef._injuredAnimStart){
-        _srvRef._injuredAnimStart = now;
-      }
-      animStart = _srvRef._injuredAnimStart;
-      a._animName = animName;
-      a._animStart = animStart;
-    } else if(a._combatUnit && a._combatUnit.alive && window._raidLiveActive && typeof getUnitAnimState === 'function'){
-      const _as = getUnitAnimState(a._combatUnit, now);
-      animName = _as.name;
-      animStart = _as.startTime;
-    } else {
-      const _moving = Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2)) > 0.8;
-      if(_moving) animName = 'walk';
-      else if(a.state === 'work') animName = 'garden_work';
-      else animName = 'idle';
-      if(!a._animStart || a._animName !== animName){
-        a._animStart = now;
-      }
-      animStart = a._animStart;
-    }
-    const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
-    a._animName = animName;
-    a._animStart = animStart;
-    const _elapsed = Math.max(0, now - animStart);
-    let _f3 = Math.floor(_elapsed / (1000 / anim.fps));
-    if(anim.loop){ _f3 = _f3 % anim.frameCount; }
-    else if(_f3 > anim.frameCount - 1){ _f3 = anim.frameCount - 1; }
-    a._animFrame = _f3;
-    /* rev-fix-raid-actor-sync: 同步 animName / animFrame 給 _combatUnit，供 spawnBullet 的 _getRaidMuzzleWorld 使用 */
-    if(a._combatUnit){
-      a._combatUnit.animName = animName;
-      a._combatUnit.animFrame = a._animFrame;
-    }
-    ctx.save();
-    const equipped = {};
-    const equippedRarity = {};
-    if(a.type === 'guard' && a.assignedPlots && a.assignedPlots.length){
-      const plot = plots[a.assignedPlots[0]];
-      if(plot && plot.type === 'tower' && plot.towerConfig && plot.towerConfig.eq){
-        const cfg = plot.towerConfig;
-        for(const s of ['head','top','primary','secondary']){
-          if(cfg.eq[s]){ equipped[s] = cfg.eq[s]; equippedRarity[s] = (cfg.eqRarity && cfg.eqRarity[s]) || '一般'; }
-        }
-      }
-    }
-    const wpSlot = equipped.primary ? 'primary' : (equipped.secondary ? 'secondary' : null);
-    let _hasBucket = false;
-    if(a.type === 'farmer' && a._srv && typeof _isAssignedToCompost === 'function'){
-      _hasBucket = _isAssignedToCompost(a._srv);
-    }
-    let _handItem = null;
-    if(_hasBucket) _handItem = 'bucket';
-    else if(a.type === 'farmer' && a._srv && typeof _isAssignedToDistillery === 'function' && _isAssignedToDistillery(a._srv)) _handItem = 'flask';
-    else if(a.type === 'farmer') _handItem = 'stick';
-    else if(a.type === 'foreman') _handItem = 'clipboard';
-    if(Math.abs(a.tx - a.x) > 2 && !window._raidLiveActive){
-      a._facingLeft = (a.tx - a.x) < 0;
-    }
-    let _facingLeft = (typeof a._facingLeft === 'boolean') ? a._facingLeft : false;
-    if(window._raidLiveActive && a.type === 'guard'){ _facingLeft = false; }
-    /* rev-fix-dead-y-center: 让尸体居中在自己格子内（格子高 64，尸体高约 58） */
-    /* rev-guard-corpse-ground: 守衛倒地 = 逆時針向後（遠離敵人）+ 貼地。
-   後院 actor canvas 是整張大畫布，沒有探索模式的逐 sprite 底部裁切：
-   順時針倒會把槍管插進地面，舊版為藏槍把身體上移 32px → 屍體懸空。
-   改為腳底為軸逆時針 350ms 漸倒（與探索倒地時長一致）：
-   軸心隨 sin 右移 193·SCALE（屍體水平中心對齊塔位，與探索 193 常數同源）、
-   上移 51·SCALE（軀幹半厚，躺平瞬間軀幹底緣正好落在 a.y 地面），
-   槍口朝上不入地；屍體不鏡像，固定向後倒。 */
-if(animName === 'dead'){
-const _gp = Math.min(1, Math.max(0, (now - (animStart || now)) / 350));
-const _gr = _gp * Math.PI / 2;
-const _gs = Math.sin(_gr);
-ctx.save();
-ctx.translate(a.x + 193 * SCALE * _gs, a.y - 51 * SCALE * _gs);
-ctx.rotate(-_gr);
-ctx.translate(-a.x, -a.y);
-(window.drawHumanSprite || _raidDrawHuman)(ctx, a.x, a.y, SCALE, equipped, equippedRarity, 'idle', 0, wpSlot, a.type, false, false, null);
-ctx.restore();
-} else {
-(window.drawHumanSprite || _raidDrawHuman)(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, _facingLeft, _hasBucket, _handItem);
+/* rev-pose45-guard: 倒地判定含 hp<=0 / _injuredDown / 戰鬥單位已死 → 不再站著；
+   移除 -32px 上移（姿態由 pose45 rig 統一裁決）；dead 幀由 GAME_ANIMS.dead 推導。 */
+const p = document.getElementById('garden-page');
+if(!p) return;
+const wrap = p.querySelector('.gp-grid-wrap');
+if(!wrap) return;
+const canvas = _gardenGetActorCanvas();
+if(!canvas) return;
+const wr = wrap.getBoundingClientRect();
+const w = wr.width || 320, h = wr.height || 320;
+const dpr = window.devicePixelRatio || 1;
+const dw = Math.floor(w * dpr), dh = Math.floor(h * dpr);
+if(canvas.width !== dw || canvas.height !== dh){
+canvas.width = dw; canvas.height = dh;
+canvas.style.width = w + 'px';
+canvas.style.height = h + 'px';
 }
-    /* rev-fix-raid-actor-bar: 守衛戰鬥中在 actor canvas 上畫血條 */
-    if(a._combatUnit && a._combatUnit.alive && window._raidLiveActive){
-      const _cu = a._combatUnit;
-      const _bw = 34, _bh = 4;
-      const _bx = a.x - _bw / 2;
-      /* rev-fix-raid-bar-above-name: 血條在姓名條上方，不被遮住 */
-      const _by = a.y - 56 * 1.26 - 26;
-      ctx.fillStyle = 'rgba(0,0,0,.75)';
-      ctx.fillRect(_bx - 1, _by - 1, _bw + 2, _bh + 2);
-      ctx.fillStyle = '#1a1010';
-      ctx.fillRect(_bx, _by, _bw, _bh);
-      ctx.fillStyle = '#4caf50';
-      ctx.fillRect(_bx, _by, _bw * Math.max(0, _cu.hp / _cu.maxHp), _bh);
-    }
-    if(a._srv){
-      const _lbl = servantLabel(a._srv);
-      ctx.save();
-      ctx.font = 'bold 9px -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      const _tw = ctx.measureText(_lbl).width;
-      const _by = (a._animName === 'dead') ? (a.y - 22) : (a.y - CHAR_PX - 14); /* rev-guard-corpse-ground-label: 名牌貼近躺倒屍體 */
-      ctx.fillStyle = 'rgba(0,0,0,0.72)';
-      ctx.fillRect(a.x - _tw/2 - 3, _by - 11, _tw + 6, 12);
-      ctx.fillStyle = '#fff';
-      ctx.fillText(_lbl, a.x, _by);
-      ctx.restore();
-    }
-    ctx.restore();
-    const _showIcon = (a.state === 'lazy' || a.state === 'rest') || (a.state === 'surrender' && window._raidLiveActive);
-    if(_showIcon){
-      ctx.save();
-      ctx.font = 'bold 13px -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.shadowColor = '#000';
-      ctx.shadowBlur = 3;
-      ctx.fillStyle = '#e8a33d';
-      ctx.fillText(a.state === 'surrender' ? '🙌' : '💤', a.x + CHAR_PX * 0.40, a.y - CHAR_PX * 1.15);
-      ctx.restore();
-    }
-  }
+const ctx = canvas.getContext('2d');
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+ctx.clearRect(0, 0, w, h);
+if(typeof _raidDrawHuman !== 'function') return;
+const CHAR_PX = 56;
+window._gardenActorCharPx = CHAR_PX;
+const SCALE = CHAR_PX / 386;
+const plots = _gardenGetPlots();
+const SPEED = 55;
+const _deadAnim = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.dead) ? GAME_ANIMS.dead : { frameCount:8, fps:8 };
+const _deadMs = Math.round(_deadAnim.frameCount / _deadAnim.fps * 1000);
+const _sortedActors = _gardenActors.slice().sort(function(a, b){ return (a.y || 0) - (b.y || 0); });
+for(const a of _sortedActors){
+if(!a.initialized) continue;
+if(typeof a.tx !== 'number'){ a.tx = a.x || 0; a.ty = a.y || 0; }
+if(typeof a.x !== 'number'){ a.x = a.tx; a.y = a.ty; }
+if(typeof a._lastRenderTime !== 'number') a._lastRenderTime = now;
+const dt = Math.min(0.1, (now - a._lastRenderTime) / 1000);
+a._lastRenderTime = now;
+const _srvRef = (state.servants || []).find(function(s){ return s.id === a.id; });
+/* 倒地判定：任何一項成立即視為倒地，且不受戰鬥分支覆蓋 */
+const _cu = a._combatUnit || null;
+/* rev-injury-persist: 倒地狀態寫回僕人存檔（任何致死路徑都經過這裡） */
+if(a.type === 'guard' && _srvRef){
+const _gpNowMs = Date.now();
+const _gpInjMs = (typeof GUARD_INJURY_MS === 'number' && GUARD_INJURY_MS > 0) ? GUARD_INJURY_MS : (4 * 3600 * 1000);
+const _gpCuDead = !!(_cu && (_cu.alive === false || (typeof _cu.hp === 'number' && _cu.hp <= 0)));
+const _gpUntil = (typeof _srvRef.injuredUntil === 'number') ? _srvRef.injuredUntil : 0;
+const _gpActive = _gpUntil > _gpNowMs;
+if(!_gpActive && (_gpCuDead || (typeof _srvRef.hp === 'number' && _srvRef.hp <= 0) || _srvRef._injuredDown)){
+_srvRef.hp = 0;
+_srvRef.injuredUntil = _gpNowMs + _gpInjMs;
+if(typeof _srvRef.injuredAt !== 'number') _srvRef.injuredAt = _gpNowMs;
+_srvRef._injuredDown = true;
+if(typeof save === 'function') save();
+} else if(_gpUntil && _gpUntil <= _gpNowMs){
+delete _srvRef.injuredUntil;
+delete _srvRef.injuredAt;
+delete _srvRef._injuredAnimStart;
+_srvRef._injuredDown = false;
+_srvRef.hp = (typeof servantMaxHp === 'function') ? servantMaxHp(_srvRef) : 100;
+if(typeof save === 'function') save();
+} else if(_gpActive && typeof _srvRef.injuredAt !== 'number'){
+_srvRef.injuredAt = _gpNowMs;
+if(typeof save === 'function') save();
+}
+}
+const _isDown = !!(a.type === 'guard' && (
+(_srvRef && _srvRef.injuredUntil && _srvRef.injuredUntil > Date.now()) ||
+(_srvRef && _srvRef._injuredDown) ||
+(_srvRef && typeof _srvRef.hp === 'number' && _srvRef.hp <= 0) ||
+(_cu && _cu.alive === false) ||
+(_cu && typeof _cu.hp === 'number' && _cu.hp <= 0)
+));
+if(!_isDown){
+const dx = a.tx - a.x, dy = a.ty - a.y;
+const dist = Math.sqrt(dx * dx + dy * dy);
+if(dist > 0.5){
+const _actorSpeed = (a.type === 'guard') ? SPEED * 0.3 : SPEED;
+const step = Math.min(dist, _actorSpeed * dt);
+a.x += (dx / dist) * step;
+a.y += (dy / dist) * step;
+} else { a.x = a.tx; a.y = a.ty; }
+}
+let animName = 'idle';
+let animStart = now;
+if(_isDown){
+animName = 'dead';
+/* rev-injury-persist: dead 幀由持久化 injuredAt 推導 → 刷新後直接停在躺平末幀，不重播倒下 */
+const _gpInjAt = (_srvRef && typeof _srvRef.injuredAt === 'number') ? _srvRef.injuredAt : 0;
+animStart = _gpInjAt ? (now - Math.max(0, Date.now() - _gpInjAt)) : now;
+if(_srvRef) _srvRef._injuredAnimStart = animStart;
+if(_cu){ _cu.animName = 'dead'; }
+} else if(_cu && _cu.alive && window._raidLiveActive && typeof getUnitAnimState === 'function'){
+const _as = getUnitAnimState(_cu, now);
+animName = _as.name;
+animStart = _as.startTime;
+if(_srvRef && _srvRef._injuredAnimStart) _srvRef._injuredAnimStart = null;
+} else {
+const _moving = Math.sqrt(Math.pow(a.tx - a.x, 2) + Math.pow(a.ty - a.y, 2)) > 0.8;
+if(_moving) animName = 'walk';
+else if(a.state === 'work') animName = 'garden_work';
+else animName = 'idle';
+if(!a._animStart || a._animName !== animName) a._animStart = now;
+animStart = a._animStart;
+if(_srvRef && _srvRef._injuredAnimStart) _srvRef._injuredAnimStart = null;
+}
+const anim = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS[animName]) ? GAME_ANIMS[animName] : { frameCount:1, fps:1, loop:true };
+a._animName = animName;
+a._animStart = animStart;
+const _elapsed = Math.max(0, now - animStart);
+let _f3 = Math.floor(_elapsed / (1000 / anim.fps));
+if(anim.loop){ _f3 = _f3 % anim.frameCount; }
+else if(_f3 > anim.frameCount - 1){ _f3 = anim.frameCount - 1; }
+a._animFrame = _f3;
+if(_cu){ _cu.animName = animName; _cu.animFrame = _f3; }
+ctx.save();
+const equipped = {};
+const equippedRarity = {};
+if(a.type === 'guard' && a.assignedPlots && a.assignedPlots.length){
+const plot = plots[a.assignedPlots[0]];
+if(plot && plot.type === 'tower' && plot.towerConfig && plot.towerConfig.eq){
+const cfg = plot.towerConfig;
+for(const s of ['head','top','primary','secondary']){
+if(cfg.eq[s]){ equipped[s] = cfg.eq[s]; equippedRarity[s] = (cfg.eqRarity && cfg.eqRarity[s]) || '一般'; }
+}
+}
+}
+const wpSlot = equipped.primary ? 'primary' : (equipped.secondary ? 'secondary' : null);
+let _hasBucket = false;
+if(a.type === 'farmer' && a._srv && typeof _isAssignedToCompost === 'function'){
+_hasBucket = _isAssignedToCompost(a._srv);
+}
+let _handItem = null;
+if(_hasBucket) _handItem = 'bucket';
+else if(a.type === 'farmer' && a._srv && typeof _isAssignedToDistillery === 'function' && _isAssignedToDistillery(a._srv)) _handItem = 'flask';
+else if(a.type === 'farmer') _handItem = 'stick';
+else if(a.type === 'foreman') _handItem = 'clipboard';
+if(!_isDown && Math.abs(a.tx - a.x) > 2 && !window._raidLiveActive){
+a._facingLeft = (a.tx - a.x) < 0;
+}
+let _facingLeft = (typeof a._facingLeft === 'boolean') ? a._facingLeft : false;
+if(window._raidLiveActive && a.type === 'guard' && !_isDown){ _facingLeft = false; }
+if(_cu) _cu._facingLeft = _facingLeft;
+/* 腳底固定 a.y，零上移；姿態 / 層序由 pose45 rig 裁決 */
+(window.drawHumanSprite || _raidDrawHuman)(ctx, a.x, a.y, SCALE, equipped, equippedRarity, animName, a._animFrame, wpSlot, a.type, _facingLeft, _hasBucket, _handItem);
+if(_cu && _cu.alive && window._raidLiveActive){
+const _bw = 34, _bh = 4;
+const _bx = a.x - _bw / 2;
+const _by = a.y - 56 * 1.26 - 26;
+ctx.fillStyle = 'rgba(0,0,0,.75)';
+ctx.fillRect(_bx - 1, _by - 1, _bw + 2, _bh + 2);
+ctx.fillStyle = '#1a1010';
+ctx.fillRect(_bx, _by, _bw, _bh);
+ctx.fillStyle = '#4caf50';
+ctx.fillRect(_bx, _by, _bw * Math.max(0, _cu.hp / _cu.maxHp), _bh);
+}
+if(a._srv){
+const _lbl = servantLabel(a._srv);
+ctx.save();
+ctx.font = 'bold 9px -apple-system, sans-serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'bottom';
+const _tw = ctx.measureText(_lbl).width;
+const _by2 = _isDown ? (a.y - 22) : (a.y - CHAR_PX - 14);
+ctx.fillStyle = 'rgba(0,0,0,0.72)';
+ctx.fillRect(a.x - _tw/2 - 3, _by2 - 11, _tw + 6, 12);
+ctx.fillStyle = '#fff';
+ctx.fillText(_lbl, a.x, _by2);
+ctx.restore();
+}
+ctx.restore();
+const _showIcon = !_isDown && ((a.state === 'lazy' || a.state === 'rest') || (a.state === 'surrender' && window._raidLiveActive));
+if(_showIcon){
+ctx.save();
+ctx.font = 'bold 13px -apple-system, sans-serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'bottom';
+ctx.shadowColor = '#000';
+ctx.shadowBlur = 3;
+ctx.fillStyle = '#e8a33d';
+ctx.fillText(a.state === 'surrender' ? '🙌' : '💤', a.x + CHAR_PX * 0.40, a.y - CHAR_PX * 1.15);
+ctx.restore();
+}
+}
 }
 
 
@@ -1121,7 +1135,7 @@ function _gardenDoOneMeal(g){
       }
       const plots = _gardenGetPlots();
       for(const p of plots){
-        if(p && p.type === 'soil' && p.crop && p.crop.matureAt > cursor && p.crop.matureAt < nextT){
+        if(p && _isSoilType(p.type) && p.crop && p.crop.matureAt > cursor && p.crop.matureAt < nextT){
           nextT = p.crop.matureAt;
         }
         if(p && p.type === 'distillery' && p.enabled !== false && typeof DISTILL_PERIOD_MS === 'number'){

@@ -13,7 +13,26 @@ const GAME_LAYERS = [
 ];
 
 const GAME_ANIMS = {
-  dead: { frameCount: 1, fps: 1, loop: true, showEq: 'primary', keys: {} },
+  dead: {
+/* rev-arm45: 一律向後倒（12f@12fps≈1s）。rootRot 由渲染端套 (flipX?+1:-1)。
+   keys.front_arm = 右手（持槍，dx 向中軸線 +3.5）；keys.back_arm = 左手（支撐）。
+   面向左時 _anim45 互換兩手 keys，右手變成 back_arm。
+   deadGunRot 70° → 槍斜向上；deadGunRotFlip 110° → 槍斜向下。 */
+frameCount: 12, fps: 12, loop: false, showEq: 'primary',
+rootRot:  [0, 2, 5, 3, 1, 6, 20, 40, 60, 76, 87, 90],
+rootLift: [0, 0, -1, -3, -6, -8, -3, 8, 22, 36, 47, 51],
+deadGunRot:     [0, -4, -8, -6, -2, 4, 16, 32, 48, 60, 68, 70],
+deadGunRotFlip: [0, -6, -13, -9, -3, 6, 25, 50, 75, 94, 107, 110],
+keys: {
+torso: [0,-3,-6,-4,-2,-5,-6,-4,-2,-1,0,0].map(function(r){return {rot:r,dx:0,dy:0};}),
+head:  [0,-5,-9,-6,-3,-7,-10,-8,-6,-5,-6,-6].map(function(r){return {rot:r,dx:0,dy:0};}),
+face:  [0,-5,-9,-6,-3,-7,-10,-8,-6,-5,-6,-6].map(function(r){return {rot:r,dx:0,dy:0};}),
+front_arm: [0,0,0,0,0,0.5,1,1.6,2.2,2.8,3.3,3.5].map(function(d){return {rot:0,dx:d,dy:0};}),
+back_arm:  [0,-1,-2,-2,-1,-2,-4,-6,-8,-9,-10,-10].map(function(r){return {rot:r,dx:0,dy:0};}),
+right_leg: [0,4,10,16,22,26,20,12,6,4,5,6].map(function(r){return {rot:r,dx:0,dy:0};}),
+left_leg:  [0,-4,-10,-16,-22,-26,-18,-10,-5,-3,-4,-4].map(function(r){return {rot:r,dx:0,dy:0};})
+}
+},
   idle: {
     frameCount: 4, fps: 4, loop: true, showEq: 'primary',
     keys: {
@@ -727,82 +746,56 @@ function computeWeaponCharLayout(cfg){
  * 探索 / Boss / 後院三處共用，各調用方自行做 canvas 座標系轉換。
  * 完整考慮三層旋轉：L.rot（靜態）+ key.rot（動畫幀）+ cfg.rotation（武器自身）
  * 返回值：{ x, y } 相對 400×500 原圖左上角的像素坐標；若 weaponId 無效返回 null */
-window.getCharWeaponMuzzleLocal = function(weaponSlot, weaponId, animName, frameIdx){
-  if(!weaponSlot || !weaponId) return null;
-  if(typeof getWeaponCfg !== 'function') return null;
-  const cfg = getWeaponCfg(weaponSlot, weaponId);
-  if(!cfg) return null;
-  const L = (typeof GAME_LAYERS !== 'undefined') ? GAME_LAYERS.find(function(l){ return l.id === cfg.layer; }) : null;
-  if(!L) return null;
-
-  const anim = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS[animName || 'idle']) || null;
-  const fc = anim ? anim.frameCount : 1;
-  const fi = anim ? (((frameIdx || 0) % fc) + fc) % fc : 0;
-  const key = (anim && anim.keys && anim.keys[L.id] && anim.keys[L.id][fi]) || { rot:0, dx:0, dy:0 };
-
-  const B = { x: 30, y: 30, w: 340, h: 460 };
-  const w = B.w * L.w;
-  const h = B.h * L.h;
-  const cx = B.x + B.w * (L.x + (key.dx || 0) * 0.01);
-  const cy = B.y + B.h * (L.y + (key.dy || 0) * 0.01);
-
-  const hasTrim = !!(cfg.trim && cfg.trim.w > 0 && cfg.trim.h > 0);
-  let localX, localY;
-
-  if(hasTrim){
-    /* rev-fix-exact-muzzle: 优先查精确 id，再回退 baseId */
-    const _cleanWid = String(weaponId || '').replace(/\.png$/i, '');
-    const _wid = (typeof resolveIconId === 'function') ? resolveIconId(_cleanWid) : _cleanWid;
-    /* rev-fix-muzzle-lookup-norm */
-    let _normWid = _cleanWid;
-    if(isNamedWeaponId(_cleanWid)){
-      const _p = _cleanWid.split('_');
-      if(_p.length === 4){
-        const _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87': 'c', 'PSO-1': 'l', 'PS320': 'l', '1P59': 'l' };
-        const _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
-        const _ns = _sMap[_p[2]] || _p[2];
-        const _ng = _gMap[_p[3]] || _p[3];
-        if(_ns !== _p[2] || _ng !== _p[3]){
-          _normWid = _p[0] + '_' + _p[1] + '_' + _ns + '_' + _ng;
-        }
-      }
-    }
-    const mz = (typeof WEAPON_MUZZLE !== 'undefined') ? (WEAPON_MUZZLE[_normWid] || WEAPON_MUZZLE[_cleanWid] || WEAPON_MUZZLE[_wid]) : null;
-    const baseW = cfg.trim.w * (cfg.scale || 1.0);
-    const baseH = cfg.trim.h * (cfg.scale || 1.0);
-    if(mz){
-      /* muzzle 在武器未旋轉坐標系（相對旋轉中心 = 圖片左邊緣中點）的偏移 */
-      let mxRaw = (mz.x / cfg.trim.w) * baseW;
-      let myRaw = -baseH / 2 + (mz.y / cfg.trim.h) * baseH;
-      /* 武器自身 rotation（drawEqLayer 裡 rotate(cfg.rotation) 繞武器中心） */
-      if(cfg.rotation){
-        const r = cfg.rotation * Math.PI / 180;
-        const cR = Math.cos(r), sR = Math.sin(r);
-        const nx = mxRaw * cR - myRaw * sR;
-        const ny = mxRaw * sR + myRaw * cR;
-        mxRaw = nx; myRaw = ny;
-      }
-      localX = w * (cfg.ox || 0) + mxRaw;
-      localY = h * (cfg.oy || 0) + myRaw;
-    } else {
-      /* 無 muzzle 定義 → 武器右邊緣中點（與原探索/Boss 行為一致） */
-      localX = w * (cfg.ox || 0) + baseW;
-      localY = h * (cfg.oy || 0);
-    }
-  } else {
-    /* 無 trim → 武器中心 */
-    const baseW2 = 400 * (cfg.scale || 0.3);
-    localX = w * (cfg.ox || 0) + baseW2 / 2;
-    localY = h * (cfg.oy || 0);
-  }
-
-  /* 應用 L.rot + key.rot（與 drawEqLayer 完全一致） */
-  const rot = ((L.rot || 0) + (key.rot || 0)) * Math.PI / 180;
-  const cK = Math.cos(rot), sK = Math.sin(rot);
-  const rOffX = localX * cK - localY * sK;
-  const rOffY = localX * sK + localY * cK;
-
-  return { x: cx + rOffX, y: cy + rOffY };
+window.getCharWeaponMuzzleLocal = function(weaponSlot, weaponId, animName, frameIdx, flipX){
+/* rev-arm45: 槍口跟著右手（flipX → back_arm）與互換後的 keys；呼叫端傳 flipX。 */
+if(!weaponSlot || !weaponId || typeof getWeaponCfg !== 'function') return null;
+const cfg = getWeaponCfg(weaponSlot, weaponId);
+if(!cfg) return null;
+const fx = !!flipX;
+const B = ARM45_B;
+const lid = _gunArm45(fx);
+const L = _armGeom45(_L45(lid), fx);
+if(!L) return null;
+const anim = _anim45((typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS[animName || 'idle']) || null, fx);
+const fc = anim ? anim.frameCount : 1;
+const fi = anim ? (((frameIdx || 0) % fc) + fc) % fc : 0;
+const key = (anim && anim.keys && anim.keys[lid] && anim.keys[lid][fi]) || {rot:0,dx:0,dy:0};
+const w = B.w * L.w, h = B.h * L.h;
+const cx = B.x + B.w * (L.x + (key.dx||0)*0.01);
+const cy = B.y + B.h * (L.y + (key.dy||0)*0.01);
+const hasTrim = !!(cfg.trim && cfg.trim.w > 0 && cfg.trim.h > 0);
+let localX, localY;
+if(hasTrim){
+const _clean = String(weaponId||'').replace(/\.png$/i,'');
+const _base = (typeof resolveIconId === 'function') ? resolveIconId(_clean) : _clean;
+let _norm = _clean;
+if(typeof isNamedWeaponId === 'function' && isNamedWeaponId(_clean)){
+const _p = _clean.split('_');
+if(_p.length === 4){
+const _sM = (typeof SCOPE_ID_SHORT!=='undefined') ? SCOPE_ID_SHORT : {'1P87':'c','PSO-1':'l','PS320':'l','1P59':'l'};
+const _gM = (typeof GRIP_ID_SHORT!=='undefined') ? GRIP_ID_SHORT : {'RK-1':'g'};
+const _ns = _sM[_p[2]] || _p[2], _ng = _gM[_p[3]] || _p[3];
+if(_ns !== _p[2] || _ng !== _p[3]) _norm = _p[0]+'_'+_p[1]+'_'+_ns+'_'+_ng;
+}
+}
+const mz = (typeof WEAPON_MUZZLE!=='undefined') ? (WEAPON_MUZZLE[_norm] || WEAPON_MUZZLE[_clean] || WEAPON_MUZZLE[_base]) : null;
+const baseW = cfg.trim.w * (cfg.scale||1.0), baseH = cfg.trim.h * (cfg.scale||1.0);
+if(mz){
+let mx = (mz.x/cfg.trim.w)*baseW, my = -baseH/2 + (mz.y/cfg.trim.h)*baseH;
+if(cfg.rotation){
+const r = cfg.rotation*Math.PI/180, cR=Math.cos(r), sR=Math.sin(r);
+const nx = mx*cR - my*sR, ny = mx*sR + my*cR; mx = nx; my = ny;
+}
+localX = w*(cfg.ox||0) + mx; localY = h*(cfg.oy||0) + my;
+} else { localX = w*(cfg.ox||0) + baseW; localY = h*(cfg.oy||0); }
+} else {
+const bw2 = 400*(cfg.scale||0.3);
+localX = w*(cfg.ox||0) + bw2/2; localY = h*(cfg.oy||0);
+}
+let deg = (L.rot||0) + (key.rot||0);
+if(animName === 'dead' && anim) deg = (L.rot||0) + _deadRot45(anim, fi, lid, fx, key.rot||0);
+const rr = deg*Math.PI/180, cK=Math.cos(rr), sK=Math.sin(rr);
+return { x: cx + localX*cK - localY*sK, y: cy + localX*sK + localY*cK };
 };
 
 const heroImgCache = new Map();
@@ -966,14 +959,16 @@ window._heroEqHolds = function(name){ return window._HERO_EQ_HOLD.indexOf(name) 
 /* rev-fix-hero-death-anim: 玩家倒地动画统一入口。记录 _deathStart 供渲染端计算 fallProgress。
  * 幂等：已在 dead 状态则不动，避免重生后立刻死亡时误重置。 */
 window._playHeroDeath = function(){
-  if(typeof heroAnim === 'undefined') return;
-  if(heroAnim.name === 'dead') return;
-  heroAnim.name = 'dead';
-  heroAnim.frame = 0;
-  heroAnim.lastUpdate = performance.now();
-  heroAnim._deathStart = performance.now();
-  heroAnim.eqSlot = null;
-  heroAnim.healItem = null;
+/* rev-arm45: forcedEnd=Infinity + updateHeroAnim 的 dead 分支 → 停末幀，絕不自動回 walk */
+if(typeof heroAnim === 'undefined') return;
+if(heroAnim.name === 'dead') return;
+heroAnim.name = 'dead';
+heroAnim.frame = 0;
+heroAnim.lastUpdate = performance.now();
+heroAnim._deathStart = performance.now();
+heroAnim.forcedEnd = Infinity;
+heroAnim.eqSlot = null;
+heroAnim.healItem = null;
 };
 
 function computeAnimFrame(animName, startAt, now){
@@ -987,37 +982,36 @@ function computeAnimFrame(animName, startAt, now){
 }
 
 function updateHeroAnim(now){
-  const a = GAME_ANIMS[heroAnim.name];
-  if(!a) return;
-  const isFire = heroAnim.name === 'fire_primary' || heroAnim.name === 'fire_secondary' || heroAnim.name === 'attack_melee';
-  /* rev-fix-anim-start: fire 動畫基於 animStart 計算幀，確保每發都從 0 開始且正常更新 */
-  if(isFire && typeof heroAnim.animStart === 'number'){
-    /* rev-fix-throw-full-anim: 單輪播完停在最後一幀，不循環；下一發 _playFire/_playMeleeFire 重設 animStart */
-    const interval = 1000 / a.fps;
-    const elapsed = Math.max(0, now - heroAnim.animStart);
-    const totalDur = (a.frameCount / a.fps) * 1000;
-    if(elapsed >= totalDur){
-      heroAnim.frame = a.frameCount - 1;
-    } else {
-      heroAnim.frame = Math.floor(elapsed / interval);
-    }
-    return;
-  }
-  const interval = 1000 / a.fps;
-  if(now - heroAnim.lastUpdate >= interval){
-    heroAnim.lastUpdate = now;
-    if(a.loop){
-      heroAnim.frame = (heroAnim.frame + 1) % a.frameCount;
-    } else {
-      if(heroAnim.frame < a.frameCount - 1){
-        heroAnim.frame++;
-      } else if(now > (heroAnim.forcedEnd||0)){
-        heroAnim.name = 'walk';
-        heroAnim.frame = 0;
-        heroAnim.eqSlot = null;
-      }
-    }
-  }
+const a = GAME_ANIMS[heroAnim.name];
+if(!a) return;
+/* rev-arm45: 倒地只推進幀、停在末幀 */
+if(heroAnim.name === 'dead'){
+const iv = 1000 / a.fps;
+if(now - heroAnim.lastUpdate >= iv){
+heroAnim.lastUpdate = now;
+if(heroAnim.frame < a.frameCount - 1) heroAnim.frame++;
+}
+return;
+}
+const isFire = heroAnim.name === 'fire_primary' || heroAnim.name === 'fire_secondary' || heroAnim.name === 'attack_melee';
+if(isFire && typeof heroAnim.animStart === 'number'){
+const interval = 1000 / a.fps;
+const elapsed = Math.max(0, now - heroAnim.animStart);
+const totalDur = (a.frameCount / a.fps) * 1000;
+heroAnim.frame = (elapsed >= totalDur) ? (a.frameCount - 1) : Math.floor(elapsed / interval);
+return;
+}
+const interval = 1000 / a.fps;
+if(now - heroAnim.lastUpdate >= interval){
+heroAnim.lastUpdate = now;
+if(a.loop){ heroAnim.frame = (heroAnim.frame + 1) % a.frameCount; }
+else {
+if(heroAnim.frame < a.frameCount - 1){ heroAnim.frame++; }
+else if(now > (heroAnim.forcedEnd || 0)){
+heroAnim.name = 'walk'; heroAnim.frame = 0; heroAnim.eqSlot = null;
+}
+}
+}
 }
 function updateBattleHeroAnim(now){
   const a = GAME_ANIMS[battleHeroAnim.name];
@@ -1149,9 +1143,67 @@ function getPlayerMuzzlePos(){
   };
 }
 
+/* ===== rev-arm45: 兩手角色互換 + 右手持槍（唯一真相源） =====
+前側手＝近側小臂；後側手＝遠側小臂。
+面向右：右手 = front_arm；面向左：右手 = back_arm。
+面向左時兩手互換角色（幾何 + 動畫 keys 同步互換）：
+  front_arm 長度不變，遠端對齊原 back_arm 遠端；
+  back_arm  w/h/pivot 同步 front_arm，近端＝原 front_arm 近端，上緣＝原 back_arm 上緣。
+武器/物品沿用原 ox/oy 綁在右手方塊 → 等價錨點，不需任何抵肩補償。 */
+var ARM45_B = { x:30, y:30, w:340, h:460 };
+function _L45(id){
+for(var i=0;i<GAME_LAYERS.length;i++){ if(GAME_LAYERS[i].id===id) return GAME_LAYERS[i]; }
+return null;
+}
+function _rect45(L){
+var B=ARM45_B, w=B.w*L.w, h=B.h*L.h;
+var cx=B.x+B.w*L.x, cy=B.y+B.h*L.y, px=w*L.pivot.x, py=h*L.pivot.y;
+return { l:cx-px, r:cx-px+w, t:cy-py, b:cy-py+h };
+}
+function _armGeom45(L, flipX){
+if(!flipX || !L || (L.id!=='front_arm' && L.id!=='back_arm')) return L;
+var B=ARM45_B, fa=_L45('front_arm'), ba=_L45('back_arm');
+if(!fa || !ba) return L;
+var rf=_rect45(fa), rb=_rect45(ba), g={}, k;
+for(k in L) g[k]=L[k];
+if(L.id==='front_arm'){
+g.x = fa.x + (rb.r - rf.r)/B.w;
+} else {
+g.w = fa.w; g.h = fa.h; g.pivot = { x:fa.pivot.x, y:fa.pivot.y };
+var nw=B.w*g.w, nh=B.h*g.h, npx=nw*g.pivot.x, npy=nh*g.pivot.y;
+g.x = (rf.l + npx - B.x)/B.w;
+g.y = (rb.t + npy - B.y)/B.h;
+}
+return g;
+}
+function _gunArm45(flipX){ return flipX ? 'back_arm' : 'front_arm'; }
+function _anim45(anim, flipX){
+if(!flipX || !anim || !anim.keys) return anim;
+var a={}, k;
+for(k in anim) a[k]=anim[k];
+var kk={};
+for(k in anim.keys) kk[k]=anim.keys[k];
+kk.front_arm = anim.keys.back_arm || [];
+kk.back_arm  = anim.keys.front_arm || [];
+a.keys = kk;
+return a;
+}
+function _deadRoot45(ctx, anim, fi, scale, flipX){
+var rr=(anim.rootRot && anim.rootRot[fi]) || 0;
+var lf=(anim.rootLift && anim.rootLift[fi]) || 0;
+ctx.translate(0, -lf*scale);
+ctx.rotate((flipX ? 1 : -1)*rr*Math.PI/180);
+}
+function _deadRot45(anim, fi, lid, flipX, baseRot){
+if(!anim || lid !== _gunArm45(flipX)) return baseRot;
+var arr = flipX ? anim.deadGunRotFlip : anim.deadGunRot;
+if(!arr) return baseRot;
+return arr[fi] || 0;
+}
 function drawBodyLayer(ctx, L, B, anim, fi, rotOverride){
   const keys = anim.keys[L.id] || [];
   const key = keys[fi] || {rot:0, dx:0, dy:0};
+if(key && key.hide) return; /* rev-corpse-hide: 只有 dead.back_arm 帶此旗標，其他動畫零影響 */
   const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
   const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
   const w = B.w * L.w;
@@ -1171,154 +1223,122 @@ function drawBodyLayer(ctx, L, B, anim, fi, rotOverride){
   ctx.restore();
 }
 
-function drawEqLayer(ctx, u, B, anim, fi){
-  const img = u.img;
-  if(!img || !img.complete || !img.naturalWidth) return;
-  const L = GAME_LAYERS.find(l => l.id === u.layerId);
-  const keys = anim.keys[L.id] || [];
-  const key = keys[fi] || {rot:0, dx:0, dy:0};
-  const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-  const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-  const w = B.w * L.w;
-  const h = B.h * L.h;
-  const px = w * L.pivot.x;
-  const py = h * L.pivot.y;
-  const localX = px + w * (u.ox || 0);
-  const localY = py + h * (u.oy || 0);
-
-  const hasTrim = u.trim && u.trim.w > 0;
-  let baseW, baseH, drawX;
-  if(hasTrim){
-    baseW = u.trim.w * (u.scale || 1.0);
-    baseH = u.trim.h * (u.scale || 1.0);
-    drawX = 0;
-  } else if(u._fitMax){
-    /* [v196] 長邊歸一化：最大邊固定 400*scale，另一邊按比例。
-       用於 healItem（water/salewa 是 64×127，原邏輯 baseH = baseW/ar 會爆到 1.98 倍）。 */
-    const _maxSide = 400 * (u.scale || 0.3);
-    const _ar = img.naturalWidth / img.naturalHeight;
-    if(_ar >= 1){ baseW = _maxSide; baseH = _maxSide / _ar; }
-    else { baseH = _maxSide; baseW = _maxSide * _ar; }
-    drawX = -baseW / 2;
-  } else {
-    baseW = 400 * (u.scale || 0.3);
-    const ar = img.naturalWidth / img.naturalHeight;
-    baseH = baseW / ar;
-    drawX = -baseW / 2;
-  }
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate((key.rot || 0) * Math.PI / 180);
-  ctx.translate(-px, -py);
-  ctx.translate(localX, localY);
-  if(u.rotation) ctx.rotate(u.rotation * Math.PI / 180);
-  if(hasTrim){
-    ctx.drawImage(img, u.trim.x, u.trim.y, u.trim.w, u.trim.h,
-                  drawX, -baseH/2, baseW, baseH);
-  } else {
-    ctx.drawImage(img, drawX, -baseH/2, baseW, baseH);
-  }
-  ctx.restore();
+function drawEqLayer(ctx, u, B, anim, fi, rotOverride){
+const img = u.img;
+if(!img || !img.complete || !img.naturalWidth) return;
+/* rev-arm45: u._L = 已互換的骨架；rotOverride = 倒地右手角度 */
+const L = u._L || GAME_LAYERS.find(l => l.id === u.layerId);
+if(!L) return;
+const keys = anim.keys[L.id] || [];
+const key = keys[fi] || {rot:0, dx:0, dy:0};
+const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
+const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
+const w = B.w * L.w, h = B.h * L.h;
+const px = w * L.pivot.x, py = h * L.pivot.y;
+const localX = px + w * (u.ox || 0);
+const localY = py + h * (u.oy || 0);
+const hasTrim = u.trim && u.trim.w > 0;
+let baseW, baseH, drawX;
+if(hasTrim){ baseW = u.trim.w*(u.scale||1.0); baseH = u.trim.h*(u.scale||1.0); drawX = 0; }
+else if(u._fitMax){
+const _maxSide = 400*(u.scale||0.3);
+const _ar = img.naturalWidth/img.naturalHeight;
+if(_ar >= 1){ baseW=_maxSide; baseH=_maxSide/_ar; } else { baseH=_maxSide; baseW=_maxSide*_ar; }
+drawX = -baseW/2;
+} else {
+baseW = 400*(u.scale||0.3);
+baseH = baseW/(img.naturalWidth/img.naturalHeight);
+drawX = -baseW/2;
+}
+const _rot = (typeof rotOverride === 'number') ? rotOverride : (key.rot || 0);
+ctx.save();
+ctx.translate(cx, cy);
+ctx.rotate(_rot * Math.PI / 180);
+ctx.translate(-px, -py);
+ctx.translate(localX, localY);
+if(u.rotation) ctx.rotate(u.rotation * Math.PI / 180);
+if(hasTrim) ctx.drawImage(img, u.trim.x, u.trim.y, u.trim.w, u.trim.h, drawX, -baseH/2, baseW, baseH);
+else ctx.drawImage(img, drawX, -baseH/2, baseW, baseH);
+ctx.restore();
 }
 
-function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio, legOverride, healItemId, fallProgress){
-  const anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
-  const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  const factor = charHFactor || CHAR_HEIGHT_FACTOR;
-  const B = { x: 30, y: 30, w: 340, h: 460 };
-  const ORIG_CHAR_H = 386;
-  const ORIG_FOOT_X = 200;
-  const ORIG_FOOT_Y = 515;
-  const targetCharH = canvasH * factor;
-  const scale = targetCharH / ORIG_CHAR_H;
-  const groundY = canvasH * 0.95;
-  const ratio = (centerXRatio != null) ? centerXRatio : 0.5;
-  const centerX = canvasW * ratio;
-  ctx.save();
-  ctx.translate(centerX, groundY);
-  if(animName === 'dead'){
-    const _fp = Math.min(1, (typeof fallProgress === 'number') ? fallProgress : 1);
-    ctx.rotate(_fp * Math.PI / 2);
-  }
-  ctx.scale(scale, scale);
-  ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
-  const units = [];
-  for(const L of GAME_LAYERS){ units.push({ z: L.z, kind:'layer', layer: L }); }
-  const eq = state.player.equipped;
-  if(eq.head){
-    const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
-    const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
-    if(layerDef){
-      const img = getHeroImg(window.getItemIconPath(eq.head));
-      units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
-    }
-  }
-  if(eq.top){
-    const cfg = getTopCfg(eq.top);
-    const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
-    if(layerDef){
-      const img = getHeroImg(window.getItemIconPath(eq.top));
-      units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
-    }
-  }
-  /* rev-hands: 手持物由「當前動作」唯一決定 —— 這是唯一權威判斷點。
-     治療（heal_melee / 有 healItem）與投擲手上沒有槍；
-     任何呼叫端漏傳 override 也不會退回 eq.primary 把步槍畫回來。
-     非治療 / 投擲時優先用 explicit override，其次動畫自身的 showEq
-     （fire_secondary 因此真的畫副武器，而不是回退成主武器）。 */
-  let wpSlot = null, wpId = null;
-  const _showEq = anim.showEq || null;
-  const _handsEmpty = (weaponSlotOverride === 'hidden')
-    || (weaponSlotOverride === 'throwable')
-    || (animName === 'heal_melee')
-    || !!healItemId;
-  if(_handsEmpty){
-    wpSlot = null; wpId = null;
-  } else if(weaponSlotOverride && eq[weaponSlotOverride]){
-    wpSlot = weaponSlotOverride; wpId = eq[weaponSlotOverride];
-  } else if(_showEq && _showEq !== 'context' && eq[_showEq]){
-    wpSlot = _showEq; wpId = eq[_showEq];
-  } else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
-  else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
-  else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
-  if(wpSlot && wpId){
-    if(typeof AMMO !== 'undefined' && AMMO[wpId]){
-      const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
-      if(_fa){
-        const _img = getHeroImg('icons/garden/ammo_pack.png');
-        units.push({ z: _fa.z - 0.5, kind:'eq', layerId: 'front_arm', ox: 1 - _fa.pivot.x, oy: -_fa.pivot.y, scale: 0.3, rotation: 0, img: _img, _fitMax: true });
-      }
-    } else {
-      const cfg = getWeaponCfg(wpSlot, wpId);
-      if(cfg){
-        const layerDef = GAME_LAYERS.find(l => l.id === cfg.layer);
-        if(layerDef){
-          const img = getHeroImg(window.getItemIconPath(wpId));
-          units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
-        }
-      }
-    }
-  }
-  if(healItemId){
-    const _fa = GAME_LAYERS.find(l => l.id === 'front_arm');
-    if(_fa){
-      const _hImg = getHeroImg(window.getItemIconPath(healItemId));
-      units.push({ z: _fa.z - 0.4, kind:'eq', layerId: 'front_arm', ox: 0.88, oy: 0.15, scale: 0.35, rotation: 45, img: _hImg, _fitMax: true });
-    }
-  }
-  units.sort((a,b)=>a.z - b.z);
-  for(const u of units){
-    if(u.kind === 'layer'){
-      let _rotOverride;
-      if(legOverride && legOverride[u.layer.id] != null && typeof legOverride[u.layer.id].rot === 'number'){
-        _rotOverride = legOverride[u.layer.id].rot;
-      }
-      drawBodyLayer(ctx, u.layer, B, anim, fi, _rotOverride);
-    }
-    else drawEqLayer(ctx, u, B, anim, fi);
-  }
-  ctx.restore();
+/* rev-corpse-fit: 倒地包圍盒防裁切 —— 僅在會被畫布邊緣裁切時最小位移（所有渲染器同一規則）。
+   +90° 面朝右：頭/盔向右伸 ~500 原圖單位、盔下緣向地面下伸 ~82；flip 鏡像。 */
+window._corpseFit = function(px, py, s, W, H, hasHelmet, dir){
+var right = (hasHelmet ? 505 : 462) * s;
+var below = (hasHelmet ? 84 : 56) * s;
+var left = 40 * s, above = 62 * s;
+var needL = (dir < 0) ? right : left;
+var needR = (dir < 0) ? left : right;
+var x = Math.min(px, W - needR - 2);
+x = Math.max(x, needL + 2);
+var y = Math.min(py, H - below - 2);
+y = Math.max(y, above + 2);
+return { x: x, y: y };
+};
+function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio, legOverride, healItemId, fallProgress, flipXArg){
+/* rev-arm45: 玩家/Boss 恆面朝右（flipXArg 未傳 = false）；骨架/錨點/倒地全走共用層。 */
+const flipX = !!flipXArg;
+const anim = _anim45(GAME_ANIMS[animName] || GAME_ANIMS.idle, flipX);
+const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
+const factor = charHFactor || CHAR_HEIGHT_FACTOR;
+const B = ARM45_B;
+const scale = (canvasH * factor) / 386;
+const groundY = canvasH * 0.95;
+const centerX = canvasW * ((centerXRatio != null) ? centerXRatio : 0.5);
+const gunArm = _gunArm45(flipX);
+const _dead = (animName === 'dead');
+ctx.save();
+ctx.translate(centerX, groundY);
+if(_dead) _deadRoot45(ctx, anim, fi, scale, flipX);
+ctx.scale(flipX ? -scale : scale, scale);
+ctx.translate(-200, -515);
+const units = [];
+for(const L of GAME_LAYERS){ const g = _armGeom45(L, flipX); units.push({z:g.z, kind:'layer', layer:g}); }
+const eq = state.player.equipped;
+if(eq.head){
+const cfg = (typeof HEAD_ARMOR_LAYOUT!=='undefined' && HEAD_ARMOR_LAYOUT[eq.head]) ? HEAD_ARMOR_LAYOUT[eq.head] : HERO_VISIBLE_EQ.head;
+const ld = _L45(cfg.layer);
+if(ld) units.push({z:ld.z+0.5, kind:'eq', layerId:cfg.layer, _L:_armGeom45(ld,flipX), ox:cfg.ox, oy:cfg.oy, scale:cfg.scale, rotation:cfg.rotation, img:getHeroImg(window.getItemIconPath(eq.head))});
+}
+if(eq.top){
+const cfg = getTopCfg(eq.top);
+const ld = _L45(cfg.layer);
+if(ld) units.push({z:ld.z+0.5, kind:'eq', layerId:cfg.layer, _L:_armGeom45(ld,flipX), ox:cfg.ox, oy:cfg.oy, scale:cfg.scale, rotation:cfg.rotation, img:getHeroImg(window.getItemIconPath(eq.top))});
+}
+let wpSlot = null, wpId = null;
+if(weaponSlotOverride === 'hidden'){}
+else if(weaponSlotOverride && eq[weaponSlotOverride]){ wpSlot = weaponSlotOverride; wpId = eq[weaponSlotOverride]; }
+else if(eq.primary){ wpSlot='primary'; wpId=eq.primary; }
+else if(eq.secondary){ wpSlot='secondary'; wpId=eq.secondary; }
+else if(eq.melee){ wpSlot='melee'; wpId=eq.melee; }
+const _ga = _armGeom45(_L45(gunArm), flipX);
+const _gz = _L45('front_arm').z - 0.5;
+if(wpSlot && wpId){
+if(typeof AMMO !== 'undefined' && AMMO[wpId]){
+if(_ga) units.push({z:_gz, kind:'eq', layerId:gunArm, _L:_ga, ox:1-_ga.pivot.x, oy:-_ga.pivot.y, scale:0.3, rotation:0, img:getHeroImg('icons/garden/ammo_pack.png'), _fitMax:true});
+} else {
+const cfg = getWeaponCfg(wpSlot, wpId);
+if(cfg && _ga) units.push({z:_gz, kind:'eq', layerId:gunArm, _L:_ga, ox:cfg.ox, oy:cfg.oy, scale:cfg.scale, rotation:cfg.rotation, img:getHeroImg(window.getItemIconPath(wpId)), trim:cfg.trim, _gun:true});
+}
+}
+if(healItemId){
+if(_ga) units.push({z:_gz+0.1, kind:'eq', layerId:gunArm, _L:_ga, ox:0.88, oy:0.15, scale:0.35, rotation:45, img:getHeroImg(window.getItemIconPath(healItemId)), _fitMax:true});
+}
+units.sort((a,b)=>a.z-b.z);
+for(const u of units){
+const _L = (u.kind === 'layer') ? u.layer : u._L;
+const _lid = _L ? _L.id : u.layerId;
+const _k = (anim.keys[_lid] && anim.keys[_lid][fi]) || {rot:0};
+let _rot = _dead ? _deadRot45(anim, fi, _lid, flipX, _k.rot||0) : (_k.rot||0);
+if(u.kind === 'layer'){
+if(!_dead && legOverride && legOverride[_lid] != null && typeof legOverride[_lid].rot === 'number') _rot = legOverride[_lid].rot;
+drawBodyLayer(ctx, u.layer, B, anim, fi, _rot);
+} else {
+drawEqLayer(ctx, u, B, anim, fi, (_lid === gunArm) ? _rot : undefined);
+}
+}
+ctx.restore();
 }
 
 function renderExploreHeroCanvas(){
@@ -1579,168 +1599,98 @@ function drawHandItemUnit(ctx, u){
 
 
 function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType, flipX, hasBucket, handItem, noWorkerHelmet, legOverride){
-  var anim = GAME_ANIMS[animName] || GAME_ANIMS.idle;
-  var fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-  var B = { x:30, y:30, w:340, h:460 };
-  var ORIG_FOOT_X = 200, ORIG_FOOT_Y = 515;
-  var TYPE_COLORS = {
-    farmer:  { body:'#5a9a48', legs:'#3a6a2e' },
-    guard:   { body:'#5088bb', legs:'#2e4a6a' },
-    foreman: { body:'#e0a830', legs:'#d8d0c0' },
-    enemy:   { body:'#8b2a2a', legs:'#3a1010' }
-  };
-  var _colors = servantType ? TYPE_COLORS[servantType] : null;
-  if(_colors){
-    for(var li = 0; li < GAME_LAYERS.length; li++){
-      var L = GAME_LAYERS[li];
-      L._oldColor = L.color;
-      if(L.id === 'right_leg' || L.id === 'left_leg') L.color = _colors.legs;
-      else if(L.id === 'torso' || L.id === 'back_arm' || L.id === 'front_arm') L.color = _colors.body;
-    }
-  }
-  ctx.save();
-  ctx.translate(px, py);
-  /* [v236] 去掉额外 translate，倒地定位与玩家一致 */
-  /* [v237] 倒地旋转方向与玩家一致 */
-  if(animName === 'dead'){ ctx.rotate(Math.PI / 2); }
-  ctx.scale(flipX ? -scale : scale, scale);
-  ctx.translate(-ORIG_FOOT_X, -ORIG_FOOT_Y);
-
-  var units = [];
-  for(var gi = 0; gi < GAME_LAYERS.length; gi++) units.push({z:GAME_LAYERS[gi].z, kind:'layer', layer:GAME_LAYERS[gi]});
-
-  if(equipped.head){
-    var cH = (typeof HEAD_ARMOR_LAYOUT !== 'undefined' && HEAD_ARMOR_LAYOUT[equipped.head]) ? HEAD_ARMOR_LAYOUT[equipped.head] : HERO_VISIBLE_EQ.head;
-    var lH = GAME_LAYERS.find(function(l){ return l.id === cH.layer; });
-    if(lH){
-      var imgH = getHeroImg(window.getItemIconPath(equipped.head));
-      units.push({z:lH.z+0.5, kind:'eq', layerId:cH.layer, ox:cH.ox, oy:cH.oy, scale:cH.scale, rotation:cH.rotation, img:imgH});
-    }
-  }
-  if(equipped.top){
-    var cT = getTopCfg(equipped.top);
-    var lT = GAME_LAYERS.find(function(l){ return l.id === cT.layer; });
-    if(lT){
-      var imgT = getHeroImg(window.getItemIconPath(equipped.top));
-      units.push({z:lT.z+0.5, kind:'eq', layerId:cT.layer, ox:cT.ox, oy:cT.oy, scale:cT.scale, rotation:cT.rotation, img:imgT});
-    }
-  }
-  var wpS = null, wpI = null;
-  if(weaponSlotOverride && equipped[weaponSlotOverride]){ wpS = weaponSlotOverride; wpI = equipped[weaponSlotOverride]; }
-  else if(equipped.primary){ wpS = 'primary'; wpI = equipped.primary; }
-  else if(equipped.secondary){ wpS = 'secondary'; wpI = equipped.secondary; }
-  else if(equipped.melee){ wpS = 'melee'; wpI = equipped.melee; }
-  if(wpS && wpI && typeof AMMO !== 'undefined' && AMMO[wpI]){
-    /* rev-fix-ammo-handler-render: 弹药手（主武器栏是弹药箱）绘制弹药箱图标，而非子弹图标 */
-    var _aLayer = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
-    if(_aLayer){
-      var _aImg = getHeroImg('icons/garden/ammo_pack.png');
-/* rev-fix-ammo-box-raid: 彈藥箱中心點對齊前側手右上角 */
-      units.push({
-        z: _aLayer.z - 0.5,
-        kind: 'eq',
-        layerId: 'front_arm',
-        ox: 1 - _aLayer.pivot.x,
-        oy: -_aLayer.pivot.y,
-        scale: 0.3,
-        rotation: 0,
-        img: _aImg,
-        _fitMax: true
-      });
-    }
-  } else if(wpS && wpI && !_isMeleeWeapon(wpI)){
-    var cW = getWeaponCfg(wpS, wpI);
-    if(cW){
-      var lW = GAME_LAYERS.find(function(l){ return l.id === cW.layer; });
-      if(lW){
-        var imgW = getHeroImg(window.getItemIconPath(wpI));
-        units.push({z:lW.z-0.5, kind:'eq', layerId:cW.layer, ox:cW.ox, oy:cW.oy, scale:cW.scale, rotation:cW.rotation, img:imgW, trim:cW.trim});
-      }
-    }
-  }
-
-  if(hasBucket){
-    var _fa = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
-    var _ba = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
-    if(_fa && _ba){
-      var _fk = (anim.keys && anim.keys[_fa.id] && anim.keys[_fa.id][fi]) || {rot:0,dx:0,dy:0};
-      var _bk = (anim.keys && anim.keys[_ba.id] && anim.keys[_ba.id][fi]) || {rot:0,dx:0,dy:0};
-      var _fCx = B.x + B.w * (_fa.x + (_fk.dx||0) * 0.01);
-      var _fCy = B.y + B.h * (_fa.y + (_fk.dy||0) * 0.01);
-      var _fW = B.w * _fa.w, _fH = B.h * _fa.h;
-      var _fMidX = _fCx + _fW * (0.5 - _fa.pivot.x);
-      var _fMidY = _fCy + _fH * (0.5 - _fa.pivot.y);
-      var _bCx = B.x + B.w * (_ba.x + (_bk.dx||0) * 0.01);
-      var _bCy = B.y + B.h * (_ba.y + (_bk.dy||0) * 0.01);
-      var _bW = B.w * _ba.w, _bH = B.h * _ba.h;
-      var _bMidX = _bCx + _bW * (0.5 - _ba.pivot.x);
-      var _bMidY = _bCy + _bH * (0.5 - _ba.pivot.y);
-      var _bkx = (_fMidX + _bMidX) / 2;
-      var _bky = (_fMidY + _bMidY) / 2;
-      units.push({z:58, kind:'bucket', bx:_bkx, topY:_bky-38, botY:_bky+97, topHalf:54, botHalf:39});
-    }
-  }
-
-  if(handItem === 'stick' || handItem === 'clipboard' || handItem === 'flask'){
-    var _fa2 = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
-    var _ba2 = GAME_LAYERS.find(function(l){ return l.id === 'back_arm'; });
-    if(_fa2 && _ba2){
-      var _fk2 = (anim.keys && anim.keys[_fa2.id] && anim.keys[_fa2.id][fi]) || {rot:0,dx:0,dy:0};
-      var _bk2 = (anim.keys && anim.keys[_ba2.id] && anim.keys[_ba2.id][fi]) || {rot:0,dx:0,dy:0};
-      var _fCx2 = B.x + B.w * (_fa2.x + (_fk2.dx||0) * 0.01);
-      var _fCy2 = B.y + B.h * (_fa2.y + (_fk2.dy||0) * 0.01);
-      var _fW2 = B.w * _fa2.w, _fH2 = B.h * _fa2.h;
-      var _fMidX2 = _fCx2 + _fW2 * (0.5 - _fa2.pivot.x);
-      var _fMidY2 = _fCy2 + _fH2 * (0.5 - _fa2.pivot.y);
-      var _bCx2 = B.x + B.w * (_ba2.x + (_bk2.dx||0) * 0.01);
-      var _bCy2 = B.y + B.h * (_ba2.y + (_bk2.dy||0) * 0.01);
-      var _bW2 = B.w * _ba2.w, _bH2 = B.h * _ba2.h;
-      var _bMidX2 = _bCx2 + _bW2 * (0.5 - _ba2.pivot.x);
-      var _bMidY2 = _bCy2 + _bH2 * (0.5 - _ba2.pivot.y);
-      if(handItem === 'stick'){
-        units.push({z:60, kind:'handitem', handItemType:'sack', bagX:_bMidX2, bagY:_bMidY2});
-        var _shovelX = _fCx2 + _fW2 * (1 - _fa2.pivot.x) - _fW2 * 0.10;
-        var _shovelY = _fCy2 + _fH2 * (0 - _fa2.pivot.y) - 7;
-        units.push({z:59, kind:'handitem', handItemType:'shovel', anchorX:_shovelX, anchorY:_shovelY});
-      } else if(handItem === 'clipboard'){
-        units.push({z:58, kind:'handitem', handItemType:'clipboard', armMidX:(_fMidX2+_bMidX2)/2, armMidY:(_fMidY2+_bMidY2)/2});
-      } else if(handItem === 'flask'){
-        var _flaskRX = _fCx2 + _fW2 * (0.85 - _fa2.pivot.x);
-        var _flaskRY = _fCy2 + _fH2 * (0.5 - _fa2.pivot.y);
-        var _flaskLX = _bCx2 + _bW2 * (0.2 - _ba2.pivot.x);
-        var _flaskLY = _bCy2 + _bH2 * (0.5 - _ba2.pivot.y);
-        units.push({z:61, kind:'handitem', handItemType:'flask', flaskPositions:[{x:_flaskLX, y:_flaskLY}, {x:_flaskRX, y:_flaskRY}]});
-      }
-    }
-  }
-
-  units.sort(function(a,b){ return a.z - b.z; });
-
-  for(var ui = 0; ui < units.length; ui++){
-    var u = units[ui];
-    if(u.kind === 'layer'){
-      if(legOverride && legOverride[u.layer.id] && typeof legOverride[u.layer.id].rot === 'number'){
-        drawBodyLayerWithRot(ctx, u.layer, B, anim, fi, legOverride[u.layer.id].rot);
-      } else {
-        drawBodyLayer(ctx, u.layer, B, anim, fi);
-      }
-    }
-    else if(u.kind === 'bucket') drawBucketUnit(ctx, u);
-    else if(u.kind === 'handitem') drawHandItemUnit(ctx, u);
-    else drawEqLayer(ctx, u, B, anim, fi);
-  }
-
-  if(!noWorkerHelmet && servantType === 'foreman') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ffffff');
-  else if(!noWorkerHelmet && servantType === 'farmer') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ff8800');
-
-  ctx.restore();
-
-  if(_colors){
-    for(var ri = 0; ri < GAME_LAYERS.length; ri++){
-      var L2 = GAME_LAYERS[ri];
-      if(typeof L2._oldColor !== 'undefined'){ L2.color = L2._oldColor; delete L2._oldColor; }
-    }
-  }
+/* rev-arm45: 與玩家同一條骨架。flipX → 兩手互換（幾何 + keys），槍錨定 back_arm（右手）。
+   顏色套在 clone 上，不再臨時改寫 GAME_LAYERS。 */
+var fx = !!flipX;
+var anim = _anim45(GAME_ANIMS[animName] || GAME_ANIMS.idle, fx);
+var fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
+var B = ARM45_B, gunArm = _gunArm45(fx), _dead = (animName === 'dead');
+var TYPE_COLORS = {
+farmer:{body:'#5a9a48',legs:'#3a6a2e'}, guard:{body:'#5088bb',legs:'#2e4a6a'},
+foreman:{body:'#e0a830',legs:'#d8d0c0'}, enemy:{body:'#8b2a2a',legs:'#3a1010'}
+};
+var _c = servantType ? TYPE_COLORS[servantType] : null;
+ctx.save();
+ctx.translate(px, py);
+if(_dead) _deadRoot45(ctx, anim, fi, scale, fx);
+ctx.scale(fx ? -scale : scale, scale);
+ctx.translate(-200, -515);
+var units = [];
+for(var gi=0; gi<GAME_LAYERS.length; gi++){
+var g = _armGeom45(GAME_LAYERS[gi], fx), cl = {};
+for(var kk in g) cl[kk] = g[kk];
+if(_c){
+if(cl.id==='right_leg'||cl.id==='left_leg') cl.color=_c.legs;
+else if(cl.id==='torso'||cl.id==='back_arm'||cl.id==='front_arm') cl.color=_c.body;
+}
+units.push({z:cl.z, kind:'layer', layer:cl});
+}
+if(equipped.head){
+var cH = (typeof HEAD_ARMOR_LAYOUT!=='undefined' && HEAD_ARMOR_LAYOUT[equipped.head]) ? HEAD_ARMOR_LAYOUT[equipped.head] : HERO_VISIBLE_EQ.head;
+var lH = _L45(cH.layer);
+if(lH) units.push({z:lH.z+0.5, kind:'eq', layerId:cH.layer, _L:_armGeom45(lH,fx), ox:cH.ox, oy:cH.oy, scale:cH.scale, rotation:cH.rotation, img:getHeroImg(window.getItemIconPath(equipped.head))});
+}
+if(equipped.top){
+var cT = getTopCfg(equipped.top);
+var lT = _L45(cT.layer);
+if(lT) units.push({z:lT.z+0.5, kind:'eq', layerId:cT.layer, _L:_armGeom45(lT,fx), ox:cT.ox, oy:cT.oy, scale:cT.scale, rotation:cT.rotation, img:getHeroImg(window.getItemIconPath(equipped.top))});
+}
+var wpS=null, wpI=null;
+if(weaponSlotOverride && equipped[weaponSlotOverride]){ wpS=weaponSlotOverride; wpI=equipped[weaponSlotOverride]; }
+else if(equipped.primary){ wpS='primary'; wpI=equipped.primary; }
+else if(equipped.secondary){ wpS='secondary'; wpI=equipped.secondary; }
+else if(equipped.melee){ wpS='melee'; wpI=equipped.melee; }
+var _ga = _armGeom45(_L45(gunArm), fx);
+var _gz = _L45('front_arm').z - 0.5;
+if(wpS && wpI && typeof AMMO!=='undefined' && AMMO[wpI]){
+if(_ga) units.push({z:_gz, kind:'eq', layerId:gunArm, _L:_ga, ox:1-_ga.pivot.x, oy:-_ga.pivot.y, scale:0.3, rotation:0, img:getHeroImg('icons/garden/ammo_pack.png'), _fitMax:true});
+} else if(wpS && wpI && !_isMeleeWeapon(wpI)){
+var cW = getWeaponCfg(wpS, wpI);
+if(cW && _ga) units.push({z:_gz, kind:'eq', layerId:gunArm, _L:_ga, ox:cW.ox, oy:cW.oy, scale:cW.scale, rotation:cW.rotation, img:getHeroImg(window.getItemIconPath(wpI)), trim:cW.trim, _gun:true});
+}
+function _mid(lid, u, v){
+var L = _armGeom45(_L45(lid), fx);
+var k = (anim.keys[lid] && anim.keys[lid][fi]) || {rot:0,dx:0,dy:0};
+var cx = B.x + B.w*(L.x + (k.dx||0)*0.01), cy = B.y + B.h*(L.y + (k.dy||0)*0.01);
+var w = B.w*L.w, h = B.h*L.h;
+return { x: cx + w*(u - L.pivot.x), y: cy + h*(v - L.pivot.y) };
+}
+if(hasBucket){
+var f1=_mid('front_arm',0.5,0.5), b1=_mid('back_arm',0.5,0.5);
+var bx=(f1.x+b1.x)/2, by=(f1.y+b1.y)/2;
+units.push({z:58, kind:'bucket', bx:bx, topY:by-38, botY:by+97, topHalf:54, botHalf:39});
+}
+if(handItem==='stick'||handItem==='clipboard'||handItem==='flask'){
+var f2=_mid('front_arm',0.5,0.5), b2=_mid('back_arm',0.5,0.5);
+if(handItem==='stick'){
+units.push({z:60, kind:'handitem', handItemType:'sack', bagX:b2.x, bagY:b2.y});
+var sh=_mid('front_arm',0.90,0);
+units.push({z:59, kind:'handitem', handItemType:'shovel', anchorX:sh.x, anchorY:sh.y-7});
+} else if(handItem==='clipboard'){
+units.push({z:58, kind:'handitem', handItemType:'clipboard', armMidX:(f2.x+b2.x)/2, armMidY:(f2.y+b2.y)/2});
+} else {
+var fr=_mid('front_arm',0.85,0.5), bl=_mid('back_arm',0.2,0.5);
+units.push({z:61, kind:'handitem', handItemType:'flask', flaskPositions:[{x:bl.x,y:bl.y},{x:fr.x,y:fr.y}]});
+}
+}
+units.sort(function(a,b){return a.z-b.z;});
+for(var ui=0; ui<units.length; ui++){
+var u = units[ui];
+var _L = (u.kind==='layer') ? u.layer : u._L;
+var _lid = _L ? _L.id : u.layerId;
+var _k = (anim.keys[_lid] && anim.keys[_lid][fi]) || {rot:0};
+var _rot = _dead ? _deadRot45(anim, fi, _lid, fx, _k.rot||0) : (_k.rot||0);
+if(u.kind==='layer'){
+if(!_dead && legOverride && legOverride[_lid] && typeof legOverride[_lid].rot==='number') _rot = legOverride[_lid].rot;
+drawBodyLayer(ctx, u.layer, B, anim, fi, _rot);
+}
+else if(u.kind==='bucket') drawBucketUnit(ctx, u);
+else if(u.kind==='handitem') drawHandItemUnit(ctx, u);
+else drawEqLayer(ctx, u, B, anim, fi, (_lid===gunArm) ? _rot : undefined);
+}
+if(!noWorkerHelmet && servantType==='foreman') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ffffff');
+else if(!noWorkerHelmet && servantType==='farmer') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ff8800');
+ctx.restore();
 }
 
 
@@ -1850,3 +1800,14 @@ function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
     _raidDrawHuman(ctx, px, py, scale, _eq, _rar, animName, frameIdx, "primary", "enemy", true, false, null);
   }
 }
+
+/* ===== rev-btn-unify:start ===== */
+(function(){
+'use strict';
+if(document.getElementById('gp-btn-unify')) return;
+var st=document.createElement('style');
+st.id='gp-btn-unify';
+st.textContent='/* ===== rev-btn-unify: 全遊戲按鍵幾何統一（靜態一次注入；顏色一律不动） ===== */\nhtml{--gp-btn-h:28px;--gp-row-gap:6px}\n.btn:not(.srv-sa-cell):not(.gp-plot):not(.item-row):not(.st-pd-slot):not(.st-pd-grenade):not(.gs-cell):not(.wk-x):not(.weapon-slot-btn):not(.wk-filter):not(.fm-btn):not(.fire-btn):not(.heal-btn):not(.radio-btn):not(.tab):not(.subnav-tab):not(.mode-btn):not(.tier-btn):not(.boss-tier-btn),\nbutton:not(.srv-sa-cell):not(.gp-plot):not(.item-row):not(.st-pd-slot):not(.st-pd-grenade):not(.gs-cell):not(.wk-x):not(.weapon-slot-btn):not(.wk-filter):not(.fm-btn):not(.fire-btn):not(.heal-btn):not(.radio-btn):not(.tab):not(.subnav-tab):not(.mode-btn):not(.tier-btn):not(.boss-tier-btn),\n.z3-btn:not(.srv-sa-cell):not(.gp-plot):not(.item-row):not(.st-pd-slot):not(.st-pd-grenade):not(.gs-cell):not(.wk-x):not(.weapon-slot-btn):not(.wk-filter):not(.fm-btn):not(.fire-btn):not(.heal-btn):not(.radio-btn):not(.tab):not(.subnav-tab):not(.mode-btn):not(.tier-btn):not(.boss-tier-btn),\n.st-x:not(.srv-sa-cell):not(.gp-plot):not(.item-row):not(.st-pd-slot):not(.st-pd-grenade):not(.gs-cell):not(.wk-x):not(.weapon-slot-btn):not(.wk-filter):not(.fm-btn):not(.fire-btn):not(.heal-btn):not(.radio-btn):not(.tab):not(.subnav-tab):not(.mode-btn):not(.tier-btn):not(.boss-tier-btn),\n.modal-hd .x:not(.srv-sa-cell):not(.gp-plot):not(.item-row):not(.st-pd-slot):not(.st-pd-grenade):not(.gs-cell):not(.wk-x):not(.weapon-slot-btn):not(.wk-filter):not(.fm-btn):not(.fire-btn):not(.heal-btn):not(.radio-btn):not(.tab):not(.subnav-tab):not(.mode-btn):not(.tier-btn):not(.boss-tier-btn){\n  height:var(--gp-btn-h)!important;\n  min-height:var(--gp-btn-h)!important;\n  max-height:var(--gp-btn-h)!important;\n  padding:0 12px!important;\n  font-size:11px!important;\n  line-height:1!important;\n  display:inline-flex!important;\n  align-items:center!important;\n  justify-content:center!important;\n  gap:4px!important;\n  border-radius:5px!important;\n  box-sizing:border-box!important;\n  white-space:nowrap!important;\n  vertical-align:middle!important;\n  background-image:none;\n}\n/* ===== rev-row-geom: 等級 / 體力 / 生命 三列等距等長 ===== */\n.gp-vrow{display:grid;grid-template-columns:34px minmax(0,1fr) 72px 46px;align-items:center;gap:8px;height:var(--gp-btn-h);margin:var(--gp-row-gap) 0}\n.gp-vlbl{font-size:10px;color:#8a7c68;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n.gp-vbar{position:relative;height:8px;border-radius:4px;background:#4a1212;border:1px solid #2a1a14;overflow:hidden;min-width:0}\n.gp-vbar>i{position:absolute;left:0;top:0;bottom:0;display:block;border-radius:3px}\n.gp-vnum{font:10px/1 ui-monospace,Menlo,Consolas,monospace;color:#cbbfae;text-align:right;white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums}\n.gp-vact{display:flex;justify-content:flex-end;align-items:center;min-width:0}\n.gp-vact:empty{visibility:hidden}\n@media(max-width:420px){.gp-vrow{grid-template-columns:30px minmax(0,1fr) 62px 44px;gap:6px}}';
+(document.head||document.documentElement).appendChild(st);
+})();
+/* ===== rev-btn-unify:end ===== */

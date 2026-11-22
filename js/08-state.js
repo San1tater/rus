@@ -2158,9 +2158,7 @@ function _stHealServantByValue(srv, targetHp){
   const _curHp = (typeof srv.hp === 'number') ? srv.hp : _maxHp;
   const _targetHp = (typeof targetHp === 'number') ? Math.min(targetHp, _maxHp) : _maxHp;
   let _needHp = _targetHp - _curHp;
-  srv.injuredUntil = 0;
-  srv._injuredDown = false;
-  if(_needHp <= 0) return { healed: 0, used: [] };
+  if(_needHp <= 0){ if(_curHp > 0){ srv.injuredUntil = 0; srv._injuredDown = false; } return { healed: 0, used: [] }; }
   const order = ['破舊','一般','庫存','精品','傳奇','具名'];
   const used = [];
   let healed = 0;
@@ -2190,5 +2188,6 @@ function _stHealServantByValue(srv, targetHp){
     used.push(picked);
   }
   srv.hp = Math.min(_targetHp, _curHp + healed);
+if(srv.hp > 0){ srv.injuredUntil = 0; srv._injuredDown = false; }
   return { healed: Math.min(healed, _targetHp - _curHp), used: used };
 }

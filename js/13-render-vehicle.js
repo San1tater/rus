@@ -793,6 +793,77 @@ window.updateAndDrawDust = function(ctx, particles, dt){
   }
 };
 
+/* 玩家是否在車上：唯一真相源。相位機是 phase 的唯一寫入者，此函式是「在車上」的唯一定義。
+   上車＝arrive（含入艙動畫）；下車＝exit（出艙即已下車，載員同幀重建）；
+   enter / leave / wreck 皆不在車上。所有模組一律讀它，不再各自列相位清單。 */
+window._isPlayerMounted = function(){
+  var b = window.BTRSupport;
+  if(!b || !b.active) return false;
+  var p = b.phase;
+  if(b._disembarked) return false;
+  return p === 'arrive' || p === 'sink' || p === 'center' || p === 'support' || p === 'lift';
+};
+/* rev-active-vid: 現役載具 id 唯一出口。支援中一律用 start() 鎖定的車，
+   車庫切換只影響下一次召喚，不污染進行中的戰鬥 / 彈藥 / 損傷。 */
+window._activeVehicleId = function(){
+  var b = window.BTRSupport;
+  if(b && b.active && b.vehicleId) return b.vehicleId;
+  var g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
+  return (g && g.currentVehicle) ? g.currentVehicle : 'btr80';
+};
+/* ===== rev-veh-hit-edge-table: 載具右側像素邊緣（patch 時離線量測，執行期唯讀） =====
+   每張圖按高度均分 64 帶，記錄該帶最右側不透明像素（alpha>10）的歸一化 x。
+   空帶已就近填補，執行期不需搜尋、不需掃描圖片。
+   用途：命中特效（火花 / 爆炸 / 曳光終點）落在「該高度的實際車體邊緣」，
+   而非整圖 bbox 右緣（砲管尖）或判定盒車頭（恆在畫面外）。 */
+window.VEHICLE_HIT_EDGE = {
+btr80:[0.3522,0.3522,0.3522,0.3522,0.3522,0.3522,0.6494,0.6572,0.6619,0.7767,0.8019,0.8019,0.8019,0.7972,0.7956,0.7956,0.8113,0.8459,0.8475,0.8475,0.8475,0.8836,0.8836,0.8836,0.9119,0.956,0.9906,0.9921,0.9969,0.9969,0.9969,0.9906,0.9937,0.9921,0.967,0.9733,0.9701,0.9623,0.956,0.9292,0.923,0.9182,0.9135,0.9072,0.9025,0.8978,0.8899,0.8852,0.8805,0.8742,0.8711,0.8522,0.8522,0.8506,0.8491,0.8475,0.8443,0.8428,0.8365,0.8349,0.8318,0.8239,0.8176,0.8082],
+btr80a:[0.6403,0.6435,0.6435,0.6435,0.6435,0.7016,0.7,0.8629,0.8629,0.6855,0.6919,0.6968,0.7032,0.8355,0.8387,0.8387,0.8387,0.8371,0.8355,0.8468,0.8484,0.8484,0.8839,0.8855,0.8855,0.8952,0.9339,0.9919,0.9968,0.9984,1,1,1,0.9935,0.971,0.9694,0.9694,0.9677,0.9661,0.9597,0.9323,0.9258,0.921,0.9145,0.9097,0.9032,0.8968,0.8903,0.8855,0.8806,0.8742,0.8726,0.8532,0.8516,0.8516,0.8484,0.8468,0.8435,0.8403,0.8371,0.8323,0.8242,0.8177,0.8081],
+btr82:[0.5297,0.5297,0.5939,0.6597,0.6597,0.6453,0.7769,0.7769,0.6982,0.6854,0.6902,0.6998,0.8299,0.8331,0.8347,0.8347,0.8347,0.8331,0.8427,0.8443,0.8459,0.8443,0.8812,0.8812,0.8812,0.9005,0.9486,0.9904,0.992,0.9968,0.9968,0.9968,0.9904,0.9775,0.9615,0.9631,0.9631,0.9631,0.9615,0.9422,0.9294,0.9213,0.9149,0.9101,0.9037,0.8989,0.8909,0.886,0.8812,0.8748,0.87,0.8507,0.8491,0.8475,0.8475,0.8443,0.8427,0.8411,0.8363,0.8331,0.8283,0.8202,0.8138,0.8042],
+btr82a:[0.6148,0.6148,0.6356,0.6356,0.6421,0.6276,0.8507,0.8507,0.6645,0.6661,0.6693,0.6822,0.8395,0.8411,0.8411,0.8411,0.8411,0.8395,0.8491,0.8523,0.8523,0.8523,0.8892,0.8892,0.8892,0.9069,0.9518,1,1,1,1,1,0.9984,0.9872,0.9695,0.9663,0.9711,0.9711,0.9695,0.9502,0.9342,0.9294,0.923,0.9181,0.9101,0.9053,0.9005,0.8957,0.8909,0.8844,0.8796,0.8571,0.8571,0.8555,0.8539,0.8507,0.8491,0.8475,0.8443,0.8395,0.8347,0.8283,0.8186,0.809],
+btr90:[0.5184,0.6388,0.6388,0.6388,0.6388,0.6388,0.6204,0.6204,0.6304,0.6304,0.6304,0.6639,0.7308,0.7475,0.995,0.995,0.8428,0.8462,0.8495,0.8495,0.8478,0.8478,0.8478,0.8896,0.8679,0.898,0.9314,0.9515,0.9699,0.9816,0.9816,0.9799,0.9766,0.9565,0.9515,0.9565,0.9565,0.9548,0.9415,0.9314,0.9197,0.9013,0.8946,0.888,0.8813,0.8746,0.8662,0.8595,0.8478,0.8378,0.8395,0.8395,0.8395,0.8395,0.8378,0.8361,0.8344,0.8311,0.8294,0.8244,0.8194,0.8127,0.8027,0.791],
+t80:[0.3797,0.481,0.5076,0.4671,0.4532,0.4089,0.4089,0.4089,0.4089,0.4089,0.4127,0.4139,0.4114,0.4114,0.4114,0.4608,0.4608,0.4608,0.4684,0.4722,0.4734,0.481,0.5038,0.6949,0.9924,1,1,1,1,0.9899,0.5215,0.5013,0.557,0.657,0.6747,0.6975,0.7051,0.7101,0.7152,0.7177,0.7203,0.7215,0.7203,0.7139,0.7101,0.7101,0.7114,0.7089,0.7076,0.7063,0.7063,0.6987,0.6975,0.6899,0.6823,0.6734,0.6709,0.6595,0.6557,0.6443,0.6354,0.6316,0.6215,0.6063],
+t80b:[0.2759,0.3823,0.3823,0.3823,0.3734,0.4646,0.4899,0.4899,0.4392,0.4354,0.3937,0.3937,0.4076,0.4076,0.4051,0.4051,0.4608,0.4608,0.4608,0.462,0.4734,0.481,0.5177,0.6949,0.9924,1,1,1,1,0.9899,0.5215,0.5025,0.5367,0.5494,0.6,0.6823,0.6987,0.7089,0.7114,0.7139,0.7177,0.7203,0.7203,0.7203,0.7101,0.7101,0.7127,0.7089,0.7076,0.7076,0.7063,0.6987,0.6962,0.6886,0.6823,0.6734,0.6709,0.6595,0.6557,0.6443,0.6354,0.6316,0.6203,0.6063],
+t80bv:[0.3759,0.3987,0.3987,0.4924,0.519,0.519,0.4772,0.4633,0.419,0.419,0.419,0.419,0.419,0.4506,0.4519,0.4532,0.4709,0.4823,0.5051,0.5253,0.5177,0.5215,0.5253,0.6987,0.9924,1,1,1,1,0.9899,0.5215,0.581,0.6494,0.6684,0.6899,0.7051,0.7101,0.7127,0.7152,0.7177,0.7203,0.7228,0.7241,0.7266,0.7291,0.7304,0.7291,0.719,0.7101,0.7089,0.7076,0.6987,0.6975,0.6899,0.6823,0.6734,0.6709,0.6595,0.6557,0.6443,0.6354,0.6316,0.6215,0.6063],
+t80u:[0.3924,0.5063,0.5329,0.5316,0.4772,0.4557,0.4329,0.4329,0.4329,0.4329,0.4329,0.4329,0.4266,0.4532,0.4532,0.4532,0.4532,0.4532,0.4532,0.9899,1,1,1,1,0.9924,0.9266,0.8354,0.6848,0.6076,0.5557,0.5595,0.5823,0.5924,0.6114,0.6519,0.6709,0.6873,0.6937,0.7038,0.7063,0.7089,0.7114,0.7139,0.7165,0.719,0.7203,0.719,0.7177,0.7165,0.7063,0.7063,0.6987,0.6962,0.6873,0.6848,0.6734,0.6709,0.6595,0.6557,0.6443,0.6354,0.6316,0.6203,0.6063],
+t80uk:[0.3063,0.3063,0.3063,0.4291,0.5165,0.543,0.543,0.5025,0.4899,0.4468,0.4468,0.4468,0.4468,0.4468,0.4468,0.4608,0.4608,0.4608,0.4608,0.5101,0.5127,0.5139,0.5152,0.6759,0.9937,1,1,1,1,0.9899,0.5608,0.5608,0.5937,0.6278,0.6582,0.6747,0.6873,0.6975,0.7051,0.7063,0.7089,0.7127,0.7139,0.7165,0.7203,0.7203,0.7215,0.7165,0.7089,0.7076,0.7076,0.7,0.6975,0.6899,0.6823,0.6734,0.6709,0.6595,0.6557,0.6443,0.6354,0.6316,0.6215,0.6063],
+t80um:[0.3329,0.3975,0.419,0.4203,0.4203,0.5089,0.5354,0.5354,0.4848,0.481,0.4392,0.4392,0.4392,0.4392,0.4544,0.4544,0.4544,0.4544,0.4544,0.4544,0.9949,1,1,1,1,0.9899,0.8671,0.7025,0.6519,0.5747,0.5658,0.5608,0.581,0.5911,0.6418,0.6595,0.6987,0.7076,0.7165,0.719,0.719,0.7215,0.7215,0.7165,0.7241,0.7241,0.7203,0.719,0.7114,0.7063,0.7063,0.7,0.6975,0.6937,0.6848,0.6734,0.6709,0.6608,0.6557,0.6443,0.638,0.6316,0.6215,0.6063],
+bmp1:[0.0624,0.578,0.6422,0.6606,0.6587,0.6679,0.6587,0.6092,0.6294,0.6294,0.6294,0.7578,0.7578,0.7578,0.7578,0.7046,0.7431,0.745,0.7633,0.8183,0.8294,0.8587,0.9394,0.9578,0.9596,0.9908,0.9908,1,1,0.9982,0.9908,0.9853,0.9908,0.9908,0.9872,0.9927,0.9927,0.9321,0.9229,0.9211,0.9156,0.9083,0.9083,0.9064,0.9138,0.8661,0.8624,0.855,0.8495,0.8459,0.8312,0.8239,0.8239,0.8147,0.8073,0.7963,0.789,0.7798,0.7725,0.7615,0.756,0.745,0.7376,0.7248],
+bmp1m:[0.055,0.2697,0.3688,0.4349,0.4367,0.4954,0.6954,0.6972,0.6972,0.5064,0.5064,0.5064,0.5064,0.6294,0.6294,0.6294,0.6294,0.6294,0.6294,0.6239,0.7156,0.7486,0.7486,0.822,0.8294,0.833,0.956,0.9578,0.989,0.9908,1,1,1,0.9908,0.9835,0.9908,0.989,0.9927,0.9927,0.9376,0.9321,0.9229,0.9193,0.9083,0.9083,0.9138,0.9138,0.8642,0.8606,0.855,0.8459,0.8349,0.8312,0.8239,0.8128,0.8073,0.7963,0.789,0.7798,0.7615,0.7615,0.7523,0.745,0.7376],
+bmp2:[0.4312,0.4312,0.4312,0.4312,0.4312,0.4128,0.4128,0.4147,0.4257,0.4257,0.4257,0.4257,0.4881,0.5394,0.5963,0.8422,0.8422,0.8404,0.5413,0.5358,0.6239,0.6257,0.7468,0.7468,0.789,0.7908,0.811,0.8569,0.9578,0.9578,0.9908,0.9982,1,1,0.9945,0.9872,0.9927,0.9908,0.9927,0.9927,0.9927,0.9358,0.9266,0.9174,0.9119,0.9083,0.9083,0.9394,0.8862,0.8569,0.8514,0.8459,0.8312,0.8257,0.8147,0.8073,0.7982,0.7908,0.7798,0.7725,0.7615,0.756,0.745,0.7376],
+bmp3:[0.5422,0.549,0.549,0.5524,0.5895,0.5895,0.5895,0.5895,0.5895,0.7027,0.7179,0.7162,0.7179,0.7179,0.9426,0.9932,0.9932,0.9932,0.924,0.7956,0.7956,0.8209,0.8243,0.9375,0.9409,0.9409,0.9611,0.9865,0.9865,0.9831,0.9797,0.9764,0.973,0.9696,0.9662,0.9628,0.9595,0.9561,0.9544,0.9544,0.9527,0.951,0.9459,0.9392,0.9358,0.9358,0.9358,0.9223,0.9088,0.9037,0.9003,0.8851,0.8784,0.8699,0.8564,0.848,0.8345,0.8277,0.8125,0.8057,0.7973,0.7838,0.777,0.7601],
+bmd4:[0.5486,0.5647,0.5647,0.5647,0.5647,0.5647,0.5647,0.5647,0.5647,0.5737,0.6169,0.6241,0.6385,0.991,0.991,0.991,0.991,0.991,0.8705,0.7662,0.8399,0.8255,0.8273,0.8291,0.8273,0.8273,0.8273,0.8561,0.8723,0.8849,0.8921,0.9083,0.9083,0.9047,0.8885,0.8849,0.8831,0.8813,0.8777,0.8759,0.8723,0.8705,0.8597,0.8453,0.8309,0.8183,0.8201,0.8219,0.8219,0.8165,0.7896,0.7806,0.7806,0.7644,0.7572,0.75,0.741,0.7284,0.7212,0.7068,0.6996,0.6924,0.6835,0.6745]
+};
+
+/* 彈著點螢幕位置：純算術 + 一次查表。回傳歸一化 {nx, ny}。
+   Y：地面線 = h*0.95 + yOffset；內容高 px 對應實車高，按命中高度線性取點。
+   X：該高度帶的靜態邊緣值 × 實繪圖寬 + 實繪左緣。 */
+window._vehicleHitScreenPos = function(vid, hitWorldY){
+var b = window.BTRSupport;
+if(!b || !b.active) return null;
+if(vid && b.vehicleId !== vid) return null;
+if(!(b.targetW > 0) || !(b.targetH > 0) || !(b.width > 0) || !(b.height > 0)) return null;
+var T = (typeof window.VEHICLE_HIT_EDGE !== "undefined") ? window.VEHICLE_HIT_EDGE[b.vehicleId] : null;
+if(!T || !T.length) return null;
+var realH = (typeof VEHICLE_REAL_HEIGHTS !== "undefined" && VEHICLE_REAL_HEIGHTS[b.vehicleId]) ? VEHICLE_REAL_HEIGHTS[b.vehicleId] : 2.5;
+if(!(realH > 0)) return null;
+var cMin = (typeof b._contentMinYRatio === "number") ? b._contentMinYRatio : 0;
+var cBot = (typeof b._contentBottomRatio === "number") ? b._contentBottomRatio : 1;
+var cH = cBot - cMin;
+if(!(cH > 0.01)) return null;
+var leftPx = b.x * b.width + (b.shakeX || 0);
+var topPy = b.height * 0.95 - cBot * b.targetH + (b.yOffset || 0) + (b.shakeY || 0);
+var groundPy = topPy + cBot * b.targetH;
+var contentPx = cH * b.targetH;
+var hM = (typeof hitWorldY === "number" && isFinite(hitWorldY)) ? hitWorldY : realH * 0.5;
+var frac = Math.max(0, Math.min(1, hM / realH));
+var syPx = groundPy - frac * contentPx;
+var imgNY = (syPx - topPy) / b.targetH;
+var N = T.length;
+var bi = Math.max(0, Math.min(N - 1, Math.floor(imgNY * N)));
+var sxPx = leftPx + T[bi] * b.targetW;
+return { nx: sxPx / b.width, ny: syPx / b.height };
+};
 const BTR_TIMELINE = {
   enterDur: 2.5, arriveDur: 1.8, sinkDur: 1.5, centerDur: 1.0,
   supportDur: 30, liftDur: 1.5, exitDur: 2.0, leaveDur: 3.5
@@ -954,6 +1025,8 @@ const BTRSupport = {
     this.playerClipH = 1.0; this.playerXOffset = 0; this._finished = false;
     /* rev-gl-atgm-fix: 按 wid 记录首发射，避免并列机枪 pkt 抢先消耗 */
     this._cannonFirstShotDone = {};
+ this._disembarked = false;
+ this._rosterIds = (typeof window._vehicleRosterIds === 'function') ? window._vehicleRosterIds(this.vehicleId, this._snap) : null;
     this._setupCanvas();
     this._setupMuzzles();
     const self = this;
@@ -1105,7 +1178,7 @@ const BTRSupport = {
       } else {
         this.yOffset = 0;
       }
-      if(_elapsed >= 500){
+      if(_elapsed >= 500 && !this._disembarked){
         this.playerClipH = Math.min(1, (_elapsed - 500) / 300);
       }
       if(!this._wreckDisembarked && _elapsed >= 800){
@@ -1121,7 +1194,7 @@ const BTRSupport = {
       }
       return;
     }
-    if(this.active && this.phase === 'support' && !(window.BossModule && window.BossModule.battle && window.BossModule.battle.sweep) && window._explore && window._explore._lootingUntil > 0){
+    if(this.active && window._isPlayerMounted() && !(window.BossModule && window.BossModule.battle && window.BossModule.battle.sweep) && window._explore && window._explore._lootingUntil > 0){
       window._explore._lootingUntil = 0;
       window._explore._corpseLootTriggered = false;
       if(window._explore._pendingLootEvents) window._explore._pendingLootEvents = null;
@@ -1176,6 +1249,7 @@ const BTRSupport = {
       this.yOffset = this.sinkOffset;
       this._updateSupport(phaseT, now);
     } else if(curPhase === 'lift'){
+if(!(window.BossModule && window.BossModule.battle && window.BossModule.battle.sweep)) this._fireReadyMuzzles(now); /* 撤離中仍由載具還擊 */
       const p = Math.min(1, phaseT / BTR_TIMELINE.liftDur);
       this.x = this.centerPX + this._easeInOut(p) * (this.doorX - this.centerPX);
       this.yOffset = (1 - this._easeInOut(p)) * this.sinkOffset;
@@ -1209,9 +1283,9 @@ const BTRSupport = {
     this.phase = 'wreckPause';
     this.wreckPauseStart = performance.now();
     this.wreckPauseDuration = 2000;
-    this._wreckDisembarked = false;
+    this._wreckDisembarked = !!this._disembarked;
     this._wreckStartYOffset = this.yOffset || 0;
-    this.playerClipH = 0;
+    if(!this._disembarked) this.playerClipH = 0;
     this.shakeX = 0;
     this.shakeY = 0;
     for(let i = 0; i < this.muzzles.length; i++){
@@ -1278,7 +1352,11 @@ const BTRSupport = {
     const _toVehicle = function(c){
       c.sceneType = 'vehicle';
       c.allies = [{ isVehicle:true, vehicleId:_vid, hp:_vh, maxHp:_vh, armorGrid:[30,20,15], armorLevel:5, worldX:_leadWX(c) }];
-      c._playerMag = { inMag:0, ammoRef:null, weaponId:null };
+      /* rev-refund-mag: 上車前已裝填的彈匣退回庫存，不憑空消失 */
+if(c._playerMag && c._playerMag.inMag > 0 && c._playerMag.ammoRef && typeof invAdd === 'function'){
+invAdd(c._playerMag.ammoRef.id, c._playerMag.ammoRef.rarity || '一般', c._playerMag.inMag);
+}
+c._playerMag = { inMag:0, ammoRef:null, weaponId:null };
       c._playerReloadEnd = 0;
       c._playerSwitchEnd = 0;
       c._fireAnim = null;
@@ -1297,19 +1375,13 @@ const BTRSupport = {
           pushLog('<span class="pl">玩家</span> 進入載具，切換為載具戰', [], 'explore');
         }
       }
-    } else if(phase === 'lift'){
+    } else if(phase === 'exit'){
       if(_inSweep) return;
-      var _isVeh = !!(_c && _c.active && _c.sceneType === 'vehicle');
-      if(window._explore && _isVeh){
-        if(window._explore.mode === 'combat' || window._explore.mode === 'vehicle') window._explore.mode = 'walk';
-        window._explore.combatEvent = null;
-        window._explore._pendingLootEvents = null;
-      }
-      if(typeof window._forceEndVehicleCombat === 'function'){
-        try{ window._forceEndVehicleCombat(); }catch(e){ console.warn('[lift forceEnd]', e); }
-      } else if(typeof window._exploreSetVehicleMode === 'function'){
-        window._exploreSetVehicleMode(false);
-      }
+      /* 下車：與 arrive 的 _toVehicle 對稱。先重建載員，再把戰鬥交回步兵。
+         舊版在 lift 就 forceEnd，但玩家還在車內 → 產生「只有載具、沒有載員、
+         沒有收尾鉤子」的孤兒車戰，下車載員 worldX 無人推進。 */
+      if(typeof _disembark === 'function'){ try{ _disembark(); }catch(e){ console.warn('[exit disembark]', e); } }
+      if(typeof window._vehicleToFoot === 'function'){ try{ window._vehicleToFoot(); }catch(e){ console.warn('[exit toFoot]', e); } }
     }
   },
 
@@ -1353,8 +1425,7 @@ const BTRSupport = {
 
   _fireMuzzle(m, now){
     /* rev-fix-weapon-usable: 炮塔卡死 / 武器 HP 歸零時該炮不能開火 */
-    const _g0 = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-    const _vid0 = _g0 ? _g0.currentVehicle : 'btr80';
+    const _vid0 = window._activeVehicleId();
     if(typeof window._isVehicleWeaponUsable === 'function' && !window._isVehicleWeaponUsable(m.weaponId, _vid0)){
       m.nextFireAt = now + 500; m._preselectedTarget = null; return;
     }
@@ -1368,8 +1439,7 @@ const BTRSupport = {
       m._preselectedTarget = null;
       return;
     }
-    const _g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-    const _vid = _g ? _g.currentVehicle : 'btr80';
+    const _vid = window._activeVehicleId();
     const _liveAmmoFM = window._getLiveVehicleAmmo(_vid);
     const _ammo = _liveAmmoFM && _liveAmmoFM[m.weaponId];
     if(!_ammo || _ammo.current <= 0){
@@ -1514,8 +1584,8 @@ const BTRSupport = {
       _isMain: isMain
     };
 
-    if(isATGM){
-      if(!this.erasedMissileImgs) this.erasedMissileImgs = [];
+    if(isATGM && _fireRes && _fireRes.ammoId === '9m14'){
+if(!this.erasedMissileImgs) this.erasedMissileImgs = [];
       const _ann49 = VEHICLE_ANNOTATIONS[this.vehicleId];
       let _pushed49 = false;
       if(_ann49 && _ann49.missiles && _ann49.missiles.length){
@@ -1672,8 +1742,7 @@ const BTRSupport = {
 
   _render(now){
     const _spd = (typeof window._currentWorldSpeed === 'function') ? window._currentWorldSpeed() : ((window._explore && window._explore._currentSpeed) || 0);
-    const _g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-    const _vid = _g ? _g.currentVehicle : 'btr80';
+    const _vid = window._activeVehicleId();
     let _maxSpd = 80 / 3.6;
     if(typeof VEHICLES !== 'undefined' && VEHICLES[_vid] && VEHICLES[_vid].speedRoad) _maxSpd = VEHICLES[_vid].speedRoad / 3.6;
     const _ratio = _maxSpd > 0 ? Math.min(1, _spd / _maxSpd) : 0;
@@ -1929,7 +1998,7 @@ _suspend(){
       erasedMissileImgs: this.erasedMissileImgs, erasedBaseImg: this.erasedBaseImg,
       kills: this.kills, loot: this.loot, killCount: this.killCount, weaponKills: this.weaponKills,
       _finished: this._finished, _cannonFirstShotDone: this._cannonFirstShotDone,
-      _snap: this._snap, _ammoSnap: this._ammoSnap,
+      _snap: this._snap, _ammoSnap: this._ammoSnap, _disembarked: this._disembarked, _rosterIds: this._rosterIds,
       lastTickSec: this.lastTickSec,
       _wreckDisembarked: this._wreckDisembarked,
       wreckPauseStart: this.wreckPauseStart, wreckPauseDuration: this.wreckPauseDuration,
@@ -1968,7 +2037,7 @@ _suspend(){
     this.kills = s.kills || {}; this.loot = s.loot || [];
     this.killCount = s.killCount || 0; this.weaponKills = s.weaponKills || {};
     this._finished = s._finished; this._cannonFirstShotDone = s._cannonFirstShotDone || {};
-    this._snap = s._snap; this._ammoSnap = s._ammoSnap;
+    this._snap = s._snap; this._ammoSnap = s._ammoSnap; this._disembarked = s._disembarked; this._rosterIds = s._rosterIds;
     this.lastTickSec = s.lastTickSec; this._lastTick = performance.now();
     this._wreckDisembarked = s._wreckDisembarked;
     this.wreckPauseStart = s.wreckPauseStart ? s.wreckPauseStart + gap : s.wreckPauseStart;
@@ -2031,11 +2100,13 @@ _suspend(){
             if(!sp || !stp || sp.srvId !== stp.srvId) continue;
             if(sp.ammoPouch && stp.ammoPouch) stp.ammoPouch.count = sp.ammoPouch.count;
             if(sp.ammoBox && stp.ammoBox) stp.ammoBox.count = sp.ammoBox.count;
+if(typeof sp.primaryWeaponBoxCount === 'number') stp.primaryWeaponBoxCount = sp.primaryWeaponBoxCount;
           }
         }
       } catch(e){ console.warn('[cleanup sync]', e); }
     }
     this._snap = null; this._ammoSnap = null;
+try { if(typeof window._rebindPassengerSnapshots === 'function') window._rebindPassengerSnapshots(); } catch(e){}
     try {
       if(window._combat && window._combat.active && window._combat.sceneType === 'vehicle'){
         const cb = window._combat.onResolve;

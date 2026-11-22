@@ -200,7 +200,7 @@ function _applyVehicleSplash(sp, impactWorldX, baseDmg, directPenMM, ratioMult, 
           let dup = false;
           for(let k = 0; k < c.enemies.length; k++){ if(c.enemies[k] === en){ dup = true; break; } }
           if(dup) continue;
-          en._eventRef = ev;
+          window._setEnemyEvent(en, ev);
           targets.push({ enemy: en, type: 'event', event: ev });
         }
       }
@@ -256,8 +256,7 @@ function _applyVehicleSplash(sp, impactWorldX, baseDmg, directPenMM, ratioMult, 
 
 window._vehicleWeaponsDead = function(){
   /* rev-fix-weapon-hp-dead-v2: 每把武器 HP + 炮塔卡死 + 彈藥判定 */
-  const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-  const vid = g ? g.currentVehicle : 'btr80';
+  const vid = window._activeVehicleId();
   const dmg = state.vehicleDamage && state.vehicleDamage[vid];
   if(!dmg) return false;
   if(dmg.destroyed) return true;
@@ -268,7 +267,7 @@ window._vehicleWeaponsDead = function(){
 
   const turretWeapons = TURRET_WEAPONS_BY_VID[vid] || {};
   const turretDead = dmg.parts && dmg.parts.turret <= 0;
-  const ammoState = state.vehicleAmmo && state.vehicleAmmo[vid];
+  const ammoState = (typeof window._getLiveVehicleAmmo === 'function') ? window._getLiveVehicleAmmo(vid) : (state.vehicleAmmo && state.vehicleAmmo[vid]);
 
   for(const wid in ld){
     /* 武器 HP 歸零 → 不可用 */
@@ -394,24 +393,21 @@ function _getVehicleAmmoStats(wid, ammoId){
   }
   if(wid === 'pkt') return VEHICLE_WEAPON_STATS.pkt;
   if(wid === 'kpvt'){
-    const _gK = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-    const _vidK = _gK ? _gK.currentVehicle : 'btr80';
+    const _vidK = window._activeVehicleId();
     const _liveAK = (typeof window._getLiveVehicleAmmo === 'function') ? window._getLiveVehicleAmmo(_vidK) : (state.vehicleAmmo && state.vehicleAmmo[_vidK]);
     const _aK = _liveAK && _liveAK[wid];
     if(_aK && _aK.preset === '高爆') return VEHICLE_WEAPON_STATS['kpvt_mdz'];
     return VEHICLE_WEAPON_STATS.kpvt;
   }
   if(wid === 'nsvt'){
-    const _gN = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-    const _vidN = _gN ? _gN.currentVehicle : 'btr80';
+    const _vidN = window._activeVehicleId();
     const _liveAN = (typeof window._getLiveVehicleAmmo === 'function') ? window._getLiveVehicleAmmo(_vidN) : (state.vehicleAmmo && state.vehicleAmmo[_vidN]);
     const _aN = _liveAN && _liveAN[wid];
     if(_aN && _aN.preset === '高爆') return VEHICLE_WEAPON_STATS['nsvt_md'];
     return VEHICLE_WEAPON_STATS.nsvt;
   }
   if(wid === '2a72' || wid === '2a42'){
-    const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-    const vid = g ? g.currentVehicle : 'btr80';
+    const vid = window._activeVehicleId();
     const _liveA2A = (typeof window._getLiveVehicleAmmo === 'function') ? window._getLiveVehicleAmmo(vid) : (state.vehicleAmmo && state.vehicleAmmo[vid]);
     const a = _liveA2A && _liveA2A[wid];
     const preset = (a && a.preset) || '穿燃';
@@ -441,16 +437,26 @@ function _vehicleCombatFloat(absWorldX, text, cls){
   var _sm = c.sm || {};
   var _srw = _sm.screenRightWorld || 2;
   var sxRaw = EXPLORE_HERO_X_RATIO + (_relWX / _srw) * (1 - EXPLORE_HERO_X_RATIO);
-
-  /* 火花：不 clamp，屏幕外不画 */
   var _b = window._lastBullet;
   var sparkYN = 0.6;
   if(_b && typeof _b.ty === 'number' && !_b.isGrenade){ sparkYN = _b.ty; }
-  if(cls !== 'miss' && cls !== 'heal' && typeof _spawnHitSpark === 'function'){
-    _spawnHitSpark(c, sxRaw * W, sparkYN * H, cls === 'crit', cls);
+  /* rev-spark-bullet-only: 只有子彈直擊產生火花；RPG 直擊 / 破片 / 手雷不畫。
+     目標一致性用世界座標比對 —— 排除濺射受害者沿用直擊 target 的錯位。 */
+  var _sparkXN = sxRaw;
+  var _hcF = window._hitCtx;
+  var _sparkOK = !!(_hcF && _hcF.isDirect && _hcF.bullet
+    && !_hcF.bullet.isRPG && !_hcF.bullet.isGrenade
+    && _hcF.target && typeof _hcF.target.worldX === 'number'
+    && typeof absWorldX === 'number' && Math.abs(_hcF.target.worldX - absWorldX) < 0.01);
+  /* rev-veh-spark-edge: 火花落在實繪邊緣 + 對應高度（查表，不篩不改） */
+  if(_sparkOK && _hcF.target.isVehicle && typeof window._vehicleHitScreenPos === 'function'){
+    var _hpF = window._vehicleHitScreenPos(_hcF.target.vehicleId, (typeof _hcF.y === 'number') ? _hcF.y : null);
+    if(_hpF){ _sparkXN = _hpF.nx; sparkYN = _hpF.ny; }
   }
-
-  /* 飘字：clamp x，y=0.12（与步战 _float 完全一致） */
+  if(_sparkOK && cls !== 'miss' && cls !== 'heal' && typeof window._spawnHitSpark === 'function'){
+    window._spawnHitSpark(c, _sparkXN * W, sparkYN * H, cls === 'crit', cls, false, _hcF.target);
+  }
+  /* 飄字：clamp x，y=0.12（與步戰 _float 完全一致）—— 位置不變 */
   var _floatX = Math.max(0.05, Math.min(0.95, sxRaw));
   c.floats.push({ text: text, cls: cls || '', age: 0, x: _floatX, y: 0.12 });
 }
@@ -642,13 +648,41 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
     }
     const _spMainW = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30, _isAinet);
     const _weaponRangeW = (typeof VEHICLE_RANGE_M !== 'undefined' && VEHICLE_RANGE_M[wid]) ? VEHICLE_RANGE_M[wid] : 300;
-    const _bulletRef = window._weaponFire({
+    var _mzStartX = p.worldX, _mzStartY = 1.5;
+try{
+var _bM = window.BTRSupport;
+var _annM = (typeof VEHICLE_ANNOTATIONS !== 'undefined') ? VEHICLE_ANNOTATIONS[p.vehicleId] : null;
+var _mzM = null;
+if(_annM && _annM.muzzles){ for(var _mi = 0; _mi < _annM.muzzles.length; _mi++){ if(_annM.muzzles[_mi].weaponId === wid){ _mzM = _annM.muzzles[_mi]; break; } } }
+if(_mzM && _bM && _bM.active && _bM.width > 0 && _bM.targetW > 0){
+var _hrM = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+var _srM = (c.sm && c.sm.screenRightWorld) || 2;
+var _mzNx = (typeof _mzM.x === 'number') ? _mzM.x : _mzM.mx;
+var _mzNy = (typeof _mzM.y === 'number') ? _mzM.y : _mzM.my;
+/* rev-muzzle-xy: VEHICLE_ANNOTATIONS.muzzles 用 .x/.y；.mx/.my 只存在於
+   BTRSupport.muzzles 執行期物件。讀錯欄位 → NaN → startX=NaN →
+   _weaponFire 的 (cfg.startX || 0) 折成 0 → 距離變成絕對世界座標 → 射程閘門全擋。 */
+if(isFinite(_mzNx) && isFinite(_mzNy)){
+var _mzPx = _bM.x * _bM.width + (_bM.shakeX || 0) + _mzNx * _bM.targetW;
+var _mzPy = _bM.height * 0.95 - (_bM._contentBottomRatio || 1) * _bM.targetH + (_bM.yOffset || 0) + (_bM.shakeY || 0) + _mzNy * _bM.targetH;
+var _chfM = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+var _phmM = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+var _sxW = p.worldX + (_mzPx / _bM.width - _hrM) / Math.max(0.05, 1 - _hrM) * _srM;
+var _syW = Math.max(0.2, (0.95 - _mzPy / _bM.height) * _phmM / _chfM);
+if(isFinite(_sxW) && isFinite(_syW)){ _mzStartX = _sxW; _mzStartY = _syW; }
+}
+}
+}catch(_eM){}
+/* rev-muzzle-finite: 最後護欄 —— 任何情況下都不讓 NaN 進入彈道核心 */
+if(!isFinite(_mzStartX)) _mzStartX = p.worldX;
+if(!isFinite(_mzStartY)) _mzStartY = 1.5;
+const _bulletRef = window._weaponFire({
       owner: c,
       weaponId: wid,
       ammoId: _usedAmmoId,
       target: target,
-      startX: p.worldX,
-      startY: 1.5,
+      startX: _mzStartX,
+      startY: _mzStartY,
       flightSpeed: _spd,
       hr: hr,
       burstCount: 1,
@@ -707,60 +741,12 @@ window._onBTRFire = function(wid, now, syncGroup, preselectedTarget){
     return { ok: true, ammoId: _usedAmmoId, reloadMs: _calcReloadMs(wid, _usedAmmoId, p.vehicleId), flightTimeSec: _flightSec, realSpeedMps: _spd };
   }
 
-  /* fallback 旧路径（_weaponFire 不存在时，理论上不可达） */
-  const hit = Math.random() * 100 < hr;
-  const _distM = Math.abs(target.worldX - p.worldX);
-  const _duration = Math.max(16, _distM / _spd * 1000);
-  const _isGuidedWeapon = _isGLATGMId(_usedAmmoId) || wid === 'atgm';
-  const _fireTargetWX = target.worldX;
-  const _fallbackFlightSec = _duration / 1000;
-  c.bullets.push({
-    sx: 0.1, sy: 0.5, tx: 0.9, ty: 0.5,
-    start: performance.now(), duration: _duration,
-    enemy: false, isFast: true,
-    _onHit: function(){
-      if(!hit){
-        const _spMiss = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30, _isAinet);
-        if(_spMiss && target){
-          const _aimWXMiss = _isGuidedWeapon ? target.worldX : _fireTargetWX;
-          const _scatterMiss = _spMiss.maxR * (1 - hr / 100);
-          const _impactXMiss = _aimWXMiss + (Math.random() * 2 - 1) * _scatterMiss;
-          _applyVehicleSplash(_spMiss, _impactXMiss, baseDmg, penMM, 0.6, wid, _usedAmmoId);
-        }
-        return;
-      }
-      const _spMain = _getVehicleSplashParams(wid, _usedAmmoId, _mixIsHE, _preset30, _isAinet);
-      if(_spMain && target){
-        const _scatterM = _spMain.maxR * (1 - hr / 100);
-        const _aimWX = _isGuidedWeapon ? target.worldX : _fireTargetWX;
-        const _impactX = _aimWX + (Math.random() * 2 - 1) * _scatterM;
-        _applyVehicleSplash(_spMain, _impactX, baseDmg, penMM, 1.0, wid, _usedAmmoId);
-        return;
-      }
-      if(!hit) return;
-      if(target && target.hp > 0){
-        const mainProxy = { hp: target.hp, armor: target.armor || 0 };
-        const mainRes = applyDamage(mainProxy, finalDmg, penMM, {
-          armorProvider: function(part){ return (typeof getEnemyArmorMMForPart === 'function') ? getEnemyArmorMMForPart(target, part) : 0; }
-        });
-        target.hp = mainProxy.hp;
-        if(target.armor !== undefined) target.armor = mainProxy.armor;
-        const _shownMain = mainRes.hpLost > 0 ? mainRes.hpLost : mainRes.armorLost;
-        _vehicleCombatFloat(target.worldX, '-' + _shownMain + (crit ? '!' : ''), crit ? 'crit' : (mainRes.hpLost > 0 ? 'enemy' : 'armor'));
-        if(target.hp <= 0){
-          _onBTRKillTarget(target, wid, c, _usedAmmoId);
-        }
-      }
-    }
-  });
-
-  return { ok: true, ammoId: _usedAmmoId, reloadMs: _calcReloadMs(wid, _usedAmmoId, p.vehicleId), flightTimeSec: _fallbackFlightSec, realSpeedMps: _spd };
-};
+  };
 
 window._settleVehicleEventIfCleared = function(enemy){
   /* rev-veh-direct: 每個事件恰好一次信物判定；死者保留 hp<=0 在 content，
      不再 filter 移除（否則 every(hp<=0) / 屍體 / 拾取鏈全部失真）。 */
-  const ev = enemy && enemy._eventRef;
+  const ev = window._getEnemyEvent(enemy);
   if(!ev || ev._settled) return;
   if(!ev.content || !ev.content.length) return;
   for(let i = 0; i < ev.content.length; i++){
@@ -868,6 +854,11 @@ function _isGLATGMId(id){
 /* rev-aps-reuse: 直接复用 _spawnRPGImpactFx 的视觉，只把 smoke_dark 改成 smoke_light。
  * 玩家已认可 RPG 爆炸的视觉，只是 APS 是白烟不是黑烟——这是拦截 vs 命中的唯一区分。
  * 火球/碎片/火星全部保留（拦截弹也是爆炸），只换烟色。 */
+/* rev-aps-smoke-life: APS 攔截煙塵的時間軸倍率。
+   小裝藥在空中引爆的煙塵，靜止空氣中要數秒才散；RPG 命中煙柱附著裝甲、被車帶走，
+   兩者不該用同一個消散速度。拉長 2.5 倍 → 主煙 3.5~5.9s、次煙 1.75~3.9s；
+   擴散速率同比降低，最終煙團尺寸不變 —— 只改「多久散掉」，不改「散到多大」。 */
+const APS_SMOKE_LIFE_MUL = 2.5;
 window._spawnAPSInterceptFx = function(owner, sx, sy, radPx){
   if(!owner) return;
   if(!owner.explosions) owner.explosions = [];
@@ -876,11 +867,22 @@ window._spawnAPSInterceptFx = function(owner, sx, sy, radPx){
   if(typeof window._spawnRPGImpactFx === 'function'){
     window._spawnRPGImpactFx(owner, sx, sy, _r);
   }
-  /* 新加的粒子中，黑烟 → 白烟 */
+  /* rev-aps-cloud-scale: APS 視覺 = RPG 爆炸視覺，但煙是白的（攔截 vs 命中的唯一區別）。
+     反制彈在裝甲前引爆，煙塵雲實際是米級：初始半徑 0.45~0.75m、
+     擴散 0.55~0.90 m/s、橫向展佈 1.4m。雲的世界足跡越大、畫面投影越大，
+     全速掠過時才讀得出來。消散 2.2~3.6s（靜止空氣中本來就慢）。
+     空中爆點的可見窗只有 0.1~0.3s → 生成延遲一律歸零，否則煙在出生前就掠出畫面。 */
+  var _cmb = window._combat;
+  var _ppm = (_cmb && _cmb.sm && _cmb.sm.bgPixelsPerMeter) ? _cmb.sm.bgPixelsPerMeter : 100;
   for(var i = _startIdx; i < owner.explosions.length; i++){
-    if(owner.explosions[i].kind === 'smoke_dark'){
-      owner.explosions[i].kind = 'smoke_light';
-    }
+    var q = owner.explosions[i];
+    q.delay = 0;
+    if(q.kind !== 'smoke_dark') continue;
+    q.kind = 'smoke_light';
+    q.size = (0.45 + Math.random() * 0.30) * _ppm;
+    q.growth = (0.55 + Math.random() * 0.35) * _ppm;
+    q.x += (Math.random() - 0.5) * 1.40 * _ppm;
+    q.life = q.maxLife = 2.2 + Math.random() * 1.4;
   }
 };
 
@@ -892,26 +894,41 @@ window._spawnAPSInterceptFxWorld = function(owner, interceptWorldX, syPx, radPx)
   if(!owner.explosions) owner.explosions = [];
   var _r = (typeof radPx === 'number' && radPx > 0) ? radPx : 60;
   var _startIdx = owner.explosions.length;
-  if(typeof window._spawnRPGImpactFx === 'function'){
-    window._spawnRPGImpactFx(owner, 0, syPx, _r);
+  /* rev-aps-world-delegate: 視覺（白煙 + 物理尺度 + 慢散）統一由
+     _spawnAPSInterceptFx 負責，此處只做世界錨定，不再自己複製一份煙色轉換。
+     攔截發生在車體前方空中，雲團留在空氣裡 → 初始落在畫面右外，
+     由相機前進把它掃入 —— 不為了可見而搬近。 */
+  if(typeof window._spawnAPSInterceptFx === 'function'){
+    window._spawnAPSInterceptFx(owner, 0, syPx, _r);
   }
   var _c = window._combat;
-  var W = (_c && _c.playerCanvas) ? _c.playerCanvas.width : 400;
+  var W = window._fxViewW(_c && _c.playerCanvas);
+  var _ppm = (_c && _c.sm && _c.sm.bgPixelsPerMeter) ? _c.sm.bgPixelsPerMeter : 1;
   var _sr = (_c && _c.sm) ? (_c.sm.screenRightWorld || 2) : 2;
   var _hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
   var _pxToM = (1 / (1 - _hr)) * _sr / W;
+  var _cam = (_c && _c.allies && _c.allies[0] && typeof _c.allies[0].worldX === 'number') ? _c.allies[0].worldX : 0;
   for(var i = _startIdx; i < owner.explosions.length; i++){
     var q = owner.explosions[i];
-    if(q._wx !== undefined) continue;
+    if(q._wx !== undefined || q._ft) continue;
     if(q.kind === 'smoke_dark') q.kind = 'smoke_light';
     q._wx = interceptWorldX + q.x * _pxToM;
     q._wvx = q.vx * _pxToM;
+    q._fxPrevPx = W * (_hr + ((q._wx - _cam) / _sr) * (1 - _hr));
+    q._wm = true;
+    q.size = q.size / _ppm;
+    q.growth = (q.growth || 0) / _ppm;
+    q.delay = 0;
     q.x = 0;
     q.vx = 0;
   }
 };
 /* rev-arena: T-80UM 硬杀拦截。口径 >=40mm 且 弹速 [100,400] m/s 才拦；每车 22 发，0.3s 冷却，82% 成功率。 */
-function _tryArenaIntercept(vid, bulletSpeed, caliberMM){
+/* ===== rev-aps-pre-decide: 攔截決策與視覺分離 =====
+   決策（roll + 扣彈 + 冷卻）在尾煙沉積之前由 09 呼叫 _apsDecide 完成；
+   _vHitVehicle 仍走 _tryArenaIntercept，但讀同一份快取，絕不二次 roll。
+   攔截面 = 預判到引爆時刻的車頭 + 2m（世界米），比 hit.t 早，尾煙夾到該面。 */
+function _apsRoll(vid, bulletSpeed, caliberMM){
   const feat = (typeof VEHICLE_FEATURES !== 'undefined') ? VEHICLE_FEATURES[vid] : null;
   if(!feat || !feat.arena) return false;
   if(typeof bulletSpeed !== 'number' || bulletSpeed < 100 || bulletSpeed > 400) return false;
@@ -927,31 +944,77 @@ function _tryArenaIntercept(vid, bulletSpeed, caliberMM){
   if(Math.random() > 0.82) return false;
   a.ammo--;
   a.lastFireAt = now;
-  /* rev-arena-fix: 用 BTRSupport 的屏幕坐标引爆，不再走世界坐标映射（会 clamp 到屏幕外）
-   * 车右边缘 px = btr.x * btr.width + btr.targetW
-   * 车中心高度 px = btr.height * 0.95 - contentBottomRatio * targetH + targetH/2 */
+  return true;
+}
+function _apsFx(vid, hitY){
   try {
     const _c = window._combat;
     const _btr = window.BTRSupport;
-    if(_c && _btr && _btr.active && _btr.width > 0 && _btr.targetW > 0){
-      /* rev-aps-world: 拦截点用世界坐标直接生成，不经过屏幕中转。
-       * 拦截点世界坐标 = camWX + halfLen + 2m，与屏幕宽度无关。
-       * 不同设备下拦截点位置都是同一个世界坐标，只是视觉上映射到不同屏幕位置。 */
-      const _camWXa = (_c.allies && _c.allies[0] && typeof _c.allies[0].worldX === 'number') ? _c.allies[0].worldX : 0;
-      const _halfLenA = (typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(vid) : 3.6;
-      const _interceptWXA = _camWXa + _halfLenA + 2;
-      const _syPx = _btr.height * 0.25;
-      const _radPx = Math.max(40, _btr.width * 0.15);
-      if(typeof window._spawnAPSInterceptFxWorld === 'function'){
-        window._spawnAPSInterceptFxWorld(_c, _interceptWXA, _syPx, _radPx);
-      }
-      /* 飘字：位置与载具受伤飘字一致（x=EXPLORE_HERO_X_RATIO=0.25, y=0.12） */
-      if(!_c.floats) _c.floats = [];
-      _c.floats.push({ text: 'APS 攔截', cls: 'armor', age: 0, x: EXPLORE_HERO_X_RATIO, y: 0.12 });
+    if(!_c || !_btr || !_btr.active || !(_btr.width > 0) || !(_btr.targetW > 0)) return;
+    const _camWXa = (_c.allies && _c.allies[0] && typeof _c.allies[0].worldX === 'number') ? _c.allies[0].worldX : 0;
+    const _halfLenA = (typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(vid) : 3.6;
+    const _interceptWXA = _camWXa + _halfLenA + 2;
+    var _syN = 0.5;
+    var _posA = (typeof window._vehicleHitScreenPos === 'function')
+      ? window._vehicleHitScreenPos(vid, (typeof hitY === 'number') ? hitY : null)
+      : null;
+    if(_posA){ _syN = _posA.ny; }
+    else if(typeof hitY === 'number'){
+      var _chfA = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+      var _phmA = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+      _syN = 0.95 - hitY * (_chfA / _phmA);
     }
+    if(!isFinite(_syN)) _syN = 0.5;
+    _syN = Math.max(0.08, Math.min(0.92, _syN));
+    const _syPx = _btr.height * _syN;
+    const _radPx = Math.max(40, _btr.width * 0.15);
+    if(typeof window._spawnAPSInterceptFxWorld === 'function'){
+      window._spawnAPSInterceptFxWorld(_c, _interceptWXA, _syPx, _radPx);
+    }
+    if(!_c.floats) _c.floats = [];
+    _c.floats.push({ text: 'APS 攔截', cls: 'armor', age: 0, x: EXPLORE_HERO_X_RATIO, y: 0.12 });
   } catch(e){ console.warn('[arena fx]', e); }
+}
+function _tryArenaIntercept(vid, bulletSpeed, caliberMM){
+  var _b = (window._hitCtx && window._hitCtx.bullet) ? window._hitCtx.bullet : null;
+  var _hit;
+  if(_b && _b._apsDone){ _hit = !!_b._apsHit; }
+  else { _hit = _apsRoll(vid, bulletSpeed, caliberMM); }
+  if(!_hit) return false;
+  var _hc = window._hitCtx;
+  _apsFx(vid, (_hc && typeof _hc.y === 'number') ? _hc.y : null);
   return true;
 }
+/* 09 在沉積前呼叫：只決策，不畫、不寫日誌。結果快取；重複呼叫回傳快取（不重 roll）。 */
+window._apsDecide = function(b, hit){
+  if(!b) return null;
+  if(b._apsDone) return b._apsHit ? { t: b._apsT, wx: b._apsWX } : null;
+  if(!b.isEnemyBullet || b.isGrenade || !b.isRPG) return null;
+  var tgt = b.target;
+  if(!tgt || !tgt.isVehicle) return null;
+  var cal = (typeof window._rpg27Cal === 'function') ? window._rpg27Cal() : 105;
+  b._apsDone = true;
+  b._apsHit = false;
+  if(!_apsRoll(tgt.vehicleId, b.flightSpeed, cal)) return null;
+  var c = window._combat;
+  var cam = (c && c.allies && c.allies[0] && typeof c.allies[0].worldX === 'number')
+    ? c.allies[0].worldX : (typeof tgt.worldX === 'number' ? tgt.worldX : 0);
+  var half = (typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(tgt.vehicleId) : 3.6;
+  /* 車在動：平面預判到「抵達車頭面」時刻，否則決策幀算的平面會落在車後 */
+  var _vAdv = (typeof window._currentWorldSpeed === 'function') ? window._currentWorldSpeed() : 0;
+  var _tFace = (hit && typeof hit.t === 'number') ? hit.t : 1;
+  var wx = cam + _vAdv * (_tFace * (b.flightTimeSec || 0)) + half + 2;
+  var dx = b.impactX - b.startX;
+  if(!(Math.abs(dx) > 1e-9)) return null;
+  var t = (wx - b.startX) / dx;
+  if(!(t >= 0 && t <= 1)) return null;
+  if(hit && typeof hit.t === 'number' && t > hit.t) t = hit.t;
+  b._apsHit = true;
+  b._apsT = t;
+  b._apsWX = wx;
+  return { t: t, wx: wx };
+};
+/* ===== rev-aps-pre-decide:end ===== */
 /* rev-gl-atgm: 按弹种定装填时间 */
 function _calcReloadMs(wid, ammoId, vid){
   if(ammoId && _isGLATGMId(ammoId)){
@@ -1019,7 +1082,7 @@ function _vGetArmor(vid, partKey, isHeat){
 
 /* rev-heat-set: 化學能彈種白名單，新彈種只加 Set */
 const _HEAT_AMMO_SET = new Set([
-  'atgm', '3bk29', '3ubk10', 'pg-15v',
+  'atgm', '3bk29', 'pg15v',
   '9m14', '9m113', '9m112', '9m119m', '9m117m1'
 ]);
 function _vIsHeatAmmo(ammoId){
@@ -1124,14 +1187,11 @@ const key = _vPickInternalKey(vid);
     if(d.members.player > 0) pool.push({ t: 'player' });
     const _st = window._getLiveStation();
     const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
-    if(_cap > 0 && _st && _st.passengers){
-      for(let i = 0; i < _st.passengers.length && i < _cap; i++){
-        const pp = _st.passengers[i];
-        const ss = (state.servants || []).find(function(x){ return x.id === pp.srvId; });
-        if(ss && (!ss.hp || ss.hp > 0)) pool.push({ t: 'passenger', srv: ss, p: pp });
-      }
-    }
-    if(!pool.length) return { penetrated: true, part: part.key, internal: '乘員', damage: 0 };
+    var _roster = (typeof window._vehicleRosterMap === 'function') ? window._vehicleRosterMap() : [];
+for(var _ri = 0; _ri < _roster.length; _ri++){
+var _rr = _roster[_ri];
+if(_rr.srv && _rr.srv.hp > 0) pool.push({ t: 'passenger', srv: _rr.srv, p: _rr.p });
+}if(!pool.length) return { penetrated: true, part: part.key, internal: '乘員', damage: 0 };
     const tgt = pool[Math.floor(Math.random() * pool.length)];
 
     if(tgt.t === 'crew'){
@@ -1367,8 +1427,7 @@ function _detonate(vid, veh){
      下車後殘留子彈命中舊載具 → 觸發 _detonate → 不能殺已下車的玩家和載員。
      判斷方式：c.active && c.sceneType === 'vehicle' && c.allies[0].isVehicle */
   const _c180 = window._combat;
-  const _playerOnBoard180 = !!(_c180 && _c180.active && _c180.sceneType === 'vehicle'
-                              && _c180.allies && _c180.allies[0] && _c180.allies[0].isVehicle);
+  const _playerOnBoard180 = (typeof window._isPlayerMounted === 'function' ? window._isPlayerMounted() : false);
 
   if(!_playerOnBoard180){
     /* [v180 F7] 玩家已下車：只摧毀載具（彈藥架歸零、部件全毀），不殺玩家和載員 */
@@ -1403,17 +1462,11 @@ function _detonate(vid, veh){
     }
   }
   /* rev-fix-detonate-passengers: 載具戰中 allies 只有載具，需獨立遍歷車上載員 */
-  if(_passengers){
-    const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
-    for(let _pi = 0; _pi < _passengers.length && _pi < _cap; _pi++){
-      const p = _passengers[_pi];
-      if(!p || !p.srvId) continue;
-      const srv = (state.servants || []).find(function(s){ return s.id === p.srvId; });
-      if(srv){ srv.hp = 0; srv.injuredUntil = _now + 4 * 3600 * 1000; }
-    }
-  }
-
-  state.player.hp = 0;
+  var _rosterD = (typeof window._vehicleRosterMap === 'function') ? window._vehicleRosterMap() : [];
+for(var _rd = 0; _rd < _rosterD.length; _rd++){
+var _srvD = _rosterD[_rd].srv;
+if(_srvD){ _srvD.hp = 0; _srvD.injuredUntil = _now + 4 * 3600 * 1000; _srvD._injuredDown = true; }
+}state.player.hp = 0;
   state.player.deadUntil = _now + 60000;
   const _ex = window._explore;
   if(_ex){ _ex.mode = 'dead'; _ex.deadUntil = performance.now() + 60000; _ex._currentSpeed = 0; _ex.combatEvent = null; }
@@ -1452,41 +1505,49 @@ function _detonate(vid, veh){
 }
 
 function _forceLeave(vid, veh, reason){
+  /* rev-forceleave-guard: 原版 if(c._forceLeaveReason) return 無計時器守卫，
+     且 resolve 後不清 reason → 後續卡死寫了「載具離場」卻不再觸發離場。
+     改為：嚴重度優先保留 reason、計時器唯一、resolve 端清除。 */
+  const _sev = function(r){
+    if(r === 'detonated' || r === 'hull_destroyed') return 3;
+    if(r === 'engine' || r === 'driver_dead' || r === 'tracks' || r === 'player_dead') return 2;
+    return 1;
+  };
   const c = window._combat;
+  const b = window.BTRSupport;
   if(c && c.active && c.sceneType === 'vehicle'){
-    if(c._forceLeaveReason) return;
-    c._forceLeaveReason = reason;
-    c._forceLeaveAt = performance.now();
-    const _cannotDrive = (reason === 'engine' || reason === 'driver_dead' || reason === 'tracks' || reason === 'hull_destroyed' || reason === 'player_dead');
-    const b = window.BTRSupport;
+    if(!c._forceLeaveReason || _sev(reason) > _sev(c._forceLeaveReason)) c._forceLeaveReason = reason;
+    if(!c._forceLeaveAt) c._forceLeaveAt = performance.now();
+    const _cannotDrive = _sev(c._forceLeaveReason) >= 2;
     if(b && b.active){
-      if(_cannotDrive){
-        if(typeof b.enterWreckMode === 'function') b.enterWreckMode();
-      } else {
-        if(typeof b.enterFastLeave === 'function') b.enterFastLeave();
-      }
+      if(_cannotDrive){ if(typeof b.enterWreckMode === 'function') b.enterWreckMode(); }
+      else { if(typeof b.enterFastLeave === 'function') b.enterFastLeave(); }
     }
-    setTimeout(function(){
-      const _c = window._combat;
-      if(_c && _c.active && _c._forceLeaveReason === reason){
-        _resolveVehicleLeave(reason);
-      }
-    }, 800);
+    if(!c._forceLeaveTimer){
+      c._forceLeaveTimer = setTimeout(function(){
+        const _c = window._combat;
+        if(!_c) return;
+        _c._forceLeaveTimer = null;
+        if(_c.active && _c._forceLeaveReason) _resolveVehicleLeave(_c._forceLeaveReason);
+      }, 800);
+    }
   } else {
-    const _cannotDrive2 = (reason === 'engine' || reason === 'driver_dead' || reason === 'tracks' || reason === 'hull_destroyed' || reason === 'player_dead');
-    if(_cannotDrive2){
-      const b2 = window.BTRSupport;
-      if(b2 && b2.active && b2.phase !== 'wreck' && typeof b2.enterWreckMode === 'function'){
-        b2.enterWreckMode();
+    if(_sev(reason) >= 2){
+      if(b && b.active && b.phase !== 'wreck' && b.phase !== 'wreckPause' && typeof b.enterWreckMode === 'function'){
+        b.enterWreckMode();
       }
     }
   }
 }
 
 function _resolveVehicleLeave(reason){
-  const c = window._combat;
-  if(!c) return;
-  const b = window.BTRSupport;
+const c = window._combat;
+if(!c) return;
+const b = window.BTRSupport;
+/* rev-forceleave-clear: 離場結算即清除 forcing 狀態，避免下一次卡死被早退吞掉 */
+if(c._forceLeaveTimer){ clearTimeout(c._forceLeaveTimer); c._forceLeaveTimer = null; }
+c._forceLeaveReason = null;
+c._forceLeaveAt = 0;
 
   if(b && b.active){
     if(reason === 'detonated'){
@@ -1535,7 +1596,7 @@ function _resolveVehicleLeave(reason){
       armor: state.player.armor,
       maxArmor: Math.max(1, state.player.maxArmor),
       armorLevel: state.player.armorLevel || 0,
-      worldX: 0,
+      worldX: (window._explore && typeof window._explore.worldX === 'number') ? window._explore.worldX : 0,
       weapon: _pw,
       _nextFireAt: performance.now() + 800
     }];
@@ -1545,7 +1606,7 @@ function _resolveVehicleLeave(reason){
        → 敵彈穿過、載員不還擊。此處主動觸發 _disembark（若尚未），
        再從 ex.passengersFollowing 讀非撤退載員，按 _startCombat 的
        同一結構加入 c.allies。 */
-    if(b && b.active && typeof _disembark === 'function' && !b._wreckDisembarked){
+    if(b && b.active && typeof _disembark === 'function' && !b._disembarked){
       b._wreckDisembarked = true;
       try { _disembark(); } catch(e){ console.warn('[v192 F1 disembark]', e); }
     }
@@ -1566,7 +1627,16 @@ function _resolveVehicleLeave(reason){
           _src: _p2.ammoBox
         });
       }
-      for(let _fi2 = 0; _fi2 < _fw2.length; _fi2++){
+      /* 彈藥手主武器欄彈藥箱一併進公共池（與 _startCombat 同語義） */
+for(let _pi3 = 0; _pi3 < _fw2.length; _pi3++){
+const _p3 = _fw2[_pi3].p;
+if(!_p3 || !_p3.primaryWeapon || typeof AMMO === 'undefined' || !AMMO[_p3.primaryWeapon]) continue;
+if(!(_p3.primaryWeaponBoxCount > 0)) continue;
+const _adef3 = AMMO[_p3.primaryWeapon];
+if(!_adef3 || !_adef3.cal) continue;
+_publicPool2.push({ cal:_adef3.cal, id:_p3.primaryWeapon, rarity:_p3.primaryWeaponRarity || '一般', count:_p3.primaryWeaponBoxCount, _isAmmoHandlerBox:true, _ownerP:_p3 });
+}
+for(let _fi2 = 0; _fi2 < _fw2.length; _fi2++){
         const _f2 = _fw2[_fi2];
         if(!_f2 || !_f2.srv || _f2._retreating) continue;
         const _srv2 = _f2.srv;
@@ -1589,15 +1659,15 @@ function _resolveVehicleLeave(reason){
           isPassenger: true, srv: _srv2,
           hp: _maxHp2, maxHp: _maxHp2,
           armor: _armor2, maxArmor: _armor2, armorLevel: _armorLevel2,
-          worldX: _exWX2,
+          worldX: _exWX2 + (_f2._slotDX || 0), _slotDX: (_f2._slotDX || 0),
           weapon: _wO2,
           equipData: {
             head: _pp2.helmet || null,
             top: _pp2.body || null,
             primary: _pp2.primaryWeapon || null
           },
-          ammoPouch: _pp2.ammoPouch ? { ammoId: _pp2.ammoPouch.ammoId, rarity: _pp2.ammoPouch.rarity, count: _pp2.ammoPouch.count } : null,
-          ammoBox: _pp2.ammoBox ? { ammoId: _pp2.ammoBox.ammoId, rarity: _pp2.ammoBox.rarity, count: _pp2.ammoBox.count } : null,
+          ammoPouch: _pp2.ammoPouch || null,
+          ammoBox: _pp2.ammoBox || null,
           _publicPool: _publicPool2,
           grenades: Array.isArray(_pp2.grenades) ? _pp2.grenades.map(function(g){
             if(typeof g === 'string') return { id: g, rarity: '一般' };
@@ -1625,24 +1695,13 @@ function _resolveVehicleLeave(reason){
        引擎/履帶/駕駛員陣亡走 enterWreckMode → 本分支 → 3.5s 後 _finishWreck
        → _cleanup 因 sceneType 已改 foot 而 cb 不跑 → 需在此手動清。
        同時清後方事件避免下車時 isV=false 把身後 225m 事件全激活造成刷臉。 */
-    if(typeof window._clearRearCombatEvents === 'function') window._clearRearCombatEvents(_exWX);
     if(typeof window._resetExploreAfterCombat === 'function') window._resetExploreAfterCombat();
-    if(typeof pushLog === 'function') pushLog('<span class="pl">玩家</span> 下車繼續作戰', [], 'explore');
+    if(reason !== 'disembark' && typeof pushLog === 'function') pushLog('<span class="pl">玩家</span> 下車繼續作戰', [], 'explore');
   }
 }
 
 window._resolveVehicleLeave = _resolveVehicleLeave;
 /* rev-fix-vehicle-leave-modularize */
-window._clearRearCombatEvents = function(exWorldX){
-  if(!window._explore || !window._explore.nodes) return;
-  for(const _node of window._explore.nodes){
-    for(const _ev of _node.events){
-      if(_ev.cleared) continue;
-      if(_ev.type !== 'combat') continue;
-      if(_ev.worldX <= exWorldX) _ev.cleared = true;
-    }
-  }
-};
 window._resetExploreAfterCombat = function(){
   if(!window._explore) return;
   window._explore.mode = 'walk';
@@ -1658,18 +1717,13 @@ function _writeVehicleDestroyedLog(reason, vid){
   const _deadMembers = [];
   for(const _mk in _dmg.members){ if(_dmg.members[_mk] <= 0) _deadMembers.push(_mk); }
   /* 加入隨車載員統計 */
-  if(state.station && Array.isArray(state.station.passengers)){
-    const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
-    for(let _pi = 0; _pi < state.station.passengers.length && _pi < _cap; _pi++){
-      const _p = state.station.passengers[_pi];
-      if(!_p || !_p.srvId) continue;
-      const _srv = (state.servants || []).find(function(s){ return s.id === _p.srvId; });
-      if(_srv && (_srv.hp <= 0 || (_srv.injuredUntil && _srv.injuredUntil > Date.now()))){
-        _deadMembers.push('passenger_' + (_pi + 1));
-      }
-    }
-  }
-  const _reasonText = reason === 'detonated' ? '彈藥架殉爆' : '車體擊毀';
+  var _rosterL = (typeof window._vehicleRosterMap === 'function') ? window._vehicleRosterMap() : [];
+for(var _rl = 0; _rl < _rosterL.length; _rl++){
+var _srvL = _rosterL[_rl].srv;
+if(_srvL && (_srvL.hp <= 0 || (_srvL.injuredUntil && _srvL.injuredUntil > Date.now()))){
+_deadMembers.push('passenger_' + (_rl + 1));
+}
+}const _reasonText = reason === 'detonated' ? '彈藥架殉爆' : '車體擊毀';
   const _summary = [];
   if(_brokenParts.length) _summary.push('損壞 ' + _brokenParts.length + ' 處');
   if(_deadMembers.length) _summary.push('陣亡 ' + _deadMembers.length + ' 人');
@@ -1796,6 +1850,9 @@ window._radioBTRTrigger = function(){
 
   if(typeof vcEnsureAmmo === 'function') vcEnsureAmmo(vid);
   if(typeof window._refillVehicleAmmo === 'function') window._refillVehicleAmmo(vid);
+/* rev-summon-refill: 載員彈藥同樣在召喚時補滿（從庫存扣差額）。
+   必須在 BTRSupport.start() 之前 —— start() 會把 station 快照凍結。 */
+if(typeof window._refillPassengerAmmo === 'function') window._refillPassengerAmmo(vid);
 
   /* rev-arena-reload: 每次出車重置 APS 彈量（戰鬥中不補、出車補滿） */
   var _featAr = (typeof VEHICLE_FEATURES !== 'undefined') ? VEHICLE_FEATURES[vid] : null;
@@ -1925,27 +1982,30 @@ return 'hullLowerFront';
 window._vPartKeyFromCtx = _vPartKeyFromCtx;
 /* 載具受濺射統一入口（敵人載具尚未實裝，先備好；逐帶回呼 _vHitVehicle 走完內部損傷） */
 window._vApplyExplosionToVehicle = function(veh, P, opts){
-if(!veh || !veh.isVehicle || !P || !opts) return null;
-var agg = { hpLost:0, armorLost:0, penetrated:0, bands:[] };
-var res = window._applyExplosionToBox(veh, P, {
-totalDmg: opts.totalDmg, maxR: opts.maxR,
-penFor: opts.penFor || function(){ return opts.pen || 0; },
-applyBand: function(part, dmg, pen){
-var prev = window._hitCtx;
-window._hitCtx = { target:veh, part:part, x:P.x, y:P.y, z:P.z || 0, isDirect:false, _noArena:true };
-var r = null;
-try {
-r = window._vHitVehicle(veh, dmg, pen, opts.ammoId || 'unknown', opts.attackerName, opts.weaponName, opts.weaponRarity, opts.attackerRarity, opts.bulletSpeed, opts.bulletCaliber);
-} catch(e){ console.warn('[vExpl]', e); }
-window._hitCtx = prev;
-if(r && r.penetrated) agg.penetrated++;
-agg.bands.push({ part:part, dmg:dmg, pen:pen, result:r });
-return { hpLost:0, armorLost:(r && r.penetrated) ? 0 : Math.round(dmg) };
-}
-});
-agg.coverage = res ? res.coverage : 0;
-agg.dNear = res ? res.dNear : Infinity;
-return agg;
+  if(!veh || !veh.isVehicle || !P || !opts) return null;
+  var agg = { hpLost:0, armorLost:0, penetrated:0, bands:[] };
+  var res = window._applyExplosionToBox(veh, P, {
+    totalDmg: opts.totalDmg, maxR: opts.maxR,
+    penFor: opts.penFor || function(){ return opts.pen || 0; },
+    applyBand: function(part, dmg, pen, R){
+      var prev = window._hitCtx;
+      /* rev-splash-band-y: 命中高度 = 該帶實際覆蓋區間中心。
+         爆心在地面時 P.y=0，會把火花畫到畫布下方外（實測 ny 1.138）。 */
+      var _by = (R && typeof R.yLo === 'number' && typeof R.yHi === 'number') ? (R.yLo + R.yHi) / 2 : P.y;
+      window._hitCtx = { target:veh, part:part, x:P.x, y:_by, z:P.z || 0, isDirect:false, _noArena:true };
+      var r = null;
+      try {
+        r = window._vHitVehicle(veh, dmg, pen, opts.ammoId || 'unknown', opts.attackerName, opts.weaponName, opts.weaponRarity, opts.attackerRarity, opts.bulletSpeed, opts.bulletCaliber);
+      } catch(e){}
+      window._hitCtx = prev;
+      if(r && r.penetrated) agg.penetrated++;
+      agg.bands.push({ part:part, dmg:dmg, pen:pen, result:r });
+      return { hpLost:0, armorLost:(r && r.penetrated) ? 0 : Math.round(dmg) };
+    }
+  });
+  agg.coverage = res ? res.coverage : 0;
+  agg.dNear = res ? res.dNear : Infinity;
+  return agg;
 };
 
 /* rev-veh-dim-sync: 命中盒高度 = 渲染實車高（含車頂武器）。
@@ -1956,3 +2016,49 @@ return agg;
     if(VEHICLE_REAL_HEIGHTS[k]) VEHICLE_DIM[k].height = VEHICLE_REAL_HEIGHTS[k];
   }
 })();
+
+/* 下車：把載具戰交回步兵。與 arrive 的 _toVehicle 對稱，
+   與車毀下車共用同一條轉換實作。'disembark' 不在癱瘓/殉爆名單內，
+   enterFastLeave 對 lift/exit/leave 本就早退 → 不改相位，只做戰鬥轉換。 */
+window._vehicleToFoot = function(){
+  var c = window._combat;
+  if(!c || !c.active || c.sceneType !== 'vehicle') return false;
+  _resolveVehicleLeave('disembark');
+  return true;
+};
+
+/* rev-rebind-src: 支援結束釋放快照後，把跟隨載員與步戰代理的 p / 彈藥來源重新綁回 live station。
+   否則下車後的步戰消耗會寫進已作廢的快照 → 彈藥憑空回復。 */
+window._rebindPassengerSnapshots = function(){
+  var ex = window._explore;
+  if(!ex || !Array.isArray(ex.passengersFollowing)) return;
+  var live = (state.station && Array.isArray(state.station.passengers)) ? state.station.passengers : [];
+  var byId = {};
+  for(var i = 0; i < live.length; i++){ if(live[i] && live[i].srvId) byId[live[i].srvId] = live[i]; }
+  for(var j = 0; j < ex.passengersFollowing.length; j++){
+    var it = ex.passengersFollowing[j];
+    if(it && it.srv && byId[it.srv.id]) it.p = byId[it.srv.id];
+  }
+  var c = window._combat;
+  if(!c || !c.active || c.sceneType !== 'foot' || !Array.isArray(c.allies)) return;
+  var pool = [];
+  for(var k = 0; k < ex.passengersFollowing.length; k++){
+    var pp = ex.passengersFollowing[k].p;
+    if(!pp) continue;
+    if(pp.ammoBox && pp.ammoBox.ammoId && typeof AMMO !== 'undefined' && AMMO[pp.ammoBox.ammoId]){
+      pool.push({ cal: AMMO[pp.ammoBox.ammoId].cal, id: pp.ammoBox.ammoId, rarity: pp.ammoBox.rarity || '一般', count: pp.ammoBox.count || 0, _src: pp.ammoBox });
+    }
+    if(pp.primaryWeapon && typeof AMMO !== 'undefined' && AMMO[pp.primaryWeapon] && (pp.primaryWeaponBoxCount > 0)){
+      pool.push({ cal: AMMO[pp.primaryWeapon].cal, id: pp.primaryWeapon, rarity: pp.primaryWeaponRarity || '一般', count: pp.primaryWeaponBoxCount, _isAmmoHandlerBox: true, _ownerP: pp });
+    }
+  }
+  for(var m = 1; m < c.allies.length; m++){
+    var a = c.allies[m];
+    if(!a || !a.isPassenger || !a.srv) continue;
+    var lp = byId[a.srv.id];
+    if(!lp) continue;
+    a.ammoPouch = lp.ammoPouch || null;
+    a.ammoBox = lp.ammoBox || null;
+    a._publicPool = pool;
+  }
+};

@@ -529,66 +529,86 @@ function openGardenSoilAction(idx){
 
 
 function openGardenSeedPickerWithRemove(idx, returnFn){
-  const plots = _gardenGetPlots();
-  const plot = plots[idx];
-  if(!plot) return;
-  const storage = _gardenStorageInit();
-  const list = [];
-  for(const k in storage){
-    const p = k.split('@');
-    const id = p[0], rar = p[1];
-    if(!SEEDS[id]) continue;
-    const cnt = storage[k];
-    if(cnt <= 0) continue;
-    list.push({id: id, rarity: rar, count: cnt, def: SEEDS[id]});
-  }
-  list.sort(function(a, b){
-    const ra = sortByRarityDesc(a, b);
-    if(ra !== 0) return ra;
-    return (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
-  });
-  let body = '';
-  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold"><img style="width:28px;height:28px;object-fit:contain;flex:0 0 auto" src="icons/garden/soil.png' + assetSuffix('icons/garden/soil.png') + '" alt=""><span>土地</span>' + _gardenFertInfoHtml(plot) + '<button class="btn danger" id="soil-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
-  body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv || 1) + '</div>';
-  body += _gardenPlotOwnersHtml(idx, 'farmer');
-  body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px">種植種子</div>';
-  if(!list.length){
-    body += '<div class="empty-hint">儲備中沒有種子</div>';
-  } else {
-    for(const s of list){
-      const cropDef = CROPS[s.def.cropId];
-      const yieldBase = Math.max(1, Math.round(s.def.baseYield * (RARITY_MULT[s.rarity] || 1)));
-      body += '<div class="item-row" data-sid="' + s.id + '" data-srar="' + s.rarity + '">' +
-        '<div class="icon">' + seedImgHtml(s.id, 30) + '</div>' +
-        '<div class="info"><div class="nm ' + rarityClass(s.rarity) + '">' + s.def.name + '</div>' +
-        '<div class="sub">' + s.rarity + ' · 生長 ' + Math.round(s.def.growMs/1000) + 's · 收穫約 ' + yieldBase + ' ' + (cropDef ? cropDef.name : '') + '</div></div>' +
-        '<div class="cnt">×' + s.count + '</div></div>';
-    }
-  }
-  const _seedOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
-  const bd = openModal({ title: '土地配置', body: body, onClose: _seedOnClose });
-  const _del = bd.querySelector('#soil-del');
-  if(_del) _del.onclick = function(){
-    plots[idx] = null;
-    _clearPlotAssignments(idx);
-    save(); closeModal();
-    renderGardenGrid();
-  };
-  const _ap1 = bd.querySelector('#soil-apply');
-  if(_ap1) _ap1.onclick = function(){ _openApplySpecificSoilDialog(idx); };
-  const _ap = bd.querySelector('#soil-apply');
-  if(_ap) _ap.onclick = function(){ closeModal(); _openApplySpecificSoilDialog(idx); };
-  _gardenPlotOwnersBind(bd);
-  const rows = bd.querySelectorAll('.item-row[data-sid]');
-  for(let i = 0; i < rows.length; i++){
-    (function(row){
-      row.onclick = function(){
-        const sid = row.getAttribute('data-sid');
-        const srar = row.getAttribute('data-srar');
-        gardenPlantSeed(idx, sid, srar);
-      };
-    })(rows[i]);
-  }
+/* rev-seed-empty-slot: 種子欄恆為空槽（與車站 / 哨塔同款 st-pd-slot），點擊開彈窗選種 → 種植。
+   lastSeed 只供自動種植 follow 使用，不進 UI。 */
+const plots = _gardenGetPlots();
+const plot = plots[idx];
+if(!plot) return;
+if(typeof _stEnsureStyles === 'function') _stEnsureStyles();
+const _back = (typeof returnFn === 'function') ? returnFn : closeModal;
+let body = '';
+body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold">'
++ '<img style="width:28px;height:28px;object-fit:contain;flex:0 0 auto" src="icons/garden/soil.png' + assetSuffix('icons/garden/soil.png') + '" alt="">'
++ '<span>土地</span>' + _gardenFertInfoHtml(plot)
++ '<button class="btn danger" id="soil-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
+body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv || 1) + '</div>';
+body += _gardenPlotOwnersHtml(idx, 'farmer');
+body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:10px 0 4px">種植種子</div>';
+body += '<div class="st-pd-row"><div class="st-pd-slot" id="gp-seed-slot">'
++ '<div class="st-pd-slot-lbl">種子</div><div class="st-pd-slot-icon empty">＋</div></div></div>';
+const bd = openModal({ title:'土地配置', body:body, onClose:_back });
+const _del = bd.querySelector('#soil-del');
+if(_del) _del.onclick = function(){
+plots[idx] = null;
+_clearPlotAssignments(idx);
+save(); closeModal();
+renderGardenGrid();
+};
+const _slot = bd.querySelector('#gp-seed-slot');
+if(_slot) _slot.onclick = function(){
+closeModal();
+_openGardenSeedSelect(idx, function(){ openGardenSeedPickerWithRemove(idx, returnFn); });
+};
+const _ap = bd.querySelector('#soil-apply');
+if(_ap) _ap.onclick = function(){ closeModal(); _openApplySpecificSoilDialog(idx); };
+_gardenPlotOwnersBind(bd);
+}
+
+function _openGardenSeedSelect(idx, returnFn){
+/* 種子選擇彈窗：只列庫存 > 0 的種子，點選即種植。 */
+const plots = _gardenGetPlots();
+const plot = plots[idx];
+if(!plot) return;
+const storage = _gardenStorageInit();
+const list = [];
+for(const k in storage){
+const p = k.split('@');
+const id = p[0], rar = p[1];
+if(!SEEDS[id] || storage[k] <= 0) continue;
+list.push({ id:id, rarity:rar, count:storage[k], def:SEEDS[id] });
+}
+list.sort(function(a, b){
+const ra = sortByRarityDesc(a, b);
+if(ra !== 0) return ra;
+return (a.def.name || '').localeCompare(b.def.name || '', 'zh-Hant');
+});
+let body = '';
+if(!list.length){
+body += '<div class="empty-hint">儲備中沒有種子</div>';
+} else {
+for(const s of list){
+const cropDef = CROPS[s.def.cropId];
+const yieldBase = Math.max(1, Math.round(s.def.baseYield * (RARITY_MULT[s.rarity] || 1)));
+body += '<div class="item-row" data-sid="' + s.id + '" data-srar="' + s.rarity + '">'
++ '<div class="icon" style="background:' + rarityBg(s.rarity) + '">' + seedImgHtml(s.id, 30) + '</div>'
++ '<div class="info"><div class="nm ' + rarityClass(s.rarity) + '">' + s.def.name + '</div>'
++ '<div class="sub">' + s.rarity + ' · 生長 ' + Math.round(s.def.growMs / 1000) + 's · 收穫約 ' + yieldBase + ' ' + (cropDef ? cropDef.name : '') + '</div></div>'
++ '<div class="cnt">×' + s.count + '</div></div>';
+}
+}
+const bd = openModal({
+title:'選擇種子 · ' + plotCoordName(idx),
+body:body,
+onClose:function(){ closeModal(); if(typeof returnFn === 'function') returnFn(); }
+});
+const rows = bd.querySelectorAll('.item-row[data-sid]');
+for(let i = 0; i < rows.length; i++){
+(function(row){
+row.onclick = function(){
+gardenPlantSeed(idx, row.getAttribute('data-sid'), row.getAttribute('data-srar'));
+};
+})(rows[i]);
+}
 }
 
 

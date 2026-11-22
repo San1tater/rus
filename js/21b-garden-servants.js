@@ -1,59 +1,13 @@
 'use strict';
 
+/* ===== rev-srv-order: 僕人卡片排序唯一比較器 =====
+   後院工作中 → 車站配置中 → 等級(遞減) → 稀有度(遞減) → 序號(遞增) */
 /* 後院僕人（CRUD / 指派 / 詳情 / 改名 / 地塊負責人 / 確認對話框） */
 /* 由 21-garden.js 拆分而來，加載順序 21a → 21b → 21c → 21d → 21e，
  * 21d/21e 依賴 21a/21b/21c；21c 依賴 21a/21b。
  * 跨文件共享符號（GARDEN_TABS / _gardenActiveTab / _gardenTickTimer /
  *   _gardenActors / _gardenActorTimer / _gardenActorCanvasRAF）
  * 以 var = window.xxx = 形式暴露。 */
-
-function _gardenPlotOwnersHtml(idx, type){
-  _gardenEnsureStyles();
-  const servants = (state.servants || []).filter(function(s){
-    return s.type === type && s.assignedPlots && s.assignedPlots.indexOf(idx) !== -1;
-  });
-  const labelMap = { farmer: '責任農民', foreman: '責任監工', guard: '駐守守衛' };
-  const label = labelMap[type] || '責任人';
-  const emptyLabelMap = { farmer: '指派農民', foreman: '指派監工', guard: '指派守衛' };
-  const emptyLabel = emptyLabelMap[type] || '指派';
-  let html = '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:8px 0 4px">' + label + '</div>';
-  if(!servants.length){
-    html += '<div class="owner-empty" data-assign-idx="' + idx + '" data-assign-type="' + type + '">＋ ' + emptyLabel + '</div>';
-    return html;
-  }
-  for(const s of servants){
-    const _img = 'icons/servants/' + s.type + '.png' + assetSuffix('icons/servants/' + s.type + '.png');
-    const effMax = servantEffectiveMaxStamina(s);
-    const stam = Math.max(0, s.stamina || 0);
-    const pct = effMax > 0 ? Math.round((stam / effMax) * 100) : 0;
-    const color = pct <= 0 ? '#e05252' : (pct <= 30 ? '#e8741e' : (pct <= 70 ? '#e8a33d' : '#4caf50'));
-    const tDef = SERVANT_TYPES[s.type] || {name:''};
-    html += '<div class="owner-row">';
-    /* rev-fix-guard-card-injured: 守衛重傷時加 cant-go */
-    const _isInjured = !!(s.injuredUntil && s.injuredUntil > Date.now());
-    html += '<div class="tower-guard-btn' + (_isInjured ? ' cant-go' : '') + '" data-srv-id="' + s.id + '" data-plot-idx="' + idx + '" style="background:' + rarityBg(s.rarity) + '">';
-    html += '<img class="tg-icon" src="' + _img + '" alt="">';
-    html += '<div class="tg-name">' + servantLabel(s) + '</div>';
-    html += '</div>';
-    html += '<div class="owner-info">';
-    html += '<div class="owner-line"><span class="' + rarityClass(s.rarity) + '">Lv.' + s.lv + ' ' + tDef.name + '</span></div>';
-    html += '<div class="owner-stam-bar"><div class="owner-stam-fill" style="width:' + pct + '%;background:' + color + '"></div></div>';
-    html += '<div class="owner-stam-text" style="color:' + color + '">體力 ' + stam + ' / ' + effMax + '</div>';
-    /* rev-fix-guard-hp-bar-v5: 只对守卫显示 HP 条 */
-    if(type === 'guard'){
-      const _maxHp2 = (typeof servantMaxHp === 'function') ? servantMaxHp(s) : (s.hp || 100);
-      const _curHp2 = _isInjured ? 0 : _maxHp2;
-      const _hpPct2 = _isInjured ? 0 : 100;
-      const _hpCol2 = _isInjured ? '#e05252' : '#4caf50';
-      html += '<div class="owner-stam-bar" style="margin-top:2px"><div class="owner-stam-fill" style="width:' + _hpPct2 + '%;background:' + _hpCol2 + '"></div></div>';
-      html += '<div class="owner-stam-text" style="color:' + _hpCol2 + '">' + (_isInjured ? '<span style="color:#e8a33d;font-weight:bold">治療</span> · ' : '') + 'HP ' + _curHp2 + '/' + _maxHp2 + '</div>';
-    }
-    html += '</div>';
-    html += '</div>';
-  }
-  return html;
-}
-
 
 function _gardenPickServantForPlot(idx, type){
   const all = (state.servants || []).filter(function(s){ return s.type === type; }).sort(function(a, b){
@@ -172,70 +126,6 @@ function _gardenPickServantForPlot(idx, type){
 }
 
 
-function _gardenPlotOwnersBind(bd){
-  /* rev-fix-guard-heal-v4: 重伤守卫整个 owner-info 可点 */
-  const _ownerInfos = bd.querySelectorAll('.owner-info');
-  for(let _hi = 0; _hi < _ownerInfos.length; _hi++){
-    (function(_oi){
-      const _row = _oi.closest('.owner-row');
-      if(!_row) return;
-      const _btn = _row.querySelector('.tower-guard-btn[data-srv-id]');
-      if(!_btn) return;
-      const _sid = _btn.getAttribute('data-srv-id');
-      const _plotIdx = parseInt(_btn.getAttribute('data-plot-idx'), 10);
-      const _srv = (state.servants || []).find(function(s){ return s.id === _sid; });
-      if(!_srv) return;
-      const _isInjuredNow = !!(_srv.injuredUntil && _srv.injuredUntil > Date.now());
-      if(!_isInjuredNow) return;
-      _oi.style.cursor = 'pointer';
-      _oi.onclick = function(e){
-        if(e && e.stopPropagation) e.stopPropagation();
-        if(typeof _stConsumeLowestMed !== 'function') return;
-        const _med = _stConsumeLowestMed();
-        if(!_med){
-          if(typeof notify === 'function') notify('沒有醫療品', 'warn');
-          return;
-        }
-        _srv.injuredUntil = 0;
-        _srv._injuredDown = false;
-        _srv.hp = (typeof servantMaxHp === 'function') ? servantMaxHp(_srv) : (_srv.hp || 100);
-        if(_srv._injuredAnimStart) _srv._injuredAnimStart = null;
-        save();
-        if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
-        renderGardenGrid();
-        closeModal();
-        if(isFinite(_plotIdx) && _plotIdx >= 0){
-          setTimeout(function(){ _gardenTowerOpen(_plotIdx); }, 50);
-        }
-      };
-    })(_ownerInfos[_hi]);
-  }
-  const btns = bd.querySelectorAll('.tower-guard-btn[data-srv-id]');
-  for(let i = 0; i < btns.length; i++){
-    (function(el){
-      el.onclick = function(){
-        const sid = el.getAttribute('data-srv-id');
-        const _pIdx = parseInt(el.getAttribute('data-plot-idx'), 10);
-        closeModal();
-        const _returnFn = (isFinite(_pIdx) && _pIdx >= 0) ? function(){ onGardenPlotClick(_pIdx); } : null;
-        setTimeout(function(){ openServantDetail(sid, _returnFn); }, 200);
-      };
-    })(btns[i]);
-  }
-  const emptyBtns = bd.querySelectorAll('.owner-empty[data-assign-idx]');
-  for(let i = 0; i < emptyBtns.length; i++){
-    (function(el){
-      el.onclick = function(){
-        const idx = parseInt(el.getAttribute('data-assign-idx'), 10);
-        const type = el.getAttribute('data-assign-type');
-        closeModal();
-        setTimeout(function(){ _gardenPickServantForPlot(idx, type); }, 100);
-      };
-    })(emptyBtns[i]);
-  }
-}
-
-
 function _isServantWorking(s){
   return !!(s && s.assignedPlots && s.assignedPlots.length > 0);
 }
@@ -243,16 +133,7 @@ function _isServantWorking(s){
 
 function renderGardenServants(box){
   if(!box) return;
-  const servants = (state.servants || []).slice().sort(function(a, b){
-    const wa = _isServantWorking(a) ? 1 : 0;
-    const wb = _isServantWorking(b) ? 1 : 0;
-    if(wb !== wa) return wb - wa;
-    if(b.lv !== a.lv) return b.lv - a.lv;
-    const ra = sortByRarityDesc(a, b);
-    if(ra !== 0) return ra;
-    const typeOrder = ['farmer', 'guard', 'foreman'];
-    return typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type);
-  });
+  const servants = (state.servants || []).slice().sort(_srvSortCmp);
   if(!servants.length){
     box.innerHTML = '<div class="gs-cols"><div class="gs-col" style="border-left:none"><div class="gs-wrap"><div class="gs-empty" style="position:static;padding:40px 0">尚未擁有僕人</div></div></div></div>';
     return;
@@ -300,7 +181,8 @@ function renderGardenServants(box){
     const cells = box.querySelectorAll('.gs-cell[data-srv-id]');
     for(let i = 0; i < cells.length; i++){
       (function(el){
-        el.onclick = function(){ openServantDetail(el.getAttribute('data-srv-id')); };
+        el.onclick = function(){
+ openServantDetail(el.getAttribute('data-srv-id')); };
       })(cells[i]);
     }
   }
@@ -475,187 +357,6 @@ function _refreshServantListNow(){
 }
 
 
-function openServantDetail(srvId, returnFn){
-  const srv = (state.servants || []).find(function(s){ return s.id === srvId; });
-  if(!srv) return;
-  const def = SERVANT_TYPES[srv.type] || {name:'?', icon:'?', desc:''};
-  const slots = servantSlots(srv.rarity, srv.type);
-  const plots = (srv.assignedPlots || []);
-  const maxStam = servantEffectiveMaxStamina(srv);
-  const stam = Math.max(0, srv.stamina || 0);
-  const stamPct = maxStam > 0 ? Math.round((stam / maxStam) * 100) : 0;
-  const stamColor = stamPct <= 0 ? '#e05252' : (stamPct <= 30 ? '#e8741e' : (stamPct <= 70 ? '#e8a33d' : '#4caf50'));
-  const ft = document.createElement('div');
-  ft.className = 'modal-ft';
-  let ftHtml = '';
-
-  ftHtml += '<button class="btn primary" id="srv-assign">指派</button>';
-  if((srv.assignedPlots||[]).length > 0) ftHtml += '<button class="btn" id="srv-withdraw">撤回</button>';
-  ftHtml += '';
-  ft.innerHTML = ftHtml;
-  let body = '';
-  body += '<div style="font-size:15px;color:#e8a33d;font-weight:bold;display:flex;align-items:center;gap:8px">';
-  body += '<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:5px;background:' + rarityBg(srv.rarity) + ';flex:0 0 auto"><img style="width:28px;height:28px;object-fit:contain" src="icons/servants/' + srv.type + '.png' + assetSuffix('icons/servants/' + srv.type + '.png') + '" alt=""></span>';
-  body += '<span class="' + rarityClass(srv.rarity) + '">' + _servantEscHtml(servantLabel(srv)) + '</span>';
-  body += '<span class="srv-rename-btn" style="font-size:11px;color:#e8a33d;cursor:pointer;padding:4px 10px;border:1px solid #3a2f25;border-radius:4px;margin-left:6px">改名</span>';
-{
-  const _fcP = srv.foodPolicy || 'normal';
-  const _fcB = (typeof FOOD_COST_BASE !== 'undefined' ? FOOD_COST_BASE[_fcP] : 0) || 0;
-  const _fcM = (typeof RARITY_FOOD_MULT !== 'undefined' ? RARITY_FOOD_MULT[srv.rarity] : 1) || 1;
-  const _fcC = Math.round(_fcB * _fcM * 10) / 10;
-  body += '<span class="srv-food-rate" style="font-size:11px;color:#e05252;font-weight:bold">🍲 -' + _fcC + '/hr</span>';
-}
-body += '<button class="btn danger" id="srv-dismiss" style="margin-left:auto;padding:4px 12px;font-size:11px;flex:0 0 auto">解僱</button>';
-
-  body += '</div>';
-  /* rev-fix-servant-hp-bar-v6: HP 条在体力条下面 */
-  const _isInjuredDetail = !!(srv.injuredUntil && srv.injuredUntil > Date.now());
-  body += '<div class="detail-sub">' + srv.rarity + ' · Lv.' + srv.lv + ' · ' + def.name + (srv.resting ? ' · <span style="color:#7a6f60">休息中</span>' : (srv.stamina <= 0 ? ' · <span style="color:#e05252">偷懶中</span>' : '')) + '</div>';
-  body += '<div class="stat-line"><span class="k">當前效果</span><span class="v" style="color:#4caf50;font-weight:bold">' + servantLevelEffectText(srv) + '</span></div>';
-  body += '<div style="margin:8px 0 4px">';
-  body += '<div style="font-size:10px;color:#7a6f60;margin-bottom:3px;display:flex;justify-content:space-between"><span>體力</span><span>' + stam + ' / ' + maxStam + '（' + stamPct + '%）</span></div>';
-  body += '<div style="height:6px;background:#1a1510;border-radius:3px;overflow:hidden;border:1px solid #2a231c"><div style="height:100%;width:' + stamPct + '%;background:' + stamColor + '"></div></div>';
-  body += '</div>';
-  const _maxHpV = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : (srv.hp || 100);
-  let _curHpV = (srv.hp !== undefined && srv.hp !== null) ? srv.hp : _maxHpV;
-  if(_isInjuredDetail) _curHpV = 0;
-  const _hpPctV = _maxHpV > 0 ? Math.round(_curHpV / _maxHpV * 100) : 0;
-  const _hpColV = _isInjuredDetail ? '#e05252' : (_curHpV < _maxHpV ? '#e8a33d' : '#4caf50');
-  body += '<div style="margin:8px 0 4px"' + (_isInjuredDetail ? ' class="srv-detail-heal" data-heal="1" style="cursor:pointer;margin:8px 0 4px"' : '') + '>';
-  body += '<div style="font-size:10px;color:' + (_isInjuredDetail ? '#e05252' : '#7a6f60') + ';margin-bottom:3px;display:flex;justify-content:space-between"><span>HP</span><span>' + _curHpV + ' / ' + _maxHpV + '（' + _hpPctV + '%）' + (_isInjuredDetail ? ' · <span style="color:#e8a33d;font-weight:bold">治療</span>' : '') + '</span></div>';
-  body += '<div style="height:6px;background:#1a1510;border-radius:3px;overflow:hidden;border:1px solid #2a231c"><div style="height:100%;width:' + _hpPctV + '%;background:' + _hpColV + '"></div></div>';
-  body += '</div>';
-  /* rev-fix-servant-detail-dedup: 删除重复的当前效果 + 体力条 */
-  if(srv.lv < SERVANT_MAX_LV){
-    const _need = servantExpNeed(srv.lv);
-    const _cur = srv.exp || 0;
-    const _pct = Math.min(100, Math.round((_cur / _need) * 100));
-    body += '<div style="margin:6px 0 4px">';
-    body += '<div style="font-size:10px;color:#7a6f60;margin-bottom:3px;display:flex;justify-content:space-between"><span>經驗</span><span>' + _cur + ' / ' + _need + '（' + _pct + '%）</span></div>';
-    body += '<div style="height:5px;background:#1a1510;border-radius:3px;overflow:hidden;border:1px solid #2a231c"><div style="height:100%;width:' + _pct + '%;background:linear-gradient(90deg,#4caf50,#7ee07e)"></div></div>';
-    body += '</div>';
-  } else {
-    body += '<div style="font-size:10px;color:#4caf50;margin:6px 0 4px;text-align:center;font-weight:bold">✦ 已滿級 Lv.' + SERVANT_MAX_LV + '</div>';
-  }
-  body += '<div class="stat-line"><span class="k">已指派</span><span class="v">' + plots.length + ' / ' + slots + '</span></div>';
-  if(plots.length){
-    body += '<div class="stat-line"><span class="k">地塊</span><span class="v">' + plots.map(function(i){ return plotCoordName(i); }).join('、') + '</span></div>';
-  }
-  if(srv.type === 'farmer'){
-    body += '<div class="divider"></div>';
-    body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:6px">🌱 自動種植</div>';
-    body += '<select id="srv-auto-plant" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:6px;font-size:11px">';
-    body += '<option value="off">關閉</option>';
-    body += '<option value="any">高價值</option>';
-    body += '<option value="follow">重複</option>';
-    body += '</select>';
-  }
-  body += '<div class="divider"></div>';
-  body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:6px">🍲 食物策略</div>';
-  body += '<select id="srv-food-policy" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:6px;font-size:11px">';
-  body += '<option value="full">吃到撐（120%）</option>';
-  body += '<option value="normal">吃飽（70%）</option>';
-  body += '<option value="half">半飽（50%）</option>';
-  body += '<option value="lick">舔舔（30%）</option>';
-  body += '<option value="starve">餓著（0%）</option>';
-  body += '</select>';
-  body += '<div style="font-size:9px;color:#5a5040;margin-top:4px;line-height:1.5">需與商人訂閱食物生產線後生效</div>';
-  const _detailOnClose = (typeof returnFn === 'function') ? returnFn : closeModal;
-  const bd = openModal({ title: '僕人詳情', body: body, footer: ft, onClose: _detailOnClose });
-  /* rev-fix-servant-heal-v3: 点击整个 HP 条区域治疗 */
-  const _healArea = bd.querySelector('.srv-detail-heal[data-heal]');
-  if(_healArea) _healArea.onclick = function(){
-    if(typeof _stConsumeLowestMed !== 'function') return;
-    const _med = _stConsumeLowestMed();
-    if(!_med){
-      if(typeof notify === 'function') notify('沒有醫療品', 'warn');
-      return;
-    }
-    srv.injuredUntil = 0;
-    srv._injuredDown = false;
-    srv.hp = _maxHpV;
-    if(srv._injuredAnimStart) srv._injuredAnimStart = null;
-    save();
-    closeModal();
-    if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
-    renderGardenGrid();
-    openServantDetail(srvId, returnFn);
-  };
-  const _wdBtn = ft.querySelector('#srv-withdraw');
-  if(_wdBtn) _wdBtn.onclick = function(){
-    const _list = srv.assignedPlots || [];
-    const _plots = _gardenGetPlots();
-    for(const _idx of _list){
-      const _p2 = _plots[_idx];
-      if(_p2 && _p2.assignedServant === srv.id) delete _p2.assignedServant;
-    }
-    srv.assignedPlots = [];
-    save();
-    closeModal();
-    _gardenLog('<span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span> 已撤回', 'clean');
-    renderGardenGrid();
-    if(typeof _gardenSyncActors === 'function') _gardenSyncActors();
-    if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
-  };
-  const _dsBtn = bd.querySelector('#srv-dismiss');
-  if(_dsBtn) _dsBtn.onclick = function(){
-    openConfirm('確定解僱 ' + (SERVANT_TYPES[srv.type]||{}).name + '？', function(){
-      const _list = srv.assignedPlots || [];
-      const _plots = _gardenGetPlots();
-      for(const _idx of _list){
-        const _p2 = _plots[_idx];
-        if(_p2 && _p2.assignedServant === srv.id) delete _p2.assignedServant;
-      }
-      state.servants = (state.servants || []).filter(function(s){ return s.id !== srv.id; });
-      const _rw = { '破舊':{s:[0,1],m:[1,2]}, '一般':{s:[1,1],m:[2,3]}, '庫存':{s:[1,2],m:[3,4]}, '精品':{s:[2,3],m:[4,6]}, '傳奇':{s:[3,5],m:[6,10]} };
-      const _r = _rw[srv.rarity] || _rw['一般'];
-      const _sn = Object.keys(SEEDS);
-      const _mn = ['wood','metal','screws','cloth','gears','electronics'];
-      const _parts = [];
-      const _sc = rndInt(_r.s[0], _r.s[1]);
-      for(let _i = 0; _i < _sc; _i++){ const _sid = pick(_sn); gardenStorageAdd(_sid, srv.rarity, 1); _parts.push('🌰' + (SEEDS[_sid]?SEEDS[_sid].name:_sid)); }
-      const _mc = rndInt(_r.m[0], _r.m[1]);
-      for(let _i = 0; _i < _mc; _i++){ const _mid = pick(_mn); invAdd(_mid, '一般', 1); _parts.push((MATERIAL_EMOJI[_mid]||'') + (MATERIALS[_mid]?MATERIALS[_mid].name:_mid)); }
-      save();
-      closeModal();
-      _gardenLog('解僱 <span class="r-' + srv.rarity + '">' + servantLabel(srv) + '</span>', 'leave');
-      renderGardenGrid();
-      if(typeof _refreshServantListNow === 'function') _refreshServantListNow();
-    });
-  };
-  const _rnBtn = bd.querySelector('.srv-rename-btn');
-  if(_rnBtn) _rnBtn.onclick = function(){ closeModal(); openServantRename(srvId, returnFn); };
-  ft.querySelector('#srv-assign').onclick = function(){ closeModal(); openServantAssign(srvId, returnFn); };
-  const apSel = bd.querySelector('#srv-auto-plant');
-  if(apSel){
-    apSel.value = srv.autoPlant || 'off';
-    apSel.onchange = function(){
-      srv.autoPlant = apSel.value;
-      save();
-    };
-  }
-  const fpSel = bd.querySelector('#srv-food-policy');
-  if(fpSel){
-    fpSel.value = srv.foodPolicy || 'normal';
-    fpSel.onchange = function(){
-      srv.foodPolicy = fpSel.value;
-      const _eff = servantEffectiveMaxStamina(srv);
-      if((srv.stamina || 0) > _eff) srv.stamina = _eff;
-      save();
-      const _rateEl = bd.querySelector('.srv-food-rate');
-      if(_rateEl){
-        const _fcB = (typeof FOOD_COST_BASE !== 'undefined' ? FOOD_COST_BASE[srv.foodPolicy] : 0) || 0;
-        const _fcM = (typeof RARITY_FOOD_MULT !== 'undefined' ? RARITY_FOOD_MULT[srv.rarity] : 1) || 1;
-        const _fcC = Math.round(_fcB * _fcM * 10) / 10;
-        _rateEl.textContent = '🍲 -' + _fcC + '/hr';
-        _rateEl.style.color = '#e05252';
-        _rateEl.style.fontWeight = 'bold';
-      }
-    };
-  }
-}
-
-
 function openConfirm(msg, onOk, onCancel){
   const el = document.createElement('div');
   el.className = 'confirm-layer';
@@ -731,4 +432,442 @@ function openServantRename(srvId, returnFn){
     openServantDetail(srvId, returnFn);
   };
   ft.querySelector('#rn-cancel').onclick = closeModal;
+}/* ===== gp-srv-ui: 僕人 UI 共用（純函式；樣式於字串產生時決定，無執行期改樣式） ===== */
+var GP_GOLD = 'background:#8a5f18;border-color:#e8a33d;color:#fff3d6';
+var GP_RED = 'background:#7d2b20;border-color:#c0392b;color:#ffd9d2';
+var GP_GREEN = 'background:#2f7a3c;border-color:#4ade80;color:#eafff0';
+var GP_GREY = 'background:#241d16;border-color:#4a3a26;color:#a89a85';
+
+/* ===== gp-ui-core: 僕人 UI 唯一真相源（純函式；樣式於字串產生時決定，無執行期改樣式） ===== */
+var GP_MINI = 'height:24px;padding:0 8px;font-size:10px;line-height:1;border-radius:5px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-weight:bold';
+var GP_GOLD = 'background:#8a5f18;border-color:#e8a33d;color:#fff3d6';
+var GP_RED = 'background:#7d2b20;border-color:#c0392b;color:#ffd9d2';
+var GP_GREEN = 'background:#2f7a3c;border-color:#4ade80;color:#eafff0';
+var GP_GREY = 'background:#241d16;border-color:#4a3a26;color:#a89a85';
+
+function _gpEsc(t){
+return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){
+if(c === '&') return '&amp;';
+if(c === '<') return '&lt;';
+if(c === '>') return '&gt;';
+return '&quot;';
+});
 }
+function _gpNum(n){
+if(typeof _stFmtNum === 'function') return _stFmtNum(n);
+var v = Math.round(Math.abs(n || 0));
+var s = (n < 0) ? '-' : '';
+if(v < 10000) return s + v;
+if(v < 1000000) return s + Math.round(v / 1000) + 'K';
+return s + (v / 1000000).toFixed(1) + 'M';
+}
+function _gpSlots(srv){
+if(!srv) return 1;
+if(typeof servantSlots === 'function') return servantSlots(srv.rarity, srv.type);
+return 1;
+}
+function _gpMaxPlots(srv){ return _gpSlots(srv); }
+function _gpOrderRank(s){
+if(!s) return 3;
+if(s.assignedPlots && s.assignedPlots.length) return 0;
+if(typeof _isServantInStation === 'function' && _isServantInStation(s.id)) return 1;
+return 2;
+}
+function _srvOrderRank(s){ return _gpOrderRank(s); }
+function _gpSrvCmp(a, b){
+var A = (a && a.srv) ? a.srv : a;
+var B = (b && b.srv) ? b.srv : b;
+if(!A || !B) return 0;
+var ra = _gpOrderRank(A), rb = _gpOrderRank(B);
+if(ra !== rb) return ra - rb;
+var la = A.lv || 1, lb = B.lv || 1;
+if(la !== lb) return lb - la;
+var RO = (typeof RARITY_ORDER !== 'undefined') ? RARITY_ORDER : ['破舊','一般','庫存','精品','傳奇','具名'];
+var ia = RO.indexOf(A.rarity), ib = RO.indexOf(B.rarity);
+if(ia !== ib) return ib - ia;
+return (A.tag || 0) - (B.tag || 0);
+}
+function _srvSortCmp(a, b){ return _gpSrvCmp(a, b); }
+function _gpStats(srv){
+var mh = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
+var hp = (typeof srv.hp === 'number') ? srv.hp : mh;
+if(srv.injuredUntil && srv.injuredUntil > Date.now()) hp = 0;
+hp = Math.max(0, Math.min(mh, hp));
+var ms = (typeof servantEffectiveMaxStamina === 'function') ? servantEffectiveMaxStamina(srv) : 100;
+var st = Math.max(0, Math.min(ms, srv.stamina || 0));
+var lv = srv.lv || 1;
+var cap = (typeof SERVANT_MAX_LV === 'number') ? SERVANT_MAX_LV : 50;
+var need = (lv >= cap) ? 1 : ((typeof servantExpNeed === 'function') ? servantExpNeed(lv) : 100);
+var ex = (lv >= cap) ? need : Math.max(0, Math.min(need, srv.exp || 0));
+return { mh:mh, hp:hp, ms:ms, st:st, lv:lv, cap:cap, need:need, ex:ex };
+}
+function _gpFood(srv){
+var pol = srv.foodPolicy || 'normal';
+var base = (typeof FOOD_COST_BASE !== 'undefined' && FOOD_COST_BASE[pol] != null) ? FOOD_COST_BASE[pol] : 0;
+var mult = (typeof RARITY_FOOD_MULT !== 'undefined' && RARITY_FOOD_MULT[srv.rarity] != null) ? RARITY_FOOD_MULT[srv.rarity] : 1;
+return Math.round(base * mult * 10) / 10;
+}
+function _gpBar(c, m, col){
+var p = Math.max(0, Math.min(100, Math.round(c / Math.max(1, m) * 100)));
+return '<div style="min-width:0;height:8px;border-radius:4px;background:#4a1212;border:1px solid #2a1a14;overflow:hidden">'
++ '<div style="height:100%;width:' + p + '%;background:' + col + '"></div></div>';
+}
+/* grid 四欄：標籤 34 / 條 1fr / 數值 72 / 動作 46。三列欄寬一致 → 三條等長且定長，
+   短按鈕固定在動作欄，绝不壓縮條寬。compact 版（地塊卡片）省略動作欄。 */
+function _gpRow(lbl, c, m, col, act){
+/* rev-row-geom: 固定高度 grid —— 標籤 34 / 條 1fr / 數值 72 / 動作 46。
+   三列同高同距；條長不隨數字位數或按鈕有無而變動。 */
+var _p = Math.max(0, Math.min(100, Math.round(c / Math.max(1, m) * 100)));
+var _f = function(v){
+if(typeof _stFmtNum === 'function') return _stFmtNum(v);
+return String(Math.round(v || 0));
+};
+return '<div class="gp-vrow">'
++ '<span class="gp-vlbl">' + lbl + '</span>'
++ '<div class="gp-vbar"><i style="width:' + _p + '%;background:' + col + '"></i></div>'
++ '<span class="gp-vnum">' + _f(c) + '/' + _f(m) + '</span>'
++ '<span class="gp-vact">' + (act || '') + '</span>'
++ '</div>';
+}
+function _gpMini(label, attr, color){
+return '<button class="btn" ' + attr + ' style="' + GP_MINI + ';' + color + '">' + label + '</button>';
+}
+function _gpKV(k, v, color){
+return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:3px 0;padding:6px 9px;background:#1a1510;border:1px solid #2a231c;border-radius:5px">'
++ '<span style="font-size:10px;color:#8a7c68">' + k + '</span>'
++ '<b style="font:800 11px/1 Menlo,Consolas,monospace;color:' + color + '">' + v + '</b></div>';
+}
+function _gpHeal(srv){
+if(!srv) return false;
+var mh = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
+var cur = (typeof srv.hp === 'number') ? srv.hp : mh;
+if(srv.injuredUntil && srv.injuredUntil > Date.now()) cur = 0;
+if(cur >= mh) return false;
+var ok = false;
+if(typeof _stHealServantByValue === 'function'){
+var r = _stHealServantByValue(srv, mh);
+ok = !!(r && r.used && r.used.length);
+}
+if(ok){
+if(typeof srv.hp !== 'number') srv.hp = mh;
+if(srv.hp >= mh){ delete srv.injuredUntil; delete srv.injuredAt; srv._injuredDown = false; srv._injuredAnimStart = null; }
+if(typeof save === 'function') save();
+}
+return ok;
+}
+function _gpRefresh(){
+if(typeof save === 'function') save();
+var fns = ['renderGardenGrid','renderGardenContent','_refreshServantListNow','_gardenSyncActors','_gardenUpdateFoodInfo'];
+for(var i = 0; i < fns.length; i++){
+try{ if(typeof window[fns[i]] === 'function') window[fns[i]](); }catch(e){}
+}
+}
+function _gpReopenPlot(idx){
+var ps = (typeof _gardenGetPlots === 'function') ? _gardenGetPlots() : [];
+var p = ps[idx];
+if(!p){ if(typeof renderGardenGrid === 'function') renderGardenGrid(); return; }
+if(p.type === 'tower' && typeof _gardenTowerOpen === 'function'){ _gardenTowerOpen(idx); return; }
+if(p.type === 'compost' && typeof openCompostDetail === 'function'){ openCompostDetail(idx); return; }
+if(p.type === 'distillery' && typeof openDistilleryDetail === 'function'){ openDistilleryDetail(idx); return; }
+if(typeof onGardenPlotClick === 'function'){ onGardenPlotClick(idx); return; }
+if(typeof renderGardenGrid === 'function') renderGardenGrid();
+}
+/* 詳情主體：頭像列（改名貼名字 / 解僱靠右）→ 等級經驗 → 體力 → 生命(短治療鈕)
+   → 已指派 a/b（不列地塊）→ 食物消耗 → 等級效果 → 自動種植｜食物策略（各一個標題）。 */
+function _gpDetailBody(srv){
+var v = _gpStats(srv);
+var n = (srv.assignedPlots || []).length, mx = _gpSlots(srv);
+var ip = 'icons/servants/' + srv.type + '.png';
+var sf = (typeof assetSuffix === 'function') ? assetSuffix(ip) : '';
+var rc = (typeof rarityClass === 'function') ? rarityClass(srv.rarity) : '';
+var rb = (typeof rarityBg === 'function') ? rarityBg(srv.rarity) : '#241d16';
+var h = '<div data-gp-ui="detail" style="display:flex;align-items:flex-start;gap:9px;padding:2px 0 8px">'
++ '<div style="flex:0 0 52px;width:52px;height:52px;border-radius:8px;overflow:hidden;background:' + rb + ';display:flex;align-items:center;justify-content:center">'
++ '<img src="' + ip + sf + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>'
++ '<div style="flex:1;min-width:0">'
++ '<div style="display:flex;align-items:center;gap:6px;min-width:0">'
++ '<span class="' + rc + '" style="font-size:14px;font-weight:bold;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _gpEsc(servantLabel(srv)) + '</span>'
++ _gpMini('改名', 'data-gp-ren="1"', GP_GREY)
++ '</div>';
+var tal = (typeof getServantTalents === 'function') ? getServantTalents(srv) : [];
+if(tal && tal.length){
+h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">';
+for(var t = 0; t < tal.length; t++){
+var td = (typeof TALENT_DEFS !== 'undefined') ? TALENT_DEFS[tal[t]] : null;
+h += '<span style="font-size:9px;padding:3px 6px;background:#2a1f10;border:1px solid #8a5f18;border-radius:3px;color:#ffd680">' + _gpEsc((td && td.name) || tal[t]) + '</span>';
+}
+h += '</div>';
+}
+h += '</div>' + _gpMini('解僱', 'data-gp-fire="1"', GP_RED) + '</div>';
+h += _gpRow('Lv.' + v.lv, v.ex, v.need, '#f0c040', '');
+h += _gpRow('體力', v.st, v.ms, '#3aa0ff', '');
+h += _gpRow('生命', v.hp, v.mh, '#4ade80', _gpMini('治療', 'data-gp-heal="1"', GP_GREEN));
+if(srv.injuredUntil && srv.injuredUntil > Date.now()){
+h += '<div style="color:#e05252;font-size:11px;font-weight:bold;padding:3px 0">重傷 · 剩 ' + Math.ceil((srv.injuredUntil - Date.now()) / 60000) + ' 分鐘</div>';
+}
+h += _gpKV('已指派', n + '/' + mx, '#e8a33d');
+h += _gpKV('食物消耗', _gpFood(srv) + ' /h', '#7ee07e');
+var eff = (typeof servantLevelEffectText === 'function') ? servantLevelEffectText(srv) : '';
+if(eff && eff !== '—') h += _gpKV('等級效果', _gpEsc(eff), '#e8a33d');
+var sel = 'width:100%;background:#151210;color:#ddd;border:1px solid #3a2f25;border-radius:5px;padding:6px;font-size:11px;font-family:inherit;box-sizing:border-box';
+h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0 2px">';
+h += '<div style="min-width:0"><div style="font-size:10px;color:#e8a33d;font-weight:bold;margin-bottom:4px">自動種植</div>';
+if(srv.type === 'farmer'){
+var ap = srv.autoPlant || 'off';
+var APN = { off:'關閉', follow:'跟隨上次', any:'高稀有度優先' };
+h += '<select data-gp-f="autoPlant" style="' + sel + '">';
+for(var k1 in APN){ h += '<option value="' + k1 + '"' + (ap === k1 ? ' selected' : '') + '>' + APN[k1] + '</option>'; }
+h += '</select>';
+} else {
+h += '<div style="padding:6px;background:#151210;border:1px solid #2a231c;border-radius:5px;font-size:11px;color:#a89a85">' + (srv.type === 'guard' ? '哨塔執勤' : '工棚管理') + '</div>';
+}
+h += '</div>';
+h += '<div style="min-width:0"><div style="font-size:10px;color:#e8a33d;font-weight:bold;margin-bottom:4px">食物策略</div>';
+var fp = srv.foodPolicy || 'normal';
+var FPN = _gpFoodPolicyNames('');
+h += '<select data-gp-f="foodPolicy" style="' + sel + '">';
+for(var k2 in FPN){ h += '<option value="' + k2 + '"' + (fp === k2 ? ' selected' : '') + '>' + FPN[k2] + '</option>'; }
+h += '</select></div></div>';
+return h;
+}
+function _gardenPlotOwnersHtml(idx, type){
+var all = (typeof state !== 'undefined' && state.servants) ? state.servants : [];
+var ow = all.filter(function(s){ return (s.assignedPlots || []).indexOf(idx) >= 0; });
+var h = '<div data-gp-own="' + idx + '" data-gp-type="' + _gpEsc(type || '') + '" style="margin:8px 0 4px">';
+h += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin-bottom:5px">責任僕人</div>';
+if(!ow.length){
+h += '<div style="font-size:11px;color:#7a6f60;padding:9px;background:#151210;border:1px dashed #3a2f25;border-radius:6px;text-align:center">未指派</div>';
+} else {
+for(var i = 0; i < ow.length; i++){
+var s = ow[i], v = _gpStats(s);
+var ip = 'icons/servants/' + s.type + '.png';
+var sf = (typeof assetSuffix === 'function') ? assetSuffix(ip) : '';
+h += '<div data-gp-srv="' + _gpEsc(s.id) + '" style="display:flex;gap:9px;padding:8px;background:#1a1510;border:1px solid #3a2f25;border-radius:6px;margin-bottom:6px;cursor:pointer;align-items:flex-start">'
++ '<div style="flex:0 0 34px;width:34px;height:34px;border-radius:5px;overflow:hidden;background:' + rarityBg(s.rarity) + ';display:flex;align-items:center;justify-content:center">'
++ '<img src="' + ip + sf + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>'
++ '<div style="flex:1;min-width:0">'
++ '<div class="' + rarityClass(s.rarity) + '" style="font-size:12px;font-weight:bold;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _gpEsc(servantLabel(s)) + '</div>'
++ _gpRow('經驗', v.ex, v.need, '#f0c040', '', true)
++ _gpRow('體力', v.st, v.ms, '#3aa0ff', '', true)
++ _gpRow('生命', v.hp, v.mh, '#4ade80', '', true)
++ '</div></div>';
+}
+}
+h += '<div style="display:flex;gap:6px;margin-top:6px">';
+h += '<button class="btn" data-gp-act="swap" style="flex:1;' + GP_GOLD + '">' + (ow.length ? '更換' : '指派') + '</button>';
+if(ow.length){
+h += '<button class="btn" data-gp-act="remove" style="flex:1;' + GP_RED + '">移除</button>';
+h += '<button class="btn" data-gp-act="heal" style="flex:1;' + GP_GREEN + '">治療</button>';
+}
+h += '</div></div>';
+return h;
+}
+
+/* ===== gp-ui-flow: 綁定 / 地塊選人 / 詳情（呼叫原版指派與改名） ===== */
+function _gardenPlotOwnersBind(bd){
+if(!bd || !bd.querySelectorAll) return;
+var wraps = bd.querySelectorAll('[data-gp-own]');
+for(var i = 0; i < wraps.length; i++){
+(function(w){
+if(w.__gpBound) return;
+w.__gpBound = true;
+var idx = parseInt(w.getAttribute('data-gp-own'), 10);
+var type = w.getAttribute('data-gp-type') || '';
+function owners(){
+var all = (typeof state !== 'undefined' && state.servants) ? state.servants : [];
+return all.filter(function(s){ return (s.assignedPlots || []).indexOf(idx) >= 0; });
+}
+w.addEventListener('click', function(e){
+var t = e.target;
+if(!t || !t.closest) return;
+var act = t.closest('[data-gp-act]');
+if(act && w.contains(act)){
+e.preventDefault(); e.stopPropagation();
+var a = act.getAttribute('data-gp-act'), ow = owners(), k;
+if(a === 'swap'){ _gpPlotPick(idx, type); return; }
+if(a === 'remove'){
+var ps = (typeof _gardenGetPlots === 'function') ? _gardenGetPlots() : [];
+for(k = 0; k < ow.length; k++){
+ow[k].assignedPlots = (ow[k].assignedPlots || []).filter(function(x){ return x !== idx; });
+if(!ow[k].assignedPlots.length) ow[k].resting = false;
+}
+if(ps[idx] && ps[idx].assignedServant) delete ps[idx].assignedServant;
+_gpRefresh(); closeModal(); _gpReopenPlot(idx); return;
+}
+if(a === 'heal'){
+var did = 0;
+for(k = 0; k < ow.length; k++){ if(_gpHeal(ow[k])) did++; }
+_gpRefresh();
+if(!did && typeof notify === 'function') notify('沒有需要治療或醫療品不足', 'warn');
+closeModal(); _gpReopenPlot(idx); return;
+}
+return;
+}
+var card = t.closest('[data-gp-srv]');
+if(card && w.contains(card)){
+e.preventDefault(); e.stopPropagation();
+var sid = (card.getAttribute('data-gp-srv') || '').trim();
+closeModal();
+openServantDetail(sid, function(){ _gpReopenPlot(idx); });
+}
+});
+})(wraps[i]);
+}
+}
+function _gpPlotPick(idx, type){
+var ps = (typeof _gardenGetPlots === 'function') ? _gardenGetPlots() : [];
+var p = ps[idx];
+if(!p) return;
+var need = type || (p.type === 'tower' ? 'guard' : (p.type === 'shed' ? 'foreman' : 'farmer'));
+var all = (typeof state !== 'undefined' && state.servants) ? state.servants : [];
+var curIds = all.filter(function(s){ return (s.assignedPlots || []).indexOf(idx) >= 0; }).map(function(s){ return s.id; });
+var list = all.filter(function(s){ return s.type === need && curIds.indexOf(s.id) < 0; }).slice().sort(_gpSrvCmp);
+var h = '<div style="font-size:11px;color:#7a6f60;margin-bottom:8px;line-height:1.5">更換 <b style="color:#e8a33d">'
++ _gpEsc(plotCoordName(idx)) + '</b> 的僕人 · 右側為已綁定地塊 / 上限；已滿仍可選，選中後確認改綁。</div>';
+if(!list.length) h += '<div class="empty-hint">沒有其他可用的僕人</div>';
+for(var i = 0; i < list.length; i++){
+var s = list[i], n = (s.assignedPlots || []).length, mx = _gpSlots(s);
+var ip = 'icons/servants/' + s.type + '.png';
+var sf = (typeof assetSuffix === 'function') ? assetSuffix(ip) : '';
+var mark = '';
+if(typeof _isServantInStation === 'function' && _isServantInStation(s.id)) mark = ' <span style="color:#39d7e6;font-size:9px">🚂車站中</span>';
+else if(n) mark = ' <span style="color:#b6f24a;font-size:9px">🌱工作中</span>';
+h += '<div class="item-row" data-gp-pick="' + _gpEsc(s.id) + '">'
++ '<div class="icon" style="background:' + rarityBg(s.rarity) + '"><img src="' + ip + sf + '" style="width:100%;height:100%;object-fit:contain" alt=""></div>'
++ '<div class="info"><div class="nm ' + rarityClass(s.rarity) + '">' + _gpEsc(servantLabel(s)) + mark + '</div>'
++ '<div class="sub">Lv.' + (s.lv || 1) + '</div></div>'
++ '<div class="cnt" style="color:' + (n >= mx ? '#e8a33d' : '#a89a85') + '">' + n + '/' + mx + '</div></div>';
+}
+var bd = openModal({ title:'更換僕人 · ' + plotCoordName(idx), body:h, onClose:function(){ closeModal(); _gpReopenPlot(idx); } });
+var rows = bd.querySelectorAll('[data-gp-pick]');
+for(var k = 0; k < rows.length; k++){
+(function(el){
+el.onclick = function(){
+var sid = (el.getAttribute('data-gp-pick') || '').trim();
+var srv = null;
+for(var q = 0; q < all.length; q++){ if(all[q].id === sid){ srv = all[q]; break; } }
+if(!srv) return;
+function bindNow(){
+var others = all.filter(function(s){ return s.id !== srv.id && (s.assignedPlots || []).indexOf(idx) >= 0; });
+for(var q2 = 0; q2 < others.length; q2++){
+others[q2].assignedPlots = (others[q2].assignedPlots || []).filter(function(x){ return x !== idx; });
+if(!others[q2].assignedPlots.length) others[q2].resting = false;
+}
+srv.assignedPlots = srv.assignedPlots || [];
+if(srv.assignedPlots.indexOf(idx) < 0) srv.assignedPlots.push(idx);
+srv.resting = false;
+if(ps[idx]) ps[idx].assignedServant = srv.id;
+_gpRefresh(); closeModal(); _gpReopenPlot(idx);
+}
+function afterStation(){
+if((srv.assignedPlots || []).length >= _gpSlots(srv)){
+var here = (srv.assignedPlots || []).map(function(x){ return plotCoordName(x); }).join('、');
+var ft = document.createElement('div');
+ft.className = 'modal-ft';
+ft.innerHTML = '<button class="btn" id="gp-rb-ok" style="flex:1;' + GP_GOLD + '">更換綁定</button>'
++ '<button class="btn" id="gp-rb-no" style="flex:1;' + GP_GREY + '">取消</button>';
+openModal({ title:'更換綁定',
+body:'<div style="font-size:12px;line-height:1.7;color:#ddd"><b class="' + rarityClass(srv.rarity) + '">' + _gpEsc(servantLabel(srv))
++ '</b> 已綁定 ' + _gpEsc(here) + '。<br>是否將綁定更換為 <b style="color:#e8a33d">' + _gpEsc(plotCoordName(idx)) + '</b>？原綁定將被解除。</div>',
+footer:ft, onClose:function(){ closeModal(); _gpPlotPick(idx, type); } });
+ft.querySelector('#gp-rb-ok').onclick = function(){ srv.assignedPlots = [idx]; bindNow(); };
+ft.querySelector('#gp-rb-no').onclick = function(){ closeModal(); _gpPlotPick(idx, type); };
+return;
+}
+bindNow();
+}
+if(typeof _isServantInStation === 'function' && _isServantInStation(srv.id)){
+if(typeof _openRelocateConfirm === 'function'){
+_openRelocateConfirm('後院', function(){
+if(typeof _removeFromStation === 'function') _removeFromStation(srv.id);
+afterStation();
+}, function(){ setTimeout(function(){ _gpPlotPick(idx, type); }, 40); });
+return;
+}
+if(typeof openConfirm === 'function'){
+openConfirm('此僕人正在車站服役，轉至後院將從車站移除。確認？', function(){
+if(typeof _removeFromStation === 'function') _removeFromStation(srv.id);
+afterStation();
+}, function(){ _gpPlotPick(idx, type); });
+return;
+}
+}
+afterStation();
+};
+})(rows[k]);
+}
+}
+function openServantDetail(a, b){
+var list = (typeof state !== 'undefined' && state.servants) ? state.servants : [];
+var srv = null;
+if(a && typeof a === 'object' && a.id) srv = a;
+else if(typeof a === 'string'){
+var key = a.trim();
+for(var i = 0; i < list.length; i++){ if(list[i].id === key){ srv = list[i]; break; } }
+} else if(typeof a === 'number') srv = list[a] || null;
+if(!srv){ if(typeof closeModal === 'function') closeModal(); return; }
+var ret = (typeof b === 'function') ? b : null;
+var sid = srv.id;
+function back(){
+if(typeof closeModal === 'function') closeModal();
+if(ret) ret();
+else {
+if(typeof renderGardenGrid === 'function') renderGardenGrid();
+if(typeof renderGardenContent === 'function') renderGardenContent();
+}
+}
+var ft = document.createElement('div');
+ft.className = 'modal-ft';
+ft.innerHTML = '<button class="btn" id="gp-sd-asg" style="flex:1;' + GP_GOLD + '">指派</button>'
++ '<button class="btn" id="gp-sd-rec" style="flex:1;' + GP_RED + '">撤回</button>';
+var bd = openModal({ title:'僕人詳情', body:_gpDetailBody(srv), footer:ft, onClose:back });
+function rerender(){ bd.innerHTML = _gpDetailBody(srv); bindBody(); }
+function bindBody(){
+var hb = bd.querySelector('[data-gp-heal]');
+if(hb) hb.onclick = function(){
+if(_gpHeal(srv)){ _gpRefresh(); rerender(); }
+else if(typeof notify === 'function') notify('已滿血或沒有醫療品', 'warn');
+};
+var rb = bd.querySelector('[data-gp-ren]');
+if(rb) rb.onclick = function(){ closeModal(); openServantRename(sid, ret); };
+var fb = bd.querySelector('[data-gp-fire]');
+if(fb) fb.onclick = function(){
+openConfirm('確定解僱 ' + servantLabel(srv) + '？將同時退出所有地塊與車站配置。', function(){
+if(typeof _removeFromStation === 'function') _removeFromStation(sid);
+var ps = (typeof _gardenGetPlots === 'function') ? _gardenGetPlots() : [];
+var old = srv.assignedPlots || [];
+for(var j = 0; j < old.length; j++){ if(ps[old[j]] && ps[old[j]].assignedServant === sid) delete ps[old[j]].assignedServant; }
+state.servants = (state.servants || []).filter(function(s){ return s.id !== sid; });
+_gpRefresh(); back();
+});
+};
+var sels = bd.querySelectorAll('[data-gp-f]');
+for(var i = 0; i < sels.length; i++){
+(function(sel){
+sel.onchange = function(){ srv[sel.getAttribute('data-gp-f')] = sel.value; _gpRefresh(); };
+})(sels[i]);
+}
+}
+bindBody();
+ft.querySelector('#gp-sd-asg').onclick = function(){ closeModal(); openServantAssign(sid, ret); };
+ft.querySelector('#gp-sd-rec').onclick = function(){
+var ps = (typeof _gardenGetPlots === 'function') ? _gardenGetPlots() : [];
+var old = srv.assignedPlots || [];
+for(var i = 0; i < old.length; i++){ if(ps[old[i]] && ps[old[i]].assignedServant === sid) delete ps[old[i]].assignedServant; }
+srv.assignedPlots = []; srv.resting = false;
+_gpRefresh(); rerender();
+};
+}
+
+/* ===== gp-two-fix helpers: 食物策略標籤（FOOD_POLICY_MULT 唯一真相源）+ 種子裝備槽 ===== */
+function _gpFoodPolicyNames(prefix, starveText){
+var NM = { full:'吃到撐', normal:'吃飽', half:'半飽', lick:'舔舔', starve:'餓著' };
+var M = (typeof FOOD_POLICY_MULT !== 'undefined' && FOOD_POLICY_MULT) ? FOOD_POLICY_MULT : {};
+var out = {};
+for(var k in NM){
+if(k === 'starve' && starveText){ out[k] = starveText; continue; }
+out[k] = NM[k] + '（' + (prefix || '') + Math.round((M[k] || 0) * 100) + '%）';
+}
+return out;
+}
+/* ===== gp-two-fix helpers:end ===== */

@@ -25,13 +25,7 @@ function openFoodPolicyPanel(){
   const servants = (state.servants || []).filter(function(s){
     return s.assignedPlots && s.assignedPlots.length > 0;
   });
-  const POLICY_NAMES = {
-    full: '吃到撐（120%）',
-    normal: '吃飽（70%）',
-    half: '半飽（50%）',
-    lick: '舔舔（30%）',
-    starve: '餓著（0%）'
-  };
+  const POLICY_NAMES = _gpFoodPolicyNames('');
   if(!servants.length){
     openModal({ title: '定時餵食', body: '<div class="empty-hint">沒有正在工作的僕人</div>' });
     return;
@@ -98,13 +92,7 @@ function _gardenCalcManualFeed(policy){
 function openManualFeed(presetPolicy){
   const g = _gardenMerchantInit();
   let selected = presetPolicy || 'normal';
-  const POLICY_NAMES = {
-    full: '吃到撐（上限 120%）',
-    normal: '吃飽（上限 70%）',
-    half: '半飽（上限 50%）',
-    lick: '舔舔（上限 30%）',
-    starve: '餓著（不餵）'
-  };
+  const POLICY_NAMES = _gpFoodPolicyNames('上限 ', '餓著（不餵）');
   function _calc(){
     const r = _gardenCalcManualFeed(selected);
     return {
@@ -724,19 +712,20 @@ function openCompostDetail(idx, returnFn){
 /* ===== 哨塔（含配置） ===== */
 
 function _gardenTowerInit(plot){
-  if(!plot.towerConfig || typeof plot.towerConfig !== 'object'){
-    plot.towerConfig = { eq:{ head:null, top:null, primary:null, secondary:null }, eqRarity:{}, ammoId:null, maxShots:'inf' };
-  }
-  const c = plot.towerConfig;
-  if(!c.eq || typeof c.eq !== 'object') c.eq = { head:null, top:null, primary:null, secondary:null };
-  if(typeof c.eq.head === 'undefined') c.eq.head = null;
-  if(typeof c.eq.top === 'undefined') c.eq.top = null;
-  if(typeof c.eq.primary === 'undefined') c.eq.primary = null;
-  if(typeof c.eq.secondary === 'undefined') c.eq.secondary = null;
-  if(!c.eqRarity || typeof c.eqRarity !== 'object') c.eqRarity = {};
-  if(typeof c.ammoId === 'undefined') c.ammoId = null;
-  if(typeof c.maxShots === 'undefined') c.maxShots = 'inf';
-  return c;
+/* rev-unlimited: 每輪射擊上限 UI 已移除，恒為無限 */
+if(!plot.towerConfig || typeof plot.towerConfig !== 'object'){
+plot.towerConfig = { eq:{ head:null, top:null, primary:null, secondary:null }, eqRarity:{}, ammoId:null, maxShots:'inf' };
+}
+const c = plot.towerConfig;
+if(!c.eq || typeof c.eq !== 'object') c.eq = { head:null, top:null, primary:null, secondary:null };
+if(typeof c.eq.head === 'undefined') c.eq.head = null;
+if(typeof c.eq.top === 'undefined') c.eq.top = null;
+if(typeof c.eq.primary === 'undefined') c.eq.primary = null;
+if(typeof c.eq.secondary === 'undefined') c.eq.secondary = null;
+if(!c.eqRarity || typeof c.eqRarity !== 'object') c.eqRarity = {};
+if(typeof c.ammoId === 'undefined') c.ammoId = null;
+c.maxShots = 'inf';
+return c;
 }
 
 
@@ -793,91 +782,67 @@ function _gardenRepairPlot(idx){
 
 
 function _gardenTowerOpen(idx){
-  const plots = _gardenGetPlots();
-  const plot = plots[idx];
-  if(!plot || plot.type !== 'tower') return;
-  const cfg = _gardenTowerInit(plot);
-  _gardenTowerNormalizeEq(cfg);
-  const servants = (state.servants || []).filter(function(s){
-    return s.type === 'guard' && s.assignedPlots && s.assignedPlots.indexOf(idx) !== -1;
-  });
-  function slotCell(key, label){
-    const id = cfg.eq[key];
-    const rar = cfg.eqRarity[key] || '';
-    if(id){
-      const d = itemDef(id) || {name:id};
-      return '<div class="tower-eq filled" data-slot="' + key + '">' +
-        '<div class="tower-eq-thumb">' + itemIcon(id, 28) + '</div>' +
-        '<div class="tower-eq-name ' + rarityClass(rar) + '">' + d.name + '</div>' +
-        '</div>';
-    }
-    return '<div class="tower-eq empty" data-slot="' + key + '">' +
-      '<div class="tower-eq-thumb">＋</div>' +
-      '<div class="tower-eq-name">' + label + '</div>' +
-      '</div>';
-  }
-  let body = '';
-  const _twIcon = _getPlotTypeIconHtml('tower', 24);
-  body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold">' + _twIcon + '<span>哨塔</span><button class="btn danger" id="tower-del" style="margin-left:auto;padding:4px 10px;font-size:11px;border-radius:5px;flex:0 0 auto">拆除</button></div>';
-  body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv||1) + '</div>';
-  body += _gardenPlotOwnersHtml(idx, 'guard');
-  body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:8px 0 4px">裝備</div>';
-  body += '<div class="tower-eq-grid">';
-  body += slotCell('head', '頭');
-  body += slotCell('top', '衣');
-  body += '</div>';
-  body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:8px 0 4px">武器（主/副擇一）</div>';
-  const hasPrimary = !!cfg.eq.primary;
-  const hasSecondary = !!cfg.eq.secondary;
-  body += '<div class="tower-eq-grid">';
-  if(hasPrimary){
-    body += slotCell('primary', '主武器');
-    body += '<div class="tower-eq locked" data-slot="secondary"><div class="tower-eq-thumb">🔒</div><div class="tower-eq-name">副武器</div></div>';
-  } else if(hasSecondary){
-    body += '<div class="tower-eq locked" data-slot="primary"><div class="tower-eq-thumb">🔒</div><div class="tower-eq-name">主武器</div></div>';
-    body += slotCell('secondary', '副武器');
-  } else {
-    body += slotCell('primary', '主武器');
-    body += slotCell('secondary', '副武器');
-  }
-  body += '</div>';
-  const wId = cfg.eq.primary || cfg.eq.secondary;
-  const wDef = wId ? itemDef(wId) : null;
-  if(wDef && wDef.cal){
-    body += '<div style="font-size:11px;color:#e8a33d;font-weight:bold;margin:8px 0 4px">彈藥</div>';
-    if(cfg.ammoId){
-      const _ar = AMMO[cfg.ammoId] ? AMMO[cfg.ammoId].rarity : '一般';
-      body += '<div class="tower-ammo-pick" id="tower-ammo-pick" style="background:' + rarityBg(_ar) + '"><span class="' + rarityClass(_ar) + '">' + (AMMO[cfg.ammoId] ? AMMO[cfg.ammoId].name : cfg.ammoId) + '</span></div>';
-    } else {
-      body += '<div class="tower-ammo-pick empty" id="tower-ammo-pick">— 未指定 —</div>';
-    }
-    body += '<div style="font-size:11px;color:#7a6f60;margin-top:6px">每輪射擊上限</div>';
-    const ms = cfg.maxShots || 'inf';
-    body += '<select id="tower-ammo-max" style="width:100%;background:#151210;color:#ddd;border:1px solid #2a231c;border-radius:4px;padding:5px;font-size:11px;margin-top:3px">';
-    body += '<option value="skip"' + (ms==='skip'?' selected':'') + '>0（不射擊）</option>';
-    body += '<option value="mag"' + (ms==='mag'?' selected':'') + '>一匣（' + (wDef.mag||30) + '）</option>';
-    body += '<option value="inf"' + (ms==='inf'?' selected':'') + '>無限</option>';
-    body += '</select>';
-  }
-  const bd = openModal({ title: '哨塔配置', body: body });
-  const _del = bd.querySelector('#tower-del');
-  if(_del) _del.onclick = function(){ _gardenTowerDemolish(idx); };
-  _gardenPlotOwnersBind(bd);
-  const eqCells = bd.querySelectorAll('.tower-eq[data-slot]');
-  for(let i = 0; i < eqCells.length; i++){
-    (function(el){
-      if(el.classList.contains('locked')) return;
-      el.onclick = function(){ _gardenTowerPickEquip(idx, el.getAttribute('data-slot')); };
-    })(eqCells[i]);
-  }
-  const ammoPick = bd.querySelector('#tower-ammo-pick');
-  if(ammoPick){
-    ammoPick.onclick = function(){ _gardenTowerPickAmmo(idx, wDef); };
-  }
-  const ammoMax = bd.querySelector('#tower-ammo-max');
-  if(ammoMax){
-    ammoMax.onchange = function(){ cfg.maxShots = ammoMax.value || 'inf'; save(); };
-  }
+/* rev-ui26: 哨塔配置 —— 第一行 頭盔 / 防彈衣 / 彈藥；第二行 主武器 / 副武器（互斥鎖死）。
+   槽位改用車站同款稀有度背景。無每輪射擊上限設定。 */
+const plots = _gardenGetPlots();
+const plot = plots[idx];
+if(!plot || plot.type !== 'tower') return;
+if(typeof _stEnsureStyles === 'function') _stEnsureStyles();
+const cfg = _gardenTowerInit(plot);
+_gardenTowerNormalizeEq(cfg);
+cfg.maxShots = 'inf';
+const wSlot = cfg.eq.primary ? 'primary' : (cfg.eq.secondary ? 'secondary' : null);
+const wId = wSlot ? cfg.eq[wSlot] : null;
+const wDef = wId ? itemDef(wId) : null;
+const canAmmo = !!(wDef && wDef.cal);
+const ammoId = canAmmo ? cfg.ammoId : null;
+const ammoDef = (ammoId && typeof AMMO !== 'undefined') ? AMMO[ammoId] : null;
+const ammoRar = ammoDef ? ammoDef.rarity : '';
+function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function slot(key, label, id, rar, locked, wt){
+const bg = id ? rarityBg(rar) : '';
+let h = '<div class="st-pd-slot' + (id ? ' filled' : '') + (locked ? ' fp26-locked' : '') + '" data-tw="' + key + '"' + (id ? ' style="border-color:' + bg + '"' : '') + '>';
+h += '<div class="st-pd-slot-lbl">' + esc(label) + '</div>';
+if(locked) h += '<div class="st-pd-slot-icon empty">🔒</div>';
+else if(id) h += '<div class="st-pd-slot-icon" style="background:' + bg + '">' + itemIcon(id, 60) + '</div>';
+else h += '<div class="st-pd-slot-icon empty">＋</div>';
+if(wt) h += '<div class="st-pd-slot-wt">' + wt + '</div>';
+h += '</div>';
+return h;
+}
+let body = '';
+body += '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#e8a33d;font-weight:bold">'
++ _getPlotTypeIconHtml('tower', 24) + '<span>哨塔</span>'
++ '<button class="btn" id="tower-del" style="margin-left:auto;flex:0 0 auto">拆除</button></div>';
+body += '<div class="detail-sub">' + plotCoordName(idx) + ' · Lv.' + (plot.lv || 1) + '</div>';
+body += _gardenPlotOwnersHtml(idx, 'guard');
+body += '<div class="st-pd-section-title">防護 + 彈藥</div>';
+body += '<div class="st-pd-row">';
+body += slot('head', '頭盔', cfg.eq.head, cfg.eqRarity.head || '一般', false, '');
+body += slot('top', '防彈衣', cfg.eq.top, cfg.eqRarity.top || '一般', false, '');
+body += slot('ammo', '彈藥', ammoId, ammoRar, !canAmmo, '');
+body += '</div>';
+body += '<div class="st-pd-section-title">武器（主 / 副擇一）</div>';
+body += '<div class="st-pd-row">';
+body += slot('primary', '主武器', cfg.eq.primary, cfg.eqRarity.primary || '一般', !!cfg.eq.secondary, '');
+body += slot('secondary', '副武器', cfg.eq.secondary, cfg.eqRarity.secondary || '一般', !!cfg.eq.primary, '');
+body += '</div>';
+if(wId && !canAmmo) body += '<div style="font-size:10px;color:#7a6f60;margin-top:4px">近戰武器不需彈藥</div>';
+const bd = openModal({ title:'哨塔配置', body:body, onClose:function(){ closeModal(); renderGardenGrid(); } });
+const _del = bd.querySelector('#tower-del');
+if(_del) _del.onclick = function(){ _gardenTowerDemolish(idx); };
+_gardenPlotOwnersBind(bd);
+const cells = bd.querySelectorAll('[data-tw]');
+for(let i = 0; i < cells.length; i++){
+(function(el){
+if(el.classList.contains('fp26-locked')) return;
+const key = el.getAttribute('data-tw');
+el.onclick = function(){
+if(key === 'ammo'){ if(canAmmo) _gardenTowerPickAmmo(idx, wDef); return; }
+_gardenTowerPickEquip(idx, key);
+};
+})(cells[i]);
+}
 }
 
 

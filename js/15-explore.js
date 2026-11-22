@@ -23,15 +23,16 @@ window._explore = {
 const RADIO_COOLDOWN_MS = 1 * 60 * 1000;
 
 function _fallbackEnemy(){
-  return {
-    eid: 'raider', rarity: '一般', hp: 45, maxHp: 45, armor: 0, maxArmor: 0, armorLevel: 3,
-    dmg: 22, penMM: 12,
-    primaryWeapon: { id: 'aks74u', rarity: '一般', ammoId: '5.45_ps', ammoCount: 30 },
-    secondaryWeapon: null, grenade: null,
-    hasRPG: false, rpgAmmo: 0,
-    helmet: 'ssh68', body: 'paca',
-    detectableR: 80, hitBase: 0.55, worldX: 0
-  };
+return {
+eid: 'raider', rarity: '一般', hp: 45, maxHp: 45, armor: 0, maxArmor: 0, armorLevel: 3,
+primaryWeapon: { id: 'aks74u', rarity: '一般', ammoId: '5.45_ps', ammoInMag: 30, magsLeft: 2, magSize: 30, dmg: 56, penMM: 6 },
+secondaryWeapon: null,
+melee: { id: '6kh2', rarity: '一般' },
+grenade: null,
+hasRPG: false, rpgAmmo: 0,
+helmet: 'ssh68', helmetRarity: '一般', body: 'paca', bodyRarity: '一般',
+detectableR: 80, hitBase: 0.55, worldX: 0
+};
 }
 
 function _genMap(region, pi){
@@ -138,33 +139,31 @@ function _getPlayerWalkSpeed(){
 
 /* rev-fix-position: 从 25-boot.js 移入。 */
 window._calcSpeedDisplay = function(){
-  var b = window.BTRSupport;
-  if(b && b.active){
-    var ph = b.phase;
-    if(ph === 'arrive' || ph === 'sink' || ph === 'center' || ph === 'support' || ph === 'lift' || ph === 'exit'){
-      var g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-      var vid = g ? g.currentVehicle : 'btr80';
-      return window._vehicleSpeedKmh(vid) / 3.6;
-    }
+  /* 面板 = 當下實際速度，不再自己算一套 */
+  var ex = window._explore;
+  if(ex && ex.active && typeof ex._currentSpeed === 'number'
+     && (typeof currentTab === 'undefined' || currentTab === 'explore')){
+    return ex._currentSpeed;
   }
   var w = (typeof getTotalWeight === 'function') ? getTotalWeight() : 0;
   return window._walkSpeedMs(w);
-};;
+};
 
 function _getVSpd(vid){
   return window._vehicleSpeedKmh(vid) / 3.6;
 }
 
 function _computeTS(now){
+  /* 步行一律讀加權速度 —— 負重 debuff 對所有非載具推進相位生效 */
   const b = window.BTRSupport;
-  if(!b || !b.active) return 1.4;
+  const walk = _getPlayerWalkSpeed();
+  if(!b || !b.active) return walk;
   const ph = b.phase;
-  const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-  const vid = g ? g.currentVehicle : 'btr80';
+  const vid = window._activeVehicleId();
   const vs = _getVSpd(vid);
   if(ph === 'center') return vs;
   if(ph === 'support') return vs;
-  return 1.4;
+  return walk;
 }
 
 function _curNodeIdx(){
@@ -340,6 +339,7 @@ function _updatePT(){
 
 function _disembark(){
   const ex = window._explore;
+if(window.BTRSupport) window.BTRSupport._disembarked = true;
   if(!ex.passengersFollowing) ex.passengersFollowing = [];
   const _oldList = ex.passengersFollowing.slice();
   for(let i = 0; i < _oldList.length; i++){
@@ -379,6 +379,7 @@ function _disembark(){
     return;
   }
   const _nowMs = Date.now();
+const _rideIds = (window.BTRSupport && Array.isArray(window.BTRSupport._rosterIds)) ? window.BTRSupport._rosterIds : ((typeof window._vehicleRosterIds === 'function') ? window._vehicleRosterIds(vid, st) : null);
   /* rev-fix-disembark-rebuild: 无条件重建，不以 _retreatingList 为起点
    * （避免旧载员 _retreating=true 残留 → _tick 无战斗分支跳过 worldX 更新 → 世界定位冻结） */
   const _newList = [];
@@ -388,6 +389,7 @@ function _disembark(){
     const p = st.passengers[i];
     const srv = state.servants.find(function(s){ return s.id === p.srvId; });
     if(!srv) continue;
+if(_rideIds && _rideIds.indexOf(srv.id) < 0) continue;
     if(srv.injuredUntil && srv.injuredUntil > _nowMs) continue;
     if(typeof srv.hp === 'number' && srv.hp <= 0) continue;
     if(srv._injuredDown) srv._injuredDown = false;
@@ -429,11 +431,16 @@ function _disembark(){
   ex._rotationOffset = 0;
   ex._lastRotateAt = 0;
   ex.evacuatingPassengers = false;
-  _updatePT();
-  for(let i = 0; i < ex.passengersFollowing.length; i++){
-    const it = ex.passengersFollowing[i];
-    if(!it._retreating) it.screenX = it.targetX;
-  }
+_updatePT();
+window._ptSyncSlots(ex);
+  const _fxD = document.getElementById('explore-fx');
+const _smD = window.computeScreenMetrics(_fxD ? _fxD.clientWidth : 400, _fxD ? _fxD.clientHeight : 500);
+for(let i = 0; i < ex.passengersFollowing.length; i++){
+const it = ex.passengersFollowing[i];
+if(it._retreating) continue;
+it.worldX = ex.worldX + (it._slotDX || 0);
+it.screenX = EXPLORE_HERO_X_RATIO + ((it.worldX - ex.worldX) / _smD.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
+}
 }
 
 function _evac(){
@@ -483,152 +490,55 @@ function _cleanPC(){
 }
 
 function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride, fallProgress){
-  const cw = fxH * 1.2;
-  const chh = fxH;
-  let cvs = fx._pc[key];
-  if(!cvs){
-    cvs = document.createElement('canvas');
-    cvs.width = Math.round(cw * 2);
-    cvs.height = Math.round(chh * 2);
-    cvs.style.cssText = 'position:absolute;bottom:0;pointer-events:none;';
-    cvs.style.width = cw + 'px';
-    cvs.style.height = chh + 'px';
-    fx._pc[key] = cvs;
-  }
-  /* rev-fix-passenger-corpse-layer: 载员按 dead 状态挂到不同层
-   * - 活：passenger-layer (z-index 7)
-   * - 死：corpse-layer (z-index 20)，与敌人尸体同级，高于所有活载员 */
-  const _drawIsDead = (animOverride === 'dead');
-  const _targetLayer = _drawIsDead
-    ? (typeof _getCorpseLayer === 'function' ? _getCorpseLayer() : fx)
-    : (typeof _getPassengerLayer === 'function' ? _getPassengerLayer() : fx);
-  if(_targetLayer && cvs.parentNode !== _targetLayer){ _targetLayer.appendChild(cvs); }
-  cvs.style.zIndex = _drawIsDead ? '21' : '7';
-  cvs.style.left = (px - cw / 2) + 'px';
-  const ctx = cvs.getContext('2d');
-  ctx.setTransform(2, 0, 0, 2, 0, 0);
-  ctx.clearRect(0, 0, cw, chh);
-  if(typeof _raidDrawHuman !== 'function') return;
-  const p = item.p;
-  const eq = { head: p.helmet || null, top: p.body || null, primary: p.primaryWeapon || null };
-  const eqR = { head: p.helmetRarity || '一般', top: p.bodyRarity || '一般', primary: p.primaryWeaponRarity || '一般' };
-  const wps = p.primaryWeapon ? 'primary' : null;
-  const ex = window._explore;
-  const _looting = (ex && ex._lootingUntil > 0 && now < ex._lootingUntil);
-  const _exSpeed = (ex && typeof ex._currentSpeed === 'number') ? ex._currentSpeed : 0;
-  /* [v179 F6] 若 _renderPass 明確標記了移動狀態（advancing / firing 分支），優先用它；
-     否則退回 targetX-screenX 判定（following / retreating 用原邏輯） */
-  const _slotMovingRaw = Math.abs(item.targetX - item.screenX) > 0.005 && !_looting;
-  const _slotMoving = (typeof item._renderForceMoving === 'boolean')
-    ? item._renderForceMoving
-    : _slotMovingRaw;
-  const moving = _slotMoving;
-  const _inCombatD = !!(window._combat && window._combat.active);
-  let animN;
-  /* [v228] 動畫完全由 animOverride 決定 */
-  if(animOverride){ animN = animOverride; }
-  else if(moving){ animN = (evac) ? 'run' : 'walk'; }
-  else { animN = 'idle'; }
-  if(!item.animStart || item._lastAnimN !== animN){
-    item.animStart = now;
-    item._lastAnimN = animN;
-  }
-  const _animFrame = (typeof computeAnimFrame === 'function') ? computeAnimFrame(animN, item.animStart, now) : 0;
-  item.animFrame = _animFrame;
-  const sc = chh * CHAR_HEIGHT_FACTOR / 386;
-  if(item.fadeIn < 1) item.fadeIn = Math.min(1, (item.fadeIn || 0) + 0.03);
-  if(item.clipH === undefined) item.clipH = 1;
-  else if(item.clipH < 1 && typeof item._spawnAt === 'number'){
-    const _elapsed = now - item._spawnAt;
-    if(_elapsed >= 600) item.clipH = 1;
-    else if(_elapsed <= 0) item.clipH = 0;
-    else item.clipH = _elapsed / 600;
-  }
-  ctx.save();
-  ctx.globalAlpha = item.fadeIn;
-  if(item.clipH < 1){
-    ctx.beginPath();
-    ctx.rect(0, 0, cw, chh * item.clipH);
-    ctx.clip();
-  }
-  if(animN === 'dead'){
-    /* rev-fix-passenger-death-rotate: fallProgress 0→1 渐进倒下。
-     * 站立时脚底 (cw/2, chh*0.96)；完全倒地时尸体水平中心对齐 cw/2，脚底在 (cw/2 - 193*sc, chh*0.95)。
-     * X 偏移按 sin(角度) 插值，让身体在水平方向的重心自然跟随。 */
-    const _fp = Math.min(1, (typeof fallProgress === 'number') ? fallProgress : 1);
-    const _rot = _fp * Math.PI / 2;
-    const _sinR = Math.sin(_rot);
-    ctx.save();
-    ctx.translate(cw / 2 - 193 * sc * _sinR, chh * 0.96 + (chh * 0.95 - chh * 0.96) * _fp);
-    ctx.rotate(_rot);
-    ctx.scale(sc, sc);
-    ctx.translate(-200, -515);
-    const anim = GAME_ANIMS.dead;
-    const B = { x: 30, y: 30, w: 340, h: 460 };
-    const _stype = item.srv ? item.srv.type : null;
-    const _TYPE_COLORS = {
-      farmer:  { body:'#5a9a48', legs:'#3a6a2e' },
-      guard:   { body:'#5088bb', legs:'#2e4a6a' },
-      foreman: { body:'#e0a830', legs:'#d8d0c0' },
-      enemy:   { body:'#8b2a2a', legs:'#3a1010' }
-    };
-    const _sc = _stype ? _TYPE_COLORS[_stype] : null;
-    const units = [];
-    for(const L of GAME_LAYERS){
-      const _clone = Object.assign({}, L);
-      if(_sc){
-        if(L.id === 'right_leg' || L.id === 'left_leg') _clone.color = _sc.legs;
-        else if(L.id === 'torso' || L.id === 'back_arm' || L.id === 'front_arm') _clone.color = _sc.body;
-      }
-      units.push({ z: L.z, kind:'layer', layer: _clone });
-    }
-    if(eq.head && typeof HEAD_ARMOR_LAYOUT !== 'undefined'){
-      const cfg = HEAD_ARMOR_LAYOUT[eq.head] || HERO_VISIBLE_EQ.head;
-      const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
-      if(layerDef){
-        const img = getHeroImg(window.getItemIconPath(eq.head));
-        units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
-      }
-    }
-    if(eq.top && typeof getTopCfg === 'function'){
-      const cfg = getTopCfg(eq.top);
-      const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
-      if(layerDef){
-        const img = getHeroImg(window.getItemIconPath(eq.top));
-        units.push({ z: layerDef.z + 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img });
-      }
-    }
-if(wps && eq[wps]){
-      if(typeof AMMO !== 'undefined' && AMMO[eq[wps]]){
-        /* rev-fix-ammo-box-corpse: 彈藥手屍體畫 ammo_pack 而非子彈圖標 */
-        const _faC = GAME_LAYERS.find(function(l){ return l.id === 'front_arm'; });
-        if(_faC){
-          const _imgC = getHeroImg('icons/garden/ammo_pack.png');
-          units.push({ z: _faC.z - 0.5, kind:'eq', layerId: 'front_arm', ox: 1 - _faC.pivot.x, oy: -_faC.pivot.y, scale: 0.3, rotation: 0, img: _imgC, _fitMax: true });
-        }
-      } else if(typeof getWeaponCfg === 'function'){
-        const cfg = getWeaponCfg(wps, eq[wps]);
-        if(cfg){
-          const layerDef = GAME_LAYERS.find(function(l){ return l.id === cfg.layer; });
-          if(layerDef){
-            const img = getHeroImg(window.getItemIconPath(eq[wps]));
-            units.push({ z: layerDef.z - 0.5, kind:'eq', layerId: cfg.layer, ox: cfg.ox, oy: cfg.oy, scale: cfg.scale, rotation: cfg.rotation, img, trim: cfg.trim });
-          }
-        }
-      }
+/* rev-arm45v3: 載員屍體統一走 _raidDrawHuman（同一條右手持槍 / 向後倒模型）。
+   畫布尺寸活↔死一致，避免切換時重建閃爍。 */
+var cw = fxH * 1.2, chh = fxH;
+var cvs = fx._pc[key];
+if(!cvs){
+cvs = document.createElement('canvas');
+cvs.style.cssText = 'position:absolute;bottom:0;pointer-events:none;';
+fx._pc[key] = cvs;
 }
-    units.sort(function(a,b){ return a.z - b.z; });
-    for(const u of units){
-      if(u.kind === 'layer') drawBodyLayer(ctx, u.layer, B, anim, 0);
-      else drawEqLayer(ctx, u, B, anim, 0);
-    }
-    ctx.restore();
-  } else {
-    /* [v236] 腳底略低於玩家 */
-    const _drawY236 = (animN === 'dead') ? (chh * 0.95) : (chh * 0.96);
-    _raidDrawHuman(ctx, cw / 2, _drawY236, sc, eq, eqR, animN, item.animFrame % 8, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
-  }
-  ctx.restore();
+var pw = Math.round(cw*2), ph = Math.round(chh*2);
+if(cvs.width !== pw){ cvs.width = pw; cvs.style.width = cw + 'px'; }
+if(cvs.height !== ph){ cvs.height = ph; cvs.style.height = chh + 'px'; }
+var isDead = (animOverride === 'dead');
+var targetLayer = isDead
+? (typeof _getCorpseLayer === 'function' ? _getCorpseLayer() : fx)
+: (typeof _getPassengerLayer === 'function' ? _getPassengerLayer() : fx);
+if(targetLayer && cvs.parentNode !== targetLayer) targetLayer.appendChild(cvs);
+cvs.style.zIndex = isDead ? '21' : '7';
+cvs.style.left = (px - cw/2) + 'px';
+var ctx = cvs.getContext('2d');
+ctx.setTransform(2, 0, 0, 2, 0, 0);
+ctx.clearRect(0, 0, cw, chh);
+if(typeof _raidDrawHuman !== 'function') return;
+var p = item.p;
+var eq = { head:p.helmet || null, top:p.body || null, primary:p.primaryWeapon || null };
+var eqR = { head:p.helmetRarity || '一般', top:p.bodyRarity || '一般', primary:p.primaryWeaponRarity || '一般' };
+var wps = p.primaryWeapon ? 'primary' : null;
+var ex = window._explore;
+var animN = animOverride || 'idle';
+if(!item.animStart || item._lastAnimN !== animN){ item.animStart = now; item._lastAnimN = animN; }
+var fi = (typeof computeAnimFrame === 'function') ? computeAnimFrame(animN, item.animStart, now) : 0;
+if(isDead){
+var da = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.dead) ? GAME_ANIMS.dead : { frameCount:8, fps:8 };
+var st = item._deathStart || item.animStart || now;
+fi = Math.min(da.frameCount - 1, Math.floor(Math.max(0, now - st)/(1000/da.fps)));
+}
+item.animFrame = fi;
+var sc = chh * CHAR_HEIGHT_FACTOR / 386;
+if(item.fadeIn < 1) item.fadeIn = Math.min(1, (item.fadeIn || 0) + 0.03);
+if(item.clipH === undefined) item.clipH = 1;
+else if(item.clipH < 1 && typeof item._spawnAt === 'number'){
+var el = now - item._spawnAt;
+item.clipH = (el >= 600) ? 1 : (el <= 0 ? 0 : el/600);
+}
+ctx.save();
+ctx.globalAlpha = item.fadeIn;
+if(item.clipH < 1 && !isDead){ ctx.beginPath(); ctx.rect(0, 0, cw, chh*item.clipH); ctx.clip(); }
+_raidDrawHuman(ctx, cw/2, chh*0.96, sc, eq, eqR, animN, fi, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
+ctx.restore();
 }
 
 function _renderPass(now){
@@ -674,7 +584,8 @@ function _renderPass(now){
   if(!list.length){ _cleanPC(); return; }
   const fxW = fx.clientWidth, fxH = fx.clientHeight;
   if(!fx._pc) fx._pc = {};
-  _updatePT();
+_updatePT();
+window._ptSyncSlots(ex);
   const sm = computeScreenMetrics(fxW, fxH);
   const dtS = (now - (ex._lastPR || now)) / 1000;
   ex._lastPR = now;
@@ -686,7 +597,6 @@ function _renderPass(now){
   const _nowWall = Date.now();
   for(let k = 0; k < list.length; k++){
     const s = list[k];
-    s._renderForceMoving = null;
     /* rev-fix-allies-flag-mode-sync: 交战中按 _mode 每帧校正 _forceRunAnim / _standingWait。
      * 根因：_forceRunAnim 只在 _tick 的无战斗分支更新。c.active=true 时该分支跳过，
      * 进战斗前若为 chasing 则残留 true → 后续 _mode 变 following/waiting/firing 时
@@ -703,102 +613,27 @@ function _renderPass(now){
        「换弹时冻结」是 _tick healing 分支 return 导致 _renderPass 不跑，
        已由 v184b H18b 修复。0.3/秒 = 3.3 秒出屏，符合「跑出屏幕」的视觉。 */
     if(_checkDown(s)){ s.screenX -= _worldStep; continue; }
-    if(s._retreating){
-      const diff = s.targetX - s.screenX;
-      if(diff > 0) {
-        const _dtS = Math.min(0.1, dtS);
-        const _evacStep = (0.3 * _dtS) + _worldStep;
-        s.screenX += _evacStep;
-      }
-      continue;
-    }
-    /* 交戰中載員獨立移動（following 以外），screenX 由 a2.worldX 計算 */
-    if(_inCombat && s.srv && _alliesBySrvId[s.srv.id]){
-      const _a2 = _alliesBySrvId[s.srv.id];
-      if(_a2._mode && _a2._mode !== 'following'){
-        /* [v178 R6] 按 ally index 施加輕微橫向錯位，避免多人在同 worldX 時重疊；
-           並改用 _followStep 步進逼近，避免一幀硬設造成視覺「刷新」 */
-        /* [v181d G10] 统一公式：targetX + (worldX - ex.worldX) 屏幕偏移。
-           targetX 由 _updatePT 维护（0.35 / 0.15 / -0.12 等），本身就是「载员相对玩家的理想屏幕位置」。
-           叠加 worldX 相对玩家偏移后，screenX 始终反映载员的真实世界位置，
-           不会出现「worldX 动了但 screenX 不动」的错位。 */
-        const _relWX = _a2.worldX - ex.worldX;
-        const _targetBaseX = (s.targetX != null) ? s.targetX : EXPLORE_HERO_X_RATIO;
-        const _targetScreenX178 = _targetBaseX
-                                + (_relWX / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-        /* [v181b G2b] 分两种：
-           (1) worldX 在变（advancing / chasing）：用 _followStep 平滑步进
-           (2) worldX 不变（firing / waiting）：screenX 直接 = _targetScreenX178
-               原因：firing 时 worldX 不变但 ex.worldX 在变（玩家在走），
-               _targetScreenX178 平滑变化，直接跟随就是平滑的；
-               若用 _followStep 追，会因 screenX 落后于 _targetScreenX178
-               而持续步进 → 视觉上「fire_primary 动画 + 向某方向滑行」。 */
-        const _worldMovedG2b = Math.abs(_a2.worldX - (_a2._lastWorldX != null ? _a2._lastWorldX : _a2.worldX)) > 0.0001;
-        /* rev-fix-render-moving-1: worldX 变化 OR screenX 变化都算移动。
-         * screenX 用 _followStep 平滑追 targetScreenX，追赶完成后 worldX 已停但 screenX 还在滑行，
-         * 那几帧 worldX 不变 → 原逻辑 idle → sprite 平移。 */
-        const _curSX1 = s.screenX;
-        const _prevSX1 = s._renderPrevSX;
-        const _screenMoved1 = (_prevSX1 != null) && Math.abs(_curSX1 - _prevSX1) > 0.0003;
-        s._renderPrevSX = _curSX1;
-        s._renderForceMoving = _worldMovedG2b || _screenMoved1;
-        /* [v182b H3] firing/waiting 也用 _followStep 平滑步进，不用瞬間吸附。
-           原代码 firing 时 s.screenX = _targetScreenX178 是瞬間吸附——
-           _updatePT 每 10 秒 rotate targetX（0.35/0.15/-0.12 循環）或載員死傷時
-           其他載員 targetX 重分配 → targetX 突變 → screenX 瞬間吸附 → 閃現。
-           平滑步進需要幾幀追上（rotate 時 0.2 屏寬需約 300ms），視覺上是「載員走兩步
-           重新站位」而非瞬間傳送。 */
-        const _dMove178b = _targetScreenX178 - s.screenX;
-        if(Math.abs(_dMove178b) <= _followStep) s.screenX = _targetScreenX178;
-        else s.screenX += Math.sign(_dMove178b) * _followStep;
-        continue;
-      }
-      /* rev-fix-nocontinue: following 不再跳过 screenX 更新。
-       * 载员开火/换弹时 worldX 不变（_busyA 控制），但玩家可能仍在移动，
-       * screenX 应随 worldX 变化平滑跟随。原 continue 会导致 screenX 卡住，
-       * 开火结束后突然追上 → 视觉吸附。 */
-    }
-    if(s.srv && s.srv._standUntil && _nowWall < s.srv._standUntil) continue;
-    if(_looting) continue;
-    /* [v181e G11] following 分支：
-       (1) screenX 用统一公式 targetX + (worldX - ex.worldX) 偏移
-       (2) _renderForceMoving 用 worldX 实际变化判断（用户明示：动画看世界定位，不看 screenX）
-       G9 已让 following 时 worldX 平滑变（2.8 m/s），所以 _renderForceMoving 能正确反映移动 */
-    let _a2_f = null;
-    if(_inCombat && _alliesBySrvId[s.srv.id]){
-      _a2_f = _alliesBySrvId[s.srv.id];
-    } else if(_c && _c.allies){
-      for(let _aiF = 1; _aiF < _c.allies.length; _aiF++){
-        if(_c.allies[_aiF].srv === s.srv){ _a2_f = _c.allies[_aiF]; break; }
-      }
-    }
-    if(_a2_f){
-      const _relWX_f = _a2_f.worldX - ex.worldX;
-      const _targetBaseX_f = (s.targetX != null) ? s.targetX : EXPLORE_HERO_X_RATIO;
-      const _targetScreenX_f = _targetBaseX_f
-                             + (_relWX_f / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-      const _diff_f = _targetScreenX_f - s.screenX;
-      if(Math.abs(_diff_f) <= _followStep) s.screenX = _targetScreenX_f;
-      else s.screenX += Math.sign(_diff_f) * _followStep;
-      /* rev-fix-render-moving-2: following 分支同样加 screenX 判定 */
-      const _curSX2 = s.screenX;
-      const _prevSX2 = s._renderPrevSX;
-      const _screenMoved2 = (_prevSX2 != null) && Math.abs(_curSX2 - _prevSX2) > 0.0003;
-      s._renderPrevSX = _curSX2;
-      const _worldMoved2 = Math.abs(_a2_f.worldX - (_a2_f._lastWorldX != null ? _a2_f._lastWorldX : _a2_f.worldX)) > 0.0001;
-      s._renderForceMoving = _worldMoved2 || _screenMoved2;
-    } else {
-      /* [v236] 無戰鬥 ally 時，用 _followStep 平滑過渡，避免吸附 */
-      const _relWX = (typeof s.worldX === 'number' ? s.worldX : ex.worldX) - ex.worldX;
-      const _targetScreenX = ((s.targetX != null) ? s.targetX : EXPLORE_HERO_X_RATIO)
-                           + (_relWX / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-      const _diffE = _targetScreenX - s.screenX;
-      if(Math.abs(_diffE) <= _followStep) s.screenX = _targetScreenX;
-      else s.screenX += Math.sign(_diffE) * _followStep;
-      s._renderForceMoving = (s._forceRunAnim === true) || (Math.abs(_relWX) > 0.05 && s._standingWait !== true);
-    }
-  }
-  const _nowRp = Date.now();
+if(s._retreating){
+const diff = s.targetX - s.screenX;
+if(diff > 0){
+const _dtS = Math.min(0.1, dtS);
+s.screenX += (0.3 * _dtS) + _worldStep;
+}
+continue;
+}
+/* rev-screen-projection: screenX 是 worldX 的純投影，不做二次平滑。
+   worldX 已由狀態機平滑（追趕 2.8m/s、跟隨 _delta、補位 >=1.6m/s），
+   再對 screenX 追 target 會殘留差值：worldX 停下後畫面仍在補差 →
+   動畫判 idle 但精靈持續平移。索敵 / 補位切換時差值最大，最易察覺。
+   投影後：畫面位移 ⟺ 世界相對位移，與動畫判定同一真相源。 */
+var _wxS = (typeof s.worldX === 'number') ? s.worldX : ex.worldX;
+if(_inCombat && s.srv && _alliesBySrvId[s.srv.id]){
+_wxS = _alliesBySrvId[s.srv.id].worldX;
+}
+var _baseXS = (s.targetX != null) ? s.targetX : EXPLORE_HERO_X_RATIO;
+s.screenX = _baseXS + ((_wxS - ex.worldX) / sm.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
+}
+const _nowRp = Date.now();
   for(let d = 0; d < list.length; d++){
     const it = list[d];
     /* [v182 G17] 放宽阈值——原 -0.3 / 1.15 在边界抖动导致 canvas 反复删建，
@@ -907,7 +742,7 @@ function _renderPass(now){
     let _lhtml = '';
     for(let _j = 0; _j < _outside.length; _j++){
       const _item = _outside[_j];
-      const _d = Math.abs((_item.screenX - EXPLORE_HERO_X_RATIO) * 10);
+      const _d = Math.abs((typeof _item.worldX === 'number' ? _item.worldX : ex.worldX) - ex.worldX);
       const _dTxt = (typeof window._fmtDistN === 'function' ? window._fmtDistN(_d) : (_d < 1 ? _d.toFixed(1) : String(Math.round(_d))));
       const _maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(_item.srv) : 100;
       let _hp = (typeof _item.srv.hp === 'number') ? _item.srv.hp : _maxHp;
@@ -955,25 +790,50 @@ function _getPassengerLayer(){
 window._getPassengerLayer = _getPassengerLayer;
 
 function _startCorpses(enemies, enemyWX, ev){
-  const ex = window._explore;
-  const fx = document.getElementById('explore-fx');
-  const layer = _getCorpseLayer();
-  if(!fx || !layer || !enemies) return;
-  for(let i = 0; i < enemies.length; i++){
-    /* [v182 G14a] 已渲染过的 enemy 跳过，避免载具击杀路径 + 步战胜利路径重复生成。
-       重复生成会导致同一事件出现两份 corpse，且视觉上「装备变化」。 */
-    if(enemies[i]._corpseRendered) continue;
-    const r = (typeof _renderEnemyCorpseCanvas === 'function') ? _renderEnemyCorpseCanvas(enemies[i], fx.clientHeight) : null;
-    if(!r) continue;
-    enemies[i]._corpseRendered = true;
-    const w = document.createElement('div');
-    w.style.cssText = 'position:absolute;bottom:0;pointer-events:none;will-change:left;width:' + r.drawW + 'px;height:' + r.drawH + 'px;';
-    r.canvas.style.cssText = 'width:100%;height:100%;display:block;';
-    w.appendChild(r.canvas);
-    layer.appendChild(w);
-    /* [v181 G4] corpse 关联它来自的 event，供逐事件拾取 */
-    ex.corpses.push({ wrap: w, drawW: r.drawW, drawH: r.drawH, worldX: ex.worldX + (enemyWX[i] || 0), ev: ev });
-  }
+/* rev-corpse-behind: 屍體只在「玩家前方或腳下」生成。
+   根因：_startCombat.onVictoryStart 每次勝利都全域掃描 cleared 事件，
+   舊的載具撞擊 / 已拾取事件沒有 _corpsesGenerated 標記，於是在下一次步戰勝利時
+   被補生成，而 en.worldX 仍是當時的舊值 → 屍體突然刷在玩家身後。
+   閘門：跳過 gone（載具撞飛）/ 已結算 / 已拾取 / 非有限偏移 / 落後玩家 2m 以上。 */
+const ex = window._explore;
+const fx = document.getElementById('explore-fx');
+const layer = (typeof _getCorpseLayer === 'function') ? _getCorpseLayer() : null;
+if(!ex || !fx || !layer || !enemies) return 0;
+if(ev && (ev._corpseLooted || ev._settled)){
+ev._corpsesGenerated = true;
+return 0;
+}
+const pxNow = (typeof ex.worldX === 'number') ? ex.worldX : 0;
+let made = 0;
+for(let i = 0; i < enemies.length; i++){
+const en = enemies[i];
+if(!en || en._corpseRendered || en.gone) continue;
+const off = (enemyWX && typeof enemyWX[i] === 'number') ? enemyWX[i] : NaN;
+if(!isFinite(off)) continue;
+if(off > 60) continue;
+const wx = pxNow + off;
+if(wx < pxNow - 2){
+/* 已在身後的戰利品不再補畫屍體，但仍排入待拾取，避免漏掉掉落 */
+if(ev && !ev._settled && !ev._corpseLooted){
+if(!ex._pendingLootEvents) ex._pendingLootEvents = [];
+if(ex._pendingLootEvents.indexOf(ev) === -1) ex._pendingLootEvents.push(ev);
+}
+continue;
+}
+let r = null;
+try { r = (typeof _renderEnemyCorpseCanvas === 'function') ? _renderEnemyCorpseCanvas(en, fx.clientHeight) : null; }
+catch(e){ r = null; }
+if(!r) continue;
+en._corpseRendered = true;
+const w = document.createElement('div');
+w.style.cssText = 'position:absolute;bottom:0;pointer-events:none;will-change:left;width:' + r.drawW + 'px;height:' + r.drawH + 'px;';
+r.canvas.style.cssText = 'width:100%;height:100%;display:block;';
+w.appendChild(r.canvas);
+layer.appendChild(w);
+ex.corpses.push({ wrap: w, drawW: r.drawW, drawH: r.drawH, worldX: wx, ev: ev });
+made++;
+}
+return made;
 }
 
 function _updateCorpsesLayout(){
@@ -1091,7 +951,7 @@ function _trigger(ev){
     /* [v178 R1] 缺陷A：若 _startCombat 空跑（敵人全死 / combatStart 缺失），
        復位 ex 狀態——否則 _tick 觸發分支永久失效（Bug 2 / Bug 4 主因）。 */
     if(!window._combatActive){
-      var _isV178=!!(window.BTRSupport&&window.BTRSupport.active&&window.BTRSupport.phase!=='wreck'&&window.BTRSupport.phase!=='wreckPause');
+      var _isV178 = (typeof window._isPlayerMounted === 'function' ? window._isPlayerMounted() : false);
       if(ex.mode==='combat')ex.mode=_isV178?'vehicle':'walk';
       if(ex.combatEvent===ev)ex.combatEvent=null;
     }
@@ -1113,17 +973,14 @@ function _startCombat(ev, first){
      修：只認 arrive/sink/center/support/lift/exit（玩家實際在車上的階段），
      與 _computeTS 的 center/support 及 _onPhaseEnter('arrive') 的
      c.sceneType='vehicle' 一致。wreckPause 不再被誤判。 */
-  const _btrPhase = (window.BTRSupport && window.BTRSupport.active) ? window.BTRSupport.phase : null;
-  const isV = !!(_btrPhase === 'arrive' || _btrPhase === 'sink' || _btrPhase === 'center' ||
-                  _btrPhase === 'support' || _btrPhase === 'lift' || _btrPhase === 'exit');
+  const isV = (typeof window._isPlayerMounted === 'function' ? window._isPlayerMounted() : false);
   const allies = [];
   let sceneType = 'foot';
   const _pWX = ex.worldX;
 
   if(isV){
     sceneType = 'vehicle';
-    const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
-    const vid = g ? g.currentVehicle : 'btr80';
+    const vid = window._activeVehicleId();
     const vdef = (typeof VEHICLES !== 'undefined') ? VEHICLES[vid] : null;
     const vh = (vdef && vdef.hp) ? vdef.hp : 500;
     allies.push({ isVehicle: true, vehicleId: vid, hp: vh, maxHp: vh, armorGrid: [30,20,15], armorLevel: 5, worldX: _pWX });
@@ -1186,15 +1043,15 @@ function _startCombat(ev, first){
         isPassenger: true, srv: srv,
         hp: servantMaxHp(srv), maxHp: servantMaxHp(srv),
         armor: _armor, maxArmor: _armor, armorLevel: _armorLevel,
-        worldX: _pWX,
-        weapon: wO,
+        worldX: _pWX + (f2._slotDX || 0), _slotDX: (f2._slotDX || 0),
+weapon: wO,
         equipData: {
           head: p.helmet || null,
           top: p.body || null,
           primary: p.primaryWeapon || null
         },
-        ammoPouch: p.ammoPouch ? { ammoId: p.ammoPouch.ammoId, rarity: p.ammoPouch.rarity, count: p.ammoPouch.count } : null,
-        ammoBox: p.ammoBox ? { ammoId: p.ammoBox.ammoId, rarity: p.ammoBox.rarity, count: p.ammoBox.count } : null,
+        ammoPouch: p.ammoPouch || null,
+        ammoBox: p.ammoBox || null,
         _publicPool: _publicPool,
         grenades: Array.isArray(p.grenades) ? p.grenades.map(function(g){
           if(typeof g === 'string') return { id: g, rarity: '一般' };
@@ -1212,7 +1069,6 @@ function _startCombat(ev, first){
       if(_e.cleared) continue;
       if(_e.type !== 'combat') continue;
       if(!_e.content || !_e.content.length) continue;
-      if(isV && _e.worldX <= ex.worldX) continue;
       for(let _j = 0; _j < _e.content.length; _j++){
         const _en = _e.content[_j];
         if(!_en || _en.hp <= 0) continue;
@@ -1220,7 +1076,7 @@ function _startCombat(ev, first){
         if(!_isDiscovered(_en, _e.worldX, isV, allies[0], ex)) continue;
         _en.worldX = _e.worldX + (_j - (_e.content.length - 1) / 2) * 1.5;
         _en._initWorldX = _en.worldX;
-        _en._eventRef = _e;
+        window._setEnemyEvent(_en, _e);
         enemies.push(_en);
       }
     }
@@ -1258,7 +1114,7 @@ function _startCombat(ev, first){
     },
     onResolve: function(win){
     /* [v240] 殉爆时 state.player.hp 已为 0，不覆盖失败 */
-    if(!win && isV && state.player.hp > 0){ win = true; }
+    if(!win && isV && window._isPlayerMounted() && state.player.hp > 0){ win = true; }
     if(win && ex.combatEvent) ex.combatEvent.cleared = true;
     if(win){
       for(const _rnode of ex.nodes){
@@ -1273,11 +1129,9 @@ function _startCombat(ev, first){
       }
     }
     ex.combatEvent = null;
-    var _isVNow = !!(window.BTRSupport && window.BTRSupport.active && window.BTRSupport.phase !== 'wreck');
+    var _isVNow = (typeof window._isPlayerMounted === 'function' ? window._isPlayerMounted() : false);
     if(win){
-      /* 載具不在 support/center 階段時，即使 isV 為 true 也重置為 walk */
-      const _btrNow = window.BTRSupport;
-      const _btrActiveNow = !!(_btrNow && _btrNow.active && (_btrNow.phase === 'support' || _btrNow.phase === 'center'));
+      const _btrActiveNow = window._isPlayerMounted(); /* 上車中才維持 vehicle 模式 */
       ex.mode = _btrActiveNow ? 'vehicle' : 'walk';
       /* rev-fix-heal-after-win: 勝利後若受傷，自動使用醫療包補血，等待治療過程 1200ms（參考 Boss 戰 manualHeal） */
       /* [v240] 殉爆时 hp=0，不补血 */
@@ -1415,25 +1269,24 @@ function _tickAlliesPositions(now){
       }
       continue;
     }
-    if(a.worldX < ex.worldX - 0.5){
+    const _tgtWX = ex.worldX + (typeof a._slotDX === 'number' ? a._slotDX : 0);
+if(a.worldX < _tgtWX - 0.5){
       a._mode = 'chasing';
-      a.worldX = Math.min(ex.worldX, a.worldX + 2.8 * dt);
-    } else if(a.worldX > ex.worldX + 0.5){
+      a.worldX = Math.min(_tgtWX, a.worldX + 2.8 * dt);
+    } else if(a.worldX > _tgtWX + 0.5){
       a._mode = 'waiting';
     } else {
       a._mode = 'following';
       /* [v185 H22] following 只向前追，不向回挪。
          载员略微超前玩家（following 范围内，_dxF181d < 0）→ 不后退，等玩家追上来。 */
-      const _dxF181d = ex.worldX - a.worldX;
+      const _dxF181d = _tgtWX - a.worldX;
       if(_dxF181d > 0.01){
         const _absDxH12 = _dxF181d;
         const _chaseSpeedH12 = Math.max(1.6, 2.8 * Math.min(1, _absDxH12 / 2.0));
         a.worldX += Math.min(_absDxH12, _chaseSpeedH12 * dt);
       } else if(_dxF181d < -0.01){
         /* 载员超前玩家 → 不动 */
-      } else {
-        a.worldX = ex.worldX;
-      }
+      } else if(a.worldX < _tgtWX){ a.worldX = _tgtWX; } /* rev-no-backstep-follow: 只前進 */
     }
     if(a.srv && ex.passengersFollowing){
       for(let _piSync = 0; _piSync < ex.passengersFollowing.length; _piSync++){
@@ -1503,11 +1356,11 @@ return;
     _evac();
   }
   if(ex._lastBtrPhase !== ph){
-    if(ph === 'exit' && ex._lastBtrPhase !== 'exit') _disembark();
-    else if(ph === 'wreck' && ex._lastBtrPhase !== 'wreck' && !(b && b._wreckDisembarked)) _disembark();
+    /* 下車由 13 的相位機統一驅動 */
+if(ph === 'wreck' && ex._lastBtrPhase !== 'wreck' && !(b && b._wreckDisembarked)) _disembark();
     ex._lastBtrPhase = ph;
   }
-  if(ph === 'support'){
+  if(window._isPlayerMounted()){
     if(ex.mode !== 'combat' && ex.mode !== 'dead') ex.mode = 'vehicle';
   } else {
     if(ex.mode === 'vehicle') ex.mode = 'walk';
@@ -1550,7 +1403,7 @@ return;
     /* [v201] 徹底清理殘留狀態，強制復活 */
     window._combatActive = false;
     window._combat = null;
-    ex._currentSpeed = 1.4;
+    ex._currentSpeed = _getPlayerWalkSpeed();
     _updateBgTransform();
     return;
   }
@@ -1569,7 +1422,7 @@ return;
       }
     }
   }
-  const _btrActiveH = !!(b && b.active && (b.phase === 'support' || b.phase === 'center'));
+  const _btrActiveH = window._isPlayerMounted();
   const _healMode = (ex.mode === 'walk' || ex.mode === 'combat') && !_btrActiveH;
   if(_healMode && !_inEngageH && now >= (ex._healBlockedUntil || 0) && state.player.hp > 0 && state.player.hp < state.player.maxHp){
 /* rev-combatfix: 先進入治療，2s CD 完整結束才消耗 + 生效 */
@@ -1595,7 +1448,7 @@ return;
   else if(window._combat && window._combat.active && window._combat.sceneType === 'foot'){
     const _cc = window._combat;
     if(_cc._hurtUntil && now < _cc._hurtUntil) ts = 0;
-    else ts = (typeof window._playerShouldStandStill === 'function' && window._playerShouldStandStill()) ? 0 : 1.4;
+    else ts = (typeof window._playerShouldStandStill === 'function' && window._playerShouldStandStill()) ? 0 : _getPlayerWalkSpeed();
   }
   else if(b && b.active) ts = _computeTS(now);
 
@@ -1647,15 +1500,11 @@ return;
       const _a = window._combat.allies[_ai];
       if(_a.hp <= 0 || _a._retreating) continue;
       if(!_a._mode){
-        if(_a.worldX < ex.worldX - 0.5){
-          _a._mode = 'chasing';
-          _a.worldX = Math.min(ex.worldX, _a.worldX + 2.8 * dt);
-        } else if(_a.worldX > ex.worldX + 0.5){
-          /* 载员在玩家前方，不动（不后退） */
-        } else {
-          _a.worldX = ex.worldX;
-        }
-      }
+const _aTgt = ex.worldX + (typeof _a._slotDX === 'number' ? _a._slotDX : 0);
+if(_a.worldX < _aTgt - 0.5){ _a._mode = 'chasing'; _a.worldX = Math.min(_aTgt, _a.worldX + 2.8 * dt); }
+else if(_a.worldX > _aTgt + 0.5){ /* 超前戰位：原地等玩家 */ }
+else if(_a.worldX < _aTgt){ _a.worldX = _aTgt; } /* rev-no-backstep-h38: 只前進 */
+}
     }
   }
   if(_delta > 0.001 && typeof window._combatPlayerAdvance === 'function') window._combatPlayerAdvance(_delta);
@@ -1671,7 +1520,8 @@ return;
         const _itNC = _pfNC[_piNC];
         if(_itNC._retreating) continue;
         if(typeof _itNC.worldX !== 'number') _itNC.worldX = ex.worldX;
-        const _relWXNC = _itNC.worldX - ex.worldX;
+        const _slotTgtNC = ex.worldX + (typeof _itNC._slotDX === 'number' ? _itNC._slotDX : 0);
+const _relWXNC = _itNC.worldX - _slotTgtNC;
         /* rev-fix-notick-sync: 阈值 0.5m；中间区间以玩家速度 1.4 m/s 同步，不吸附。 */
         if(_relWXNC > 0.5){
           /* 超前战位 0.5m+，停下等 */
@@ -1679,7 +1529,7 @@ return;
           _itNC._forceRunAnim = false;
         } else if(_relWXNC < -0.5){
           /* 落后战位 0.5m+，跑步追赶（2.8 m/s） */
-          _itNC.worldX = Math.min(ex.worldX, _itNC.worldX + 2.8 * _dtNC);
+          _itNC.worldX = Math.min(_slotTgtNC, _itNC.worldX + 2.8 * _dtNC);
           _itNC._standingWait = false;
           _itNC._forceRunAnim = true;
         } else {
@@ -1804,10 +1654,13 @@ function _startMap(region, ri){
     return;
   }
   ex.worldX = persisted.worldX || 0;
-  ex.mode = 'walk';
-  ex.active = true;
-  ex.deadUntil = 0;
-  ex.combatEvent = null;
+  /* 切換地圖：舊地圖的交戰單位不屬於新座標系，必須先結束。
+   否則殘留敵人會被 _combatPlayerAdvance 拉到玩家前方 0.5m（貼臉）。 */
+if(window._combat){ try { window._combatCleanup(); } catch(e){} }
+ex.mode = 'walk';
+ex.active = true;
+ex.deadUntil = 0;
+ex.combatEvent = null;
   ex._curNodeIdx = 0;
   ex._bgDirty = true;
   if(!_sameRegion){
@@ -1840,7 +1693,7 @@ function _startMap(region, ri){
   if(_n > 0){ if(ex._slot0 >= _n) ex._slot0 = 0; if(ex._slot1 >= _n) ex._slot1 = (_n > 1 ? 1 : 0); }
   else { ex._slot0 = 0; ex._slot1 = 0; }
   ex._lastRotate = 0;
-  ex._currentSpeed = 1.4;
+  ex._currentSpeed = _getPlayerWalkSpeed();
   _cleanPC();
 }
 
@@ -1983,8 +1836,8 @@ function _radioShowConfirm(){
   })();
   const _canHeal = _hasInjured && _hasAnyMed;
   body += '<div style="display:flex;gap:6px;margin:8px 0">';
-  body += '<button class="btn" id="_p37_repair" ' + (canRepair ? '' : 'disabled') + ' style="flex:1;padding:8px;font-size:12px">維修</button>';
-  body += '<button class="btn" id="_p37_heal" ' + (_canHeal ? '' : 'disabled') + ' style="flex:1;padding:8px;font-size:12px">治療</button>';
+  body += '<button class="btn" id="_p37_repair" ' + (canRepair ? '' : 'disabled') + ' style="flex:1;padding:8px;font-size:12px;background:#e8a33d;color:#0e0c0a;border-color:#e8a33d;font-weight:bold">維修</button>';
+  body += '<button class="btn" id="_p37_heal" ' + (_canHeal ? '' : 'disabled') + ' style="flex:1;padding:8px;font-size:12px;background:#4caf50;color:#fff;border-color:#4caf50;font-weight:bold">治療</button>';
   body += '</div>';
   body += '<div class="divider"></div>';
 
@@ -2251,37 +2104,5 @@ heroAnim.healItem = null;
 }
 if(typeof save === 'function') save();
 };
-/* ===== rev-combatfix:end ===== */
-
-/* ===== rev-follow-anim-rig:start =====
-   載員跟隨動畫基線維護（非戰鬥）：
-   _renderPass 的 walk/idle 判定讀 _renderPrevWX，但 run / 等待 / 戰鬥 / 撤退分支
-   不更新它 → 切換瞬間用陳舊基線 → idle/walk 閃幀；首幀基線缺失 → 誤判 idle。
-   本 rig 每幀在 tick 前補齊 / 刷新基線，不改 _renderPass 本體。 */
-(function(){
-'use strict';
-if(window.__followAnimRig) return;
-window.__followAnimRig = true;
-var _tick = window._exploreTick;
-window._exploreTick = function(now){
-  try{
-    var ex = window._explore;
-    if(ex && Array.isArray(ex.passengersFollowing)){
-      var inCombat = !!(window._combat && window._combat.active);
-      var nowMs = Date.now();
-      for(var i = 0; i < ex.passengersFollowing.length; i++){
-        var it = ex.passengersFollowing[i];
-        if(!it) continue;
-        var cur = (typeof it.worldX === 'number') ? it.worldX : ex.worldX;
-        if(typeof it._renderPrevWX !== 'number') it._renderPrevWX = cur;
-        var down = !!(it.srv && (it.srv._injuredDown || (it.srv.injuredUntil && it.srv.injuredUntil > nowMs)));
-        if(it._retreating || inCombat || it._forceRunAnim || it._standingWait || down){
-          it._renderPrevWX = cur;
-        }
-      }
-    }
-  }catch(e){}
-  return _tick.apply(this, arguments);
-};
-})();
-/* ===== rev-follow-anim-rig:end ===== */
+/* 已移除 rev-follow-anim-rig */
+/* 已移除 rev-follow-invariant：每幀改回載員狀態的補丁層 */

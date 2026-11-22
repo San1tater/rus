@@ -612,7 +612,7 @@ function onBuildCell(i){
     ft.innerHTML = (_isMax
       ? '<button class="btn" id="m-up" disabled style="white-space:nowrap">已滿級</button>'
       : '<button class="btn primary" id="m-up">升級</button>')
-      + (isWorkbench ? '<button class="btn" id="m-craft">改造</button>' : '');
+      + (isWorkbench ? '<button class="btn" id="m-craft" style="background:#e8a33d;color:#0e0c0a;border-color:#e8a33d;font-weight:bold">改造</button>' : '');
     openModal({title:b.name,body,footer:ft});
     ft.querySelector('#m-up').onclick=()=>{
       if(b.maxLv && slot.lv >= b.maxLv){return;}
@@ -730,7 +730,6 @@ function openModding(workbenchLv){
   body+='<div id="mod-queue-area">'+renderModQueueHtml(workbenchLv)+'</div>';
   if(!candidates.length){
     body+='<div class="empty-hint">沒有可改造的傳奇武器</div>';
-    body+='<div style="font-size:9px;color:#7a6f60;margin-top:8px;padding:6px;background:#1a1510;border-radius:4px">可改造的傳奇武器需：<br>· 稀有度為傳奇或具名<br>· 具備改造槽位（彈匣/瞄具）</div>';
     openModal({title:'工作台',body});
     return;
   }
@@ -742,7 +741,6 @@ function openModding(workbenchLv){
     const isBusy=!!c.busy;
     const eqLabel=c.equippedSlot?'（裝備中）':(isBusy?'（改造中）':'×'+(c.count||1));
     const _dim = !typeMaxed || isBusy;
-    body+='<div class="item-row'+(isBusy?' disabled':'')+'" data-idx="'+candidates.indexOf(c)+'" data-busy="'+(isBusy?'1':'0')+'" style="'+(_dim?'opacity:.4':'')+(isBusy?';cursor:not-allowed':'')+'"><div class="icon">'+itemIcon(c.id,30)+'</div><div class="info"><div class="nm '+(c.rarity==='具名'?'r-具名':'r-傳奇')+'">'+c.def.name+' '+eqLabel+'</div><div class="sub">彈匣：'+(getMagOptionsForWeapon(c.baseId).join('/')||'—')+' ｜ 瞄具：'+((rules.scopes||[]).join('/')||'—')+'</div><div class="sub" style="color:'+(typeMaxed?'#4caf50':'#e05252')+'">熟練度 '+Math.floor(state.proficiency[wdef.type]||0)+'/'+MAX_PROF_LEVEL+'</div></div></div>';
   }
   const bd=openModal({title:'工作台 · 改造',body});
   if(window.modQueueTimer){clearInterval(window.modQueueTimer);window.modQueueTimer=null;}
@@ -794,8 +792,6 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
         return (SCOPE_NAME[a] || a).localeCompare(SCOPE_NAME[b] || b, 'zh-Hant');
       });
       const sortedScopes = _scopesRaw;
-      body+='<div style="color:#e8a33d;font-weight:bold;font-size:11px;margin:8px 0 4px">瞄具（可選）</div>';
-      body+='<div class="mod-opt '+(state_mod.scope===null?'on':'')+'" data-opt="scope" data-val=""><div class="nm">不裝瞄具</div><div class="bonus">—</div></div>';
       for(const s of sortedScopes){body+='<div class="mod-opt '+(state_mod.scope===s?'on':'')+'" data-opt="scope" data-val="'+s+'"><div class="nm">'+(SCOPE_NAME[s]||s)+'</div><div class="bonus">命中 +'+(SCOPE_BONUS[s]||0)+'%</div></div>';}
     }
     const mag=state_mod.mag;const scope=state_mod.scope;
@@ -889,13 +885,13 @@ function _wkEnsureStyles(){
     '.wk-title{font-size:13px;color:#e8a33d;font-weight:bold}',
     '.wk-x{font-size:14px;color:#fff;padding:4px 10px;background:#6a2a2a;border-radius:5px;cursor:pointer;margin-left:auto;font-weight:bold}',
     '.wk-main{flex:1;min-height:0;display:flex;flex-direction:column;gap:5px;overflow:hidden}',
-    '.wk-showcase{flex:0 0 22vh;background:linear-gradient(180deg,#1a1510,#14110c);border:2px solid #2a231c;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;min-height:0;overflow:hidden;padding:6px;box-sizing:border-box;transition:border-color 0.15s}',
-    '.wk-showcase:hover{filter:brightness(1.1)}',
+    '.wk-showcase{flex:0 0 22vh;background:#1a1510 url("icons/workbench/workbench_bg.png") center/cover no-repeat;border:2px solid #2a231c;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;min-height:0;overflow:hidden;padding:6px;box-sizing:border-box;transition:border-color 0.15s}',
+    
     '.wk-showcase img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}',
     '.wk-showcase .wname{position:absolute;top:5px;left:7px;font-size:13px;font-weight:bold;background:rgba(14,12,10,0.78);padding:3px 10px;border-radius:4px;pointer-events:none;max-width:calc(100% - 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.wk-showcase .switch{position:absolute;bottom:5px;right:7px;font-size:10px;color:#a89a85;background:rgba(14,12,10,0.78);padding:2px 8px;border-radius:4px;pointer-events:none}',
     '.wk-showcase.empty{cursor:default;justify-content:center;color:#5a5040;font-size:12px;border-color:#2a231c !important}',
-    '.wk-showcase.empty:hover{filter:none}',
+    
     '.wk-slots{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:5px}',
     '.wk-slot{background:#1a1510;border:1.5px solid #3a2f25;border-radius:6px;padding:8px 4px;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;text-align:center}',
     '.wk-slot:hover{border-color:#8a5f18}',
@@ -930,7 +926,7 @@ function _wkEnsureStyles(){
     '#workbench-page img,.wk-picker-overlay img{-webkit-user-drag:none;-khtml-user-drag:none;-moz-user-drag:none;-o-user-drag:none;user-drag:none;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}',
     '.wk-dock-list,.wk-dock-card,.wk-showcase,.wk-picker-bd,.wk-picker-bd .item-row{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}',
     '.wk-dock-card,.wk-dock-card *{cursor:default}',
-    '.wk-dock-card{flex:0 0 140px;background:#241d16;border:1px solid #3a2f25;border-radius:5px;padding:5px 8px;display:flex;flex-direction:column;gap:3px;box-sizing:border-box;overflow:hidden}',
+    '.wk-dock-card{flex:0 0 140px;background:#1a1510 url("icons/workbench/workbench_bg.png") center/cover no-repeat;border:1px solid #3a2f25;border-radius:5px;padding:5px 8px;display:flex;flex-direction:column;gap:3px;box-sizing:border-box;overflow:hidden}',
     '.wk-dock-card .nm{font-size:10px;color:#e8a33d;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.wk-dock-card .bar{height:4px;background:#0e0c0a;border-radius:2px;overflow:hidden;border:1px solid #2a231c}',
     '.wk-dock-card .bar .fill{height:100%;background:linear-gradient(90deg,#8a5f18,#e8a33d);transition:width 0.3s linear}',
@@ -1209,7 +1205,7 @@ function _wkRender(p){
   }
 
   html += '<div class="wk-actions">';
-  html += '<button class="btn primary" id="wk-craft"' + (_canCraft ? '' : ' disabled') + '>' + _btnLabel + '</button>';
+  html += '<button class="btn" id="wk-craft" style="background:#e8a33d;color:#0e0c0a;border-color:#e8a33d;font-weight:bold"' + (_canCraft ? '' : ' disabled') + '>' + _btnLabel + '</button>';
   html += '<button class="btn ghost" id="wk-reset">重置</button>';
   html += '</div>';
 
@@ -1251,7 +1247,7 @@ function _wkRenderQueue(){
     var remain = Math.max(0, Math.ceil((total - elapsed) / 1000));
     html += '<div class="wk-dock-card" data-qi="' + i + '">'
           + '<div class="nm" style="color:#a45ede">' + name + '</div>'
-          + '<div style="flex:1 1 auto;min-height:28px;display:flex;align-items:center;justify-content:center;background:#151210;border-radius:3px;overflow:hidden"><img src="' + _imgPath + assetSuffix(_imgPath) + '" onerror="this.onerror=null;this.src=&quot;' + _fbPath + assetSuffix(_fbPath) + '&quot;" style="max-width:100%;max-height:100%;object-fit:contain" alt=""></div>'
+          + '<div style="flex:1 1 auto;min-height:28px;display:flex;align-items:center;justify-content:center;background:transparent;border-radius:3px;overflow:hidden"><img src="' + _imgPath + assetSuffix(_imgPath) + '" onerror="this.onerror=null;this.src=&quot;' + _fbPath + assetSuffix(_fbPath) + '&quot;" style="max-width:100%;max-height:100%;object-fit:contain" alt=""></div>'
           + '<div class="bar"><div class="fill" style="width:' + pct + '%"></div></div>'
           + '<div class="remain">剩 ' + remain + ' 秒</div>'
           + '</div>';

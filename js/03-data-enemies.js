@@ -231,67 +231,55 @@ function rollEnemyLoot(en){
   'use strict';
 
   function _baseLayers(){
-    return [
-      {id:"right_leg",name:"右腿",x:0.4,y:0.562,w:0.13,h:0.42,color:"#2a2a2a",pivot:{x:0.5,y:0.05},z:18},
-      {id:"torso",name:"躯干",x:0.5,y:0.232,w:0.3,h:0.42,color:"#4a6741",pivot:{x:0.5,y:0.1},z:30},
-      {id:"head",name:"头",x:0.47,y:0.182,w:0.2,h:0.17,color:"#c89870",pivot:{x:0.5,y:0.92},z:45},
-      {id:"face",name:"面部",x:0.43,y:0.192,w:0.14,h:0.13,color:"#b88860",pivot:{x:0.5,y:0.92},z:48},
-      {id:"left_leg",name:"左腿",x:0.56,y:0.582,w:0.14,h:0.44,color:"#3a3a3a",pivot:{x:0.5,y:0.05},z:52},
-      {id:"back_arm",name:"后臂",x:0.2,y:0.322,w:0.11,h:0.1,color:"#3d3020",pivot:{x:0.5,y:0.5},z:55},
-      {id:"front_arm",name:"前臂",x:0.73,y:0.342,w:0.4,h:0.08,color:"#5a4a35",pivot:{x:0.95,y:0.5},z:62}
-    ];
-  }
+/* rev-arm45: 敵人恆面朝左（骨架已鏡像）→ back_arm = 右手（持槍），front_arm = 左手（支撐）。
+   front_arm 長度不變，遠端（左緣）對齊原 back_arm 左緣；
+   back_arm  w/h/pivot 同步 front_arm，近端（右緣）＝原 front_arm 右緣，上緣＝原 back_arm 上緣。
+   武器 ox/oy 不變即落在等價錨點。 */
+return [
+{id:"right_leg",name:"右腿",x:0.4,y:0.562,w:0.13,h:0.42,color:"#2a2a2a",pivot:{x:0.5,y:0.05},z:18},
+{id:"torso",name:"躯干",x:0.5,y:0.232,w:0.3,h:0.42,color:"#4a6741",pivot:{x:0.5,y:0.1},z:30},
+{id:"head",name:"头",x:0.47,y:0.182,w:0.2,h:0.17,color:"#c89870",pivot:{x:0.5,y:0.92},z:45},
+{id:"face",name:"面部",x:0.43,y:0.192,w:0.14,h:0.13,color:"#b88860",pivot:{x:0.5,y:0.92},z:48},
+{id:"left_leg",name:"左腿",x:0.56,y:0.582,w:0.14,h:0.44,color:"#3a3a3a",pivot:{x:0.5,y:0.05},z:52},
+{id:"back_arm",name:"后臂",x:0.73,y:0.312,w:0.4,h:0.08,color:"#3d3020",pivot:{x:0.95,y:0.5},z:55},
+{id:"front_arm",name:"前臂",x:0.525,y:0.342,w:0.4,h:0.08,color:"#5a4a35",pivot:{x:0.95,y:0.5},z:62}
+];
+}
 
   function _baseAnims(){
-    return {
-      idle:{
-        frameCount:4,fps:4,loop:true,
-        rootPivot:{x:0.5,y:0.95},rootRot:[0,0,0,0],rootDy:[0,-0.008,0,0.008],
-        keys:{
-          right_leg:[{rot:0},{rot:1.5},{rot:0},{rot:-1.5}],
-          left_leg:[{rot:0},{rot:-1.5},{rot:0},{rot:1.5}]
-        }
-      },
-      walk:{
-        frameCount:4,fps:8,loop:true,
-        rootPivot:{x:0.5,y:0.95},rootRot:[0,0,0,0],rootDy:[0,-0.01,0,-0.01],
-        keys:{
-          right_leg:[{rot:10},{rot:0},{rot:-10},{rot:0}],
-          left_leg:[{rot:-10},{rot:0},{rot:10},{rot:0}]
-        }
-      },
-      attack:{
-        frameCount:4,fps:12,loop:false,
-        rootPivot:{x:0.5,y:0.95},rootRot:[0,0,0,0],rootDy:[0,0,0,0],
-        keys:{
-          right_leg:[{rot:0},{rot:2},{rot:3.5},{rot:0}],
-          torso:[{rot:0},{rot:3},{rot:1.5},{rot:0}],
-          head:[{rot:0},{rot:2},{rot:1},{rot:0}],
-          face:[{rot:0},{rot:2},{rot:1},{rot:0}],
-          left_leg:[{rot:0},{rot:-1},{rot:-1.75},{rot:0}],
-          back_arm:[{rot:0},{rot:2,dx:-1},{rot:1,dx:-0.5},{rot:0}],
-          front_arm:[{rot:0},{rot:6,dx:-3},{rot:3,dx:-1.5},{rot:0}]
-        }
-      },
-      hurt:{
-        frameCount:4,fps:12,loop:false,
-        rootPivot:{x:0.5,y:0.95},rootRot:[0,0,0,0],rootDy:[0,0,0,0],
-        keys:{
-          torso:[{rot:0},{rot:-3},{rot:-1.5},{rot:0}],
-          head:[{rot:0},{rot:-3},{rot:-1.5},{rot:0}],
-          face:[{rot:0},{rot:-3},{rot:-1.5},{rot:0}]
-        }
-      },
-      death:{
-        frameCount:4,fps:8,loop:false,
-        rootPivot:{x:0.48,y:1},rootRot:[0,22,53,90],rootDy:[0,-0.0326,-0.0803,-0.136],
-        keys:{
-          right_leg:[{rot:0},{rot:5},{rot:3},{rot:0}],
-          left_leg:[{rot:0},{rot:-5},{rot:-3},{rot:0}]
-        }
-      }
-    };
-  }
+/* rev-arm45: back_arm = 右手（動作手），front_arm = 左手（支撐）。
+   death 與玩家同構：12f 向後倒，rootDy 末幀 -0.136 背貼地。
+   back_arm 末幀 rot -110° → 槍斜向下；dx -3.5 → 向身體中軸線偏移。 */
+return {
+idle:{frameCount:4,fps:4,loop:true,rootPivot:{x:0.5,y:0.95},rootRot:[0,0,0,0],rootDy:[0,-0.008,0,0.008],
+keys:{right_leg:[{rot:0},{rot:1.5},{rot:0},{rot:-1.5}],left_leg:[{rot:0},{rot:-1.5},{rot:0},{rot:1.5}]}},
+walk:{frameCount:4,fps:8,loop:true,rootPivot:{x:0.5,y:0.95},rootRot:[0,0,0,0],rootDy:[0,-0.01,0,-0.01],
+keys:{right_leg:[{rot:10},{rot:0},{rot:-10},{rot:0}],left_leg:[{rot:-10},{rot:0},{rot:10},{rot:0}]}},
+attack:{frameCount:4,fps:12,loop:false,rootPivot:{x:0.5,y:0.95},rootRot:[0,0,0,0],rootDy:[0,0,0,0],
+keys:{
+right_leg:[{rot:0},{rot:2},{rot:3.5},{rot:0}],
+torso:[{rot:0},{rot:3},{rot:1.5},{rot:0}],
+head:[{rot:0},{rot:2},{rot:1},{rot:0}],
+face:[{rot:0},{rot:2},{rot:1},{rot:0}],
+left_leg:[{rot:0},{rot:-1},{rot:-1.75},{rot:0}],
+back_arm:[{rot:0},{rot:6,dx:-3},{rot:3,dx:-1.5},{rot:0}],
+front_arm:[{rot:0},{rot:2,dx:-1},{rot:1,dx:-0.5},{rot:0}]}},
+hurt:{frameCount:4,fps:12,loop:false,rootPivot:{x:0.5,y:0.95},rootRot:[0,0,0,0],rootDy:[0,0,0,0],
+keys:{torso:[{rot:0},{rot:-3},{rot:-1.5},{rot:0}],head:[{rot:0},{rot:-3},{rot:-1.5},{rot:0}],face:[{rot:0},{rot:-3},{rot:-1.5},{rot:0}]}},
+death:{frameCount:12,fps:12,loop:false,rootPivot:{x:0.48,y:1},
+rootRot:[0,2,5,3,1,6,20,40,60,76,87,90],
+rootDy:[0,0,0.0027,0.008,0.016,0.0213,0.008,-0.0213,-0.0587,-0.096,-0.1253,-0.136],
+keys:{
+torso:[0,3,6,4,2,5,6,4,2,1,0,0].map(function(r){return {rot:r};}),
+head:[0,5,9,6,3,7,10,8,6,5,6,6].map(function(r){return {rot:r};}),
+face:[0,5,9,6,3,7,10,8,6,5,6,6].map(function(r){return {rot:r};}),
+back_arm:[0,-3,-6,-5,-2,-8,-26,-50,-74,-94,-107,-110].map(function(r,i){return {rot:r,dx:[0,0,0,0,0,-0.4,-0.8,-1.3,-1.8,-2.3,-2.8,-3.5][i]};}),
+front_arm:[0,-1,-2,-2,-1,-2,-4,-6,-8,-9,-10,-10].map(function(r){return {rot:r};}),
+right_leg:[0,4,10,16,22,26,20,12,6,4,5,6].map(function(r){return {rot:r};}),
+left_leg:[0,-4,-10,-16,-22,-26,-18,-10,-5,-3,-4,-4].map(function(r){return {rot:r};})
+}}
+};
+}
 
   var D = window.HUMAN_ENEMY_DATA = window.HUMAN_ENEMY_DATA || {};
   D.human_raider={

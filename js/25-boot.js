@@ -144,36 +144,53 @@ function updatePlayerStatPanel(){
 /* ===== 主循環 ===== */
 /* rev-fix-tickHeroWalkSwitch: 探索模式下根據移動速度切換 walk/idle */
 window._tickHeroWalkSwitch = function(now){
-  const ex = window._explore;
-  if(!ex || !ex.active) return;
-  if(typeof heroAnim === 'undefined') return;
-  /* [v187 H32] 全局守卫：非 heal_melee 时清 eqSlot / healItem。
-     H21 只在 walk/idle 分支清，combat/vehicle/dead/healing 模式下不清——
-     战斗中 heal 被打断 → eqSlot='__hidden__' 残留 → 武器一直不显示。
-     这里在模式判定之前清，所有模式都生效。 */
-  if(!(window._heroEqHolds && window._heroEqHolds(heroAnim.name))){ /* rev-eqslot-guard */
-    if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
-    if(heroAnim.healItem) heroAnim.healItem = null;
-  }
-  if(ex.mode === 'combat' || ex.mode === 'vehicle' || ex.mode === 'dead' || ex.mode === 'healing') return;
-  if(window._combatActive) return;
-  /* rev-fix-tickHeroWalkSwitch-v2: 補全 fire_* / switch_* 守衛 */
-  const _blocked = ['attack_melee','heal_melee','hurt','reload','fire_primary','fire_secondary','switch_secondary','switch_melee'];
-  if(_blocked.indexOf(heroAnim.name) >= 0) return;
-  const want = (ex._currentSpeed > 0.5) ? 'walk' : 'idle';
-  if(heroAnim.name !== want){
-    heroAnim.name = want;
-    heroAnim.frame = 0;
-    heroAnim.lastUpdate = now;
-    /* [v184b H21] 从 heal_melee 切到 walk/idle 时清 eqSlot / healItem。
-       原代码只清 heroAnim.name，eqSlot='__hidden__' 残留 → 武器一直不显示。
-       _updatePAnim 里 v180 F6d 也有类似逻辑，但 _updatePAnim 只在战斗中跑，
-       探索模式 healing 结束（或被打断）由这里处理。 */
-    if(want === 'walk' || want === 'idle'){
-      heroAnim.healItem = null;
-      if(heroAnim.eqSlot === '__hidden__') heroAnim.eqSlot = null;
-    }
-  }
+/* rev-weapon-restore: 全域武器可見性看門狗 —— 治療 / 手雷 / 換彈 / 切槍視窗過期後
+   強制清 eqSlot='hidden' 與 healItem，並復位卡住的非循環動作動畫。 */
+const ex = window._explore;
+if(!ex || !ex.active) return;
+if(typeof heroAnim === 'undefined') return;
+const _c = window._combat;
+const _healing = (ex.mode === 'healing') || (heroAnim.name === 'heal_melee' && !!heroAnim.healItem);
+if(!_healing){
+if(heroAnim.eqSlot === 'hidden') heroAnim.eqSlot = null;
+if(heroAnim.healItem) heroAnim.healItem = null;
+}
+if(ex.mode === 'dead' || heroAnim.name === 'dead') return;
+if(_healing) return;
+/* 動作動畫過期復位（手雷 / 近戰 / 換彈 / 切槍 / 受擊） */
+const _acts = ['attack_melee','heal_melee','hurt','reload','fire_primary','fire_secondary','switch_secondary','switch_melee'];
+if(_acts.indexOf(heroAnim.name) >= 0){
+const _a = (typeof GAME_ANIMS !== 'undefined') ? GAME_ANIMS[heroAnim.name] : null;
+const _dur = _a ? Math.round(_a.frameCount / _a.fps * 1000) : 600;
+const _t0 = (typeof heroAnim.animStart === 'number') ? heroAnim.animStart
+: (typeof heroAnim.lastUpdate === 'number' ? heroAnim.lastUpdate : now);
+const _winEnd = Math.max(heroAnim.forcedEnd || 0, _t0 + _dur);
+const _busy = !!(_c && _c.active && (
+now < (_c._playerAnimUntil || 0) ||
+now < (_c._playerReloadEnd || 0) ||
+now < (_c._playerSwitchEnd || 0) ||
+now < (_c._hurtUntil || 0)));
+if(!_busy && now > _winEnd + 60){
+heroAnim.eqSlot = null;
+heroAnim.healItem = null;
+heroAnim.animStart = null;
+heroAnim.forcedEnd = 0;
+heroAnim.name = (ex._currentSpeed > 0.5) ? 'walk' : 'idle';
+heroAnim.frame = 0;
+heroAnim.lastUpdate = now;
+}
+return;
+}
+if(ex.mode === 'combat' || ex.mode === 'vehicle') return;
+if(window._combatActive) return;
+const want = (ex._currentSpeed > 0.5) ? 'walk' : 'idle';
+if(heroAnim.name !== want){
+heroAnim.name = want;
+heroAnim.frame = 0;
+heroAnim.lastUpdate = now;
+heroAnim.healItem = null;
+if(heroAnim.eqSlot === 'hidden') heroAnim.eqSlot = null;
+}
 };
 
 function heroLoop(now){

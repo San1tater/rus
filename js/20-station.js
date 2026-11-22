@@ -109,7 +109,10 @@ function _stEnsureStyles(){
     '.st-ammo-cell-hd .cnt{color:#fff;font-family:monospace;font-size:14px;font-weight:bold}',
     '@media (max-width:420px){.st-passenger-card,.st-crew-card{min-height:64px;padding:6px 4px;gap:4px}.st-pass-ico,.st-crew-ico{width:32px;height:32px;flex:0 0 32px}.st-pass-name,.st-crew-name{font-size:11px}.st-pass-stat,.st-crew-stat{font-size:9px}.st-belt-preset img{width:24px;height:24px}.st-main-icon{width:26px;height:26px}.st-pd-slot,.st-pd-grenade{width:56px;height:56px}.st-pd-row,.st-pd-grenades{grid-template-columns:repeat(3,56px);gap:4px}.st-veh .btn{padding:4px 8px;font-size:10px}.st-title{font-size:12px;max-width:40%}.st-pd-sprite{flex:0 0 44px;width:44px;height:44px}.st-pd-heal-area{height:44px;padding:4px 8px}.st-belt-name,.st-main-name{font-size:10px;padding-right:4px}.st-talent-badge{width:44px;height:44px}}'
     ,'.st-passenger-card.over-cap::after,.st-crew-card.over-cap::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top right,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px)),linear-gradient(to top left,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px))}'
-  ].join('');
+  ,
+'.st-pd-grenade.oos{filter:grayscale(1);opacity:0.45}',
+'.st-pd-grenade.oos::after{content:" ";position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top right,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px)),linear-gradient(to top left,transparent calc(50% - 0.5px),rgba(255,255,255,0.55) 50%,transparent calc(50% + 0.5px))}'
+].join('');
   document.head.appendChild(st);
 }
 
@@ -283,11 +286,23 @@ function _stHealAreaHtml(hp, maxHp, hpPct, talentHtml){
   return _inner;
 }
 
-function _stCard(p, srv, pi, cap){
+/* ===== rev-deploy-order: 實際可上場序 =====
+   依載員順序跳過重傷 / 超重者，前 cap 名可上場者取得出場資格。
+   前順位重傷時，後順位補位者不再被畫上容量叉號。 */
+function _stDeployMap(s, cap){
+/* rev-roster-ui */
+var ps = (s && Array.isArray(s.passengers)) ? s.passengers : [];
+var vid = (typeof window._activeVehicleId === 'function') ? window._activeVehicleId() : 'btr80';
+var ids = (typeof window._vehicleRosterIds === 'function') ? window._vehicleRosterIds(vid, s) : [];
+var out = [];
+for(var i = 0; i < ps.length; i++){ out.push(!!(ps[i] && ids.indexOf(ps[i].srvId) >= 0)); }
+return out;
+}
+function _stCard(p, srv, pi, cap, canDeploy){
   const w = _stPassW(p);
   const mw = calcPassengerMaxWeight(srv);
   const over = w > mw;
-  const _overCap = (typeof cap === 'number' && pi >= cap);
+  const _overCap = (typeof canDeploy === 'boolean') ? !canDeploy : (typeof cap === 'number' && pi >= cap); /* rev-deploy-card */
   const maxHp = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
   let hp = (srv.hp !== undefined && srv.hp !== null) ? srv.hp : maxHp;
   if(srv.injuredUntil && srv.injuredUntil > Date.now()) hp = 0;
@@ -364,6 +379,7 @@ function _stRender(page){
   const g = (typeof _garageInitState === 'function') ? _garageInitState() : null;
   const vid = g ? g.currentVehicle : 'btr80';
   const cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
+const _dep141 = _stDeployMap(s, cap); /* rev-deploy-render */
 
   const _vh = _stVehicleHealth(vid);
   const _hpCol = _vh.pct > 60 ? '#4caf50' : (_vh.pct > 30 ? '#e8a33d' : '#e05252');
@@ -414,7 +430,7 @@ function _stRender(page){
     if(pi < s.passengers.length){
       const p = s.passengers[pi];
       const psrv = state.servants.find(function(x){ return x.id === p.srvId; });
-      if(psrv) html += _stCard(p, psrv, pi, cap);
+      if(psrv) html += _stCard(p, psrv, pi, cap, _dep141[pi]);
       else html += _stEmptyCardAt(pi, pi >= cap);
     } else {
       html += _stEmptyCardAt(pi, pi >= cap);
@@ -1043,19 +1059,20 @@ function _stDetail(idx){
   body += '</div><div class="st-pd-section-title">手榴彈</div><div class="st-pd-grenades">';
 
   for(let g = 0; g < slots; g++){
-    const gi = p.grenades[g];
-    const gid = gi ? (typeof gi === 'string' ? gi : gi.id) : null;
-    const gr = gi ? (typeof gi === 'string' ? '一般' : (gi.rarity || '一般')) : null;
-    const gw = gid ? (ITEM_WEIGHT[gid] || 0.5) : 0;
-    const bg = gid ? rarityBg(gr) : '';
-    const _stockQ141 = gid ? ((typeof invCount === 'function') ? invCount(gid, gr) : 0) : 0;
-    const _stockCol141 = _stockQ141 > 0 ? '#fff' : '#e05252';
-    body += '<div class="st-pd-grenade' + (gid ? ' filled' : '') + '" data-grenade="' + g + '"' + (gid ? ' style="border-color:' + bg + '"' : '') + '>';
-    body += '<div class="st-pd-grenade-lbl">#' + (g + 1) + '</div>';
-    if(gid) body += '<div class="st-pd-grenade-icon" style="background:' + bg + '">' + itemIcon(gid, 60) + '</div><div class="st-pd-grenade-wt" style="color:' + _stockCol141 + '">×' + _stockQ141 + (_stockQ141 > 0 ? ' · ' + gw.toFixed(1) + 'kg' : ' 缺') + '</div>';
-    else body += '<div class="st-pd-grenade-icon empty">＋</div>';
-    body += '</div>';
-  }
+/* rev-grenade-oos: 只顯示重量，不顯示倉庫個數；用罄 → 灰階 + 對角叉（與重傷載員同款） */
+const gi = p.grenades[g];
+const gid = gi ? (typeof gi === 'string' ? gi : gi.id) : null;
+const gr = gi ? (typeof gi === 'string' ? '一般' : (gi.rarity || '一般')) : null;
+const gw = gid ? (ITEM_WEIGHT[gid] || 0.5) : 0;
+const bg = gid ? rarityBg(gr) : '';
+const _stock141 = gid ? ((typeof invCount === 'function') ? invCount(gid, gr) : 0) : 0;
+const _oos141 = !!(gid && _stock141 <= 0);
+body += '<div class="st-pd-grenade' + (gid ? ' filled' : '') + (_oos141 ? ' oos' : '') + '" data-grenade="' + g + '"' + (gid ? ' style="border-color:' + bg + '"' : '') + '>';
+body += '<div class="st-pd-grenade-lbl">#' + (g + 1) + '</div>';
+if(gid) body += '<div class="st-pd-grenade-icon" style="background:' + bg + '">' + itemIcon(gid, 60) + '</div><div class="st-pd-grenade-wt">' + gw.toFixed(1) + 'kg</div>';
+else body += '<div class="st-pd-grenade-icon empty">＋</div>';
+body += '</div>';
+}
   body += '</div>';
 
   const ft = document.createElement('div');
@@ -1168,7 +1185,7 @@ function _stPickEquip(idx, slot){
           if(!AMMO[pp3[0]]) continue;
           if(AMMO[pp3[0]].cal !== cal) continue;
           if(state.inventory[k3] <= 0) continue;
-          list.push({ id:pp3[0], rarity:pp3[1], def:AMMO[pp3[0]], count:Math.min(120, state.inventory[k3]) });
+          list.push({ id:pp3[0], rarity:pp3[1], def:AMMO[pp3[0]], count:Math.min(window._ST_POUCH_CAP, state.inventory[k3]) });
         }
         if(!list.length) hint = '庫存沒有主武器口徑彈藥';
       }
@@ -1214,7 +1231,7 @@ function _stPickEquip(idx, slot){
       el.onclick = function(){
         if(el.getAttribute('data-clear')){
           if(slot === 'primaryWeapon'){
-            if(p.primaryWeapon && AMMO[p.primaryWeapon]){ invAdd(p.primaryWeapon, p.primaryWeaponRarity, p.primaryWeaponBoxCount || AMMOBOX_CAPACITY); }
+            if(p.primaryWeapon && AMMO[p.primaryWeapon]){ invAdd(p.primaryWeapon, p.primaryWeaponRarity, (p.primaryWeaponBoxCount || 0)); }
             p.primaryWeapon = null; p.primaryWeaponRarity = ''; p.primaryWeaponBoxCount = 0;
           } else if(slot === 'helmet'){ p.helmet = null; p.helmetRarity = ''; }
           else if(slot === 'body'){ p.body = null; p.bodyRarity = ''; }
@@ -1240,7 +1257,7 @@ function _stPickEquip(idx, slot){
           }
         } else {
           if(slot === 'primaryWeapon'){
-            if(p.primaryWeapon && AMMO[p.primaryWeapon]){ invAdd(p.primaryWeapon, p.primaryWeaponRarity, p.primaryWeaponBoxCount || AMMOBOX_CAPACITY); }
+            if(p.primaryWeapon && AMMO[p.primaryWeapon]){ invAdd(p.primaryWeapon, p.primaryWeaponRarity, (p.primaryWeaponBoxCount || 0)); }
             if(AMMO[eid]){
               const _boxCnt = Math.min(AMMOBOX_CAPACITY, invCount(eid, rid));
               if(_boxCnt <= 0) return;
@@ -1446,7 +1463,7 @@ function _stReturnPassengerEquip(p){
      （否則會造出第二份 → 被唯一化分解 → 憑空刷材料）。彈藥仍是消耗品，退回。 */
   if(!p) return;
   if(p.primaryWeapon && AMMO[p.primaryWeapon]){
-    invAdd(p.primaryWeapon, p.primaryWeaponRarity || '一般', p.primaryWeaponBoxCount || AMMOBOX_CAPACITY);
+    invAdd(p.primaryWeapon, p.primaryWeaponRarity || '一般', (p.primaryWeaponBoxCount || 0));
   }
   p.primaryWeapon = null; p.primaryWeaponRarity = ''; p.primaryWeaponBoxCount = 0;
   p.helmet = null; p.helmetRarity = '';
@@ -1532,3 +1549,89 @@ function _removeFromStation(srvId){
     state.station.passengers = state.station.passengers.filter(function(p){ return !(p && p.srvId === srvId); });
   }
 }
+/* ===== rev-roster-src: 上車名單唯一真相源 =====
+   容量內、未重傷、未超重。召喚時 freeze 成 BTRSupport._rosterIds；
+   途中陣亡不改名單（供擊毀報告統計），下車時再依當下健康過濾。
+   UI / 下車 / 車上受擊 / 殉爆 / 擊毀報告 全部讀同一份。 */
+function _stRosterEligible(p, srv, now){
+  if(!p || !srv) return false;
+  if(srv.injuredUntil && srv.injuredUntil > now) return false;
+  var mh = (typeof servantMaxHp === 'function') ? servantMaxHp(srv) : 100;
+  var hp = (typeof srv.hp === 'number') ? srv.hp : mh;
+  if(hp <= 0) return false;
+  var mw = (typeof calcPassengerMaxWeight === 'function') ? calcPassengerMaxWeight(srv) : 0;
+  if((typeof _stPassW === 'function') && _stPassW(p) > mw) return false;
+  return true;
+}
+window._vehicleRosterIds = function(vid, st){
+  var cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
+  var out = [];
+  if(cap <= 0 || !st || !Array.isArray(st.passengers)) return out;
+  var now = Date.now();
+  for(var i = 0; i < st.passengers.length && out.length < cap; i++){
+    var p = st.passengers[i];
+    if(!p || !p.srvId) continue;
+    var srv = (state.servants || []).find(function(s){ return s.id === p.srvId; });
+    if(!_stRosterEligible(p, srv, now)) continue;
+    out.push(srv.id);
+  }
+  return out;
+};
+window._vehicleRosterMap = function(){
+  var b = window.BTRSupport;
+  var vid = (typeof window._activeVehicleId === 'function') ? window._activeVehicleId() : 'btr80';
+  var st = window._getLiveStation();
+  var ids = (b && b.active && Array.isArray(b._rosterIds)) ? b._rosterIds : window._vehicleRosterIds(vid, st);
+  var out = [];
+  if(!st || !Array.isArray(st.passengers)) return out;
+  for(var i = 0; i < st.passengers.length; i++){
+    var p = st.passengers[i];
+    if(!p || ids.indexOf(p.srvId) < 0) continue;
+    var srv = (state.servants || []).find(function(s){ return s.id === p.srvId; });
+    if(srv) out.push({ p: p, srv: srv });
+  }
+  return out;
+};
+
+
+/* ===== rev-summon-refill: 召喚補彈（車站彈藥 = 消耗品，從庫存轉移） =====
+   每次召喚把載員彈掛 / 彈藥箱 / 彈藥手彈箱補到上限，只補差額並從庫存扣除。
+   這是「轉移」不是「消耗」：卸下時 _stReturnPassengerEquip 會退回庫存。
+   補滿對象 = 車站全部已配置載員（不只上車名單）——
+   讓重量在 _vehicleRosterIds 計算前就穩定，車站 UI 的超重叉號與實際名單一致。
+   戰鬥消耗直接寫在車站資料上（_startCombat 持引用），所以下次召喚的差額
+   正好等於上次實際打掉的數量。庫存無該 id+rarity 則不補，不憑空造彈。 */
+window._ST_POUCH_CAP = 120;
+window._refillPassengerAmmo = function(vid){
+  var st = (typeof state !== 'undefined') ? state.station : null;
+  if(!st || !Array.isArray(st.passengers)) return 0;
+  var _boxCap = (typeof AMMOBOX_CAPACITY !== 'undefined') ? AMMOBOX_CAPACITY : 0;
+  var moved = 0;
+  function topUp(id, rar, cur, cap){
+    var c0 = (typeof cur === 'number' && cur > 0) ? cur : 0;
+    if(!id || !(cap > 0)) return c0;
+    var need = cap - c0;
+    if(need <= 0) return c0;
+    var have = (typeof invCount === 'function') ? invCount(id, rar || '一般') : 0;
+    var take = Math.min(need, have);
+    if(take <= 0) return c0;
+    if(typeof invRemove === 'function') invRemove(id, rar || '一般', take);
+    moved += take;
+    return c0 + take;
+  }
+  for(var i = 0; i < st.passengers.length; i++){
+    var p = st.passengers[i];
+    if(!p) continue;
+    if(p.ammoPouch && p.ammoPouch.ammoId){
+      p.ammoPouch.count = topUp(p.ammoPouch.ammoId, p.ammoPouch.rarity, p.ammoPouch.count, window._ST_POUCH_CAP);
+    }
+    if(p.ammoBox && p.ammoBox.ammoId){
+      p.ammoBox.count = topUp(p.ammoBox.ammoId, p.ammoBox.rarity, p.ammoBox.count, _boxCap);
+    }
+    if(p.primaryWeapon && typeof AMMO !== 'undefined' && AMMO[p.primaryWeapon]){
+      p.primaryWeaponBoxCount = topUp(p.primaryWeapon, p.primaryWeaponRarity, p.primaryWeaponBoxCount, _boxCap);
+    }
+  }
+  if(moved > 0 && typeof save === 'function') save();
+  return moved;
+};

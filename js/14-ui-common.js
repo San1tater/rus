@@ -143,7 +143,6 @@ function openSlotDetail(slot){
     body += '<div class="stat-line"><span class="k">重量</span><span class="v">' + getItemWeight(id, rar).toFixed(2) + ' kg</span></div>';
     if(def.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
     if(def.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">' + (slot === 'throwable' ? '爆炸群傷' : '爆炸（群傷）') + '</span></div>';
-    if(def.scopeBonus) body += '<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+' + def.scopeBonus + '% 命中</span></div>';
     if(def.fixed) body += '<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>';
     if(slot === 'throwable') body += '<div class="stat-line"><span class="k">庫存</span><span class="v">' + getThrowableCount() + '</span></div>';
   } else {
@@ -374,7 +373,6 @@ function openEquipmentCompare(slot, newId, newRarity, onConfirm, onCancel){
     body += '<div class="stat-line"><span class="k">重量</span><span class="v">' + getItemWeight(newId, newRarity).toFixed(2) + ' kg</span></div>';
     if(newDef.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
     if(newDef.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">' + (newDef.slot === 'throwable' ? '爆炸群傷' : '爆炸（群傷）') + '</span></div>';
-    if(newDef.scopeBonus) body += '<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+' + newDef.scopeBonus + '% 命中</span></div>';
   }
 
   const ft = el('div', 'modal-ft');
@@ -493,7 +491,6 @@ function openItemDetail(id, rarity, returnFn){
   if(!AMMO[id]) body += '<div class="stat-line"><span class="k">重量</span><span class="v">' + getItemWeight(id, rarity).toFixed(2) + ' kg</span></div>';
   if(d.armored) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#4a90d9">帶護臂甲</span></div>';
   if(d.explosive) body += '<div class="stat-line"><span class="k">特性</span><span class="v" style="color:#e05252">' + (d.slot === 'throwable' ? '爆炸群傷' : '爆炸群傷') + '</span></div>';
-  if(d.scopeBonus) body += '<div class="stat-line"><span class="k">瞄具加成</span><span class="v">+' + d.scopeBonus + '% 命中</span></div>';
   if(d.fixed) body += '<div class="stat-line"><span class="k">固定</span><span class="v" style="color:#4a90d9">不可卸下</span></div>';
   /* rev-fix-stackable-owned: 「持有」只對可堆疊物品有意義（無 slot，或投擲物）；其餘為唯一實例 */
   var _stackable = !d.slot || d.slot === 'throwable';
@@ -753,4 +750,3 @@ window.renderEquipZone = function(z2){
       });
     }
   };
-
