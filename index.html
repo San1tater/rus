@@ -5,6 +5,42 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
 <title>廢土求生 v17.5</title>
   <link rel="stylesheet" href="styles.css">
+<style id="btn-geom">
+/* ===== btn-geom: 全站按鍵幾何統一（固定 border-box 高度；不涉顏色） ===== */
+html{--btn-h:25px}
+.btn,
+.gp-timer-btn,
+.gp-feed-btn,
+.z3-btn,
+.st-x,
+.modal-hd .x{
+  height:var(--btn-h)!important;
+  min-height:var(--btn-h)!important;
+  max-height:var(--btn-h)!important;
+  padding-top:0!important;
+  padding-bottom:0!important;
+  padding-left:12px!important;
+  padding-right:12px!important;
+  font-size:11px!important;
+  font-weight:700!important;
+  line-height:1!important;
+  gap:4px!important;
+  border-radius:5px!important;
+  box-sizing:border-box!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  white-space:nowrap!important;
+  vertical-align:middle!important
+}
+.btn:disabled,
+.gp-timer-btn:disabled,
+.gp-feed-btn:disabled,
+.z3-btn:disabled,
+.st-x:disabled,
+.modal-hd .x:disabled{opacity:0.4!important}
+/* ===== btn-geom:end ===== */
+</style>
 </head>
 <body>
 <div id="app">
@@ -36,6 +72,7 @@
   <script src="js/08-state.js"></script>
   <script src="js/09-damage.js"></script>
   <script src="js/10-render-hero.js"></script>
+  <script src="js/10b-puppet-rig.js"></script>
   <script src="js/11-render-enemy.js"></script>
   <script src="js/12-render-boss.js"></script>
   <script src="js/btr80_annotation.js"></script>
@@ -93,6 +130,7 @@
   <script src="js/22-garden-merchant.js"></script>
   <script src="js/23-garden-raid.js"></script>
   <script src="js/24-base.js"></script>
+  <script src="js/24b-puppet-adapters.js"></script>
   <script src="js/25-boot.js"></script>
 
 </body>
