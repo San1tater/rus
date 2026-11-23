@@ -801,6 +801,7 @@ function _garageOpenTechTree(){
     { vid: 'bmp2',   x: 140, y: 250 },
     { vid: 'bmp3',   x: 140, y: 330 },
     { vid: 'bmd4',   x: 140, y: 410 },
+    { vid: 'bmp3m',  x: 140, y: 490 },
     { vid: 't80',    x: 260, y: 90 },
     { vid: 't80b',   x: 260, y: 170 },
     { vid: 't80bv',  x: 260, y: 250 },
@@ -809,7 +810,7 @@ function _garageOpenTechTree(){
     { vid: 't80um',  x: 380, y: 440 }
   ];
 
-  let svg = '<svg width="500" height="520" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+  let svg = '<svg width="500" height="600" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
   svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
   svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
   svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
@@ -820,6 +821,7 @@ function _garageOpenTechTree(){
   svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
   svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
   svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
+  svg += '<line x1="190" y1="474" x2="190" y2="490" stroke="#8a5f18" stroke-width="2"/>';
   svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
   svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
   svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
@@ -859,7 +861,7 @@ function _garageOpenTechTree(){
       + '</div>';
   }
 
-  const body = '<div class="wt-tech-custom-scroll" style="overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;max-height:60vh;"><div style="position:relative; width:500px; height:520px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + svg + nodesHtml + '</div></div>';
+  const body = '<div class="wt-tech-custom-scroll" style="overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;max-height:60vh;"><div style="position:relative; width:500px; height:600px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + svg + nodesHtml + '</div></div>';
 
   const bd = openModal({ title: '科技樹', body: body });
 

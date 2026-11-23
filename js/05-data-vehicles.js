@@ -130,8 +130,17 @@ const VEHICLES = {
     weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
     armorGrid:['40/30/20','23/20/15','—'],
     speedFwd:70, speedRev:20, speedRoad:70, speedOffroad:'45-50',
-    supportDuration:48, next:[],
+    supportDuration:48, next:['bmp3m'],
     researchCost:{ ammoCal:'7.62x54', ammoCount:3000, liquor:3000, exp:15000 }
+  },
+  /* ---------- BMP-3M：UTD-32 660hp / 19.1t，前弧附加裝甲 + 熱像 FCS ---------- */
+  bmp3m: {
+    id:'bmp3m', name:'BMP-3M', tier:6, line:'bmp',
+    weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
+    armorGrid:['90/40/22','80/45/30','前弧附加'],
+    speedFwd:70, speedRev:20, speedRoad:70, speedOffroad:'50-55',
+    supportDuration:50, next:[],
+    researchCost:{ ammoCal:'7.62x54', ammoCount:3500, liquor:3500, exp:18000 }
   }
 };
 
@@ -146,6 +155,7 @@ const VEHICLE_LOADOUT = {
   bmp2:{'2a42':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250},atgm:{rounds:3,ammoId:'9m113'}},
   bmp3:{'2a70':{rounds:40},'2a72':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250}},
   bmd4:{'2a70':{rounds:40},'2a72':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250}},
+  bmp3m:{'2a70':{rounds:40},'2a72':{belts:5,perBelt:100},pkt:{belts:8,perBelt:250}},
   t80:{'2a46':{rounds:40},pkt:{belts:4,perBelt:250},nsvt:{belts:3,perBelt:100}},
   t80b:{'2a46':{rounds:40},pkt:{belts:4,perBelt:250},nsvt:{belts:3,perBelt:100}},
   t80bv:{'2a46':{rounds:40},pkt:{belts:4,perBelt:250},nsvt:{belts:3,perBelt:100}},
@@ -160,7 +170,7 @@ const VEHICLE_BELT_ROUNDS = { pkt:250, nsvt:100, kpvt:50, '2a42':100, '2a72':100
 const CARRIER_CAPACITY = {
   btr80:7, btr80a:7, btr82:7, btr82a:7, btr90:7,
   t80:0, t80b:0, t80bv:0, t80u:0, t80uk:0, t80um:0,
-  bmp1:8, bmp1m:8, bmp2:7, bmp3:7, bmd4:5
+  bmp1:8, bmp1m:8, bmp2:7, bmp3:7, bmd4:5, bmp3m:7
 };
 window.CARRIER_CAPACITY = CARRIER_CAPACITY;
 
@@ -256,6 +266,12 @@ const VEHICLE_ARMOR_LAYOUT = {
     hullSide:{baseKE:18,baseHEAT:18,era:null},       hullRear:{baseKE:14,baseHEAT:14,era:null},
     turretFront:{baseKE:38,baseHEAT:38,era:null},    turretSide:{baseKE:26,baseHEAT:26,era:null},  turretRear:{baseKE:20,baseHEAT:20,era:null}
   },
+  /* BMP-3M：前弧附加裝甲（抗 30mm APDS），側後同 BMP-3 */
+  bmp3m: {
+    hullUpperFront:{baseKE:90,baseHEAT:90,era:null}, hullLowerFront:{baseKE:42,baseHEAT:42,era:null},
+    hullSide:{baseKE:40,baseHEAT:40,era:null},       hullRear:{baseKE:22,baseHEAT:22,era:null},
+    turretFront:{baseKE:80,baseHEAT:80,era:null},    turretSide:{baseKE:45,baseHEAT:45,era:null},  turretRear:{baseKE:30,baseHEAT:30,era:null}
+  },
   /* ═══ T-80 系列（複合 + ERA） ═══ */
   t80: {
     hullUpperFront:{baseKE:425,baseHEAT:475,era:null}, hullLowerFront:{baseKE:90,baseHEAT:90,era:null},
@@ -292,35 +308,77 @@ const VEHICLE_ARMOR_LAYOUT = {
 /* rev-veh-length: 載具半車長（世界米），供投擲/濺射落點部位判定 */
 const VEHICLE_HALF_LENGTH_WORLD = {
   btr80:3.85, btr80a:3.85, btr82:3.85, btr82a:3.85, btr90:4.0,
-  bmp1:3.37, bmp1m:3.37, bmp2:3.36, bmp3:3.57, bmd4:3.05,
+  bmp1:3.37, bmp1m:3.37, bmp2:3.36, bmp3:3.57, bmp3m:3.57, bmd4:3.05,
   t80:3.5, t80b:3.5, t80bv:3.5, t80u:3.5, t80uk:3.5, t80um:3.5
 };
 window.getVehicleHalfLengthWorld = function(vid){
   return VEHICLE_HALF_LENGTH_WORLD[vid] || 3.6;
 };
 
+/* rev-veh-weapon-aim: 载具武器瞄準點 Y（米，相對目標腳底） */
+const VEHICLE_WEAPON_AIM_Y = {
+  pkt: 0.85, kpvt: 0.85, nsvt: 0.85,
+  '2a42': 0.85, '2a72': 0.85, '2a28': 0.85, '2a70': 0.85,
+  '2a46': 0.85, '2a46m1': 0.85,
+  atgm: 0.85
+};
+window.getVehicleWeaponAimY = function(wid){
+  return VEHICLE_WEAPON_AIM_Y[wid] || 0.85;
+};
+
+/* rev-veh-weapon-burst: 载具武器連發累積係數，按 (vid, wid) 分檔
+ * 30mm 機炮：BMP-3/BMD-4 剛性連接 0.15；BMP-1M/BMP-2 0.20；BTR-90 0.25；BTR-80A/82A 遙控炮塔 0.30
+ * 主炮（2a46/2a46m1/2a28/2a70）：單發，0
+ * 機槍（pkt/kpvt/nsvt）：支架穩固，0.15 */
+const VEHICLE_WEAPON_BURST = {
+  btr80:  { kpvt: 0.15, pkt: 0.15 },
+  btr80a: { '2a72': 0.30, pkt: 0.15 },
+  btr82:  { kpvt: 0.15, pkt: 0.15 },
+  btr82a: { '2a72': 0.30, pkt: 0.15 },
+  btr90:  { '2a42': 0.25, pkt: 0.15 },
+  bmp1:   { '2a28': 0, pkt: 0.15 },
+  bmp1m:  { '2a72': 0.20, pkt: 0.15 },
+  bmp2:   { '2a42': 0.20, pkt: 0.15 },
+  bmp3:   { '2a70': 0, '2a72': 0.15, pkt: 0.15 },
+  bmd4:   { '2a70': 0, '2a72': 0.15, pkt: 0.15 },
+  bmp3m:  { '2a70': 0, '2a72': 0.15, pkt: 0.15 },
+  t80:    { '2a46': 0, pkt: 0.15 },
+  t80b:   { '2a46': 0, pkt: 0.15 },
+  t80bv:  { '2a46': 0, pkt: 0.15 },
+  t80u:   { '2a46m1': 0, pkt: 0.15 },
+  t80uk:  { '2a46m1': 0, pkt: 0.15 },
+  t80um:  { '2a46m1': 0, pkt: 0.15 }
+};
+window.getVehicleWeaponBurst = function(vid, wid){
+  var row = VEHICLE_WEAPON_BURST[vid];
+  if(!row) return 0.15;
+  return (typeof row[wid] === 'number') ? row[wid] : 0.15;
+};
+
 /* 載具基礎命中率（百分比） */
 /* rev-fix-atgm-ammo: 導彈彈藥表（與 VEHICLE_MAIN_AMMO_POOL 平級）*/
 const VEHICLE_ATGM_AMMO = {
-  '9m14':   { name:'9M14 嬰兒',    dmg:1000, penMM:400, speed:120, caliberMM:125, hrBonus:3 },
-  '9m113':  { name:'9M113 競賽',   dmg:1200, penMM:600, speed:200, caliberMM:120, hrBonus:8 },
-  '9m112':  { name:'9M112 眼鏡蛇', dmg:650,  penMM:600, speed:350, caliberMM:125, isGL:true, hrBonus:5 },
-  '9m119m': { name:'9M119M 殷鋼',  dmg:850,  penMM:800, speed:350, caliberMM:125, isGL:true, hrBonus:10 },
-  '9m117m1':{ name:'9M117M1 阿爾坎', dmg:750, penMM:750, speed:320, caliberMM:100, isGL:true, hrBonus:8 }
+  '9m14':   { name:'9M14 嬰兒',    dmg:1000, penMM:400, speed:120, caliberMM:125, hrBonus:3,  guidanceMode:'radio', guidanceUpdateMs:500 },
+  '9m113':  { name:'9M113 競賽',   dmg:1200, penMM:600, speed:200, caliberMM:120, hrBonus:8,  guidanceMode:'laser', guidanceUpdateMs:250 },
+  '9m112':  { name:'9M112 眼鏡蛇', dmg:650,  penMM:600, speed:350, caliberMM:125, isGL:true, hrBonus:5,  guidanceMode:'radio', guidanceUpdateMs:500 },
+  '9m119m': { name:'9M119M 殷鋼',  dmg:850,  penMM:800, speed:350, caliberMM:125, isGL:true, hrBonus:10, guidanceMode:'laser', guidanceUpdateMs:250 },
+  '9m117m1':{ name:'9M117M1 阿爾坎', dmg:750, penMM:750, speed:320, caliberMM:100, isGL:true, hrBonus:8,  guidanceMode:'laser', guidanceUpdateMs:250 }
 };
 /* rev-gl-atgm: 每車 GL-ATGM 硬上限（不做 UI 强制，供 _stOpenMainAmmoPicker 校驗） */
 const GL_ATGM_MAX_CARRY = {
   t80b:  { '9m112': 6 },   t80bv:{ '9m112': 6 },
   t80u:  { '9m119m': 6 },  t80uk:{ '9m119m': 6 }, t80um:{ '9m119m': 6 },
   bmp3:  { '9m117m1': 8 },
-  bmd4:  { '9m117m1': 4 }
+  bmd4:  { '9m117m1': 4 },
+  bmp3m: { '9m117m1': 8 }
 };
 /* rev-gl-atgm: GL-ATGM 按車型的裝填時間（ms）；主炮裝填查 MUZZLE_PROFILES[wid].pauseMs */
 const GL_ATGM_RELOAD_MS = {
   t80b: 7500, t80bv: 7500,
   t80u: 7500, t80uk: 7500, t80um: 7500,
   bmp3: 15000,
-  bmd4: 4000
+  bmd4: 4000,
+  bmp3m: 15000
 };
 /* rev-fix-features: 車輛特性開關，新車只加表不改邏輯 */
 const VEHICLE_FEATURES = {
@@ -351,7 +409,7 @@ const VEHICLE_AMMO_SPEED_MS = {
 
 const VEHICLE_BASE_HR = {
   btr80:50,btr80a:50,btr82:50,btr82a:50,btr90:50,
-  bmp1:55,bmp1m:55,bmp2:55,bmp3:60,bmd4:60,
+  bmp1:55,bmp1m:55,bmp2:55,bmp3:60,bmd4:60,bmp3m:65,
   t80:65,t80b:65,t80bv:65,t80u:65,t80uk:65,t80um:65
 };
 

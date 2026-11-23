@@ -24,6 +24,7 @@ const TURRET_WEAPONS_BY_VID = {
   bmp2:   { '2a42':1, pkt:1 },
   bmp3:   { '2a70':1, '2a72':1, pkt:1 },
   bmd4:   { '2a70':1, '2a72':1, pkt:1 },
+  bmp3m:  { '2a70':1, '2a72':1, pkt:1 },
   t80:    { '2a46':1, pkt:1 },
   t80b:   { '2a46':1, pkt:1 },
   t80bv:  { '2a46':1, pkt:1 },
@@ -93,6 +94,7 @@ _VEHICLE_PART_PROB_BY_VID.btr90   = _VEHICLE_PART_PROB_BY_VID.btr80;
 _VEHICLE_PART_PROB_BY_VID.bmp1m   = _VEHICLE_PART_PROB_BY_VID.bmp1;
 _VEHICLE_PART_PROB_BY_VID.bmp2    = _VEHICLE_PART_PROB_BY_VID.bmp1;
 _VEHICLE_PART_PROB_BY_VID.bmd4    = _VEHICLE_PART_PROB_BY_VID.bmp3;
+_VEHICLE_PART_PROB_BY_VID.bmp3m   = _VEHICLE_PART_PROB_BY_VID.bmp3;
 
 function _getPartProbForVid(vid){
   return _VEHICLE_PART_PROB_BY_VID[vid] || _VEHICLE_PART_PROB_BY_VID.t80;
@@ -110,6 +112,7 @@ const _VEHICLE_INTERNAL_WEIGHTS = {
   bmp2:    { ammoRack: 0.14, crew: 0.20, engine: 0.18, tracks: 0.12, gun: 0.18, turret: 0.18 },
   bmp3:    { ammoRack: 0.15, crew: 0.20, engine: 0.17, tracks: 0.12, gun: 0.18, turret: 0.18 },
   bmd4:    { ammoRack: 0.15, crew: 0.20, engine: 0.17, tracks: 0.12, gun: 0.18, turret: 0.18 },
+  bmp3m:   { ammoRack: 0.15, crew: 0.20, engine: 0.17, tracks: 0.12, gun: 0.18, turret: 0.18 },
   t80:     { ammoRack: 0.20, crew: 0.18, engine: 0.16, tracks: 0.12, gun: 0.16, turret: 0.18 },
   t80b:    { ammoRack: 0.20, crew: 0.18, engine: 0.16, tracks: 0.12, gun: 0.16, turret: 0.18 },
   t80bv:   { ammoRack: 0.20, crew: 0.18, engine: 0.16, tracks: 0.12, gun: 0.16, turret: 0.18 },
@@ -429,9 +432,10 @@ function _getVehicleAmmoStats(wid, ammoId){
 function _vehicleCombatFloat(absWorldX, text, cls){
   var c = window._combat;
   if(!c) return;
-  var fxEl = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
-  var W = fxEl ? fxEl.clientWidth : 400;
-  var H = fxEl ? fxEl.clientHeight : 500;
+  /* rev-vfloat-canvas: 火花像素讀畫布邏輯尺寸；飄字正規化座標不變 */
+  var _cvV = c.playerCanvas || document.getElementById('combat-overlay');
+  var W = (typeof window._fxViewW === 'function') ? window._fxViewW(_cvV) : (_cvV ? _cvV.clientWidth : 400);
+  var H = (typeof window._fxViewH === 'function') ? window._fxViewH(_cvV) : (_cvV ? _cvV.clientHeight : 500);
   var _px = c.allies[0] ? c.allies[0].worldX : 0;
   var _relWX = (typeof absWorldX === 'number') ? (absWorldX - _px) : 0;
   var _sm = c.sm || {};
@@ -988,7 +992,7 @@ function _tryArenaIntercept(vid, bulletSpeed, caliberMM){
 /* 09 在沉積前呼叫：只決策，不畫、不寫日誌。結果快取；重複呼叫回傳快取（不重 roll）。 */
 window._apsDecide = function(b, hit){
   if(!b) return null;
-  if(b._apsDone) return b._apsHit ? { t: b._apsT, wx: b._apsWX } : null;
+  if(b._apsDone) return b._apsHit ? { t: b._apsT, wx: b._apsWX, wy: b._apsWY } : null;
   if(!b.isEnemyBullet || b.isGrenade || !b.isRPG) return null;
   var tgt = b.target;
   if(!tgt || !tgt.isVehicle) return null;
@@ -1000,7 +1004,6 @@ window._apsDecide = function(b, hit){
   var cam = (c && c.allies && c.allies[0] && typeof c.allies[0].worldX === 'number')
     ? c.allies[0].worldX : (typeof tgt.worldX === 'number' ? tgt.worldX : 0);
   var half = (typeof window.getVehicleHalfLengthWorld === 'function') ? window.getVehicleHalfLengthWorld(tgt.vehicleId) : 3.6;
-  /* 車在動：平面預判到「抵達車頭面」時刻，否則決策幀算的平面會落在車後 */
   var _vAdv = (typeof window._currentWorldSpeed === 'function') ? window._currentWorldSpeed() : 0;
   var _tFace = (hit && typeof hit.t === 'number') ? hit.t : 1;
   var wx = cam + _vAdv * (_tFace * (b.flightTimeSec || 0)) + half + 2;
@@ -1012,7 +1015,18 @@ window._apsDecide = function(b, hit){
   b._apsHit = true;
   b._apsT = t;
   b._apsWX = wx;
-  return { t: t, wx: wx };
+  /* rev-aps-visual-y: 回傳攔截面的實繪高度，尾煙終點與 APS 爆炸同點。
+     settle 的 hit.y 仍用彈道高（_apsFx 自行做一次實繪轉換，避免雙重轉換）。 */
+  var _wyA = b.startY + (b.impactY - b.startY) * t;
+  var _posA = (typeof window._vehicleHitScreenPos === 'function') ? window._vehicleHitScreenPos(tgt.vehicleId, _wyA) : null;
+  if(_posA){
+    var _ftA = (tgt && typeof tgt.y === 'number') ? tgt.y : 0;
+    var _chfA = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+    var _phmA = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+    _wyA = _ftA + (0.95 - _posA.ny) * _phmA / _chfA;
+  }
+  b._apsWY = _wyA;
+  return { t: t, wx: wx, wy: _wyA };
 };
 /* ===== rev-aps-pre-decide:end ===== */
 /* rev-gl-atgm: 按弹种定装填时间 */
@@ -1082,7 +1096,7 @@ function _vGetArmor(vid, partKey, isHeat){
 
 /* rev-heat-set: 化學能彈種白名單，新彈種只加 Set */
 const _HEAT_AMMO_SET = new Set([
-  'atgm', '3bk29', 'pg15v',
+  'atgm', 'pg27', '3bk29', 'pg15v',
   '9m14', '9m113', '9m112', '9m119m', '9m117m1'
 ]);
 function _vIsHeatAmmo(ammoId){
@@ -1931,6 +1945,7 @@ btr90:{frontWidth:3.12,height:2.65},
 bmp1:{frontWidth:2.94,height:2.07},  bmp1m:{frontWidth:2.94,height:2.07},
 bmp2:{frontWidth:3.15,height:2.26},  bmp3:{frontWidth:3.30,height:2.30},
 bmd4:{frontWidth:3.15,height:2.17},
+bmp3m:{frontWidth:3.30,height:2.30},
 t80:{frontWidth:3.60,height:2.20},   t80b:{frontWidth:3.60,height:2.20},
 t80bv:{frontWidth:3.60,height:2.20}, t80u:{frontWidth:3.60,height:2.20},
 t80uk:{frontWidth:3.60,height:2.20}, t80um:{frontWidth:3.60,height:2.20}
