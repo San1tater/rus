@@ -742,7 +742,7 @@ const _bulletRef = window._weaponFire({
     });
     /* rev-atgm-flighttime: 供 _fireMuzzle 计算导弹视觉速度 */
     const _flightSec = (_bulletRef && typeof _bulletRef.flightTimeSec === 'number' && _bulletRef.flightTimeSec > 0) ? _bulletRef.flightTimeSec : 1;
-    return { ok: true, ammoId: _usedAmmoId, reloadMs: _calcReloadMs(wid, _usedAmmoId, p.vehicleId), flightTimeSec: _flightSec, realSpeedMps: _spd };
+    return { ok: true, ammoId: _usedAmmoId, reloadMs: _calcReloadMs(wid), flightTimeSec: _flightSec, realSpeedMps: _spd };
   }
 
   };
@@ -1030,11 +1030,11 @@ window._apsDecide = function(b, hit){
 };
 /* ===== rev-aps-pre-decide:end ===== */
 /* rev-gl-atgm: 按弹种定装填时间 */
-function _calcReloadMs(wid, ammoId, vid){
-  if(ammoId && _isGLATGMId(ammoId)){
-    return (typeof GL_ATGM_RELOAD_MS !== 'undefined' && GL_ATGM_RELOAD_MS[vid]) || 7500;
-  }
-  return (typeof MUZZLE_PROFILES !== 'undefined' && MUZZLE_PROFILES[wid] ? MUZZLE_PROFILES[wid].pauseMs : 3000);
+function _calcReloadMs(wid){
+/* rev-gl-reload-cycle: 炮塔循環恆 = 主炮裝填，與打出什麼彈無關。
+   GL_ATGM_RELOAD_MS 是「導彈整備時間」，只用於 _glParticipates 判斷導彈能否跟上
+   主炮節奏，不能用來凍結炮塔 —— 舊實作打完導彈回 15000，連 HE 一起啞 15s。 */
+return (typeof MUZZLE_PROFILES !== 'undefined' && MUZZLE_PROFILES[wid] ? MUZZLE_PROFILES[wid].pauseMs : 3000);
 }
 
 function _vEnsureDamage(vid){
@@ -1081,17 +1081,19 @@ function _vEnsureDamage(vid){
 }
 
 /* rev-7part: 按部位 × 彈種查 LAYOUT + ERA_TYPES，一次返回最終等效（mm RHA） */
-function _vGetArmor(vid, partKey, isHeat){
-  const layout = (typeof VEHICLE_ARMOR_LAYOUT !== 'undefined') ? VEHICLE_ARMOR_LAYOUT[vid] : null;
-  if(!layout) return 30;
-  const part = layout[partKey];
-  if(!part) return 30;
-  const base = isHeat ? (part.baseHEAT != null ? part.baseHEAT : (part.baseKE || 30)) : (part.baseKE || 30);
-  let eraBonus = 0;
-  if(part.era && typeof ERA_TYPES !== 'undefined' && ERA_TYPES[part.era]){
-    eraBonus = isHeat ? (ERA_TYPES[part.era].heat || 0) : (ERA_TYPES[part.era].ke || 0);
-  }
-  return base + eraBonus;
+function _vGetArmor(vid, partKey, isHeat, noEra){
+const layout = (typeof VEHICLE_ARMOR_LAYOUT !== 'undefined') ? VEHICLE_ARMOR_LAYOUT[vid] : null;
+if(!layout) return 30;
+const part = layout[partKey];
+if(!part) return 30;
+const base = isHeat ? (part.baseHEAT != null ? part.baseHEAT : (part.baseKE || 30)) : (part.baseKE || 30);
+/* rev-era-noera-param: noEra=true 代表這一發落在爆反縫隙 → 只算基礎等效。
+   函式保持純查詢（無隨機），覆蓋 roll 由 _vHitVehicle 命中結算處負責。 */
+let eraBonus = 0;
+if(!noEra && part.era && typeof ERA_TYPES !== 'undefined' && ERA_TYPES[part.era]){
+eraBonus = isHeat ? (ERA_TYPES[part.era].heat || 0) : (ERA_TYPES[part.era].ke || 0);
+}
+return base + eraBonus;
 }
 
 /* rev-heat-set: 化學能彈種白名單，新彈種只加 Set */
@@ -1168,7 +1170,12 @@ window._vHitVehicle = function(veh, dmg, penMM, ammoId, attackerName, weaponName
   /* rev-7part: 分車型部位權重 + 一次算完 ERA */
   const part = { key: _vPartKeyFromCtx(veh) }; /* rev-box3d: 幾何定部位，刪權重隨機 */
   const isHeat = _vIsHeatAmmo(ammoId);
-  const armorMM = _vGetArmor(vid, part.key, isHeat);
+/* rev-era-coverage: 爆反是離散塊，掛載率 <1 時部分命中落在縫隙 → 只算基礎等效。
+   未標 eraCoverage 的部位預設 1（T-80 系行為不變）。 */
+const _layC = (typeof VEHICLE_ARMOR_LAYOUT !== 'undefined' && VEHICLE_ARMOR_LAYOUT[vid]) ? VEHICLE_ARMOR_LAYOUT[vid][part.key] : null;
+const _covC = (_layC && _layC.era && typeof _layC.eraCoverage === 'number') ? Math.max(0, Math.min(1, _layC.eraCoverage)) : 1;
+const _eraHitC = (_covC >= 1) || (Math.random() < _covC);
+const armorMM = _vGetArmor(vid, part.key, isHeat, !_eraHitC);
 
   /* 載具無護甲池：diff <= 0 直接 0，diff > 0 按剩餘穿深/原穿深 */
   const _diff = penMM - armorMM;

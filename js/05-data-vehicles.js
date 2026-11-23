@@ -137,7 +137,7 @@ const VEHICLES = {
   bmp3m: {
     id:'bmp3m', name:'BMP-3M', tier:6, line:'bmp',
     weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
-    armorGrid:['90/40/22','80/45/30','前弧附加'],
+    armorGrid:['70/40/22','65/45/30','Kaktus'],
     speedFwd:70, speedRev:20, speedRoad:70, speedOffroad:'50-55',
     supportDuration:50, next:[],
     researchCost:{ ammoCal:'7.62x54', ammoCount:3500, liquor:3500, exp:18000 }
@@ -266,11 +266,15 @@ const VEHICLE_ARMOR_LAYOUT = {
     hullSide:{baseKE:18,baseHEAT:18,era:null},       hullRear:{baseKE:14,baseHEAT:14,era:null},
     turretFront:{baseKE:38,baseHEAT:38,era:null},    turretSide:{baseKE:26,baseHEAT:26,era:null},  turretRear:{baseKE:20,baseHEAT:20,era:null}
   },
-  /* BMP-3M：前弧附加裝甲（抗 30mm APDS），側後同 BMP-3 */
+  /* BMP-3M：Kaktus / 4S24 軟殼爆反（全車約 150~200 塊，增重 4.2t）。
+     base 維持 BMP-3 原值 —— 4S24 無抗 KE 增益，附加鋼板抗 12.7 B-32 / 23mm / 3UBR6 已由 base 涵蓋。
+     eraCoverage = 該部位掛載覆蓋率：炮塔周邊 70%、車側 62%、正面合計 36%
+     （首下較完整 0.65 / 首上避開駕駛艙蓋·潛望鏡·航向機槍射界僅 0.14；
+       按正面投影權重 32:24 加權回代 = 0.359）。車尾與炮塔尾為格柵，非爆反。 */
   bmp3m: {
-    hullUpperFront:{baseKE:90,baseHEAT:90,era:null}, hullLowerFront:{baseKE:42,baseHEAT:42,era:null},
-    hullSide:{baseKE:40,baseHEAT:40,era:null},       hullRear:{baseKE:22,baseHEAT:22,era:null},
-    turretFront:{baseKE:80,baseHEAT:80,era:null},    turretSide:{baseKE:45,baseHEAT:45,era:null},  turretRear:{baseKE:30,baseHEAT:30,era:null}
+    hullUpperFront:{baseKE:70,baseHEAT:70,era:'kaktus',eraCoverage:0.14}, hullLowerFront:{baseKE:42,baseHEAT:42,era:'kaktus',eraCoverage:0.65},
+    hullSide:{baseKE:40,baseHEAT:40,era:'kaktus',eraCoverage:0.62},       hullRear:{baseKE:22,baseHEAT:22,era:null},
+    turretFront:{baseKE:65,baseHEAT:65,era:'kaktus',eraCoverage:0.70},    turretSide:{baseKE:45,baseHEAT:45,era:'kaktus',eraCoverage:0.70},  turretRear:{baseKE:30,baseHEAT:30,era:null}
   },
   /* ═══ T-80 系列（複合 + ERA） ═══ */
   t80: {
@@ -389,7 +393,10 @@ const VEHICLE_FEATURES = {
 const ERA_TYPES = {
   kontakt_1:       { ke: 20,  heat: 300 },
   kontakt_5:       { ke: 135, heat: 525 },
-  kontakt_5_light: { ke: 65,  heat: 350 }
+  kontakt_5_light: { ke: 65,  heat: 350 },
+/* Kaktus / 4S24 軟殼爆反：裝藥僅 K1 一半、飛板薄 → 無抗 KE 增益；
+   heat 470 使 bmp3m 五個掛載部位 base+470 落在實測 500~550mm 區間。 */
+kaktus: { ke: 0, heat: 470 }
 };
 
 /* [v206] 載具武器真實彈速（m/s） */

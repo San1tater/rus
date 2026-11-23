@@ -337,7 +337,7 @@ function _updatePT(){
   }
 }
 
-function _disembark(){
+function _disembark(){/*PM-GATE*/var _bG=window.BTRSupport;if(_bG&&_bG._disembarked)return;if(_bG)_bG._disembarked=true;
   const ex = window._explore;
 if(window.BTRSupport) window.BTRSupport._disembarked = true;
   if(!ex.passengersFollowing) ex.passengersFollowing = [];
@@ -492,7 +492,7 @@ function _cleanPC(){
 function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride, fallProgress){
 /* rev-arm45v3: 載員屍體統一走 _raidDrawHuman（同一條右手持槍 / 向後倒模型）。
    畫布尺寸活↔死一致，避免切換時重建閃爍。 */
-var cw = fxH * 1.2, chh = fxH;
+var cw = fxH * ((animOverride === 'dead') ? 1.9 : 1.2), chh = fxH;
 var cvs = fx._pc[key];
 if(!cvs){
 cvs = document.createElement('canvas');
@@ -508,7 +508,7 @@ var targetLayer = isDead
 : (typeof _getPassengerLayer === 'function' ? _getPassengerLayer() : fx);
 if(targetLayer && cvs.parentNode !== targetLayer) targetLayer.appendChild(cvs);
 cvs.style.zIndex = isDead ? '21' : '7';
-cvs.style.left = (px - cw/2) + 'px';
+cvs.style.left = (px - cw/2) + 'px'; cvs.style.bottom = isDead ? (-8)+'px' : '0px';
 var ctx = cvs.getContext('2d');
 ctx.setTransform(2, 0, 0, 2, 0, 0);
 ctx.clearRect(0, 0, cw, chh);
@@ -537,7 +537,20 @@ item.clipH = (el >= 600) ? 1 : (el <= 0 ? 0 : el/600);
 ctx.save();
 ctx.globalAlpha = item.fadeIn;
 if(item.clipH < 1 && !isDead){ ctx.beginPath(); ctx.rect(0, 0, cw, chh*item.clipH); ctx.clip(); }
-_raidDrawHuman(ctx, cw/2, chh*0.96, sc, eq, eqR, animN, fi, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
+if(isDead && window.PuppetRig){
+    var _R = window.PuppetRig;
+    var _cfg = wps ? _R.weaponCfg(wps, eq[wps]) : null;
+    var _bb = _R.bbox('dead', fi, true, _cfg, { head:eq.head||null, top:eq.top||null, headEnv:!eq.head, topEnv:!eq.top });
+    if(_bb){
+      var _fx = cw/2 - sc*((_bb.x0 + _bb.x1)/2 - 200);
+      var _fy = chh - sc*(_bb.y1 - 515);
+      _R.draw(ctx, _fx, _fy, sc, { anim:'dead', frame:fi, flip:true, slot:wps, weaponId:eq[wps],
+        head:eq.head, top:eq.top, colors:(window._pmColors ? window._pmColors(item.srv ? item.srv.type : null) : null),
+        ammoBox:(typeof AMMO !== 'undefined' && !!AMMO[eq[wps]]) });
+    }
+  } else {
+    _raidDrawHuman(ctx, cw/2, chh*0.96, sc, eq, eqR, animN, fi, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
+  }
 ctx.restore();
 }
 
@@ -826,11 +839,11 @@ catch(e){ r = null; }
 if(!r) continue;
 en._corpseRendered = true;
 const w = document.createElement('div');
-w.style.cssText = 'position:absolute;bottom:0;pointer-events:none;will-change:left;width:' + r.drawW + 'px;height:' + r.drawH + 'px;';
+w.style.cssText = 'position:absolute;bottom:' + (-((r.pad||4) + 8)) + 'px;pointer-events:none;will-change:left;width:' + r.drawW + 'px;height:' + r.drawH + 'px;';
 r.canvas.style.cssText = 'width:100%;height:100%;display:block;';
 w.appendChild(r.canvas);
 layer.appendChild(w);
-ex.corpses.push({ wrap: w, drawW: r.drawW, drawH: r.drawH, worldX: wx, ev: ev });
+ex.corpses.push({ wrap: w, drawW: r.drawW, drawH: r.drawH, footX: (typeof r.footX === 'number' ? r.footX : r.drawW / 2), footY: (typeof r.footY === 'number' ? r.footY : r.drawH), worldX: wx, ev: ev });
 made++;
 }
 return made;
@@ -846,7 +859,7 @@ function _updateCorpsesLayout(){
   const px = fx.clientWidth * EXPLORE_HERO_X_RATIO;
   for(let i = ex.corpses.length - 1; i >= 0; i--){
     const c = ex.corpses[i];
-    const left = px + (c.worldX - ex.worldX) * ppm - c.drawW / 2;
+    const left = px + (c.worldX - ex.worldX) * ppm - (typeof c.footX === 'number' ? c.footX : c.drawW / 2);
     c.wrap.style.left = left + 'px';
     if(left + c.drawW < -50){
       try { c.wrap.remove(); } catch(e){}
@@ -1357,7 +1370,7 @@ return;
   }
   if(ex._lastBtrPhase !== ph){
     /* 下車由 13 的相位機統一驅動 */
-if(ph === 'wreck' && ex._lastBtrPhase !== 'wreck' && !(b && b._wreckDisembarked)) _disembark();
+if(ph === 'wreck' && ex._lastBtrPhase !== 'wreck') _disembark();
     ex._lastBtrPhase = ph;
   }
   if(window._isPlayerMounted()){

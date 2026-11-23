@@ -278,36 +278,32 @@ window._fxProjectPx = function(q, W){
    相機在 life 秒內前進 spd*life，加上可視右半窗 srw，即為可達距離。
    更遠的煙在相機抵達前就已消散，沉積它們只是浪費。 */
 window._rpgTrailDeposit = function(owner, b, t0, t1, P){
-if(!owner || !b || !(t1 > t0)) return;
-P = P || window._RPG27; if(!P) return;
-if(!owner.rpgSmoke) owner.rpgSmoke = [];
-if(owner.rpgSmoke.length > 900) return;
-var c = window._combat;
-var cam = (c && c.allies && c.allies[0] && typeof c.allies[0].worldX === 'number') ? c.allies[0].worldX : 0;
-var srw = (c && c.sm && c.sm.screenRightWorld) || 2;
-var spd = (typeof window._currentWorldSpeed === 'function') ? Math.abs(window._currentWorldSpeed()) : 0;
-var reach = srw + spd * P.life + 0.5;
-var dx = b.impactX - b.startX, dy = b.impactY - b.startY;
-var pathLen = Math.abs(dx);
-if(!(pathLen > 0.01)) return;
-var spacing = P.spacing || 0.12;
-var steps = Math.ceil(pathLen * (t1 - t0) / spacing);
-if(steps < 1) steps = 1; if(steps > 400) steps = 400;
-for(var i = 1; i <= steps; i++){
-var t = t0 + (t1 - t0) * (i / steps);
-var wx = b.startX + dx * t;
-if(wx - cam > reach) continue;
-var wy = b.startY + dy * t;
-owner.rpgSmoke.push({
-_wx: wx, _wy: wy + (Math.random() - 0.5) * 0.06,
-age: 0, life: P.life,
-r0: P.r0 * (0.85 + Math.random() * 0.3),
-grow: P.grow * (0.8 + Math.random() * 0.5),
-vy: (P.rise || 0.10) * (0.5 + Math.random()),
-alpha: P.alpha * (0.7 + Math.random() * 0.6)
-});
-}
-}
+  if(!owner || !b || !(t1 > t0)) return;
+  P = P || window._RPG27; if(!P) return;
+  if(!owner.rpgSmoke) owner.rpgSmoke = [];
+  if(owner.rpgSmoke.length > 900) return;
+  /* rev-trail-no-reach: 移除 reach 過濾器 —— 全速時它把「連到爆點的最後一段煙」
+     整段丟掉（reach≈27m 但爆點在 30m 外），造成煙與爆炸分離。上限 900 + 渲染裁切已足夠。 */
+  var dx = b.impactX - b.startX, dy = b.impactY - b.startY;
+  var pathLen = Math.abs(dx);
+  if(!(pathLen > 0.01)) return;
+  var spacing = P.spacing || 0.12;
+  var steps = Math.ceil(pathLen * (t1 - t0) / spacing);
+  if(steps < 1) steps = 1; if(steps > 400) steps = 400;
+  for(var i = 1; i <= steps; i++){
+    var t = t0 + (t1 - t0) * (i / steps);
+    var wx = b.startX + dx * t;
+    var wy = b.startY + dy * t;
+    owner.rpgSmoke.push({
+      _wx: wx, _wy: wy + (Math.random() - 0.5) * 0.06,
+      age: 0, life: P.life,
+      r0: P.r0 * (0.85 + Math.random() * 0.3),
+      grow: P.grow * (0.8 + Math.random() * 0.5),
+      vy: (P.rise || 0.10) * (0.5 + Math.random()),
+      alpha: P.alpha * (0.7 + Math.random() * 0.6)
+    });
+  }
+};
 
 /* ===== rev-fx-logical-view: 畫布邏輯尺寸唯一出口 =====
    战斗 FX 畫布背板 = CSS × dpr（與載具畫布一致），ctx 帶 dpr 變換，

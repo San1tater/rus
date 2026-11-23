@@ -1524,80 +1524,36 @@ function _getPlayerMuzzlePosFoot(){
 }
 
 function _getPassengerMuzzlePos(a){
-  const c = window._combat;
-  if(!c) return null;
-  const fx = document.getElementById('combat-overlay');
-  if(!fx) return { x: 0.35, y: 0.55 };
-  const W = fx.clientWidth, H = fx.clientHeight;
-  if(!W || !H) return { x: 0.35, y: 0.55 };
-  const _pfArr = (window._explore && window._explore.passengersFollowing) || [];
-  let _pfItem = null;
-  for(let i = 0; i < _pfArr.length; i++){
-    if(_pfArr[i].srv && a.srv && _pfArr[i].srv.id === a.srv.id){ _pfItem = _pfArr[i]; break; }
-  }
-  if(!_pfItem) return { x: 0.35, y: 0.55 };
-  const _sxN = _pfItem.screenX;
-  if(!a.weapon || !a.weapon.id || typeof getWeaponCfg !== 'function' || typeof computeWeaponCharLayout !== 'function'){
-    return { x: _sxN + 0.02, y: 0.55 };
-  }
-  const _wid = a.weapon.id;
-  const _slot = a.weapon.slot || 'primary';
-  const cfg = getWeaponCfg(_slot, _wid);
-  if(!cfg) return { x: _sxN + 0.02, y: 0.55 };
-  const layout = computeWeaponCharLayout(cfg);
-  if(!layout) return { x: _sxN + 0.02, y: 0.55 };
-  const _wm = (typeof WEAPON_MUZZLE !== 'undefined') ? WEAPON_MUZZLE[resolveIconId(_wid)] : null;
-  const _tr = cfg.trim;
-  const cw = H * 1.2;
-  const chh = H;
-  const sc = chh * CHAR_HEIGHT_FACTOR / 386;
-  const ORIG_FOOT_X = 200;
-  const ORIG_FOOT_Y = 515;
-  const _centerX = cw / 2;
-  const _groundY = chh * 0.95;
-  let _localX, _localY;
-  if(_wm && _tr && _tr.w > 0 && _tr.h > 0 && layout.isTrimMode){
-    const _baseW = layout.baseW;
-    const _baseH = _tr.h * (cfg.scale || 1.0);
-    const _mzLocalX = layout.anchorX + (_wm.x / _tr.w) * _baseW;
-    const _mzLocalY = layout.anchorY - _baseH / 2 + (_wm.y / _tr.h) * _baseH;
-    _localX = _centerX + sc * (_mzLocalX - ORIG_FOOT_X);
-    _localY = _groundY + sc * (_mzLocalY - ORIG_FOOT_Y);
-  } else {
-    _localX = _centerX + sc * (layout.rightX - ORIG_FOOT_X);
-    _localY = _groundY + sc * (layout.anchorY - ORIG_FOOT_Y);
-  }
-  const _fxLeft = _sxN * W - cw / 2;
-  return {
-    x: (_fxLeft + _localX) / W,
-    y: _localY / H
-  };
-}
+var R=window.PuppetRig,c=window._combat;
+if(!R||!c||!a||!a.weapon||!a.weapon.id)return null;
+var fx=document.getElementById('combat-overlay');if(!fx)return null;
+var W=fx.clientWidth,H=fx.clientHeight;if(!W||!H)return null;
+var ex=window._explore,ls=(ex&&ex.passengersFollowing)||[],it=null;
+for(var i=0;i<ls.length;i++){if(ls[i].srv&&a.srv&&ls[i].srv.id===a.srv.id){it=ls[i];break;}}
+if(!it)return null;
+var an=(it._lastAnimN==='death')?'dead':(it._lastAnimN||'idle');
+var m=R.muzzle(a.weapon.slot||'primary',a.weapon.id,an,it.animFrame|0,false);
+if(!m)return null;
+var cw=H*1.2,s=(H*CHAR_HEIGHT_FACTOR)/386,left=it.screenX*W-cw/2;
+return{x:(left+cw/2+s*(m.x-200))/W,y:(H*0.96+s*(m.y-515))/H};}
 
-function _getEnemyMuzzlePos(e, p, isRPG){
-/* rev-arm45: 敵槍口委派共用函數（flipX=true → 右手=back_arm + 互換 keys）。 */
-const fx = document.getElementById('combat-overlay');
-const W = fx ? fx.clientWidth : 400, H = fx ? fx.clientHeight : 500;
-const c = window._combat;
-if(!c) return {x:1.05, y:0.55};
-const sm = c.sm || {screenRightWorld:2};
-const relRaw = e.worldX - p.worldX;
-const rel = isRPG ? (relRaw + 0.5) : relRaw;
-let sxPx = (EXPLORE_HERO_X_RATIO + (rel/(sm.screenRightWorld||2))*(1-EXPLORE_HERO_X_RATIO))*W;
-if(rel <= 0) sxPx = 0.02*W;
-const _wid = (isRPG && e.hasRPG) ? 'rpg'
-: (e.primaryWeapon && e.primaryWeapon.id) ? e.primaryWeapon.id
-: (e.secondaryWeapon && e.secondaryWeapon.id) ? e.secondaryWeapon.id : null;
-if(!_wid || typeof window.getCharWeaponMuzzleLocal !== 'function') return {x:sxPx/W, y:0.55};
-const _slot = (isRPG && e.hasRPG) ? 'primary' : ((e.primaryWeapon && e.primaryWeapon.id === _wid) ? 'primary' : 'secondary');
-const _now = performance.now();
-const _as = (typeof getUnitAnimState === 'function') ? getUnitAnimState(e, _now) : {name:'idle', startTime:_now};
-const _fi = (typeof computeAnimFrame === 'function') ? computeAnimFrame(_as.name, _as.startTime, _now) : 0;
-const mz = window.getCharWeaponMuzzleLocal(_slot, _wid, _as.name, _fi, true);
-if(!mz) return {x:sxPx/W, y:0.55};
-const sc = (H*CHAR_HEIGHT_FACTOR)/386;
-return { x: (sxPx + sc*(200 - mz.x))/W, y: (H*0.95 + sc*(mz.y - 515))/H };
-}
+function _getEnemyMuzzlePos(e,p,isRPG){
+var R=window.PuppetRig,fx=document.getElementById('combat-overlay');
+var W=fx?fx.clientWidth:400,H=fx?fx.clientHeight:500,c=window._combat;
+if(!R||!c)return{x:1.05,y:0.55};
+var sm=c.sm||{screenRightWorld:2},rel=(e.worldX-p.worldX)+(isRPG?0.5:0);
+var sx=(EXPLORE_HERO_X_RATIO+(rel/(sm.screenRightWorld||2))*(1-EXPLORE_HERO_X_RATIO))*W;
+if(rel<=0)sx=0.02*W;
+var aw=(isRPG&&e.hasRPG)?{id:'rpg',slot:'primary'}:_pmActiveWeapon(e);
+if(!aw)return{x:sx/W,y:0.55};
+var now=performance.now();
+var as=(typeof getUnitAnimState==='function')?getUnitAnimState(e,now):{name:'idle',startTime:now};
+var an=(as.name==='death')?'dead':as.name;
+var fi=Math.floor(Math.max(0,now-as.startTime)/(1000/R.fps(an)));
+var m=R.muzzle(aw.slot,aw.id,an,fi,true);
+if(!m)return{x:sx/W,y:0.55};
+var s=(H*CHAR_HEIGHT_FACTOR)/386;
+return{x:(sx+s*(m.x-200))/W,y:(H*0.95+s*(m.y-515))/H};}
 
 
 function _firePlayer(p, t, now, w){
@@ -2543,8 +2499,10 @@ window._rpgGroundBurst(c, e, rarR2, dmgR2, impactX, impactZ);
       onHit: function(hitX, hitY, tgt){
 /* rev-combatfix: RPG 直擊爆炸特效, 與射失 _rpgGroundBurst 對稱 */
 try {
-var _fxR = document.getElementById("battle-fx") || document.getElementById("combat-overlay");
-var _WR = _fxR ? _fxR.clientWidth : 400, _HR = _fxR ? _fxR.clientHeight : 500;
+/* rev-rpgfx-canvas: 爆炸像素讀畫布邏輯尺寸（battle-fx 是 500 高的錯誤來源） */
+var _fxR = (c && c.playerCanvas) ? c.playerCanvas : document.getElementById("combat-overlay");
+var _WR = (typeof window._fxViewW === 'function') ? window._fxViewW(_fxR) : (_fxR ? _fxR.clientWidth : 400);
+var _HR = (typeof window._fxViewH === 'function') ? window._fxViewH(_fxR) : (_fxR ? _fxR.clientHeight : 500);
 var _p0R = c.allies[0] ? c.allies[0].worldX : 0;
 var _hrR = (typeof EXPLORE_HERO_X_RATIO === "number") ? EXPLORE_HERO_X_RATIO : 0.25;
 var _sxR = _hrR + (hitX - _p0R) / c.sm.screenRightWorld * (1 - _hrR);
@@ -2570,7 +2528,7 @@ if(!(tgt && tgt.isVehicle)) _doRpgFx();
         if(tgt.isVehicle){
           if(typeof window._vHitVehicle === 'function'){
             const _eNameR2 = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
-            var _vResR2 = window._vHitVehicle(tgt, baseDmgR2, penMMR2, 'atgm', _eNameR2, 'RPG', rarR2, e.rarity || '一般', spdR2, window._rpg27Cal());
+            var _vResR2 = window._vHitVehicle(tgt, baseDmgR2, penMMR2, 'pg27', _eNameR2, 'RPG', rarR2, e.rarity || '一般', spdR2, window._rpg27Cal());
 if(!(_vResR2 && _vResR2.intercepted) && typeof _doRpgFx === 'function') _doRpgFx();
           }
         }
@@ -2728,7 +2686,7 @@ if(!(_vResR2 && _vResR2.intercepted) && typeof _doRpgFx === 'function') _doRpgFx
         if(typeof window._vHitVehicle === 'function'){
           const _eNameR = (typeof ENEMIES !== 'undefined' && ENEMIES[e.eid]) ? ENEMIES[e.eid].name : e.eid;
           /* rev-rpg27-note: RPG-27 / PG-27 —— 105mm，初速 130 m/s（筒內燃盡，無續燃） */
-          window._vHitVehicle(p, baseDmg, penMM, 'atgm', _eNameR, 'RPG', rar, e.rarity || '一般', window._rpg27Spd(), window._rpg27Cal());
+          window._vHitVehicle(p, baseDmg, penMM, 'pg27', _eNameR, 'RPG', rar, e.rarity || '一般', window._rpg27Spd(), window._rpg27Cal());
         }
       }
 
@@ -2965,22 +2923,15 @@ function _calcGrenadeParams(distM, gid, H0){
   return { vx, vy, theta, T, distM: d, speed: v, maxRange };
 }
 /* 手部 = front_arm 右上頂點（u=1,v=0），含 L.rot + key.rot；具體計算委託 window.getCharLayerCornerN */
-function _getPlayerHandPos(animName, frameIdx){
-  if(typeof heroAnim === 'undefined') return { x: EXPLORE_HERO_X_RATIO + 0.04, y: 0.5 };
-  const canvas = document.getElementById('hero-canvas');
-  const W = canvas && canvas.clientWidth ? canvas.clientWidth : 400;
-  const H = canvas && canvas.clientHeight ? canvas.clientHeight : 500;
-  if(!W || !H) return { x: EXPLORE_HERO_X_RATIO + 0.04, y: 0.5 };
-  const scale = (H * CHAR_HEIGHT_FACTOR) / 386;
-  return window.getCharLayerCornerN('front_arm', 1, 0, {
-    animName: animName || heroAnim.name,
-    frameIdx: (typeof frameIdx === 'number') ? frameIdx : heroAnim.frame,
-    canvasW: W, canvasH: H,
-    scale: scale,
-    centerX_px: W * EXPLORE_HERO_X_RATIO,
-    groundY_px: H * 0.95
-  });
-}
+function _getPlayerHandPos(animName,frameIdx){
+var R=window.PuppetRig,cv=document.getElementById('hero-canvas');
+var W=(cv&&cv.clientWidth)?cv.clientWidth:400,H=(cv&&cv.clientHeight)?cv.clientHeight:500;
+if(!R||!W||!H)return{x:EXPLORE_HERO_X_RATIO+0.04,y:0.5};
+var s=(H*CHAR_HEIGHT_FACTOR)/386;
+var an=(animName==='death')?'dead':(animName||((typeof heroAnim!=='undefined')?heroAnim.name:'idle'));
+var fi=(typeof frameIdx==='number')?frameIdx:((typeof heroAnim!=='undefined')?heroAnim.frame:0);
+var p=R.hand(an,fi,false);
+return{x:(W*EXPLORE_HERO_X_RATIO+s*(p.x-200))/W,y:(H*0.95+s*(p.y-515))/H};}
 function _handYToH0(handPosY){
   const normAboveGround = Math.max(0.05, 0.95 - handPosY);
   return normAboveGround * (PLAYER_HEIGHT_M / CHAR_HEIGHT_FACTOR);
@@ -3218,22 +3169,6 @@ function _tickBullets(dt){
       b.t += dt * 5;
     }
     
-    if(b.isRPG){
-      /* rev-fix-rpg-trail: 步戰 RPG 尾煙插值（按距離生成，不按幀） */
-      const _dtT = b.duration > 0 ? (dt * 1000) / b.duration : 0;
-      const _startT = Math.max(0, b.t - _dtT);
-      const _endT = Math.min(1, b.t);
-      const _span = _endT - _startT;
-      if(_span > 0){
-        const _steps = Math.max(1, Math.ceil(_span * 300));
-        for(let _k = 0; _k < _steps; _k++){
-          const _kt = _startT + _span * (_k / _steps);
-          const _bx = b.sx + (b.tx - b.sx) * _kt;
-          const _by = b.sy + (b.ty - b.sy) * _kt;
-          c.rpgSmoke.push({ x: _bx, y: _by, age: 0, size: 0.015 + Math.random() * 0.010 });
-        }
-      }
-    }
     
     if(b.t >= 1){
       if(!b.resolved){
@@ -3242,36 +3177,27 @@ function _tickBullets(dt){
          * 手雷：worldStartX + vx*T 反推落点世界坐标。
          * RPG：bullet 携带 _absWorldX。
          * 不 clamp 到屏幕内——世界坐标映射后 sxN ∉ [0,1] 天然不生成。 */
-        if(b.isGrenade || b.isRPG){
+        if(b.isGrenade){
+          /* rev-grenade-only-burst: RPG 已走統一武器核心，c.bullets 不再有 isRPG（舊分支不可達，刪除） */
           var _finalWX = null;
-          if(b.isGrenade && typeof b.worldStartX === 'number' && typeof b.vx === 'number' && b.T > 0){
+          if(typeof b.worldStartX === 'number' && typeof b.vx === 'number' && b.T > 0){
             var _dirG = (b.dir === -1) ? -1 : 1;
             _finalWX = b.worldStartX + _dirG * b.vx * b.T;
-          } else if(typeof b._absWorldX === 'number'){
-            _finalWX = b._absWorldX;
           }
           if(_finalWX !== null){
-            var _fxElG = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
-            var _WG = _fxElG ? _fxElG.clientWidth : 400;
-            var _HG = _fxElG ? _fxElG.clientHeight : 500;
+            var _cvBG = c.playerCanvas || document.getElementById('combat-overlay');
+            var _WG = (typeof window._fxViewW === 'function') ? window._fxViewW(_cvBG) : (_cvBG ? _cvBG.clientWidth : 400);
+            var _HG = (typeof window._fxViewH === 'function') ? window._fxViewH(_cvBG) : (_cvBG ? _cvBG.clientHeight : 500);
             var _px0 = c.allies[0] ? c.allies[0].worldX : 0;
             var _relWX = _finalWX - _px0;
             var _smC = c.sm || { screenRightWorld: 2 };
             var _sxN = EXPLORE_HERO_X_RATIO + (_relWX / _smC.screenRightWorld) * (1 - EXPLORE_HERO_X_RATIO);
-            /* 天然裁切：屏幕映射后超出 [0,1] 就跳过 */
             if(_sxN >= 0 && _sxN <= 1){
               var _explX = _sxN * _WG;
-              var _explY = b.isGrenade ? (_HG * 0.95) : (b.ty * _HG);
-              if(b.isRPG){
-                var _radRPG = _WG * 0.18;
-                var _startIdxR = c.explosions ? c.explosions.length : 0;
-                if(typeof window._spawnRPGImpactFx === 'function') window._spawnRPGImpactFx(c, _explX, _explY, _radRPG);
-                if(typeof window._applyWorldAnchor === 'function') window._applyWorldAnchor(c, _startIdxR, _px0, c.sm);
-              } else {
-                var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : _WG * 0.08;
-                if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, _explX, _explY, _radG);
-                if(typeof window._applyWorldAnchor === 'function') window._applyWorldAnchor(c, 0, _px0, c.sm);
-              }
+              var _explY = _HG * 0.95;
+              var _radG = (c.sm && c.sm.bgPixelsPerMeter) ? (4.5 * c.sm.bgPixelsPerMeter) : _WG * 0.08;
+              if(typeof _spawnExplosionSmoke === 'function') _spawnExplosionSmoke(c, _explX, _explY, _radG);
+              if(typeof window._applyWorldAnchor === 'function') window._applyWorldAnchor(c, 0, _px0, c.sm);
             }
           }
         }
@@ -3317,9 +3243,10 @@ function _float(t, text, cls, opts){
   var c = window._combat;
   if(!c) return;
   var sm = c.sm;
-  var fxEl = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
-  var W = fxEl ? fxEl.clientWidth : 400;
-  var H = fxEl ? fxEl.clientHeight : 500;
+  /* rev-float-canvas: 火花像素讀畫布邏輯尺寸；飄字正規化座標不變 */
+  var _cvF = c.playerCanvas || document.getElementById('combat-overlay');
+  var W = (typeof window._fxViewW === 'function') ? window._fxViewW(_cvF) : (_cvF ? _cvF.clientWidth : 400);
+  var H = (typeof window._fxViewH === 'function') ? window._fxViewH(_cvF) : (_cvF ? _cvF.clientHeight : 500);
   /* rev-spark-bullet-only: 命中火花只屬於子彈命中。
      RPG 直擊 / 破片 / 手雷不畫 —— 它們有自己的爆炸特效。
      近戰無 _hitCtx → 保留火花。判定只用既有資料，不新增欄位。 */
@@ -3477,15 +3404,15 @@ const rel = e.worldX - px;
     const animStart = _as.startTime;
     const frame = (typeof computeAnimFrame === 'function') ? computeAnimFrame(animName, animStart, _renderNow) : 0;
 
-    const pwId = (e.hasRPG && e.rpgAmmo > 0) ? 'rpg'
-               : (e.primaryWeapon && e.primaryWeapon.id) ? e.primaryWeapon.id
-               : (e.secondaryWeapon && e.secondaryWeapon.id) ? e.secondaryWeapon.id
-               : null;
-    const eq = { head: e.helmet || null, top: e.body || null, primary: pwId };
-    const eqR = { head: e.rarity || '一般', top: e.rarity || '一般', primary: e.rarity || '一般' };
-    if(typeof _raidDrawHuman !== 'function') continue;
+    const _aw=(e.hasRPG&&e.rpgAmmo>0)?{id:'rpg',slot:'primary'}:_pmActiveWeapon(e);
+ const pwId=_aw?_aw.id:null;
+ const pwSlot=_aw?_aw.slot:null;
+ const eq={head:e.helmet||null,top:e.body||null};
+ if(pwSlot)eq[pwSlot]=pwId;
+ const eqR={head:e.rarity||'一般',top:e.rarity||'一般'};
+ if(typeof _raidDrawHuman !== 'function') continue;
     ctx.save();
-    try { (window.drawHumanSprite || _raidDrawHuman)(ctx, sx, fy, eh / 386, eq, eqR, animName, frame, pwId ? 'primary' : null, 'enemy', true, false, null); } catch(err){}
+    try { (window.drawHumanSprite || _raidDrawHuman)(ctx, sx, fy, eh / 386, eq, eqR, animName, frame, pwSlot, 'enemy', true, false, null); } catch(err){}
     ctx.restore();
   }
 
@@ -3834,8 +3761,10 @@ var budget = baseDmg * 0.35 * 0.6;
 if(!(budget > 0)) return;
 var P = { x: impactX, y: 0, z: (typeof impactZ === 'number') ? impactZ : 0 };
 try {
-var fxEl = document.getElementById('battle-fx') || document.getElementById('combat-overlay');
-var W = fxEl ? fxEl.clientWidth : 400, H = fxEl ? fxEl.clientHeight : 500;
+/* rev-groundburst-canvas: 讀畫布邏輯尺寸 —— 舊實測 boomY=475 畫到 328 高畫布外 */
+var _cvG = c.playerCanvas || document.getElementById('combat-overlay');
+var W = (typeof window._fxViewW === 'function') ? window._fxViewW(_cvG) : (_cvG ? _cvG.clientWidth : 400);
+var H = (typeof window._fxViewH === 'function') ? window._fxViewH(_cvG) : (_cvG ? _cvG.clientHeight : 500);
 var p0 = c.allies[0] ? c.allies[0].worldX : 0;
 var sm = c.sm || { screenRightWorld: 2 };
 var hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
@@ -3910,3 +3839,11 @@ if(typeof _float === 'function') _float(a, '-' + shown, res.hpLost > 0 ? (isCrit
 }
 };
 
+/* ===== PM: 活體武器（渲染與槍口共用 _enemyActiveWeapon） ===== */
+function _pmActiveWeapon(e){if(!e)return null;
+var w=(typeof _enemyActiveWeapon==='function')?_enemyActiveWeapon(e)
+:(e._activeWeapon||e.primaryWeapon||e.secondaryWeapon||e.melee);
+if(!w||!w.id)return null;
+var sl=(e.primaryWeapon&&e.primaryWeapon.id===w.id)?'primary'
+:((e.secondaryWeapon&&e.secondaryWeapon.id===w.id)?'secondary':'melee');
+return{id:w.id,slot:sl};}

@@ -2,686 +2,33 @@
 
 'use strict';
 
-const GAME_LAYERS = [
-  { id:'right_leg', name:'右腿', z:18, color:'#2a2a2a', pivot:{x:0.5,y:0.05}, x:0.6, y:0.6, w:0.13, h:0.42 },
-  { id:'torso', name:'軀幹', z:30, color:'#4a6741', pivot:{x:0.5,y:0.10}, x:0.5, y:0.27, w:0.3, h:0.42 },
-  { id:'head', name:'頭', z:45, color:'#c89870', pivot:{x:0.5,y:0.92}, x:0.53, y:0.22, w:0.2, h:0.17 },
-  { id:'face', name:'面部', z:48, color:'#b88860', pivot:{x:0.5,y:0.92}, x:0.57, y:0.23, w:0.14, h:0.13 },
-  { id:'left_leg', name:'左腿', z:52, color:'#3a3a3a', pivot:{x:0.5,y:0.05}, x:0.44, y:0.62, w:0.14, h:0.44 },
-  { id:'back_arm', name:'後臂', z:55, color:'#3d3020', pivot:{x:0.5,y:0.5}, x:0.8, y:0.36, w:0.11, h:0.1 },
-  { id:'front_arm', name:'前臂', z:62, color:'#5a4a35', pivot:{x:0.05,y:0.5}, x:0.27, y:0.38, w:0.4, h:0.08 },
-];
+const GAME_LAYERS=(function(){var B=window.__PUPPET_BAKE__,bx=B.box,f0=B.anim.R.idle.f[0].L,o=[];
+for(var i=0;i<B.ids.length;i++){var id=B.ids[i],d=f0[i];
+var z=B.order.R.indexOf(id);if(z<0)z=i;
+o.push({id:id,name:id,z:z,color:B.col[id],
+pivot:{x:d[3]?d[5]/d[3]:0,y:d[4]?d[6]/d[4]:0.5},
+x:(d[0]-bx[0])/bx[2],y:(d[1]-bx[1])/bx[3],w:d[3]/bx[2],h:d[4]/bx[3],rot:d[2]});}
+return o;})();
 
-const GAME_ANIMS = {
-  dead: {
-/* rev-arm45: 一律向後倒（12f@12fps≈1s）。rootRot 由渲染端套 (flipX?+1:-1)。
-   keys.front_arm = 右手（持槍，dx 向中軸線 +3.5）；keys.back_arm = 左手（支撐）。
-   面向左時 _anim45 互換兩手 keys，右手變成 back_arm。
-   deadGunRot 70° → 槍斜向上；deadGunRotFlip 110° → 槍斜向下。 */
-frameCount: 12, fps: 12, loop: false, showEq: 'primary',
-rootRot:  [0, 2, 5, 3, 1, 6, 20, 40, 60, 76, 87, 90],
-rootLift: [0, 0, -1, -3, -6, -8, -3, 8, 22, 36, 47, 51],
-deadGunRot:     [0, -4, -8, -6, -2, 4, 16, 32, 48, 60, 68, 70],
-deadGunRotFlip: [0, -6, -13, -9, -3, 6, 25, 50, 75, 94, 107, 110],
-keys: {
-torso: [0,-3,-6,-4,-2,-5,-6,-4,-2,-1,0,0].map(function(r){return {rot:r,dx:0,dy:0};}),
-head:  [0,-5,-9,-6,-3,-7,-10,-8,-6,-5,-6,-6].map(function(r){return {rot:r,dx:0,dy:0};}),
-face:  [0,-5,-9,-6,-3,-7,-10,-8,-6,-5,-6,-6].map(function(r){return {rot:r,dx:0,dy:0};}),
-front_arm: [0,0,0,0,0,0.5,1,1.6,2.2,2.8,3.3,3.5].map(function(d){return {rot:0,dx:d,dy:0};}),
-back_arm:  [0,-1,-2,-2,-1,-2,-4,-6,-8,-9,-10,-10].map(function(r){return {rot:r,dx:0,dy:0};}),
-right_leg: [0,4,10,16,22,26,20,12,6,4,5,6].map(function(r){return {rot:r,dx:0,dy:0};}),
-left_leg:  [0,-4,-10,-16,-22,-26,-18,-10,-5,-3,-4,-4].map(function(r){return {rot:r,dx:0,dy:0};})
-}
-},
-  idle: {
-    frameCount: 4, fps: 4, loop: true, showEq: 'primary',
-    keys: {
-      head:      Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
-      face:      Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
-      torso:     Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
-      back_arm:  Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
-      front_arm: Array(4).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.5,-0.8,-0.5][i]})),
-    }
-  },
-  /* rev-fix-walk-bobbing: 走路/奔跑的垂直起伏改平滑正弦取樣（週期 4 幀），
-     原 i%2?A:B 每幀交替會造成高頻抖動（10fps 每秒 5 次、16fps 每秒 8 次），對眼睛不友善。
-     幅度保持原設計：walk 0~-0.5、run -0.5~-1.5 */
-  walk: {
-    frameCount: 8, fps: 10, loop: true, showEq: 'primary',
-    keys: {
-      head:      Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
-      face:      Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
-      torso:     Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
-      back_arm:  Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
-      front_arm: Array(8).fill(0).map((_,i)=>({rot:0,dx:0,dy:[0,-0.25,-0.5,-0.25,0,-0.25,-0.5,-0.25][i]})),
-      right_leg: [-18,-9,0,9,18,9,0,-9].map(r=>({rot:r,dx:0,dy:0})),
-      left_leg:  [18,9,0,-9,-18,-9,0,9].map(r=>({rot:r,dx:0,dy:0})),
-    }
-  },
-  /* rev-fix-run-bobbing-v2: 跑步起伏加大幅度 + 不對稱曲線
-     真實跑步：觸地瞬間快速下落（衝擊）、蹬地後緩慢上升（騰空）
-     每步 4 幀：1 幀下落 1.6 + 3 幀上升 1.6，幅度 1.6（原 1.0） */
-  run: {
-    frameCount: 8, fps: 16, loop: true, showEq: 'primary',
-    keys: {
-      head:      Array(8).fill(0).map((_,i)=>({rot:-3,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
-      face:      Array(8).fill(0).map((_,i)=>({rot:-3,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
-      torso:     Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
-      back_arm:  Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
-      front_arm: Array(8).fill(0).map((_,i)=>({rot:-5,dx:0,dy:[-0.2,-1.8,-1.0,-0.6,-0.2,-1.8,-1.0,-0.6][i]})),
-      right_leg: [-42,-22,0,22,42,22,0,-22].map(r=>({rot:r,dx:0,dy:0})),
-      left_leg:  [42,22,0,-22,-42,-22,0,22].map(r=>({rot:r,dx:0,dy:0})),
-    }
-  },
-  hurt: {
-    frameCount: 4, fps: 8, loop: false, showEq: 'context',
-    keys: {
-      head:      [{rot:0,dx:0,dy:0},{rot:6,dx:0,dy:-1},{rot:6,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
-      face:      [{rot:0,dx:0,dy:0},{rot:6,dx:0,dy:-1},{rot:6,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
-      torso:     [{rot:0,dx:0,dy:0},{rot:4,dx:0,dy:-1},{rot:4,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
-      back_arm:  [{rot:0,dx:0,dy:0},{rot:4,dx:0,dy:-1},{rot:4,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
-      front_arm: [{rot:0,dx:0,dy:0},{rot:5,dx:0,dy:-1},{rot:5,dx:0,dy:-1},{rot:0,dx:0,dy:0}],
-    }
-  },
-  fire_primary: {
-    frameCount: 4, fps: 16, loop: false, showEq: 'primary',
-    keys: {
-      head:      [{rot:0,dx:0,dy:0},{rot:1,dx:0,dy:-1},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-      face:      [{rot:0,dx:0,dy:0},{rot:1,dx:0,dy:-1},{rot:0,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-      torso:     [{rot:0,dx:0,dy:0},{rot:2,dx:0,dy:-1},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-      back_arm:  [{rot:0,dx:0,dy:0},{rot:4,dx:0,dy:-1},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-      front_arm: [
-        {rot:0,  dx:0,  dy:0},
-        {rot:-8, dx:-3, dy:-1},
-        {rot:-3, dx:-1, dy:0},
-        {rot:0,  dx:0,  dy:0},
-      ],
-    }
-  },
-  reload: {
-    frameCount: 10, fps: 10, loop: false, showEq: 'primary',
-    keys: {
-      head:      Array(10).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,-1,0,0][i];return {rot:0,dx:0,dy:p*0.3};}),
-      face:      Array(10).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,-1,0,0][i];return {rot:0,dx:0,dy:p*0.3};}),
-      torso:     Array(10).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,-1,0,0][i];return {rot:0,dx:0,dy:p*0.5};}),
-      back_arm:  [0,-15,-30,-35,-25,-10,5,15,5,0].map(r=>({rot:r,dx:0,dy:0})),
-      front_arm: [
-        {rot:0,  dx:0,  dy:0},
-        {rot:-20,dx:-5, dy:1},
-        {rot:-40,dx:-8, dy:2},
-        {rot:-45,dx:-8, dy:2.5},
-        {rot:-30,dx:-5, dy:1.5},
-        {rot:-10,dx:-2, dy:0.5},
-        {rot:15, dx:5,  dy:-0.5},
-        {rot:30, dx:10, dy:-1.5},
-        {rot:10, dx:5,  dy:-0.5},
-        {rot:0,  dx:0,  dy:0},
-      ],
-    }
-  },
-  switch_secondary: {
-    frameCount: 8, fps: 10, loop: false, showEq: 'secondary',
-    keys: {
-      head:      Array(8).fill(0).map((_,i)=>{const p=[0,1,2,2,1,0,-1,-1][i];return {rot:0,dx:0,dy:p*0.3};}),
-      face:      Array(8).fill(0).map((_,i)=>{const p=[0,1,2,2,1,0,-1,-1][i];return {rot:0,dx:0,dy:p*0.3};}),
-      torso:     Array(8).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,0][i];return {rot:0,dx:0,dy:p*0.4};}),
-      back_arm:  [
-        {rot:0,  dx:0,  dy:0},{rot:-8, dx:-2, dy:0},{rot:-15,dx:-4, dy:0},{rot:-12,dx:-3, dy:0},
-        {rot:-8, dx:-2, dy:0},{rot:-4, dx:-1, dy:0},{rot:0,  dx:0,  dy:0},{rot:0,  dx:0,  dy:0},
-      ],
-      front_arm: [
-        {rot:0,  dx:0,   dy:0},{rot:-15,dx:-3,  dy:1},{rot:-25,dx:-5,  dy:2},{rot:-15,dx:-3,  dy:1.5},
-        {rot:-5, dx:-1,  dy:0.5},{rot:0,  dx:0,   dy:-0.5},{rot:3,  dx:0,   dy:-1},{rot:3,  dx:0,   dy:-1},
-      ],
-    }
-  },
-  fire_secondary: {
-    frameCount: 4, fps: 14, loop: false, showEq: 'secondary',
-    keys: {
-      head:      Array(4).fill({rot:0,dx:0,dy:0}),
-      face:      Array(4).fill({rot:0,dx:0,dy:0}),
-      torso:     Array(4).fill({rot:0,dx:0,dy:0}),
-      back_arm:  Array(4).fill({rot:0,dx:0,dy:0}),
-      front_arm: [
-        {rot:3,   dx:0,   dy:-1},
-        {rot:-12, dx:-1,  dy:-3},
-        {rot:-4,  dx:0,   dy:-1.8},
-        {rot:3,   dx:0,   dy:-1},
-      ],
-    }
-  },
-  switch_melee: {
-    frameCount: 8, fps: 10, loop: false, showEq: 'melee',
-    keys: {
-      head:      Array(8).fill(0).map((_,i)=>{const p=[0,1,2,2,1,0,-1,-1][i];return {rot:0,dx:0,dy:p*0.3};}),
-      face:      Array(8).fill(0).map((_,i)=>{const p=[0,1,2,2,1,0,-1,-1][i];return {rot:0,dx:0,dy:p*0.3};}),
-      torso:     Array(8).fill(0).map((_,i)=>{const p=[0,2,3,3,2,1,0,0][i];return {rot:0,dx:0,dy:p*0.4};}),
-      back_arm:  [0,-8,-15,-15,-10,-5,5,10].map(r=>({rot:r,dx:0,dy:0})),
-      front_arm: [
-        {rot:0,  dx:0,  dy:0},{rot:-15,dx:-3, dy:1},{rot:-25,dx:-5, dy:2},{rot:-10,dx:-2, dy:1.5},
-        {rot:10, dx:0,  dy:0.5},{rot:20, dx:2,  dy:0},{rot:15, dx:2,  dy:-1},{rot:10, dx:1,  dy:-1},
-      ],
-    }
-  },
-  attack_melee: {
-    frameCount: 8, fps: 14, loop: false, showEq: 'melee',
-    keys: {
-      head:      [{rot:0,dx:0,dy:0},{rot:-2,dx:0,dy:0},{rot:-3,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:3,dx:0,dy:0},{rot:2,dx:0,dy:0},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-      face:      [{rot:0,dx:0,dy:0},{rot:-2,dx:0,dy:0},{rot:-3,dx:0,dy:0},{rot:0,dx:0,dy:0},{rot:3,dx:0,dy:0},{rot:2,dx:0,dy:0},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-      torso:     [{rot:0,dx:0,dy:0},{rot:-3,dx:-1,dy:0},{rot:-6,dx:-2,dy:0},{rot:0,dx:0,dy:0},{rot:6,dx:2,dy:0},{rot:3,dx:1,dy:0},{rot:1,dx:0,dy:0},{rot:0,dx:0,dy:0}],
-      back_arm:  [10,-10,-25,-10,15,5,5,10].map(r=>({rot:r,dx:0,dy:0})),
-      front_arm: [
-        {rot:10, dx:1,  dy:-1},{rot:-15,dx:-2, dy:-1},{rot:-40,dx:-5, dy:-2},{rot:0,  dx:0,  dy:-1},
-        {rot:60, dx:10, dy:0},{rot:100,dx:15, dy:1},{rot:60, dx:8,  dy:0},{rot:10, dx:1,  dy:-1},
-      ],
-    }
-  },
-};
+const GAME_ANIMS=(function(){var B=window.__PUPPET_BAKE__,o={},k,i,j;
+for(k in B.anim.R){var a=B.anim.R[k],ks={};
+for(i=0;i<B.ids.length;i++){var arr=[];for(j=0;j<a.fc;j++)arr.push({rot:0,dx:0,dy:0});ks[B.ids[i]]=arr;}
+o[k]={frameCount:a.fc,fps:a.fps,loop:a.loop,showEq:a.show,keys:ks};}
+o.death=o.dead;return o;})();
 
 /* rev-fix-heal-melee: 治療動畫 = attack_melee 循環版 */
-GAME_ANIMS.heal_melee = JSON.parse(JSON.stringify(GAME_ANIMS.attack_melee));
-GAME_ANIMS.heal_melee.loop = true;
 
-const WEAPON_LAYOUT = {
-  '6kh2':     { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:5,y:19,w:117,h:28} },
-  '6kh5':     { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:5,y:19,w:117,h:28} },
-  '9a91':     { scale:1, ox:0, oy:-0.2, rotation:0, trim:{x:10,y:22,w:232,h:84} },
-  '9a91_x_c_x':{ scale:1, ox:0, oy:-0.675543, rotation:0, trim:{x:10,y:3,w:232,h:121} },
-  '9a91_x_l_x':{ scale:1, ox:0, oy:-0.566848, rotation:0, trim:{x:10,y:7,w:232,h:113} },
-  'ak103':    { scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:16,y:18,w:287,h:91} },
-  'ak103_75_c_g':{ scale:1, ox:0.15, oy:-0.571196, rotation:0, trim:{x:16,y:9,w:287,h:109} },
-  'ak103_75_c_x':{ scale:1, ox:0.15, oy:-0.571196, rotation:0, trim:{x:16,y:9,w:287,h:109} },
-  'ak103_75_l_g':{ scale:1, ox:0.15, oy:-0.4625, rotation:0, trim:{x:16,y:13,w:287,h:101} },
-  'ak103_75_l_x':{ scale:1, ox:0.15, oy:-0.4625, rotation:0, trim:{x:16,y:13,w:287,h:101} },
-  'ak103_75_x_g':{ scale:1, ox:0.15, oy:-0.231522, rotation:0, trim:{x:16,y:22,w:287,h:84} },
-  'ak103_75_x_x':{ scale:1, ox:0.15, oy:-0.231522, rotation:0, trim:{x:16,y:22,w:287,h:84} },
-  'ak103_x_c_g':{ scale:1, ox:0.142647, oy:-0.4625, rotation:0, trim:{x:15,y:7,w:288,h:113} },
-  'ak103_x_c_x':{ scale:1, ox:0.142647, oy:-0.4625, rotation:0, trim:{x:15,y:7,w:288,h:113} },
-  'ak103_x_l_g':{ scale:1, ox:0.15, oy:-0.367391, rotation:0, trim:{x:16,y:10,w:287,h:107} },
-  'ak103_x_l_x':{ scale:1, ox:0.15, oy:-0.367391, rotation:0, trim:{x:16,y:10,w:287,h:107} },
-  'ak103_x_x_g':{ scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:16,y:18,w:287,h:91} },
-  'ak104':    { scale:1, ox:0.2, oy:-0.15, rotation:0, trim:{x:12,y:22,w:232,h:83} },
-  'ak104_75_c_g':{ scale:1, ox:0.2, oy:-0.557609, rotation:0, trim:{x:12,y:14,w:232,h:99} },
-  'ak104_75_c_x':{ scale:1, ox:0.2, oy:-0.557609, rotation:0, trim:{x:12,y:14,w:232,h:99} },
-  'ak104_75_l_g':{ scale:1, ox:0.2, oy:-0.435326, rotation:0, trim:{x:12,y:17,w:232,h:93} },
-  'ak104_75_l_x':{ scale:1, ox:0.2, oy:-0.435326, rotation:0, trim:{x:12,y:17,w:232,h:93} },
-  'ak104_75_x_g':{ scale:1, ox:0.2, oy:-0.245109, rotation:0, trim:{x:12,y:26,w:232,h:75} },
-  'ak104_75_x_x':{ scale:1, ox:0.2, oy:-0.245109, rotation:0, trim:{x:12,y:26,w:232,h:75} },
-  'ak104_x_c_g':{ scale:1, ox:0.2, oy:-0.421739, rotation:0, trim:{x:12,y:11,w:232,h:105} },
-  'ak104_x_c_x':{ scale:1, ox:0.2, oy:-0.421739, rotation:0, trim:{x:12,y:11,w:232,h:105} },
-  'ak104_x_l_g':{ scale:1, ox:0.2, oy:-0.408152, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'ak104_x_l_x':{ scale:1, ox:0.2, oy:-0.408152, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'ak104_x_x_g':{ scale:1, ox:0.2, oy:-0.15, rotation:0, trim:{x:12,y:22,w:232,h:83} },
-  'ak105':    { scale:1, ox:0.2, oy:-0.15, rotation:0, trim:{x:12,y:21,w:232,h:84} },
-  'ak105_60_c_g':{ scale:1, ox:0.2, oy:-0.380978, rotation:0, trim:{x:12,y:8,w:232,h:110} },
-  'ak105_60_c_x':{ scale:1, ox:0.2, oy:-0.380978, rotation:0, trim:{x:12,y:8,w:232,h:110} },
-  'ak105_60_l_g':{ scale:1, ox:0.2, oy:-0.245109, rotation:0, trim:{x:12,y:11,w:232,h:104} },
-  'ak105_60_l_x':{ scale:1, ox:0.2, oy:-0.245109, rotation:0, trim:{x:12,y:11,w:232,h:104} },
-  'ak105_60_x_g':{ scale:1, ox:0.2, oy:-0.109239, rotation:0, trim:{x:12,y:19,w:232,h:89} },
-  'ak105_60_x_x':{ scale:1, ox:0.2, oy:-0.109239, rotation:0, trim:{x:12,y:19,w:232,h:89} },
-  'ak105_95_c_g':{ scale:1, ox:0.2, oy:-0.394565, rotation:0, trim:{x:12,y:11,w:232,h:105} },
-  'ak105_95_c_x':{ scale:1, ox:0.2, oy:-0.394565, rotation:0, trim:{x:12,y:11,w:232,h:105} },
-  'ak105_95_l_g':{ scale:1, ox:0.2, oy:-0.380978, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'ak105_95_l_x':{ scale:1, ox:0.2, oy:-0.380978, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'ak105_95_x_g':{ scale:1, ox:0.2, oy:-0.136413, rotation:0, trim:{x:12,y:22,w:232,h:82} },
-  'ak105_95_x_x':{ scale:1, ox:0.2, oy:-0.136413, rotation:0, trim:{x:12,y:22,w:232,h:82} },
-  'ak105_x_c_g':{ scale:1, ox:0.2, oy:-0.408152, rotation:0, trim:{x:12,y:11,w:232,h:105} },
-  'ak105_x_c_x':{ scale:1, ox:0.2, oy:-0.408152, rotation:0, trim:{x:12,y:11,w:232,h:105} },
-  'ak105_x_l_g':{ scale:1, ox:0.2, oy:-0.340217, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'ak105_x_l_x':{ scale:1, ox:0.2, oy:-0.340217, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'ak105_x_x_g':{ scale:1, ox:0.2, oy:-0.15, rotation:0, trim:{x:12,y:21,w:232,h:84} },
-  'ak12':     { scale:1, ox:0.15, oy:-0.21, rotation:0, trim:{x:15,y:18,w:288,h:92} },
-  'ak12_60_c_g':{ scale:1, ox:0.194118, oy:-0.305109, rotation:0, trim:{x:17,y:3,w:282,h:121} },
-  'ak12_60_c_x':{ scale:1, ox:0.194118, oy:-0.305109, rotation:0, trim:{x:17,y:3,w:282,h:121} },
-  'ak12_60_l_g':{ scale:1, ox:0.15, oy:-0.291522, rotation:0, trim:{x:15,y:3,w:288,h:121} },
-  'ak12_60_l_x':{ scale:1, ox:0.15, oy:-0.291522, rotation:0, trim:{x:15,y:3,w:288,h:121} },
-  'ak12_60_x_g':{ scale:1, ox:0.15, oy:-0.087717, rotation:0, trim:{x:15,y:11,w:288,h:104} },
-  'ak12_60_x_x':{ scale:1, ox:0.15, oy:-0.087717, rotation:0, trim:{x:15,y:11,w:288,h:104} },
-  'ak12_95_c_g':{ scale:1, ox:0.15, oy:-0.400217, rotation:0, trim:{x:15,y:5,w:288,h:116} },
-  'ak12_95_c_x':{ scale:1, ox:0.15, oy:-0.400217, rotation:0, trim:{x:15,y:5,w:288,h:116} },
-  'ak12_95_l_g':{ scale:1, ox:0.157353, oy:-0.38663, rotation:0, trim:{x:15,y:7,w:287,h:113} },
-  'ak12_95_l_x':{ scale:1, ox:0.157353, oy:-0.38663, rotation:0, trim:{x:15,y:7,w:287,h:113} },
-  'ak12_95_x_g':{ scale:1, ox:0.157353, oy:-0.142065, rotation:0, trim:{x:15,y:15,w:287,h:97} },
-  'ak12_95_x_x':{ scale:1, ox:0.157353, oy:-0.142065, rotation:0, trim:{x:15,y:15,w:287,h:97} },
-  'ak12_x_c_g':{ scale:1, ox:0.157353, oy:-0.454565, rotation:0, trim:{x:15,y:7,w:287,h:113} },
-  'ak12_x_c_x':{ scale:1, ox:0.157353, oy:-0.454565, rotation:0, trim:{x:15,y:7,w:287,h:113} },
-  'ak12_x_l_g':{ scale:1, ox:0.15, oy:-0.400217, rotation:0, trim:{x:15,y:7,w:288,h:113} },
-  'ak12_x_l_x':{ scale:1, ox:0.15, oy:-0.400217, rotation:0, trim:{x:15,y:7,w:288,h:113} },
-  'ak12_x_x_g':{ scale:1, ox:0.15, oy:-0.182826, rotation:0, trim:{x:15,y:17,w:288,h:93} },
-  'ak74':     { scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:15,y:17,w:288,h:93} },
-  'ak74_60_x_g':{ scale:1, ox:0.15, oy:-0.082065, rotation:0, trim:{x:15,y:14,w:288,h:98} },
-  'ak74_60_x_x':{ scale:1, ox:0.15, oy:-0.082065, rotation:0, trim:{x:15,y:14,w:288,h:98} },
-  'ak74_95_x_g':{ scale:1, ox:0.15, oy:-0.177174, rotation:0, trim:{x:15,y:17,w:288,h:92} },
-  'ak74_95_x_x':{ scale:1, ox:0.15, oy:-0.177174, rotation:0, trim:{x:15,y:17,w:288,h:92} },
-  'ak74_x_c_g':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:15,y:5,w:288,h:117} },
-  'ak74_x_c_x':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:15,y:5,w:288,h:117} },
-  'ak74_x_l_g':{ scale:1, ox:0.15, oy:-0.367391, rotation:0, trim:{x:15,y:9,w:288,h:109} },
-  'ak74_x_l_x':{ scale:1, ox:0.15, oy:-0.367391, rotation:0, trim:{x:15,y:9,w:288,h:109} },
-  'ak74_x_x_g':{ scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:15,y:17,w:288,h:93} },
-  'ak74m':    { scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:16,y:18,w:287,h:91} },
-  'ak74m_60_c_g':{ scale:1, ox:0.15, oy:-0.380978, rotation:0, trim:{x:16,y:3,w:287,h:121} },
-  'ak74m_60_c_x':{ scale:1, ox:0.15, oy:-0.380978, rotation:0, trim:{x:16,y:3,w:287,h:121} },
-  'ak74m_60_l_g':{ scale:1, ox:0.142647, oy:-0.272283, rotation:0, trim:{x:15,y:7,w:288,h:113} },
-  'ak74m_60_l_x':{ scale:1, ox:0.142647, oy:-0.272283, rotation:0, trim:{x:15,y:7,w:288,h:113} },
-  'ak74m_60_x_g':{ scale:1, ox:0.142647, oy:-0.068478, rotation:0, trim:{x:15,y:15,w:288,h:97} },
-  'ak74m_60_x_x':{ scale:1, ox:0.142647, oy:-0.068478, rotation:0, trim:{x:15,y:15,w:288,h:97} },
-  'ak74m_95_c_g':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:16,y:7,w:287,h:113} },
-  'ak74m_95_c_x':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:16,y:7,w:287,h:113} },
-  'ak74m_95_l_g':{ scale:1, ox:0.15, oy:-0.380978, rotation:0, trim:{x:16,y:11,w:287,h:105} },
-  'ak74m_95_l_x':{ scale:1, ox:0.15, oy:-0.380978, rotation:0, trim:{x:16,y:11,w:287,h:105} },
-  'ak74m_95_x_g':{ scale:1, ox:0.142647, oy:-0.163587, rotation:0, trim:{x:15,y:19,w:288,h:89} },
-  'ak74m_95_x_x':{ scale:1, ox:0.142647, oy:-0.163587, rotation:0, trim:{x:15,y:19,w:288,h:89} },
-  'ak74m_x_c_g':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:16,y:5,w:287,h:116} },
-  'ak74m_x_c_x':{ scale:1, ox:0.15, oy:-0.476087, rotation:0, trim:{x:16,y:5,w:287,h:116} },
-  'ak74m_x_l_g':{ scale:1, ox:0.15, oy:-0.353804, rotation:0, trim:{x:16,y:9,w:287,h:109} },
-  'ak74m_x_l_x':{ scale:1, ox:0.15, oy:-0.353804, rotation:0, trim:{x:16,y:9,w:287,h:109} },
-  'ak74m_x_x_g':{ scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:16,y:18,w:287,h:91} },
-  'ak74n':    { scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:15,y:17,w:288,h:93} },
-  'ak74n_60_c_g':{ scale:1, ox:0.179412, oy:-0.394565, rotation:0, trim:{x:17,y:3,w:284,h:121} },
-  'ak74n_60_c_x':{ scale:1, ox:0.179412, oy:-0.394565, rotation:0, trim:{x:17,y:3,w:284,h:121} },
-  'ak74n_60_l_g':{ scale:1, ox:0.15, oy:-0.299457, rotation:0, trim:{x:15,y:6,w:288,h:114} },
-  'ak74n_60_l_x':{ scale:1, ox:0.15, oy:-0.299457, rotation:0, trim:{x:15,y:6,w:288,h:114} },
-  'ak74n_60_x_g':{ scale:1, ox:0.15, oy:-0.082065, rotation:0, trim:{x:15,y:14,w:288,h:98} },
-  'ak74n_60_x_x':{ scale:1, ox:0.15, oy:-0.082065, rotation:0, trim:{x:15,y:14,w:288,h:98} },
-  'ak74n_95_c_g':{ scale:1, ox:0.15, oy:-0.489674, rotation:0, trim:{x:15,y:5,w:288,h:116} },
-  'ak74n_95_c_x':{ scale:1, ox:0.15, oy:-0.489674, rotation:0, trim:{x:15,y:5,w:288,h:116} },
-  'ak74n_95_l_g':{ scale:1, ox:0.15, oy:-0.394565, rotation:0, trim:{x:15,y:9,w:288,h:108} },
-  'ak74n_95_l_x':{ scale:1, ox:0.15, oy:-0.394565, rotation:0, trim:{x:15,y:9,w:288,h:108} },
-  'ak74n_95_x_g':{ scale:1, ox:0.15, oy:-0.177174, rotation:0, trim:{x:15,y:17,w:288,h:92} },
-  'ak74n_95_x_x':{ scale:1, ox:0.15, oy:-0.177174, rotation:0, trim:{x:15,y:17,w:288,h:92} },
-  'ak74n_x_x_g':{ scale:1, ox:0.15, oy:-0.15, rotation:0, trim:{x:15,y:17,w:288,h:93} },
-  'akm':      { scale:1, ox:0.1, oy:-0.15, rotation:0, trim:{x:15,y:15,w:287,h:97} },
-  'akm_75_x_g':{ scale:1, ox:0.1, oy:-0.217935, rotation:0, trim:{x:15,y:18,w:287,h:90} },
-  'akm_75_x_x':{ scale:1, ox:0.1, oy:-0.217935, rotation:0, trim:{x:15,y:18,w:287,h:90} },
-  'akm_x_x_g':{ scale:1, ox:0.1, oy:-0.15, rotation:0, trim:{x:15,y:15,w:287,h:97} },
-  'akmn':     { scale:1, ox:0.1, oy:-0.15, rotation:0, trim:{x:15,y:15,w:288,h:97} },
-  'akmn_75_c_g':{ scale:1, ox:0.107353, oy:-0.584783, rotation:0, trim:{x:15,y:5,w:287,h:117} },
-  'akmn_75_c_x':{ scale:1, ox:0.107353, oy:-0.584783, rotation:0, trim:{x:15,y:5,w:287,h:117} },
-  'akmn_75_l_g':{ scale:1, ox:0.107353, oy:-0.476087, rotation:0, trim:{x:15,y:9,w:287,h:109} },
-  'akmn_75_l_x':{ scale:1, ox:0.107353, oy:-0.476087, rotation:0, trim:{x:15,y:9,w:287,h:109} },
-  'akmn_75_x_g':{ scale:1, ox:0.107353, oy:-0.217935, rotation:0, trim:{x:15,y:18,w:287,h:90} },
-  'akmn_75_x_x':{ scale:1, ox:0.107353, oy:-0.217935, rotation:0, trim:{x:15,y:18,w:287,h:90} },
-  'akmn_x_c_g':{ scale:1, ox:0.173529, oy:-0.489674, rotation:0, trim:{x:19,y:3,w:278,h:121} },
-  'akmn_x_c_x':{ scale:1, ox:0.173529, oy:-0.489674, rotation:0, trim:{x:19,y:3,w:278,h:121} },
-  'akmn_x_l_g':{ scale:1, ox:0.114706, oy:-0.353804, rotation:0, trim:{x:15,y:5,w:286,h:117} },
-  'akmn_x_l_x':{ scale:1, ox:0.114706, oy:-0.353804, rotation:0, trim:{x:15,y:5,w:286,h:117} },
-  'akmn_x_x_g':{ scale:1, ox:0.107353, oy:-0.15, rotation:0, trim:{x:15,y:15,w:287,h:97} },
-  'akms':     { scale:1, ox:0.1, oy:-0.15, rotation:0, trim:{x:15,y:16,w:288,h:94} },
-  'akms_75_x_g':{ scale:1, ox:0.114706, oy:-0.190761, rotation:0, trim:{x:15,y:19,w:286,h:89} },
-  'akms_75_x_x':{ scale:1, ox:0.114706, oy:-0.190761, rotation:0, trim:{x:15,y:19,w:286,h:89} },
-  'akms_x_x_g':{ scale:1, ox:0.107353, oy:-0.136413, rotation:0, trim:{x:15,y:16,w:287,h:94} },
-  'aks74u':   { scale:1, ox:0.15, oy:-0.2, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'aks74u_60_x_g':{ scale:1, ox:0.15, oy:-0.132065, rotation:0, trim:{x:12,y:12,w:232,h:102} },
-  'aks74u_60_x_x':{ scale:1, ox:0.15, oy:-0.132065, rotation:0, trim:{x:12,y:12,w:232,h:102} },
-  'aks74u_95_x_g':{ scale:1, ox:0.15, oy:-0.254348, rotation:0, trim:{x:12,y:15,w:232,h:96} },
-  'aks74u_95_x_x':{ scale:1, ox:0.15, oy:-0.254348, rotation:0, trim:{x:12,y:15,w:232,h:96} },
-  'aks74u_x_x_g':{ scale:1, ox:0.15, oy:-0.2, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'aks74un':  { scale:1, ox:0.15, oy:-0.2, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'aks74un_60_c_g':{ scale:1, ox:0.223529, oy:-0.458152, rotation:0, trim:{x:17,y:3,w:222,h:121} },
-  'aks74un_60_c_x':{ scale:1, ox:0.223529, oy:-0.458152, rotation:0, trim:{x:17,y:3,w:222,h:121} },
-  'aks74un_60_x_g':{ scale:1, ox:0.15, oy:-0.132065, rotation:0, trim:{x:12,y:12,w:232,h:102} },
-  'aks74un_60_x_x':{ scale:1, ox:0.15, oy:-0.132065, rotation:0, trim:{x:12,y:12,w:232,h:102} },
-  'aks74un_95_c_g':{ scale:1, ox:0.15, oy:-0.498913, rotation:0, trim:{x:12,y:5,w:232,h:117} },
-  'aks74un_95_c_x':{ scale:1, ox:0.15, oy:-0.498913, rotation:0, trim:{x:12,y:5,w:232,h:117} },
-  'aks74un_95_x_g':{ scale:1, ox:0.15, oy:-0.254348, rotation:0, trim:{x:12,y:15,w:232,h:96} },
-  'aks74un_95_x_x':{ scale:1, ox:0.15, oy:-0.254348, rotation:0, trim:{x:12,y:15,w:232,h:96} },
-  'aks74un_x_c_g':{ scale:1, ox:0.15, oy:-0.498913, rotation:0, trim:{x:12,y:3,w:232,h:121} },
-  'aks74un_x_c_x':{ scale:1, ox:0.15, oy:-0.498913, rotation:0, trim:{x:12,y:3,w:232,h:121} },
-  'aks74un_x_x_g':{ scale:1, ox:0.15, oy:-0.2, rotation:0, trim:{x:12,y:15,w:232,h:97} },
-  'aps':      { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:19,y:0,w:89,h:64} },
-  'ash12':    { scale:1, ox:-0.1, oy:-0.51, rotation:0, trim:{x:15,y:17,w:229,h:93} },
-  'ash12_20_c_g':{ scale:1, ox:0.127941, oy:-0.482826, rotation:0, trim:{x:30,y:3,w:198,h:121} },
-  'ash12_20_c_x':{ scale:1, ox:0.127941, oy:-0.482826, rotation:0, trim:{x:30,y:3,w:198,h:121} },
-  'ash12_20_l_g':{ scale:1, ox:0.120588, oy:-0.442065, rotation:0, trim:{x:29,y:3,w:199,h:121} },
-  'ash12_20_l_x':{ scale:1, ox:0.120588, oy:-0.442065, rotation:0, trim:{x:29,y:3,w:199,h:121} },
-  'ash12_20_x_g':{ scale:1, ox:-0.1, oy:-0.143152, rotation:0, trim:{x:15,y:3,w:229,h:121} },
-  'ash12_20_x_x':{ scale:1, ox:-0.1, oy:-0.143152, rotation:0, trim:{x:15,y:3,w:229,h:121} },
-  'ash12_x_c_g':{ scale:1, ox:-0.1, oy:-0.781739, rotation:0, trim:{x:15,y:7,w:229,h:113} },
-  'ash12_x_c_x':{ scale:1, ox:-0.1, oy:-0.781739, rotation:0, trim:{x:15,y:7,w:229,h:113} },
-  'ash12_x_l_g':{ scale:1, ox:-0.1, oy:-0.740978, rotation:0, trim:{x:15,y:7,w:229,h:113} },
-  'ash12_x_l_x':{ scale:1, ox:-0.1, oy:-0.740978, rotation:0, trim:{x:15,y:7,w:229,h:113} },
-  'ash12_x_x_g':{ scale:1, ox:-0.1, oy:-0.51, rotation:0, trim:{x:15,y:17,w:229,h:93} },
-  'asval':    { scale:1, ox:0.01, oy:-0.090232, rotation:0, trim:{x:11,y:15,w:299,h:85} },
-  'asval_30_c_g':{ scale:1, ox:0.201176, oy:-0.348384, rotation:0, trim:{x:24,y:3,w:273,h:121} },
-  'asval_30_c_x':{ scale:1, ox:0.201176, oy:-0.348384, rotation:0, trim:{x:24,y:3,w:273,h:121} },
-  'asval_30_l_g':{ scale:1, ox:0.105588, oy:-0.239689, rotation:0, trim:{x:17,y:3,w:286,h:121} },
-  'asval_30_l_x':{ scale:1, ox:0.105588, oy:-0.239689, rotation:0, trim:{x:17,y:3,w:286,h:121} },
-  'asval_30_x_g':{ scale:1, ox:0.105588, oy:0.099985, rotation:0, trim:{x:17,y:16,w:286,h:95} },
-  'asval_30_x_x':{ scale:1, ox:0.105588, oy:0.099985, rotation:0, trim:{x:17,y:16,w:286,h:95} },
-  'asval_x_c_g':{ scale:1, ox:0.105588, oy:-0.579362, rotation:0, trim:{x:17,y:9,w:286,h:108} },
-  'asval_x_c_x':{ scale:1, ox:0.105588, oy:-0.579362, rotation:0, trim:{x:17,y:9,w:286,h:108} },
-  'asval_x_l_g':{ scale:1, ox:0.105588, oy:-0.484254, rotation:0, trim:{x:17,y:13,w:286,h:101} },
-  'asval_x_l_x':{ scale:1, ox:0.105588, oy:-0.484254, rotation:0, trim:{x:17,y:13,w:286,h:101} },
-  'asval_x_x_g':{ scale:1, ox:0.105588, oy:-0.171754, rotation:0, trim:{x:17,y:26,w:286,h:75} },
-  'f1':       { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:13,y:4,w:33,h:57} },
-  'ks23':     { scale:1, ox:0.154468, oy:-0.038305, rotation:-6, trim:{x:57,y:0,w:266,h:64} },
-  'kukri':    { scale:1, ox:0.89, oy:0.69, rotation:-80, trim:{x:8,y:13,w:112,h:34} },
-  'mp133':    { scale:1, ox:0.05, oy:0, rotation:-6, trim:{x:40,y:0,w:368,h:64} },
-  'mp153':    { scale:1, ox:0.05, oy:0, rotation:-6, trim:{x:13,y:0,w:290,h:62} },
-  'mp155':    { scale:1, ox:0.154468, oy:-0.038305, rotation:-6, trim:{x:18,y:1,w:344,h:60} },
-  'mp443':    { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:26,y:0,w:75,h:61} },
-  'pb':       { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:30,y:0,w:130,h:64} },
-  'pkm':      { scale:1, ox:-0.05, oy:-0.25, rotation:0, trim:{x:0,y:42,w:376,h:112} },
-  'pkm_x_x_g':{ scale:1, ox:-0.057353, oy:-0.222826, rotation:0, trim:{x:0,y:41,w:377,h:115} },
-  'pkp':      { scale:1, ox:-0.05, oy:-0.25, rotation:0, trim:{x:0,y:42,w:378,h:119} },
-  'pkp_x_c_g':{ scale:1, ox:-0.042647, oy:-0.671196, rotation:0, trim:{x:1,y:9,w:377,h:153} },
-  'pkp_x_c_x':{ scale:1, ox:-0.042647, oy:-0.684783, rotation:0, trim:{x:0,y:8,w:377,h:156} },
-  'pkp_x_l_g':{ scale:1, ox:-0.035294, oy:-0.5625, rotation:0, trim:{x:2,y:18,w:376,h:145} },
-  'pkp_x_l_x':{ scale:1, ox:0.192647, oy:-0.671196, rotation:0, trim:{x:17,y:39,w:345,h:112} },
-  'pkp_x_x_g':{ scale:1, ox:0.192647, oy:-0.440217, rotation:0, trim:{x:17,y:49,w:345,h:92} },
-  'pm':       { scale:1, ox:0.67, oy:-0.22, rotation:0, trim:{x:27,y:0,w:74,h:64} },
-  'pp19':     { scale:1.25, ox:0.3, oy:-0.15, rotation:0, trim:{x:8,y:34,w:149,h:69} },
-  'rgd5':     { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:11,y:3,w:36,h:60} },
-  'rgn':      { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:9,y:0,w:42,h:62} },
-  'rgo':      { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:11,y:1,w:37,h:58} },
-  'rpd':      { scale:1, ox:-0.05, oy:-0.05, rotation:0, trim:{x:33,y:5,w:362,h:122} },
-  'rpdn':     { scale:1, ox:-0.05, oy:-0.05, rotation:0, trim:{x:33,y:5,w:362,h:122} },
-  'rpdn_x_c_x':{ scale:1, ox:-0.072059, oy:-0.484783, rotation:0, trim:{x:19,y:24,w:365,h:144} },
-  'rpdn_x_l_x':{ scale:1, ox:-0.05, oy:-0.335326, rotation:0, trim:{x:19,y:29,w:362,h:138} },
-  'rpg':      { scale:1, ox:-0.04529, oy:-1.109863, rotation:0, trim:{x:21,y:0,w:210,h:64} },
-  'rpk16':    { scale:1, ox:0.1, oy:-0.2, rotation:0, trim:{x:15,y:13,w:288,h:101} },
-  'rpk16_x_c_g':{ scale:1, ox:0.1, oy:-0.430978, rotation:0, trim:{x:15,y:3,w:288,h:121} },
-  'rpk16_x_c_x':{ scale:1, ox:0.1, oy:-0.430978, rotation:0, trim:{x:15,y:3,w:288,h:121} },
-  'rpk16_x_l_g':{ scale:1, ox:0.1, oy:-0.430978, rotation:0, trim:{x:15,y:5,w:288,h:117} },
-  'rpk16_x_l_x':{ scale:1, ox:0.1, oy:-0.430978, rotation:0, trim:{x:15,y:5,w:288,h:117} },
-  'rpk16_x_x_g':{ scale:1, ox:0.1, oy:-0.2, rotation:0, trim:{x:15,y:13,w:288,h:101} },
-  'saiga12':  { scale:1, ox:0.05, oy:0, rotation:-6, trim:{x:15,y:24,w:284,h:78} },
-  'saiga12_10_c_x':{ scale:1, ox:0.053074, oy:0.1081, rotation:-6, trim:{x:15,y:27,w:284,h:135} },
-  'saiga12_10_x_x':{ scale:1, ox:0.06961, oy:0.42956, rotation:-6, trim:{x:16,y:39,w:283,h:111} },
-  'saiga12_20_c_x':{ scale:1, ox:0.053854, oy:-0.124453, rotation:-6, trim:{x:16,y:5,w:283,h:117} },
-  'saiga12_20_x_x':{ scale:1, ox:0.056149, oy:0.2162, rotation:-6, trim:{x:15,y:17,w:284,h:93} },
-  'saiga12_x_c_x':{ scale:1, ox:0.048474, oy:-0.313629, rotation:-6, trim:{x:16,y:11,w:283,h:105} },
-  'sr3m':     { scale:1.25, ox:0.1, oy:-0.05, rotation:0, trim:{x:11,y:25,w:172,h:76} },
-  'sr3m_x_c_x':{ scale:1.25, ox:0.1, oy:-0.406658, rotation:0, trim:{x:11,y:13,w:172,h:100} },
-  'sr3m_x_l_x':{ scale:1.25, ox:0.1, oy:-0.304755, rotation:0, trim:{x:11,y:17,w:172,h:93} },
-  'sv98':     { scale:1, ox:0.115847, oy:-0.45, rotation:0, trim:{x:18,y:33,w:344,h:61} },
-  'sv98_x_l_x':{ scale:1, ox:0.115847, oy:-0.866848, rotation:0, trim:{x:18,y:17,w:344,h:93} },
-  'svd':      { scale:1, ox:0.07, oy:-0.5, rotation:0, trim:{x:19,y:33,w:345,h:61} },
-  'svd_20_c_x':{ scale:1, ox:0.077353, oy:-0.690217, rotation:0, trim:{x:19,y:14,w:344,h:98} },
-  'svd_20_l_x':{ scale:1, ox:0.077353, oy:-0.567935, rotation:0, trim:{x:19,y:17,w:344,h:93} },
-  'svd_20_x_x':{ scale:1, ox:0.077353, oy:-0.36413, rotation:0, trim:{x:19,y:26,w:344,h:74} },
-  'svd_x_c_x':{ scale:1, ox:0.07, oy:-0.853261, rotation:0, trim:{x:19,y:19,w:345,h:87} },
-  'svd_x_l_x':{ scale:1, ox:0.077353, oy:-0.717391, rotation:0, trim:{x:19,y:24,w:344,h:80} },
-  'toz106':   { scale:1.25, ox:0.15, oy:0, rotation:-6, trim:{x:8,y:10,w:182,h:54} },
-  'vog17':    { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:14,y:3,w:33,h:54} },
-  'vog25':    { scale:1, ox:0, oy:0.2, rotation:0, trim:{x:14,y:3,w:33,h:54} },
-  'vss':      { scale:1, ox:0.02, oy:-0.390761, rotation:0, trim:{x:19,y:28,w:284,h:60} },
-  'vss_20_c_g':{ scale:1, ox:0.02, oy:-0.635326, rotation:0, trim:{x:19,y:11,w:284,h:105} },
-  'vss_20_c_x':{ scale:1, ox:0.02, oy:-0.635326, rotation:0, trim:{x:19,y:11,w:284,h:105} },
-  'vss_20_l_g':{ scale:1, ox:0.02, oy:-0.580978, rotation:0, trim:{x:19,y:13,w:284,h:100} },
-  'vss_20_l_x':{ scale:1, ox:0.02, oy:-0.580978, rotation:0, trim:{x:19,y:13,w:284,h:100} },
-  'vss_20_x_g':{ scale:1, ox:0.02, oy:-0.227717, rotation:0, trim:{x:19,y:27,w:284,h:73} },
-  'vss_20_x_x':{ scale:1, ox:0.02, oy:-0.227717, rotation:0, trim:{x:19,y:27,w:284,h:73} },
-  'vss_30_c_g':{ scale:1, ox:0.071471, oy:-0.404348, rotation:0, trim:{x:22,y:3,w:277,h:121} },
-  'vss_30_c_x':{ scale:1, ox:0.071471, oy:-0.404348, rotation:0, trim:{x:22,y:3,w:277,h:121} },
-  'vss_30_l_g':{ scale:1, ox:0.02, oy:-0.295652, rotation:0, trim:{x:19,y:5,w:284,h:117} },
-  'vss_30_l_x':{ scale:1, ox:0.02, oy:-0.295652, rotation:0, trim:{x:19,y:5,w:284,h:117} },
-  'vss_30_x_g':{ scale:1, ox:0.02, oy:0.030435, rotation:0, trim:{x:19,y:17,w:284,h:93} },
-  'vss_30_x_x':{ scale:1, ox:0.02, oy:0.030435, rotation:0, trim:{x:19,y:17,w:284,h:93} },
-  'vss_x_c_g':{ scale:1, ox:0.02, oy:-0.79837, rotation:0, trim:{x:19,y:11,w:284,h:95} },
-  'vss_x_c_x':{ scale:1, ox:0.02, oy:-0.825543, rotation:0, trim:{x:19,y:11,w:284,h:93} },
-  'vss_x_l_g':{ scale:1, ox:0.02, oy:-0.689674, rotation:0, trim:{x:19,y:15,w:284,h:89} },
-  'vss_x_l_x':{ scale:1, ox:0.02, oy:-0.744022, rotation:0, trim:{x:19,y:15,w:284,h:85} },
-  'vss_x_x_g':{ scale:1, ox:0.02, oy:-0.35, rotation:0, trim:{x:19,y:28,w:284,h:63} },
-};
+const WEAPON_LAYOUT=(function(){var B=window.__PUPPET_BAKE__,o={},k;
+for(k in B.attach){var a=B.attach[k];o[k]={scale:a.scale,rotation:a.rotation,trim:a.trim};}
+return o;})();
 
-const HEAD_ARMOR_LAYOUT = {
-  '6b13':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  '6b13m':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  '6b23':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  '6b231':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  '6b232':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  '6b43':     { layer:"torso", behind:false, scale:0.65, ox:0, oy:0.47, rotation:0 },
-  '6b45':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  '6b47':     { layer:"head", behind:false, scale:0.28, ox:-0.019509, oy:-0.61, rotation:4 },
-  '6b47m':    { layer:"head", behind:false, scale:0.28, ox:-0.019509, oy:-0.61, rotation:4 },
-  'altyn':    { layer:"head", behind:false, scale:0.34, ox:-0.02, oy:-0.68, rotation:4 },
-  'defender2':{ layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.45, rotation:0 },
-  'kiver':    { layer:"head", behind:false, scale:0.37, ox:-0.127016, oy:-0.527087, rotation:4 },
-  'kolpak':   { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
-  'maska':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
-  'paca':     { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  'redutm':   { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  'ssh68':    { layer:"head", behind:false, scale:0.34, ox:-0.019509, oy:-0.675705, rotation:4 },
-  'sssh94':   { layer:"head", behind:false, scale:0.34, ox:-0.04, oy:-0.6, rotation:0 },
-  'zhuk3':    { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  'zhuk6a':   { layer:"torso", behind:false, scale:0.44, ox:0.04, oy:0.36, rotation:0 },
-  'zsh12m':   { layer:"head", behind:false, scale:0.35, ox:-0.1, oy:-0.6, rotation:4 },
-};
+const HEAD_ARMOR_LAYOUT=(function(){var B=window.__PUPPET_BAKE__,o={},k;
+for(k in B.armor){var a=B.armor[k];
+o[k]={layer:a.layer,behind:false,scale:a.scale,ox:a.ox,oy:a.oy,rotation:a.rotation};}
+return o;})();
 
-const WEAPON_MUZZLE = {
-  '9a91':     { x: 231, y: 18 },
-  '9a91_x_c_x':{ x: 231, y: 54 },
-  '9a91_x_l_x':{ x: 231, y: 46 },
-  'ak103':    { x: 286, y: 19.5 },
-  'ak103_75_c_g':{ x: 286, y: 44 },
-  'ak103_75_c_x':{ x: 286, y: 44 },
-  'ak103_75_l_g':{ x: 286, y: 36 },
-  'ak103_75_l_x':{ x: 286, y: 36 },
-  'ak103_75_x_g':{ x: 286, y: 19 },
-  'ak103_75_x_x':{ x: 286, y: 19 },
-  'ak103_x_c_g':{ x: 287, y: 42 },
-  'ak103_x_c_x':{ x: 287, y: 42 },
-  'ak103_x_l_g':{ x: 286, y: 35.5 },
-  'ak103_x_l_x':{ x: 286, y: 35.5 },
-  'ak103_x_x_g':{ x: 286, y: 19.5 },
-  'ak104':    { x: 231, y: 17.5 },
-  'ak104_75_c_g':{ x: 231, y: 40.5 },
-  'ak104_75_c_x':{ x: 231, y: 40.5 },
-  'ak104_75_l_g':{ x: 231, y: 33 },
-  'ak104_75_l_x':{ x: 231, y: 33 },
-  'ak104_75_x_g':{ x: 231, y: 17 },
-  'ak104_75_x_x':{ x: 231, y: 17 },
-  'ak104_x_c_g':{ x: 231, y: 38.5 },
-  'ak104_x_c_x':{ x: 231, y: 38.5 },
-  'ak104_x_l_g':{ x: 231, y: 34 },
-  'ak104_x_l_x':{ x: 231, y: 34 },
-  'ak104_x_x_g':{ x: 231, y: 17.5 },
-  'ak105':    { x: 231, y: 18.5 },
-  'ak105_60_c_g':{ x: 231, y: 40 },
-  'ak105_60_c_x':{ x: 231, y: 40 },
-  'ak105_60_l_g':{ x: 231, y: 32 },
-  'ak105_60_l_x':{ x: 231, y: 32 },
-  'ak105_60_x_g':{ x: 231, y: 19.5 },
-  'ak105_60_x_x':{ x: 231, y: 19.5 },
-  'ak105_95_c_g':{ x: 231, y: 38 },
-  'ak105_95_c_x':{ x: 231, y: 38 },
-  'ak105_95_l_g':{ x: 231, y: 33.5 },
-  'ak105_95_l_x':{ x: 231, y: 33.5 },
-  'ak105_95_x_g':{ x: 231, y: 17 },
-  'ak105_95_x_x':{ x: 231, y: 17 },
-  'ak105_x_c_g':{ x: 231, y: 38.5 },
-  'ak105_x_c_x':{ x: 231, y: 38.5 },
-  'ak105_x_l_g':{ x: 231, y: 32 },
-  'ak105_x_l_x':{ x: 231, y: 32 },
-  'ak105_x_x_g':{ x: 231, y: 18.5 },
-  'ak12':     { x: 287, y: 22.5 },
-  'ak12_60_c_g':{ x: 281, y: 40.5 },
-  'ak12_60_c_x':{ x: 281, y: 40.5 },
-  'ak12_60_l_g':{ x: 287, y: 40 },
-  'ak12_60_l_x':{ x: 287, y: 40 },
-  'ak12_60_x_g':{ x: 287, y: 24 },
-  'ak12_60_x_x':{ x: 287, y: 24 },
-  'ak12_95_c_g':{ x: 287, y: 41.5 },
-  'ak12_95_c_x':{ x: 287, y: 41.5 },
-  'ak12_95_l_g':{ x: 286, y: 39.5 },
-  'ak12_95_l_x':{ x: 286, y: 39.5 },
-  'ak12_95_x_g':{ x: 286, y: 22.5 },
-  'ak12_95_x_x':{ x: 286, y: 22.5 },
-  'ak12_x_c_g':{ x: 286, y: 42 },
-  'ak12_x_c_x':{ x: 286, y: 42 },
-  'ak12_x_l_g':{ x: 287, y: 40 },
-  'ak12_x_l_x':{ x: 287, y: 40 },
-  'ak12_x_x_g':{ x: 287, y: 22 },
-  'ak74':     { x: 287, y: 20 },
-  'ak74_60_x_g':{ x: 287, y: 20 },
-  'ak74_60_x_x':{ x: 287, y: 20 },
-  'ak74_95_x_g':{ x: 287, y: 20.5 },
-  'ak74_95_x_x':{ x: 287, y: 20.5 },
-  'ak74_x_c_g':{ x: 287, y: 44 },
-  'ak74_x_c_x':{ x: 287, y: 44 },
-  'ak74_x_l_g':{ x: 287, y: 36 },
-  'ak74_x_l_x':{ x: 287, y: 36 },
-  'ak74_x_x_g':{ x: 287, y: 20 },
-  'ak74m':    { x: 286, y: 19.5 },
-  'ak74m_60_c_g':{ x: 286, y: 43 },
-  'ak74m_60_c_x':{ x: 286, y: 43 },
-  'ak74m_60_l_g':{ x: 287, y: 35 },
-  'ak74m_60_l_x':{ x: 287, y: 35 },
-  'ak74m_60_x_g':{ x: 287, y: 19.5 },
-  'ak74m_60_x_x':{ x: 287, y: 19.5 },
-  'ak74m_95_c_g':{ x: 286, y: 42.5 },
-  'ak74m_95_c_x':{ x: 286, y: 42.5 },
-  'ak74m_95_l_g':{ x: 286, y: 35 },
-  'ak74m_95_l_x':{ x: 286, y: 35 },
-  'ak74m_95_x_g':{ x: 287, y: 19 },
-  'ak74m_95_x_x':{ x: 287, y: 19 },
-  'ak74m_x_c_g':{ x: 286, y: 44 },
-  'ak74m_x_c_x':{ x: 286, y: 44 },
-  'ak74m_x_l_g':{ x: 286, y: 36 },
-  'ak74m_x_l_x':{ x: 286, y: 36 },
-  'ak74m_x_x_g':{ x: 286, y: 19.5 },
-  'ak74n':    { x: 287, y: 20 },
-  'ak74n_60_c_g':{ x: 283, y: 43 },
-  'ak74n_60_c_x':{ x: 283, y: 43 },
-  'ak74n_60_l_g':{ x: 287, y: 36 },
-  'ak74n_60_l_x':{ x: 287, y: 36 },
-  'ak74n_60_x_g':{ x: 287, y: 20 },
-  'ak74n_60_x_x':{ x: 287, y: 20 },
-  'ak74n_95_c_g':{ x: 287, y: 44 },
-  'ak74n_95_c_x':{ x: 287, y: 44 },
-  'ak74n_95_l_g':{ x: 287, y: 36.5 },
-  'ak74n_95_l_x':{ x: 287, y: 36.5 },
-  'ak74n_95_x_g':{ x: 287, y: 20.5 },
-  'ak74n_95_x_x':{ x: 287, y: 20.5 },
-  'ak74n_x_x_g':{ x: 287, y: 20 },
-  'akm':      { x: 286, y: 23.5 },
-  'akm_75_x_g':{ x: 286, y: 22.5 },
-  'akm_75_x_x':{ x: 286, y: 22.5 },
-  'akm_x_x_g':{ x: 286, y: 23.5 },
-  'akmn':     { x: 287, y: 23.5 },
-  'akmn_75_c_g':{ x: 286, y: 49.5 },
-  'akmn_75_c_x':{ x: 286, y: 49.5 },
-  'akmn_75_l_g':{ x: 286, y: 41.5 },
-  'akmn_75_l_x':{ x: 286, y: 41.5 },
-  'akmn_75_x_g':{ x: 286, y: 22.5 },
-  'akmn_75_x_x':{ x: 286, y: 22.5 },
-  'akmn_x_c_g':{ x: 277, y: 48 },
-  'akmn_x_c_x':{ x: 277, y: 48 },
-  'akmn_x_l_g':{ x: 285, y: 41 },
-  'akmn_x_l_x':{ x: 285, y: 41 },
-  'akmn_x_x_g':{ x: 286, y: 23.5 },
-  'akms':     { x: 287, y: 23 },
-  'akms_75_x_g':{ x: 285, y: 22 },
-  'akms_75_x_x':{ x: 285, y: 22 },
-  'akms_x_x_g':{ x: 286, y: 22.5 },
-  'aks74u':   { x: 231, y: 22.5 },
-  'aks74u_60_x_g':{ x: 231, y: 22.5 },
-  'aks74u_60_x_x':{ x: 231, y: 22.5 },
-  'aks74u_95_x_g':{ x: 231, y: 24 },
-  'aks74u_95_x_x':{ x: 231, y: 24 },
-  'aks74u_x_x_g':{ x: 231, y: 22.5 },
-  'aks74un':  { x: 231, y: 22.5 },
-  'aks74un_60_c_g':{ x: 221, y: 44 },
-  'aks74un_60_c_x':{ x: 221, y: 44 },
-  'aks74un_60_x_g':{ x: 231, y: 22.5 },
-  'aks74un_60_x_x':{ x: 231, y: 22.5 },
-  'aks74un_95_c_g':{ x: 231, y: 43.5 },
-  'aks74un_95_c_x':{ x: 231, y: 43.5 },
-  'aks74un_95_x_g':{ x: 231, y: 24 },
-  'aks74un_95_x_x':{ x: 231, y: 24 },
-  'aks74un_x_c_g':{ x: 231, y: 45.5 },
-  'aks74un_x_c_x':{ x: 231, y: 45.5 },
-  'aks74un_x_x_g':{ x: 231, y: 22.5 },
-  'aps':      { x: 88, y: 9.5 },
-  'ash12':    { x: 228, y: 34.5 },
-  'ash12_20_c_g':{ x: 197, y: 47.5 },
-  'ash12_20_c_x':{ x: 197, y: 47.5 },
-  'ash12_20_l_g':{ x: 198, y: 46 },
-  'ash12_20_l_x':{ x: 198, y: 46 },
-  'ash12_20_x_g':{ x: 228, y: 35 },
-  'ash12_20_x_x':{ x: 228, y: 35 },
-  'ash12_x_c_g':{ x: 228, y: 54.5 },
-  'ash12_x_c_x':{ x: 228, y: 54.5 },
-  'ash12_x_l_g':{ x: 228, y: 53 },
-  'ash12_x_l_x':{ x: 228, y: 53 },
-  'ash12_x_x_g':{ x: 228, y: 34.5 },
-  'asval':    { x: 298, y: 17 },
-  'asval_30_c_g':{ x: 272, y: 44.5 },
-  'asval_30_c_x':{ x: 272, y: 44.5 },
-  'asval_30_l_g':{ x: 285, y: 40.5 },
-  'asval_30_l_x':{ x: 285, y: 40.5 },
-  'asval_30_x_g':{ x: 285, y: 15 },
-  'asval_30_x_x':{ x: 285, y: 15 },
-  'asval_x_c_g':{ x: 285, y: 46.5 },
-  'asval_x_c_x':{ x: 285, y: 46.5 },
-  'asval_x_l_g':{ x: 285, y: 39.5 },
-  'asval_x_l_x':{ x: 285, y: 39.5 },
-  'asval_x_x_g':{ x: 285, y: 15 },
-  'ks23':     { x: 265, y: 11 },
-  'mp133':    { x: 367, y: 7 },
-  'mp153':    { x: 289, y: 13.5 },
-  'mp155':    { x: 343, y: 11.5 },
-  'mp443':    { x: 74, y: 8.5 },
-  'pb':       { x: 129, y: 11 },
-  'pkm':      { x: 375, y: 29 },
-  'pkm_x_x_g':{ x: 376, y: 29.5 },
-  'pkp':      { x: 377, y: 29 },
-  'pkp_x_c_g':{ x: 376, y: 61.5 },
-  'pkp_x_c_x':{ x: 376, y: 63.5 },
-  'pkp_x_l_g':{ x: 375, y: 53.5 },
-  'pkp_x_l_x':{ x: 344, y: 41 },
-  'pkp_x_x_g':{ x: 344, y: 22.5 },
-  'pm':       { x: 73, y: 10.5 },
-  'pp19':     { x: 148, y: 13.5 },
-  'rpd':      { x: 361, y: 26 },
-  'rpdn':     { x: 361, y: 26 },
-  'rpdn_x_c_x':{ x: 364, y: 53 },
-  'rpdn_x_l_x':{ x: 361, y: 44.5 },
-  'rpg':      { x: 209, y: 42.5 },
-  'rpk16':    { x: 287, y: 24.5 },
-  'rpk16_x_c_g':{ x: 287, y: 43 },
-  'rpk16_x_c_x':{ x: 287, y: 43 },
-  'rpk16_x_l_g':{ x: 287, y: 41 },
-  'rpk16_x_l_x':{ x: 287, y: 41 },
-  'rpk16_x_x_g':{ x: 287, y: 24.5 },
-  'saiga12':  { x: 283, y: 18 },
-  'saiga12_10_c_x':{ x: 283, y: 42.5 },
-  'saiga12_10_x_x':{ x: 282, y: 18.5 },
-  'saiga12_20_c_x':{ x: 282, y: 42 },
-  'saiga12_20_x_x':{ x: 283, y: 17.5 },
-  'saiga12_x_c_x':{ x: 282, y: 43 },
-  'sr3m':     { x: 171, y: 15 },
-  'sr3m_x_c_x':{ x: 171, y: 37.5 },
-  'sr3m_x_l_x':{ x: 171, y: 31 },
-  'sv98':     { x: 343, y: 11.5 },
-  'sv98_x_l_x':{ x: 343, y: 41 },
-  'svd':      { x: 344, y: 16.5 },
-  'svd_20_c_x':{ x: 343, y: 42 },
-  'svd_20_l_x':{ x: 343, y: 35 },
-  'svd_20_x_x':{ x: 343, y: 18 },
-  'svd_x_c_x':{ x: 344, y: 42.5 },
-  'svd_x_l_x':{ x: 343, y: 34 },
-  'toz106':   { x: 181, y: 7 },
-  'vss':      { x: 283, y: 13.5 },
-  'vss_20_c_g':{ x: 283, y: 45 },
-  'vss_20_c_x':{ x: 283, y: 45 },
-  'vss_20_l_g':{ x: 283, y: 40.5 },
-  'vss_20_l_x':{ x: 283, y: 40.5 },
-  'vss_20_x_g':{ x: 283, y: 14 },
-  'vss_20_x_x':{ x: 283, y: 14 },
-  'vss_30_c_g':{ x: 276, y: 44.5 },
-  'vss_30_c_x':{ x: 276, y: 44.5 },
-  'vss_30_l_g':{ x: 283, y: 38.5 },
-  'vss_30_l_x':{ x: 283, y: 38.5 },
-  'vss_30_x_g':{ x: 283, y: 14.5 },
-  'vss_30_x_x':{ x: 283, y: 14.5 },
-  'vss_x_c_g':{ x: 283, y: 46 },
-  'vss_x_c_x':{ x: 283, y: 46 },
-  'vss_x_l_g':{ x: 283, y: 39 },
-  'vss_x_l_x':{ x: 283, y: 39 },
-  'vss_x_x_g':{ x: 283, y: 13.5 },
-};
+const WEAPON_MUZZLE=(function(){var B=window.__PUPPET_BAKE__,o={},k;
+for(k in B.muzzle)o[k]={x:B.muzzle[k].x,y:B.muzzle[k].y};return o;})();
 
 /* rev-fix-mod-source: 改裝圖命名（WEAPON_LAYOUT / WEAPON_MUZZLE）為唯一真相源
  * 掃描 <baseId>_<mag>_<scope>_<grip> 形式的 key，僅提取 mag 段：
@@ -713,90 +60,35 @@ function _getModOptionsFromLayout(baseId){
 }
 window._getModOptionsFromLayout = _getModOptionsFromLayout;
 
-const HERO_VISIBLE_EQ = {
-  head:              { layer:'head',      behind:false, scale:0.34, ox:-0.14926568895119788, oy:-0.5893343612503056, rotation:4 },
-  top:               { layer:'torso',     behind:false, scale:0.42, ox: 0.06118610784887918, oy: 0.37261399041264553, rotation:0 },
-  top_armored:       { layer:'torso',     behind:false, scale:0.69, ox: 0.01932121500187131, oy: 0.47659930482259394, rotation:0 },
-  primary:           { layer:'front_arm', behind:true,  scale:0.65, ox: 1.172848538298235,   oy:-0.179409255863679,  rotation:0 },
-  secondary_pistol:  { layer:'front_arm', behind:true,  scale:0.30, ox: 0.9651682108009549,  oy:-0.20433511738218535, rotation:0 },
-  secondary_shotgun: { layer:'front_arm', behind:true,  scale:0.82, ox: 1.0823428754163478,  oy:-0.22286666388149015, rotation:-6 },
-  melee:             { layer:'front_arm', behind:true,  scale:0.28, ox: 1.032533995645278,   oy:-0.5089333212549385,  rotation:-34 },
-};
 
-function computeWeaponCharLayout(cfg){
-  if(!cfg || !cfg.layer) return null;
-  const L = GAME_LAYERS.find(l => l.id === cfg.layer);
-  if(!L) return null;
-  const B = { x:30, y:30, w:340, h:460 };
-  const w = B.w * L.w;
-  const h = B.h * L.h;
-  const cx = B.x + B.w * L.x;
-  const cy = B.y + B.h * L.y;
-  const anchorX = cx + w * (cfg.ox || 0);
-  const anchorY = cy + h * (cfg.oy || 0);
-  const isTrimMode = !!(cfg.trim && cfg.trim.w > 0);
-  const baseW = isTrimMode
-    ? cfg.trim.w * (cfg.scale || 1.0)
-    : 400 * (cfg.scale || 0.3);
-  const rightX = isTrimMode ? (anchorX + baseW) : (anchorX + baseW / 2);
-  return { anchorX, anchorY, rightX, baseW, isTrimMode };
-}
+
+/* ===== PM: 骨架委派共用 ===== */
+function _pmSlot(eq,ov){if(!eq)return null;if(ov==='hidden')return null;if(ov&&eq[ov])return ov;
+if(eq.primary)return'primary';if(eq.secondary)return'secondary';if(eq.melee)return'melee';return null;}
+function _pmAmmo(id){return typeof AMMO!=='undefined'&&!!AMMO[id];}
+function _pmAnim(a){return a==='death'?'dead':(a||'idle');}
+var _PM_COL={farmer:{b:'#5a9a48',l:'#3a6a2e'},guard:{b:'#5088bb',l:'#2e4a6a'},foreman:{b:'#e0a830',l:'#d8d0c0'},enemy:{b:'#8b2a2a',l:'#3a1010'}};
+function _pmColors(t){var c=_PM_COL[t];if(!c)return null;
+return{torso:c.b,front_upper_arm:c.b,front_forearm:c.b,back_upper_arm:c.b,back_forearm:c.b,
+right_thigh:c.l,right_shin:c.l,left_thigh:c.l,left_shin:c.l};}
+function _pmWorker(t,no){if(no)return null;return t==='foreman'?'#ffffff':(t==='farmer'?'#ff8800':null);}
+function _pmFit(px,py,s,W,H,flip,sl,id,eq,wk){var R=window.PuppetRig;
+var bb=R.deadBox(flip,id?R.weaponCfg(sl,id):null,{head:(eq&&eq.head)||null,top:(eq&&eq.top)||null,
+headEnv:!(eq&&eq.head),topEnv:!(eq&&eq.top),worker:!!wk});
+var nL=Math.max(0,200-bb.x0)*s+3,nR=Math.max(0,bb.x1-200)*s+3;
+var nA=Math.max(0,515-bb.y0)*s+3,nB=Math.max(0,bb.y1-515)*s+3;
+var x=Math.min(px,W-nR);x=Math.max(x,nL);var y=Math.min(py,H-nB);y=Math.max(y,nA);
+return{x:x,y:y};}
+function computeWeaponCharLayout(cfg){var R=window.PuppetRig;if(!cfg)return null;
+var b=R.boxOf(cfg);if(!b)return null;
+return{anchorX:0,anchorY:0,rightX:b.bw,baseW:b.bw,baseH:b.bh,isTrimMode:true};}
 
 /* rev-fix-weapon-muzzle-common: 武器 muzzle 在原圖座標系（400×500）的位置 —— 唯一計算入口
  * 探索 / Boss / 後院三處共用，各調用方自行做 canvas 座標系轉換。
  * 完整考慮三層旋轉：L.rot（靜態）+ key.rot（動畫幀）+ cfg.rotation（武器自身）
  * 返回值：{ x, y } 相對 400×500 原圖左上角的像素坐標；若 weaponId 無效返回 null */
-window.getCharWeaponMuzzleLocal = function(weaponSlot, weaponId, animName, frameIdx, flipX){
-/* rev-arm45: 槍口跟著右手（flipX → back_arm）與互換後的 keys；呼叫端傳 flipX。 */
-if(!weaponSlot || !weaponId || typeof getWeaponCfg !== 'function') return null;
-const cfg = getWeaponCfg(weaponSlot, weaponId);
-if(!cfg) return null;
-const fx = !!flipX;
-const B = ARM45_B;
-const lid = _gunArm45(fx);
-const L = _armGeom45(_L45(lid), fx);
-if(!L) return null;
-const anim = _anim45((typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS[animName || 'idle']) || null, fx);
-const fc = anim ? anim.frameCount : 1;
-const fi = anim ? (((frameIdx || 0) % fc) + fc) % fc : 0;
-const key = (anim && anim.keys && anim.keys[lid] && anim.keys[lid][fi]) || {rot:0,dx:0,dy:0};
-const w = B.w * L.w, h = B.h * L.h;
-const cx = B.x + B.w * (L.x + (key.dx||0)*0.01);
-const cy = B.y + B.h * (L.y + (key.dy||0)*0.01);
-const hasTrim = !!(cfg.trim && cfg.trim.w > 0 && cfg.trim.h > 0);
-let localX, localY;
-if(hasTrim){
-const _clean = String(weaponId||'').replace(/\.png$/i,'');
-const _base = (typeof resolveIconId === 'function') ? resolveIconId(_clean) : _clean;
-let _norm = _clean;
-if(typeof isNamedWeaponId === 'function' && isNamedWeaponId(_clean)){
-const _p = _clean.split('_');
-if(_p.length === 4){
-const _sM = (typeof SCOPE_ID_SHORT!=='undefined') ? SCOPE_ID_SHORT : {'1P87':'c','PSO-1':'l','PS320':'l','1P59':'l'};
-const _gM = (typeof GRIP_ID_SHORT!=='undefined') ? GRIP_ID_SHORT : {'RK-1':'g'};
-const _ns = _sM[_p[2]] || _p[2], _ng = _gM[_p[3]] || _p[3];
-if(_ns !== _p[2] || _ng !== _p[3]) _norm = _p[0]+'_'+_p[1]+'_'+_ns+'_'+_ng;
-}
-}
-const mz = (typeof WEAPON_MUZZLE!=='undefined') ? (WEAPON_MUZZLE[_norm] || WEAPON_MUZZLE[_clean] || WEAPON_MUZZLE[_base]) : null;
-const baseW = cfg.trim.w * (cfg.scale||1.0), baseH = cfg.trim.h * (cfg.scale||1.0);
-if(mz){
-let mx = (mz.x/cfg.trim.w)*baseW, my = -baseH/2 + (mz.y/cfg.trim.h)*baseH;
-if(cfg.rotation){
-const r = cfg.rotation*Math.PI/180, cR=Math.cos(r), sR=Math.sin(r);
-const nx = mx*cR - my*sR, ny = mx*sR + my*cR; mx = nx; my = ny;
-}
-localX = w*(cfg.ox||0) + mx; localY = h*(cfg.oy||0) + my;
-} else { localX = w*(cfg.ox||0) + baseW; localY = h*(cfg.oy||0); }
-} else {
-const bw2 = 400*(cfg.scale||0.3);
-localX = w*(cfg.ox||0) + bw2/2; localY = h*(cfg.oy||0);
-}
-let deg = (L.rot||0) + (key.rot||0);
-if(animName === 'dead' && anim) deg = (L.rot||0) + _deadRot45(anim, fi, lid, fx, key.rot||0);
-const rr = deg*Math.PI/180, cK=Math.cos(rr), sK=Math.sin(rr);
-return { x: cx + localX*cK - localY*sK, y: cy + localX*sK + localY*cK };
-};
+window.getCharWeaponMuzzleLocal=function(weaponSlot,weaponId,animName,frameIdx,flipX){
+return window.PuppetRig.muzzle(weaponSlot,weaponId,_pmAnim(animName),frameIdx|0,!!flipX);};
 
 const heroImgCache = new Map();
 function getHeroImg(src){
@@ -1033,115 +325,30 @@ function updateBattleHeroAnim(now){
   }
 }
 
-function getWeaponCfg(slot, id){
-  const isNamed = (typeof id === 'string' && isNamedWeaponId(id));
-  const _cleanId = String(id || '').replace(/\.png$/i, '');
-  const baseId = resolveIconId(_cleanId);
-  /* rev-fix-layout-lookup-norm: 精确匹配前先规范化 scope/grip 短码 */
-  let _normId = _cleanId;
-  if(isNamed){
-    const _p = _cleanId.split('_');
-    if(_p.length === 4){
-      const _sMap = (typeof SCOPE_ID_SHORT !== 'undefined') ? SCOPE_ID_SHORT : { '1P87': 'c', 'PSO-1': 'l', 'PS320': 'l', '1P59': 'l' };
-      const _gMap = (typeof GRIP_ID_SHORT !== 'undefined') ? GRIP_ID_SHORT : { 'RK-1': 'g' };
-      const _ns = _sMap[_p[2]] || _p[2];
-      const _ng = _gMap[_p[3]] || _p[3];
-      if(_ns !== _p[2] || _ng !== _p[3]){
-        _normId = _p[0] + '_' + _p[1] + '_' + _ns + '_' + _ng;
-      }
-    }
-  }
-  const exactLayout = WEAPON_LAYOUT[_normId] || WEAPON_LAYOUT[_cleanId];
-  const layout = exactLayout || WEAPON_LAYOUT[baseId];
-  if(layout){
-    return {
-      layer:'front_arm', behind:true,
-      scale:layout.scale, ox:layout.ox, oy:layout.oy, rotation:layout.rotation,
-      trim:layout.trim,
-      isNamed: isNamed && !exactLayout
-    };
-  }
-  if(slot === 'primary') return HERO_VISIBLE_EQ.primary;
-  if(slot === 'melee') return HERO_VISIBLE_EQ.melee;
-  if(slot === 'secondary'){
-    const def = itemDef(id);
-    if(def && def.type === '霰彈槍') return HERO_VISIBLE_EQ.secondary_shotgun;
-    return HERO_VISIBLE_EQ.secondary_pistol;
-  }
-  return null;
-}
-function getTopCfg(id){
-  /* rev92: 優先查 per-item 表，回退到類型級別 */
-  if(typeof HEAD_ARMOR_LAYOUT !== 'undefined' && HEAD_ARMOR_LAYOUT[id]) return HEAD_ARMOR_LAYOUT[id];
-  const def = itemDef(id);
-  if(def && def.armored) return HERO_VISIBLE_EQ.top_armored;
-  return HERO_VISIBLE_EQ.top;
-}
+function getWeaponCfg(slot,id){return window.PuppetRig.weaponCfg(slot,id);}
+function getTopCfg(id){return window.PuppetRig.topCfg(id);}
 
-function getExploreWeaponRightEdge(canvasW, canvasH){
-  const ORIG_FOOT_X = 200;
-  const ORIG_FOOT_Y = 515;
-  const scale = (canvasH * CHAR_HEIGHT_FACTOR) / 386;
-  const groundY = canvasH * 0.95;
-  const centerX = canvasW * EXPLORE_HERO_X_RATIO;
+function getExploreWeaponRightEdge(canvasW,canvasH){var R=window.PuppetRig;
+var s=(canvasH*CHAR_HEIGHT_FACTOR)/386,gy=canvasH*0.95,cx=canvasW*EXPLORE_HERO_X_RATIO;
+var eq=(typeof state!=='undefined'&&state.player&&state.player.equipped)||{};
+var sl=_pmSlot(eq,heroAnim.eqSlot),id=sl?eq[sl]:null;
+if(!id)return{x:cx,y:gy};
+var m=R.muzzle(sl,id,_pmAnim(heroAnim.name),heroAnim.frame,false);
+return m?{x:cx+s*(m.x-200),y:gy+s*(m.y-515)}:{x:cx,y:gy};}
 
-  const eq = state.player.equipped;
-  let wpSlot = null, wpId = null;
-  if(heroAnim.eqSlot && eq[heroAnim.eqSlot]){ wpSlot = heroAnim.eqSlot; wpId = eq[heroAnim.eqSlot]; }
-  else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
-  else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
-  else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
-
-  if(!wpSlot || !wpId) return { x: centerX, y: groundY };
-  /* 委託通用槍口函數，跟隨 heroAnim 當前幀 */
-  const mz = window.getCharWeaponMuzzleLocal(wpSlot, wpId, heroAnim.name, heroAnim.frame);
-  if(!mz) return { x: centerX, y: groundY };
-  return {
-    x: centerX + scale * (mz.x - ORIG_FOOT_X),
-    y: groundY + scale * (mz.y - ORIG_FOOT_Y)
-  };
-}
-
-function getPlayerMuzzlePos(){
-  const fx = document.getElementById('battle-fx');
-  const W = fx ? fx.clientWidth : 400;
-  const H = fx ? fx.clientHeight : 500;
-  const spriteW = (typeof battle !== 'undefined' && battle && battle.playerCanvasW) ? battle.playerCanvasW : 220;
-  const spriteH = (typeof battle !== 'undefined' && battle && battle.playerCanvasH) ? battle.playerCanvasH : BATTLE_HERO_SPRITE_H;
-
-  const ORIG_FOOT_X = 200;
-  const ORIG_FOOT_Y = 515;
-  const scale = (spriteH * CHAR_HEIGHT_FACTOR) / 386;
-  const groundY_local = spriteH * 0.95;
-  const centerX_local = spriteW / 2;
-
-  const eq = state.player.equipped;
-  let wpSlot = null, wpId = null;
-  if(typeof battle !== 'undefined' && battle && battle.weaponSlot && eq[battle.weaponSlot]){ wpSlot = battle.weaponSlot; wpId = eq[battle.weaponSlot]; }
-  else if(eq.primary){ wpSlot = 'primary'; wpId = eq.primary; }
-  else if(eq.secondary){ wpSlot = 'secondary'; wpId = eq.secondary; }
-  else if(eq.melee){ wpSlot = 'melee'; wpId = eq.melee; }
-
-  let localX = centerX_local;
-  let localY = groundY_local - spriteH * 0.4;
-
-  if(wpSlot && wpId){
-    /* 委託通用槍口函數，跟隨 battleHeroAnim 當前幀 */
-    const _amName = (typeof battleHeroAnim !== 'undefined') ? battleHeroAnim.name : 'idle';
-    const _amFrame = (typeof battleHeroAnim !== 'undefined') ? battleHeroAnim.frame : 0;
-    const mz = window.getCharWeaponMuzzleLocal(wpSlot, wpId, _amName, _amFrame);
-    if(mz){
-      localX = centerX_local + scale * (mz.x - ORIG_FOOT_X);
-      localY = groundY_local + scale * (mz.y - ORIG_FOOT_Y);
-    }
-  } /* rev-fix-restore-muzzle */
-  const px = (typeof battle !== 'undefined' && battle) ? battle.px : 0.15;
-  const py = (typeof battle !== 'undefined' && battle) ? battle.py : 0.75;
-  return {
-    x: (px * W - spriteW / 2 + localX) / W,
-    y: localY / H
-  };
-}
+function getPlayerMuzzlePos(){var R=window.PuppetRig;
+var fx=document.getElementById('battle-fx');
+var W=fx?fx.clientWidth:400,H=fx?fx.clientHeight:500;
+var bt=(typeof battle!=='undefined')?battle:null;
+var sw=(bt&&bt.playerCanvasW)?bt.playerCanvasW:220;
+var sh=(bt&&bt.playerCanvasH)?bt.playerCanvasH:((typeof BATTLE_HERO_SPRITE_H==='number')?BATTLE_HERO_SPRITE_H:118);
+var s=(sh*CHAR_HEIGHT_FACTOR)/386,gy=sh*0.95,cx=sw/2;
+var eq=(typeof state!=='undefined'&&state.player&&state.player.equipped)||{};
+var sl=_pmSlot(eq,bt?bt.weaponSlot:null),id=sl?eq[sl]:null;
+var lx=cx,ly=gy-sh*0.4;
+if(id){var m=R.muzzle(sl,id,_pmAnim(battleHeroAnim.name),battleHeroAnim.frame,false);
+if(m){lx=cx+s*(m.x-200);ly=gy+s*(m.y-515);}}
+var px=bt?bt.px:0.15;return{x:(px*W-sw/2+lx)/W,y:ly/H};}
 
 /* ===== rev-arm45: 兩手角色互換 + 右手持槍（唯一真相源） =====
 前側手＝近側小臂；後側手＝遠側小臂。
@@ -1150,196 +357,33 @@ function getPlayerMuzzlePos(){
   front_arm 長度不變，遠端對齊原 back_arm 遠端；
   back_arm  w/h/pivot 同步 front_arm，近端＝原 front_arm 近端，上緣＝原 back_arm 上緣。
 武器/物品沿用原 ox/oy 綁在右手方塊 → 等價錨點，不需任何抵肩補償。 */
-var ARM45_B = { x:30, y:30, w:340, h:460 };
-function _L45(id){
-for(var i=0;i<GAME_LAYERS.length;i++){ if(GAME_LAYERS[i].id===id) return GAME_LAYERS[i]; }
-return null;
-}
-function _rect45(L){
-var B=ARM45_B, w=B.w*L.w, h=B.h*L.h;
-var cx=B.x+B.w*L.x, cy=B.y+B.h*L.y, px=w*L.pivot.x, py=h*L.pivot.y;
-return { l:cx-px, r:cx-px+w, t:cy-py, b:cy-py+h };
-}
-function _armGeom45(L, flipX){
-if(!flipX || !L || (L.id!=='front_arm' && L.id!=='back_arm')) return L;
-var B=ARM45_B, fa=_L45('front_arm'), ba=_L45('back_arm');
-if(!fa || !ba) return L;
-var rf=_rect45(fa), rb=_rect45(ba), g={}, k;
-for(k in L) g[k]=L[k];
-if(L.id==='front_arm'){
-g.x = fa.x + (rb.r - rf.r)/B.w;
-} else {
-g.w = fa.w; g.h = fa.h; g.pivot = { x:fa.pivot.x, y:fa.pivot.y };
-var nw=B.w*g.w, nh=B.h*g.h, npx=nw*g.pivot.x, npy=nh*g.pivot.y;
-g.x = (rf.l + npx - B.x)/B.w;
-g.y = (rb.t + npy - B.y)/B.h;
-}
-return g;
-}
-function _gunArm45(flipX){ return flipX ? 'back_arm' : 'front_arm'; }
-function _anim45(anim, flipX){
-if(!flipX || !anim || !anim.keys) return anim;
-var a={}, k;
-for(k in anim) a[k]=anim[k];
-var kk={};
-for(k in anim.keys) kk[k]=anim.keys[k];
-kk.front_arm = anim.keys.back_arm || [];
-kk.back_arm  = anim.keys.front_arm || [];
-a.keys = kk;
-return a;
-}
-function _deadRoot45(ctx, anim, fi, scale, flipX){
-var rr=(anim.rootRot && anim.rootRot[fi]) || 0;
-var lf=(anim.rootLift && anim.rootLift[fi]) || 0;
-ctx.translate(0, -lf*scale);
-ctx.rotate((flipX ? 1 : -1)*rr*Math.PI/180);
-}
-function _deadRot45(anim, fi, lid, flipX, baseRot){
-if(!anim || lid !== _gunArm45(flipX)) return baseRot;
-var arr = flipX ? anim.deadGunRotFlip : anim.deadGunRot;
-if(!arr) return baseRot;
-return arr[fi] || 0;
-}
-function drawBodyLayer(ctx, L, B, anim, fi, rotOverride){
-  const keys = anim.keys[L.id] || [];
-  const key = keys[fi] || {rot:0, dx:0, dy:0};
-if(key && key.hide) return; /* rev-corpse-hide: 只有 dead.back_arm 帶此旗標，其他動畫零影響 */
-  const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-  const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-  const w = B.w * L.w;
-  const h = B.h * L.h;
-  const px = w * L.pivot.x;
-  const py = h * L.pivot.y;
-  const _finalRot = (typeof rotOverride === 'number') ? rotOverride : (key.rot || 0);
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(_finalRot * Math.PI / 180);
-  ctx.translate(-px, -py);
-  ctx.fillStyle = L.color;
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, w - 2, h - 2);
-  ctx.restore();
-}
 
-function drawEqLayer(ctx, u, B, anim, fi, rotOverride){
-const img = u.img;
-if(!img || !img.complete || !img.naturalWidth) return;
-/* rev-arm45: u._L = 已互換的骨架；rotOverride = 倒地右手角度 */
-const L = u._L || GAME_LAYERS.find(l => l.id === u.layerId);
-if(!L) return;
-const keys = anim.keys[L.id] || [];
-const key = keys[fi] || {rot:0, dx:0, dy:0};
-const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-const w = B.w * L.w, h = B.h * L.h;
-const px = w * L.pivot.x, py = h * L.pivot.y;
-const localX = px + w * (u.ox || 0);
-const localY = py + h * (u.oy || 0);
-const hasTrim = u.trim && u.trim.w > 0;
-let baseW, baseH, drawX;
-if(hasTrim){ baseW = u.trim.w*(u.scale||1.0); baseH = u.trim.h*(u.scale||1.0); drawX = 0; }
-else if(u._fitMax){
-const _maxSide = 400*(u.scale||0.3);
-const _ar = img.naturalWidth/img.naturalHeight;
-if(_ar >= 1){ baseW=_maxSide; baseH=_maxSide/_ar; } else { baseH=_maxSide; baseW=_maxSide*_ar; }
-drawX = -baseW/2;
-} else {
-baseW = 400*(u.scale||0.3);
-baseH = baseW/(img.naturalWidth/img.naturalHeight);
-drawX = -baseW/2;
-}
-const _rot = (typeof rotOverride === 'number') ? rotOverride : (key.rot || 0);
-ctx.save();
-ctx.translate(cx, cy);
-ctx.rotate(_rot * Math.PI / 180);
-ctx.translate(-px, -py);
-ctx.translate(localX, localY);
-if(u.rotation) ctx.rotate(u.rotation * Math.PI / 180);
-if(hasTrim) ctx.drawImage(img, u.trim.x, u.trim.y, u.trim.w, u.trim.h, drawX, -baseH/2, baseW, baseH);
-else ctx.drawImage(img, drawX, -baseH/2, baseW, baseH);
-ctx.restore();
-}
+
+
+
+
+
+
+
+
+
+
 
 /* rev-corpse-fit: 倒地包圍盒防裁切 —— 僅在會被畫布邊緣裁切時最小位移（所有渲染器同一規則）。
    +90° 面朝右：頭/盔向右伸 ~500 原圖單位、盔下緣向地面下伸 ~82；flip 鏡像。 */
-window._corpseFit = function(px, py, s, W, H, hasHelmet, dir){
-var right = (hasHelmet ? 505 : 462) * s;
-var below = (hasHelmet ? 84 : 56) * s;
-var left = 40 * s, above = 62 * s;
-var needL = (dir < 0) ? right : left;
-var needR = (dir < 0) ? left : right;
-var x = Math.min(px, W - needR - 2);
-x = Math.max(x, needL + 2);
-var y = Math.min(py, H - below - 2);
-y = Math.max(y, above + 2);
-return { x: x, y: y };
-};
-function drawBlockHero(ctx, canvasW, canvasH, animName, frameIdx, weaponSlotOverride, charHFactor, centerXRatio, legOverride, healItemId, fallProgress, flipXArg){
-/* rev-arm45: 玩家/Boss 恆面朝右（flipXArg 未傳 = false）；骨架/錨點/倒地全走共用層。 */
-const flipX = !!flipXArg;
-const anim = _anim45(GAME_ANIMS[animName] || GAME_ANIMS.idle, flipX);
-const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-const factor = charHFactor || CHAR_HEIGHT_FACTOR;
-const B = ARM45_B;
-const scale = (canvasH * factor) / 386;
-const groundY = canvasH * 0.95;
-const centerX = canvasW * ((centerXRatio != null) ? centerXRatio : 0.5);
-const gunArm = _gunArm45(flipX);
-const _dead = (animName === 'dead');
-ctx.save();
-ctx.translate(centerX, groundY);
-if(_dead) _deadRoot45(ctx, anim, fi, scale, flipX);
-ctx.scale(flipX ? -scale : scale, scale);
-ctx.translate(-200, -515);
-const units = [];
-for(const L of GAME_LAYERS){ const g = _armGeom45(L, flipX); units.push({z:g.z, kind:'layer', layer:g}); }
-const eq = state.player.equipped;
-if(eq.head){
-const cfg = (typeof HEAD_ARMOR_LAYOUT!=='undefined' && HEAD_ARMOR_LAYOUT[eq.head]) ? HEAD_ARMOR_LAYOUT[eq.head] : HERO_VISIBLE_EQ.head;
-const ld = _L45(cfg.layer);
-if(ld) units.push({z:ld.z+0.5, kind:'eq', layerId:cfg.layer, _L:_armGeom45(ld,flipX), ox:cfg.ox, oy:cfg.oy, scale:cfg.scale, rotation:cfg.rotation, img:getHeroImg(window.getItemIconPath(eq.head))});
-}
-if(eq.top){
-const cfg = getTopCfg(eq.top);
-const ld = _L45(cfg.layer);
-if(ld) units.push({z:ld.z+0.5, kind:'eq', layerId:cfg.layer, _L:_armGeom45(ld,flipX), ox:cfg.ox, oy:cfg.oy, scale:cfg.scale, rotation:cfg.rotation, img:getHeroImg(window.getItemIconPath(eq.top))});
-}
-let wpSlot = null, wpId = null;
-if(weaponSlotOverride === 'hidden'){}
-else if(weaponSlotOverride && eq[weaponSlotOverride]){ wpSlot = weaponSlotOverride; wpId = eq[weaponSlotOverride]; }
-else if(eq.primary){ wpSlot='primary'; wpId=eq.primary; }
-else if(eq.secondary){ wpSlot='secondary'; wpId=eq.secondary; }
-else if(eq.melee){ wpSlot='melee'; wpId=eq.melee; }
-const _ga = _armGeom45(_L45(gunArm), flipX);
-const _gz = _L45('front_arm').z - 0.5;
-if(wpSlot && wpId){
-if(typeof AMMO !== 'undefined' && AMMO[wpId]){
-if(_ga) units.push({z:_gz, kind:'eq', layerId:gunArm, _L:_ga, ox:1-_ga.pivot.x, oy:-_ga.pivot.y, scale:0.3, rotation:0, img:getHeroImg('icons/garden/ammo_pack.png'), _fitMax:true});
-} else {
-const cfg = getWeaponCfg(wpSlot, wpId);
-if(cfg && _ga) units.push({z:_gz, kind:'eq', layerId:gunArm, _L:_ga, ox:cfg.ox, oy:cfg.oy, scale:cfg.scale, rotation:cfg.rotation, img:getHeroImg(window.getItemIconPath(wpId)), trim:cfg.trim, _gun:true});
-}
-}
-if(healItemId){
-if(_ga) units.push({z:_gz+0.1, kind:'eq', layerId:gunArm, _L:_ga, ox:0.88, oy:0.15, scale:0.35, rotation:45, img:getHeroImg(window.getItemIconPath(healItemId)), _fitMax:true});
-}
-units.sort((a,b)=>a.z-b.z);
-for(const u of units){
-const _L = (u.kind === 'layer') ? u.layer : u._L;
-const _lid = _L ? _L.id : u.layerId;
-const _k = (anim.keys[_lid] && anim.keys[_lid][fi]) || {rot:0};
-let _rot = _dead ? _deadRot45(anim, fi, _lid, flipX, _k.rot||0) : (_k.rot||0);
-if(u.kind === 'layer'){
-if(!_dead && legOverride && legOverride[_lid] != null && typeof legOverride[_lid].rot === 'number') _rot = legOverride[_lid].rot;
-drawBodyLayer(ctx, u.layer, B, anim, fi, _rot);
-} else {
-drawEqLayer(ctx, u, B, anim, fi, (_lid === gunArm) ? _rot : undefined);
-}
-}
-ctx.restore();
-}
+window._corpseFit=function(px,py,s,W,H,hasHelmet,dir){
+var eq=(typeof state!=='undefined'&&state.player&&state.player.equipped)||{};
+var sl=_pmSlot(eq,null);return _pmFit(px,py,s,W,H,dir<0,sl,sl?eq[sl]:null,eq,null);};
+function drawBlockHero(ctx,canvasW,canvasH,animName,frameIdx,weaponSlotOverride,charHFactor,centerXRatio,legOverride,healItemId,fallProgress,flipXArg){
+var R=window.PuppetRig;
+var eq=(typeof state!=='undefined'&&state.player&&state.player.equipped)||{};
+var s=(canvasH*(charHFactor||CHAR_HEIGHT_FACTOR))/386,gy=canvasH*0.95;
+var cx=canvasW*((centerXRatio!=null)?centerXRatio:0.5);
+var an=_pmAnim(animName),flip=!!flipXArg;
+var sl=_pmSlot(eq,weaponSlotOverride),id=sl?eq[sl]:null;
+if(an==='dead'){var f=_pmFit(cx,gy,s,canvasW,canvasH,flip,sl,id,eq,null);cx=f.x;gy=f.y;}
+R.draw(ctx,cx,gy,s,{anim:an,frame:frameIdx|0,flip:flip,slot:sl,weaponId:id,
+head:eq.head,top:eq.top,healId:healItemId,ammoBox:_pmAmmo(id)});}
 
 function renderExploreHeroCanvas(){
   if(typeof currentTab === 'undefined' || currentTab !== 'explore') return;
@@ -1422,34 +466,7 @@ function renderZone2Silhouette(){
 
 
 /* rev-fix-render-move: 從 23-garden-raid.js 搬移的繪製函數 */
-function _raidDrawWorkerHelmet(ctx, B, anim, fi, color){
-  const L = GAME_LAYERS.find(function(l){ return l.id === 'head'; });
-  if(!L) return;
-  const keys = anim.keys[L.id] || [];
-  const key = keys[fi] || {rot:0, dx:0, dy:0};
-  const cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-  const cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-  const w = B.w * L.w;
-  const h = B.h * L.h;
-  const px = w * L.pivot.x;
-  const py = h * L.pivot.y;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate((key.rot || 0) * Math.PI / 180);
-  ctx.translate(-px, -py);
-  const cxL = w * 0.5;
-  const cyL = h * 0.45;
-  const r = w * 0.72;
-  ctx.fillStyle = color;
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cxL, cyL, r, Math.PI, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-}
+
 
 
 function drawBucketUnit(ctx, u){
@@ -1598,208 +615,36 @@ function drawHandItemUnit(ctx, u){
 }
 
 
-function _raidDrawHuman(ctx, px, py, scale, equipped, equippedRarity, animName, frameIdx, weaponSlotOverride, servantType, flipX, hasBucket, handItem, noWorkerHelmet, legOverride){
-/* rev-arm45: 與玩家同一條骨架。flipX → 兩手互換（幾何 + keys），槍錨定 back_arm（右手）。
-   顏色套在 clone 上，不再臨時改寫 GAME_LAYERS。 */
-var fx = !!flipX;
-var anim = _anim45(GAME_ANIMS[animName] || GAME_ANIMS.idle, fx);
-var fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-var B = ARM45_B, gunArm = _gunArm45(fx), _dead = (animName === 'dead');
-var TYPE_COLORS = {
-farmer:{body:'#5a9a48',legs:'#3a6a2e'}, guard:{body:'#5088bb',legs:'#2e4a6a'},
-foreman:{body:'#e0a830',legs:'#d8d0c0'}, enemy:{body:'#8b2a2a',legs:'#3a1010'}
-};
-var _c = servantType ? TYPE_COLORS[servantType] : null;
-ctx.save();
-ctx.translate(px, py);
-if(_dead) _deadRoot45(ctx, anim, fi, scale, fx);
-ctx.scale(fx ? -scale : scale, scale);
-ctx.translate(-200, -515);
-var units = [];
-for(var gi=0; gi<GAME_LAYERS.length; gi++){
-var g = _armGeom45(GAME_LAYERS[gi], fx), cl = {};
-for(var kk in g) cl[kk] = g[kk];
-if(_c){
-if(cl.id==='right_leg'||cl.id==='left_leg') cl.color=_c.legs;
-else if(cl.id==='torso'||cl.id==='back_arm'||cl.id==='front_arm') cl.color=_c.body;
-}
-units.push({z:cl.z, kind:'layer', layer:cl});
-}
-if(equipped.head){
-var cH = (typeof HEAD_ARMOR_LAYOUT!=='undefined' && HEAD_ARMOR_LAYOUT[equipped.head]) ? HEAD_ARMOR_LAYOUT[equipped.head] : HERO_VISIBLE_EQ.head;
-var lH = _L45(cH.layer);
-if(lH) units.push({z:lH.z+0.5, kind:'eq', layerId:cH.layer, _L:_armGeom45(lH,fx), ox:cH.ox, oy:cH.oy, scale:cH.scale, rotation:cH.rotation, img:getHeroImg(window.getItemIconPath(equipped.head))});
-}
-if(equipped.top){
-var cT = getTopCfg(equipped.top);
-var lT = _L45(cT.layer);
-if(lT) units.push({z:lT.z+0.5, kind:'eq', layerId:cT.layer, _L:_armGeom45(lT,fx), ox:cT.ox, oy:cT.oy, scale:cT.scale, rotation:cT.rotation, img:getHeroImg(window.getItemIconPath(equipped.top))});
-}
-var wpS=null, wpI=null;
-if(weaponSlotOverride && equipped[weaponSlotOverride]){ wpS=weaponSlotOverride; wpI=equipped[weaponSlotOverride]; }
-else if(equipped.primary){ wpS='primary'; wpI=equipped.primary; }
-else if(equipped.secondary){ wpS='secondary'; wpI=equipped.secondary; }
-else if(equipped.melee){ wpS='melee'; wpI=equipped.melee; }
-var _ga = _armGeom45(_L45(gunArm), fx);
-var _gz = _L45('front_arm').z - 0.5;
-if(wpS && wpI && typeof AMMO!=='undefined' && AMMO[wpI]){
-if(_ga) units.push({z:_gz, kind:'eq', layerId:gunArm, _L:_ga, ox:1-_ga.pivot.x, oy:-_ga.pivot.y, scale:0.3, rotation:0, img:getHeroImg('icons/garden/ammo_pack.png'), _fitMax:true});
-} else if(wpS && wpI && !_isMeleeWeapon(wpI)){
-var cW = getWeaponCfg(wpS, wpI);
-if(cW && _ga) units.push({z:_gz, kind:'eq', layerId:gunArm, _L:_ga, ox:cW.ox, oy:cW.oy, scale:cW.scale, rotation:cW.rotation, img:getHeroImg(window.getItemIconPath(wpI)), trim:cW.trim, _gun:true});
-}
-function _mid(lid, u, v){
-var L = _armGeom45(_L45(lid), fx);
-var k = (anim.keys[lid] && anim.keys[lid][fi]) || {rot:0,dx:0,dy:0};
-var cx = B.x + B.w*(L.x + (k.dx||0)*0.01), cy = B.y + B.h*(L.y + (k.dy||0)*0.01);
-var w = B.w*L.w, h = B.h*L.h;
-return { x: cx + w*(u - L.pivot.x), y: cy + h*(v - L.pivot.y) };
-}
-if(hasBucket){
-var f1=_mid('front_arm',0.5,0.5), b1=_mid('back_arm',0.5,0.5);
-var bx=(f1.x+b1.x)/2, by=(f1.y+b1.y)/2;
-units.push({z:58, kind:'bucket', bx:bx, topY:by-38, botY:by+97, topHalf:54, botHalf:39});
-}
-if(handItem==='stick'||handItem==='clipboard'||handItem==='flask'){
-var f2=_mid('front_arm',0.5,0.5), b2=_mid('back_arm',0.5,0.5);
-if(handItem==='stick'){
-units.push({z:60, kind:'handitem', handItemType:'sack', bagX:b2.x, bagY:b2.y});
-var sh=_mid('front_arm',0.90,0);
-units.push({z:59, kind:'handitem', handItemType:'shovel', anchorX:sh.x, anchorY:sh.y-7});
-} else if(handItem==='clipboard'){
-units.push({z:58, kind:'handitem', handItemType:'clipboard', armMidX:(f2.x+b2.x)/2, armMidY:(f2.y+b2.y)/2});
-} else {
-var fr=_mid('front_arm',0.85,0.5), bl=_mid('back_arm',0.2,0.5);
-units.push({z:61, kind:'handitem', handItemType:'flask', flaskPositions:[{x:bl.x,y:bl.y},{x:fr.x,y:fr.y}]});
-}
-}
-units.sort(function(a,b){return a.z-b.z;});
-for(var ui=0; ui<units.length; ui++){
-var u = units[ui];
-var _L = (u.kind==='layer') ? u.layer : u._L;
-var _lid = _L ? _L.id : u.layerId;
-var _k = (anim.keys[_lid] && anim.keys[_lid][fi]) || {rot:0};
-var _rot = _dead ? _deadRot45(anim, fi, _lid, fx, _k.rot||0) : (_k.rot||0);
-if(u.kind==='layer'){
-if(!_dead && legOverride && legOverride[_lid] && typeof legOverride[_lid].rot==='number') _rot = legOverride[_lid].rot;
-drawBodyLayer(ctx, u.layer, B, anim, fi, _rot);
-}
-else if(u.kind==='bucket') drawBucketUnit(ctx, u);
-else if(u.kind==='handitem') drawHandItemUnit(ctx, u);
-else drawEqLayer(ctx, u, B, anim, fi, (_lid===gunArm) ? _rot : undefined);
-}
-if(!noWorkerHelmet && servantType==='foreman') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ffffff');
-else if(!noWorkerHelmet && servantType==='farmer') _raidDrawWorkerHelmet(ctx, B, anim, fi, '#ff8800');
-ctx.restore();
-}
+function _raidDrawHuman(ctx,px,py,scale,equipped,equippedRarity,animName,frameIdx,weaponSlotOverride,servantType,flipX,hasBucket,handItem,noWorkerHelmet,legOverride){
+var R=window.PuppetRig;var eq=equipped||{};
+var an=_pmAnim(animName),flip=!!flipX;
+var sl=_pmSlot(eq,weaponSlotOverride),id=sl?eq[sl]:null;
+var wk=_pmWorker(servantType,noWorkerHelmet);
+if(an==='dead'){var cv=ctx.canvas,CW=(cv&&cv.clientWidth)||400,CH=(cv&&cv.clientHeight)||500;
+var f=_pmFit(px,py,scale,CW,CH,flip,sl,id,eq,wk);px=f.x;py=f.y;}
+R.draw(ctx,px,py,scale,{anim:an,frame:frameIdx|0,flip:flip,slot:sl,weaponId:id,
+head:eq.head,top:eq.top,colors:_pmColors(servantType),
+bucket:!!hasBucket,handItem:handItem,worker:wk,ammoBox:_pmAmmo(id)});}
 
 
-function drawBodyLayerWithRot(ctx, L, B, anim, fi, rotOverride){
-  var keys = anim.keys[L.id] || [];
-  var key = keys[fi] || {rot:0, dx:0, dy:0};
-  var cx = B.x + B.w * (L.x + (key.dx||0) * 0.01);
-  var cy = B.y + B.h * (L.y + (key.dy||0) * 0.01);
-  var w = B.w * L.w;
-  var h = B.h * L.h;
-  var px = w * L.pivot.x;
-  var py = h * L.pivot.y;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(rotOverride * Math.PI / 180);
-  ctx.translate(-px, -py);
-  ctx.fillStyle = L.color;
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, w - 2, h - 2);
-  ctx.restore();
-}
 
 
-function _raidDrawEnemy(ctx, px, py, scale, animName, frameIdx, enemyId){
-  var _realId = enemyId;
-  if(typeof HUMAN_ENEMY_DATA !== "undefined"){
-    if(!HUMAN_ENEMY_DATA[enemyId] && HUMAN_ENEMY_DATA["human_" + enemyId]){
-      _realId = "human_" + enemyId;
-    }
-  }
-  if(typeof HUMAN_ENEMY_DATA !== "undefined" && HUMAN_ENEMY_DATA[_realId]){
-    const def = HUMAN_ENEMY_DATA[_realId];
-    const anims = def.anims;
-    if(!anims) return;
-    let anim = anims[animName];
-    if(!anim && animName === 'walk') anim = GAME_ANIMS.walk;
-    if(!anim) anim = anims.idle;
-    if(!anim) return;
-    const fi = ((frameIdx % anim.frameCount) + anim.frameCount) % anim.frameCount;
-    if(!window._rev510_raidEquipCache) window._rev510_raidEquipCache = {};
-    if(!window._rev510_raidEquipCache[_realId]){
-      window._rev510_raidEquipCache[_realId] = (typeof _rev506_getRandomEquip === "function")
-        ? _rev506_getRandomEquip(_realId) : null;
-    }
-    const equip = window._rev510_raidEquipCache[_realId];
-    const ox = px - def.canvas.w * scale / 2;
-    const oy = py - def.canvas.h * scale;
-    const _isDeath = (animName === "death");
-    if(typeof _rev506_drawHumanCorpse === "function"){
-      _rev506_drawHumanCorpse(ctx, _realId, scale, ox, oy, def, anim, fi, equip, _isDeath);
-      return;
-    }
-  }
-  if(typeof _drawEnemyAt === "function"){
-    var _bdef = (typeof BEAST_LAYERS !== "undefined" && BEAST_LAYERS[_realId]);
-    if(_bdef){
-      var _bx = px - _bdef.canvas.w * scale / 2;
-      var _by = py - _bdef.canvas.h * scale;
-      if(_drawEnemyAt(ctx, _realId, _bx, _by, scale, animName, frameIdx)) return;
-    }
-  }
-  if(typeof BEAST_LAYERS !== "undefined" && BEAST_LAYERS[_realId]) {
-    const def = BEAST_LAYERS[_realId];
-    const bounds = (typeof getBeastBounds === "function") ? getBeastBounds(def) : null;
-    if(bounds) {
-      const targetVisualH = 386 * 0.9;
-      const actualScale = (targetVisualH * scale) / bounds.h;
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.scale(actualScale, actualScale);
-      const centerX = (bounds.minX + bounds.maxX) / 2;
-      const bottomY = bounds.maxY;
-      ctx.translate(-centerX, -bottomY);
-      const world = (typeof resolveBossWorld === "function") ? resolveBossWorld(def, { keys:{} }, 0) : {};
-      const sorted = def.layers.slice().sort((a,b)=>a.z - b.z);
-      for(const L of sorted) {
-        const wp = world[L.id];
-        if(!wp) continue;
-        const w = def.canvas.w * L.w;
-        const h = def.canvas.h * L.h;
-        const ppx = w * L.pivot.x;
-        const ppy = h * L.pivot.y;
-        ctx.save();
-        ctx.translate(wp.wx, wp.wy);
-        ctx.rotate((L.rot || 0) * Math.PI / 180);
-        ctx.translate(-ppx, -ppy);
-        if(L.id.indexOf("eye") === 0) {
-          ctx.shadowColor = "#ff0000";
-          ctx.shadowBlur = 15;
-        }
-        ctx.fillStyle = L.color;
-        ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = "rgba(0,0,0,0.65)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(1, 1, w - 2, h - 2);
-        ctx.restore();
-      }
-      ctx.restore();
-      return;
-    }
-  }
-  if(typeof _raidDrawHuman === "function") {
-    const _eq = { head: "ssh68", top: "6b231", primary: "ak74" };
-    const _rar = { head: "一般", top: "一般", primary: "一般" };
-    _raidDrawHuman(ctx, px, py, scale, _eq, _rar, animName, frameIdx, "primary", "enemy", true, false, null);
-  }
-}
+
+function _raidDrawEnemy(ctx,px,py,scale,animName,frameIdx,enemyId){
+var rid=enemyId;
+if(typeof HUMAN_ENEMY_DATA!=='undefined'){
+if(!HUMAN_ENEMY_DATA[enemyId]&&HUMAN_ENEMY_DATA['human_'+enemyId])rid='human_'+enemyId;
+if(HUMAN_ENEMY_DATA[rid]){
+if(!window._pmEqC)window._pmEqC={};
+if(!window._pmEqC[rid]){var e=null;
+try{if(typeof _rev506_getRandomEquip==='function')e=_rev506_getRandomEquip(rid);}catch(x){}
+window._pmEqC[rid]=e||{head:'ssh68',top:'6b231',primary:'ak74'};}
+var eq=window._pmEqC[rid]||{};
+_raidDrawHuman(ctx,px,py,scale,eq,{},_pmAnim(animName),frameIdx|0,
+_pmSlot(eq,null),'enemy',true,false,null,true,null);
+return;}}
+_raidDrawHuman(ctx,px,py,scale,{head:'ssh68',top:'6b231',primary:'ak74'},{},
+_pmAnim(animName),frameIdx|0,'primary','enemy',true,false,null,true,null);}
 
 /* ===== rev-btn-unify:start ===== */
 (function(){

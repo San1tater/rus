@@ -512,7 +512,6 @@ window._tickWeaponBullets = function(owner, dt, allTargets){
   var _bullets = _wbsGet(owner);
   if(!_bullets.length) return;
   var now = performance.now();
-  /* rev-box3d: 命中結算集中在此，_hitCtx 同步傳遞部位/落點給場景層 */
   function _settle(b, tgt, box, hit){
     b._resolved = true; b._hitDetected = true;
     var _r = (hit.y - box.yFoot) / box.H;
@@ -569,9 +568,7 @@ window._tickWeaponBullets = function(owner, dt, allTargets){
     var _progress = Math.min(1, _elapsed / b.flightTimeSec);
     var _sz = (typeof b.startZ === 'number') ? b.startZ : 0;
     var _ez = (typeof b.impactZ === 'number') ? b.impactZ : 0;
-    /* rev-aps-pre-decide: 幾何相交（與 progress 無關）即決策。
-       攔截面在車頭前 2m、比 hit.t 早；若等 progress>=hit.t 才決策，
-       中間幀尾煙已噴過攔截面。決策只一次，結果快取在彈體。 */
+    /* rev-aps-pre-decide: 幾何相交（與 progress 無關）即決策，結果快取在彈體 */
     var _rayHit = null, _rayTgt = null, _rayBox = null;
     if(!b.isGrenade){
       var _cand = [];
@@ -593,31 +590,44 @@ window._tickWeaponBullets = function(owner, dt, allTargets){
     }
     var _aps = null;
     if(_rayHit && _rayTgt === b.target && _rayTgt.isVehicle){
-      if(b._apsDone){ _aps = b._apsHit ? { t:b._apsT, wx:b._apsWX } : null; }
+      if(b._apsDone){ _aps = b._apsHit ? { t:b._apsT, wx:b._apsWX, wy:b._apsWY } : null; }
       else if(typeof window._apsDecide === 'function'){
         try { _aps = window._apsDecide(b, _rayHit); } catch(e){ _aps = null; }
       }
     }
     var _best = (_rayHit && _progress >= _rayHit.t) ? _rayHit : null;
-    /* rev-trail-stop-at-impact: 尾煙上限 = 終端事件（攔截面優先於車頭面） */
-    var _tEnd = (_aps && typeof _aps.t === 'number') ? Math.min(_progress, _aps.t)
-              : (_best ? Math.min(_progress, _best.t) : _progress);
+    /* rev-trail-visual-end: 尾煙沿「起點→視覺終點」沉積，與爆炸同點。
+       人形=中軸+命中高（每幀跟隨移動目標）；載具=實繪邊緣；APS=攔截面實繪高；
+       射失=(impactX,0)，與 _rpgGroundBurst 完全同點。上限 t 沿用 T1/APS 夾止。 */
     var _mvD = (window.MISSILE_VISUAL && b.ammoId) ? window.MISSILE_VISUAL[b.ammoId] : null;
     if(_mvD && b.ammoId !== '9m14'){
       var _ccT = (owner && owner.sm) ? owner : window._combat;
       if(_ccT && _ccT.sm){
         var _t0T = (typeof b._trailT === 'number') ? b._trailT : 0;
+        var _tEnd = _progress, _lineB = b;
+        if(_aps && typeof _aps.t === 'number'){
+          _tEnd = Math.min(_progress, _aps.t);
+          var _ayA = (typeof _aps.wy === 'number') ? _aps.wy : (b.startY + (b.impactY - b.startY) * _aps.t);
+          _lineB = { startX:b.startX, startY:b.startY, impactX:_aps.wx, impactY:_ayA };
+        } else if(_rayHit){
+          _tEnd = Math.min(_progress, _rayHit.t);
+          var _prevCtx = window._hitCtx;
+          window._hitCtx = { target:_rayTgt, part:null, x:_rayHit.x, y:_rayHit.y, z:_rayHit.z, face:_rayHit.face, isDirect:true, bullet:b };
+          var _vhE = (typeof window._getTargetHitVisualWorld === 'function') ? window._getTargetHitVisualWorld(_rayTgt) : null;
+          window._hitCtx = _prevCtx;
+          _lineB = { startX:b.startX, startY:b.startY, impactX:(_vhE ? _vhE.wx : _rayHit.x), impactY:(_vhE ? _vhE.wy : _rayHit.y) };
+        } else if(b.guidanceMode === 'none'){
+          _lineB = { startX:b.startX, startY:b.startY, impactX:b.impactX, impactY:0 };
+        }
         var _PD = (_mvD.smoke === 'tracer') ? window._RPG27 : window.MISSILE_TRAIL;
-        if(typeof window._rpgTrailDeposit === 'function') window._rpgTrailDeposit(_ccT, b, _t0T, _tEnd, _PD);
+        if(typeof window._rpgTrailDeposit === 'function') window._rpgTrailDeposit(_ccT, _lineB, _t0T, _tEnd, _PD);
         b._trailT = _tEnd;
       }
     }
-    /* 攔截成立：以攔截面上的虛擬命中走原結算鏈（onHit → _vHitVehicle 讀快取 → 攔截日誌） */
     if(_aps && typeof _aps.t === 'number' && _progress >= _aps.t){
       var _ftA = _aps.t;
       _settle(b, _rayTgt, _rayBox, {
-        t: _ftA,
-        x: _aps.wx,
+        t: _ftA, x: _aps.wx,
         y: b.startY + (b.impactY - b.startY) * _ftA,
         z: _sz + (_ez - _sz) * _ftA,
         face: _rayHit.face
@@ -687,8 +697,6 @@ window._getWeaponBullets = function(owner){
  * 人偶在 386 高原图中，torso layer 中心相对脚底的 Y = 264.2 * 1.7 / 386 ≈ 1.163m */
 
 window._getTargetHitVisualWorld = function(target){
-  /* rev-incoming-visual: 載具命中 / 曳光落點 = 實際繪製的車體中心。
-     舊版用 AABB centerY × 世界 ppm → 落點低於實繪車體（打車底空氣）。 */
   if(!target) return null;
   var _footY = (typeof target.y === 'number') ? target.y : 0;
   var _wx = (typeof target.worldX === 'number') ? target.worldX : 0;
@@ -700,31 +708,31 @@ window._getTargetHitVisualWorld = function(target){
     return { wx: _wx + _hz, wy: _hy };
   }
   if(target.isVehicle){
-/* rev-veh-hit-visual: 載具命中視覺 = 實繪車體在該命中高度的右側像素邊緣。
-   判定盒車頭（worldX + 半車長）恆在畫面外，整圖 bbox 右緣是砲管尖，兩者都不是彈著點。
-   取實繪螢幕位置後反投影回世界米，下游曳光 / 爆炸沿用既有公式即落在同一點。
-   步兵分支不受影響；飄字位置不經此函式，亦不受影響。 */
-var _hpV = (typeof window._vehicleHitScreenPos === 'function')
-? window._vehicleHitScreenPos(target.vehicleId, (window._hitCtx && typeof window._hitCtx.y === 'number') ? window._hitCtx.y : null)
-: null;
-if(_hpV){
-var _cV = window._combat;
-var _camV = (_cV && _cV.allies && _cV.allies[0] && typeof _cV.allies[0].worldX === 'number') ? _cV.allies[0].worldX : _wx;
-var _srV = (_cV && _cV.sm && _cV.sm.screenRightWorld) || 2;
-var _hrV = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
-var _chfV = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
-var _phmV = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
-return {
-wx: _camV + (_hpV.nx - _hrV) / Math.max(0.05, 1 - _hrV) * _srV,
-wy: _footY + (0.95 - _hpV.ny) * _phmV / _chfV
-};
-}
-var _ay = (typeof window._vehicleAimWorldY === 'function') ? window._vehicleAimWorldY() : null;
-if(_ay != null) return { wx: _wx, wy: _footY + _ay };
-var _aabb = (typeof window.getVehicleAABB === 'function') ? window.getVehicleAABB(target.vehicleId) : null;
-return { wx: _wx, wy: _footY + ((_aabb && _aabb.centerY) ? _aabb.centerY : 1.2) };
-}
-  return { wx: _wx, wy: _footY + 1.163 };
+    var _hpV = (typeof window._vehicleHitScreenPos === 'function')
+      ? window._vehicleHitScreenPos(target.vehicleId, (window._hitCtx && typeof window._hitCtx.y === 'number') ? window._hitCtx.y : null)
+      : null;
+    if(_hpV){
+      var _cV = window._combat;
+      var _camV = (_cV && _cV.allies && _cV.allies[0] && typeof _cV.allies[0].worldX === 'number') ? _cV.allies[0].worldX : _wx;
+      var _srV = (_cV && _cV.sm && _cV.sm.screenRightWorld) || 2;
+      var _hrV = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+      var _chfV = (typeof CHAR_HEIGHT_FACTOR === 'number') ? CHAR_HEIGHT_FACTOR : 0.58;
+      var _phmV = (typeof PLAYER_HEIGHT_M === 'number') ? PLAYER_HEIGHT_M : 1.7;
+      return {
+        wx: _camV + (_hpV.nx - _hrV) / Math.max(0.05, 1 - _hrV) * _srV,
+        wy: _footY + (0.95 - _hpV.ny) * _phmV / _chfV
+      };
+    }
+    var _ay = (typeof window._vehicleAimWorldY === 'function') ? window._vehicleAimWorldY() : null;
+    if(_ay != null) return { wx: _wx, wy: _footY + _ay };
+    var _aabb = (typeof window.getVehicleAABB === 'function') ? window.getVehicleAABB(target.vehicleId) : null;
+    return { wx: _wx, wy: _footY + ((_aabb && _aabb.centerY) ? _aabb.centerY : 1.2) };
+  }
+  /* rev-human-center-x: 人形視覺終點 x 固定中軸 —— 包圍盒含武器輪廓與透明邊，
+     不全是人體，但中軸線一定在身體上。y 用實際命中高度，不再固定軀幹中心。 */
+  var _hcH = window._hitCtx;
+  var _hyH = (_hcH && typeof _hcH.y === 'number') ? _hcH.y : (_footY + 1.163);
+  return { wx: _wx, wy: _hyH };
 };;
 ;
 

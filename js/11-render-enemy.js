@@ -1,209 +1,9 @@
-
 'use strict';
-
-var _DEF_COLORS = {
-  head:'#c89870', face:'#b88860', torso:'#4a4038',
-  right_leg:'#3a3028', left_leg:'#3a3028',
-  front_arm:'#4a3a2e', back_arm:'#4a3a2e',
-  helmet:'#5a5a5a', legs:'#3a3028'
-};
-
-function _resolveEnemyDef(id){
-  if(typeof BEAST_LAYERS !== 'undefined' && BEAST_LAYERS[id]) return {def:BEAST_LAYERS[id], resolvedId:id};
-  if(typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA[id]) return {def:HUMAN_ENEMY_DATA[id], resolvedId:id};
-  if(typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA['human_' + id]) return {def:HUMAN_ENEMY_DATA['human_' + id], resolvedId:'human_' + id};
-  return null;
-}
-function _resolveEnemyAnims(id){
-  if(typeof BEAST_ANIMS !== 'undefined' && BEAST_ANIMS[id]) return BEAST_ANIMS[id];
-  if(typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA[id] && HUMAN_ENEMY_DATA[id].anims) return HUMAN_ENEMY_DATA[id].anims;
-  return null;
-}
-function _isMeleeWeapon(id){
-  if(!id) return false;
-  if(typeof WEAPONS !== 'undefined' && WEAPONS[id] && WEAPONS[id].slot === 'melee') return true;
-  if(typeof WEAPONS !== 'undefined' && WEAPONS[id] && WEAPONS[id].type === '刺刀') return true;
-  if(id === '6kh2' || id === '6kh5' || id === 'kukri') return true;
-  return false;
-}
-
-function _measureLayerMaxY(def, anim, frame, layerId){
-  var L = def.layers.find(function(l){ return l.id === layerId; });
-  if(!L) return null;
-  var cw = def.canvas.w, ch = def.canvas.h;
-  var rootRot = ((anim.rootRot && anim.rootRot[frame]) || 0) * Math.PI / 180;
-  var rootDy = (anim.rootDy && anim.rootDy[frame]) || 0;
-  var rp = anim.rootPivot || {x:0.5, y:0.95};
-  var pcx = cw * rp.x, pcy = ch * rp.y, cosR = Math.cos(rootRot), sinR = Math.sin(rootRot);
-  var k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][frame]) || {rot:0, dx:0, dy:0};
-  var w = cw * L.w, h = ch * L.h;
-  var cx = cw * L.x + cw * (k.dx || 0) * 0.01;
-  var cy = ch * L.y + ch * (k.dy || 0) * 0.01;
-  var px = w * L.pivot.x, py = h * L.pivot.y;
-  var rot = ((L.rot || 0) + (k.rot || 0)) * Math.PI / 180;
-  var cL = Math.cos(rot), sL = Math.sin(rot);
-  var cs = [[-px,-py],[w-px,-py],[-px,h-py],[w-px,h-py]];
-  var maxY = -Infinity;
-  for(var ci = 0; ci < 4; ci++){
-    var lx = cs[ci][0], ly = cs[ci][1];
-    var Px = cx + lx * cL - ly * sL;
-    var Py = cy + lx * sL + ly * cL;
-    var ry = pcy + (Px - pcx) * sinR + (Py - pcy) * cosR + ch * rootDy;
-    if(ry > maxY) maxY = ry;
-  }
-  return maxY;
-}
-
-function _measureDeathBBox(def, anim, frame){
-  var cw = def.canvas.w, ch = def.canvas.h;
-  var rootRot = ((anim.rootRot && anim.rootRot[frame]) || 0) * Math.PI / 180;
-  var rootDy = (anim.rootDy && anim.rootDy[frame]) || 0;
-  var rp = anim.rootPivot || {x:0.5, y:0.95};
-  var pcx = cw * rp.x, pcy = ch * rp.y;
-  var cosR = Math.cos(rootRot), sinR = Math.sin(rootRot);
-  var mnX = Infinity, mnY = Infinity, mxX = -Infinity, mxY = -Infinity;
-  for(var li = 0; li < def.layers.length; li++){
-    var L = def.layers[li];
-    var k = (anim.keys && anim.keys[L.id] && anim.keys[L.id][frame]) || {rot:0, dx:0, dy:0};
-    var w = cw * L.w, h = ch * L.h;
-    var cx = cw * L.x + cw * (k.dx || 0) * 0.01;
-    var cy = ch * L.y + ch * (k.dy || 0) * 0.01;
-    var px = w * L.pivot.x, py = h * L.pivot.y;
-    var rot = ((L.rot || 0) + (k.rot || 0)) * Math.PI / 180;
-    var cL = Math.cos(rot), sL = Math.sin(rot);
-    var cs = [[-px,-py],[w-px,-py],[-px,h-py],[w-px,h-py]];
-    for(var ci = 0; ci < 4; ci++){
-      var lx = cs[ci][0], ly = cs[ci][1];
-      var Px = cx + lx * cL - ly * sL;
-      var Py = cy + lx * sL + ly * cL;
-      var rx = pcx + (Px - pcx) * cosR - (Py - pcy) * sinR;
-      var ry = pcy + (Px - pcx) * sinR + (Py - pcy) * cosR + ch * rootDy;
-      if(rx < mnX) mnX = rx;
-      if(ry < mnY) mnY = ry;
-      if(rx > mxX) mxX = rx;
-      if(ry > mxY) mxY = ry;
-    }
-  }
-  if(!isFinite(mnX)) return null;
-  return {minX:mnX, minY:mnY, maxX:mxX, maxY:mxY, w:mxX - mnX, h:mxY - mnY};
-}
-
-function _tryDrawArmorAtLayer(ctx, armorId, lw, lh, px, py){
-  if(typeof HEAD_ARMOR_LAYOUT === 'undefined') return false;
-  var cfg = HEAD_ARMOR_LAYOUT[armorId];
-  if(!cfg) return false;
-  var img = (typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(armorId)) : null;
-  if(!img || !img.complete || !img.naturalWidth) return false;
-  var lid = cfg.layer || 'head';
-  var pl = GAME_LAYERS.find(function(l){ return l.id === lid; });
-  var pw = pl ? (340 * pl.w) : 68;
-  var ratio = lw / pw, bW = 400 * (cfg.scale || 0.3) * ratio;
-  var ar = img.naturalWidth / img.naturalHeight, bH = bW / ar;
-  var lX = px + lw * (cfg.ox || 0), lY = py + lh * (cfg.oy || 0);
-  ctx.save();
-  ctx.translate(lX, lY);
-  ctx.scale(-1, 1);
-  if(cfg.rotation) ctx.rotate(cfg.rotation * Math.PI / 180);
-  ctx.drawImage(img, -bW/2, -bH/2, bW, bH);
-  ctx.restore();
-  return true;
-}
-
-function _tryDrawWeaponAtLayer(ctx, weaponId, lw, lh, px, py){
-  if(_isMeleeWeapon(weaponId)) return false;
-  /* rev-fix-ammo-handler-render: 弹药手尸体绘制弹药箱图标 */
-  if(typeof AMMO !== 'undefined' && AMMO[weaponId]){
-    var _aImg = (typeof getHeroImg === 'function') ? getHeroImg('icons/garden/ammo_pack.png') : null;
-    if(_aImg && _aImg.complete && _aImg.naturalWidth){
-      var _aSz = lw * 0.8;
-      ctx.save();
-      ctx.translate(px + lw * 0.2, py + lh * 0.2);
-      ctx.scale(-1, 1);
-      ctx.drawImage(_aImg, -_aSz/2, -_aSz/2, _aSz, _aSz);
-      ctx.restore();
-      return true;
-    }
-    return false;
-  }
-  if(typeof WEAPON_LAYOUT === 'undefined') return false;
-  /* rev-fix-exact-layout-enemy: 优先查精确 id，再回退 baseId */
-  var _cleanWid2 = String(weaponId || '').replace(/\.png$/i, '');
-  var baseId = resolveIconId(_cleanWid2);
-  var layout = WEAPON_LAYOUT[_cleanWid2] || WEAPON_LAYOUT[baseId] || HERO_VISIBLE_EQ.primary;
-  if(!layout) return false;
-  var img = (typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(weaponId)) : null;
-  if(!img || !img.complete || !img.naturalWidth) return false;
-  var hasTrim = !!(layout.trim && layout.trim.w > 0 && layout.trim.h > 0), bW, bH;
-  if(hasTrim){
-    bW = layout.trim.w * (layout.scale || 1.0);
-    bH = layout.trim.h * (layout.scale || 1.0);
-  } else {
-    bW = 400 * (layout.scale || 0.3);
-    bH = bW / (img.naturalWidth / img.naturalHeight);
-  }
-  var lX = px - lw * (layout.ox || 0), lY = py + lh * (layout.oy || 0);
-  ctx.save();
-  ctx.translate(lX, lY);
-  ctx.rotate(-(layout.rotation || 0) * Math.PI / 180);
-  ctx.scale(-1, 1);
-  if(hasTrim) ctx.drawImage(img, layout.trim.x, layout.trim.y, layout.trim.w, layout.trim.h, 0, -bH/2, bW, bH);
-  else ctx.drawImage(img, 0, -bH/2, bW, bH);
-  ctx.restore();
-  return true;
-}
-
-/* 完整版 `_drawHumanCorpse`：含 melee 判斷、bodyBottomY 對齊、front_arm 下移 */
-function _drawHumanCorpse(ctx, drawId, s, ox, oy, def, anim, fi, eqD, isDeath){
-/* rev-arm45: 敵人與玩家同構。武器掛 back_arm（右手），z = front_arm.z-0.5
-   → back_arm 55 被槍遮擋、front_arm 62 蓋槍。
-   刪除舊 dM 反向旋轉 / bodyBottomY 對齊 / 跳過 back_arm 補丁；
-   武器與 back_arm 共用同一 keys（含倒地 -110°），自然跟著手擺動。 */
-var cw = def.canvas.w, ch = def.canvas.h, eq = eqD || null;
-if(eq && eq.primary && _isMeleeWeapon(eq.primary)) eq = {head:eq.head, top:eq.top, primary:null};
-var rr = (anim.rootRot && anim.rootRot[fi]) || 0;
-var rDy = (anim.rootDy && anim.rootDy[fi]) || 0;
-var rp = anim.rootPivot || {x:0.5, y:0.95};
-var pcx = cw*rp.x, pcy = ch*rp.y;
-var faZ = 62;
-for(var zi=0; zi<def.layers.length; zi++){ if(def.layers[zi].id==='front_arm'){ faZ = def.layers[zi].z; break; } }
-ctx.save();
-ctx.translate(ox, oy); ctx.scale(s, s);
-ctx.translate(0, ch*rDy);
-ctx.translate(pcx, pcy); ctx.rotate(rr*Math.PI/180); ctx.translate(-pcx, -pcy);
-var units = [];
-for(var li=0; li<def.layers.length; li++){
-var LL = def.layers[li];
-if(LL.id === 'back_arm' && eq && eq.primary && !_isMeleeWeapon(eq.primary))
-units.push({z:faZ-0.5, kind:'weapon', layer:LL, weaponId:eq.primary});
-units.push({z:LL.z, kind:'layer', layer:LL});
-if(LL.id === 'head' && eq && eq.head) units.push({z:LL.z+0.5, kind:'armor', layer:LL, armorId:eq.head});
-if(LL.id === 'torso' && eq && eq.top) units.push({z:LL.z+0.5, kind:'armor', layer:LL, armorId:eq.top});
-}
-units.sort(function(a,b){return a.z-b.z;});
-for(var ui=0; ui<units.length; ui++){
-var uu = units[ui], Lu = uu.layer;
-var ku = (anim.keys && anim.keys[Lu.id] && anim.keys[Lu.id][fi]) || {rot:0,dx:0,dy:0};
-var lwu = cw*Lu.w, lhu = ch*Lu.h;
-var cxu = cw*Lu.x + cw*(ku.dx||0)*0.01;
-var cyu = ch*Lu.y + ch*(ku.dy||0)*0.01;
-var pxu = lwu*Lu.pivot.x, pyu = lhu*Lu.pivot.y;
-var lRR = ((Lu.rot||0)+(ku.rot||0))*Math.PI/180;
-ctx.save();
-ctx.translate(cxu, cyu); ctx.rotate(lRR); ctx.translate(-pxu, -pyu);
-if(uu.kind === 'layer'){
-var col = (def.colors && def.colors[Lu.id]) || _DEF_COLORS[Lu.id] || Lu.color || '#5a4a3a';
-ctx.fillStyle = col; ctx.fillRect(0,0,lwu,lhu);
-ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.lineWidth = 2; ctx.strokeRect(1,1,lwu-2,lhu-2);
-} else if(uu.kind === 'armor') _tryDrawArmorAtLayer(ctx, uu.armorId, lwu, lhu, pxu, pyu);
-else if(uu.kind === 'weapon') _tryDrawWeaponAtLayer(ctx, uu.weaponId, lwu, lhu, pxu, pyu);
-ctx.restore();
-}
-ctx.restore();
-}
-
-/* 兼容別名：08b 的 _raidDrawEnemy 使用 _rev506_drawHumanCorpse */
-window._rev506_drawHumanCorpse = _drawHumanCorpse;
-
+/* ============================================================
+   人形敵人渲染 —— 唯一 rig 路徑（自包含）
+   姿勢 / 層序 / 掛載一律讀 __PUPPET_BAKE__ 的授權資料。
+   不依賴 WEAPON_LAYOUT.ox/oy，不依賴 HERO_VISIBLE_EQ。
+   ============================================================ */
 const _EQI = {
   human_raider: {
     head:['ssh68','sssh94','kolpak'],
@@ -221,82 +21,198 @@ const _EQI = {
     primary:['ak74','akms','akmn']
   }
 };
-function _pickR(arr){ return (!arr || !arr.length) ? null : arr[Math.floor(Math.random() * arr.length)]; }
-function _getRandomEquipForEnemy(drawId){
-  var p = _EQI[drawId];
-  if(!p) return null;
+function _pickR(a){ return (!a || !a.length) ? null : a[Math.floor(Math.random()*a.length)]; }
+function _isMeleeWeapon(id){
+  if(!id) return false;
+  if(typeof WEAPONS !== 'undefined' && WEAPONS[id]){
+    if(WEAPONS[id].slot === 'melee') return true;
+    if(WEAPONS[id].type === '刺刀') return true;
+  }
+  return id === '6kh2' || id === '6kh5' || id === 'kukri';
+}
+function _getRandomEquipForEnemy(id){
+  var p = _EQI[id]; if(!p) return null;
   return { head:_pickR(p.head), top:_pickR(p.top), primary:_pickR(p.primary) };
 }
-window._rev506_getRandomEquip = _getRandomEquipForEnemy;
-
-(function(){
-  var _ids = {};
-  for(var _k in _EQI){
-    var _p = _EQI[_k];
-    if(_p.head) _p.head.forEach(function(x){ _ids[x] = 1; });
-    if(_p.top) _p.top.forEach(function(x){ _ids[x] = 1; });
-    if(_p.primary) _p.primary.forEach(function(x){ _ids[x] = 1; });
-  }
-  setTimeout(function(){
-    for(var id in _ids){
-      try { getHeroImg(window.getItemIconPath(id)); } catch(e){}
-    }
-  }, 200);
-})();
-
-function _renderEnemyCorpseCanvas(enemy, fxH){
-  var eid = enemy.eid || enemy.id;
-  if(!eid) return null;
-  var r = _resolveEnemyDef(eid);
-  if(!r) return null;
-  var def = r.def, drawId = r.resolvedId;
-  var an = _resolveEnemyAnims(drawId);
-  if(!an || !an.death) return null;
-  var dA = an.death, lf = dA.frameCount - 1;
-  var bb = _measureDeathBBox(def, dA, lf);
-  if(!bb) return null;
-  var isH = (def.kind === 'human');
-  var charPx = fxH * CHAR_HEIGHT_FACTOR;
-  var sc = charPx / 386;
-  var cHU = bb.h;
-  var eq = null;
-  if(isH){
-    /* [v182 G13] 装备缓存到 enemy._corpseEquip。
-       原代码每次调用 _pickR 随机，同一 enemy 被 _onBTRKillTarget + onVictoryStart
-       两次渲染时装备不同 → 玩家看到「尸体装备变化」。 */
-    if(!enemy._corpseEquip){
-      var _pool = _EQI[drawId] || _EQI.human_raider;
-      var _pwId = (enemy.primaryWeapon && enemy.primaryWeapon.id) ? enemy.primaryWeapon.id
-               : (enemy.secondaryWeapon && enemy.secondaryWeapon.id) ? enemy.secondaryWeapon.id
-               : null;
-      if(_pwId && _isMeleeWeapon(_pwId)) _pwId = null;
-      if(!_pwId){
-        _pwId = _pickR(_pool.primary);
-        if(_pwId && _isMeleeWeapon(_pwId)) _pwId = null;
-      }
-      var _head = enemy.helmet || _pickR(_pool.head);
-      var _body = enemy.body || _pickR(_pool.top);
-      enemy._corpseEquip = { head:_head || null, top:_body || null, primary:_pwId || null };
-    }
-    eq = enemy._corpseEquip;
-  }
-  var pL = 0, pR = 0, pT = 0;
-  if(isH){ pL = 110; pR = 110; if(eq.primary) pT = Math.round(386 * 0.30); }
-  cHU += pT;
-  var dW = (bb.w + pL + pR) * sc, dH = cHU * sc;
-  var cvs = document.createElement('canvas');
-  cvs.width = Math.max(1, Math.round(dW * 2));
-  cvs.height = Math.max(1, Math.round(dH * 2));
-  var ctx = cvs.getContext('2d');
-  ctx.setTransform(2, 0, 0, 2, 0, 0);
-  _drawHumanCorpse(ctx, drawId, sc, -(bb.minX - pL) * sc, -(bb.minY - pT) * sc, def, dA, lf, eq, true);
-  return { canvas: cvs, drawW: dW, drawH: dH };
+function _resolveEnemyDef(id){
+  if(typeof HUMAN_ENEMY_DATA === 'undefined') return null;
+  if(HUMAN_ENEMY_DATA[id]) return { def:HUMAN_ENEMY_DATA[id], resolvedId:id };
+  var k = 'human_' + id;
+  if(HUMAN_ENEMY_DATA[k]) return { def:HUMAN_ENEMY_DATA[k], resolvedId:k };
+  return null;
 }
-
-window._renderEnemyCorpseCanvas = _renderEnemyCorpseCanvas;
-window._drawHumanCorpse = _drawHumanCorpse;
+/* 敵人自訂 anims 退場：回傳 rig 時序（含 death 別名），外部呼叫不斷鏈 */
+function _resolveEnemyAnims(id){
+  if(typeof GAME_ANIMS === 'undefined') return null;
+  if(!window._pmAnimShim){
+    var o = {}, k;
+    for(k in GAME_ANIMS){
+      var a = GAME_ANIMS[k];
+      o[k] = { frameCount:a.frameCount, fps:a.fps, loop:a.loop, keys:{} };
+    }
+    o.death = o.dead || o.idle;
+    window._pmAnimShim = o;
+  }
+  return window._pmAnimShim;
+}
+var _PM_COL = {
+  enemy:{b:'#8b2a2a',l:'#3a1010'}, farmer:{b:'#5a9a48',l:'#3a6a2e'},
+  guard:{b:'#5088bb',l:'#2e4a6a'}, foreman:{b:'#e0a830',l:'#d8d0c0'}
+};
+function _pmColors(t){
+  var c = _PM_COL[t]; if(!c) return null;
+  return { torso:c.b, front_upper_arm:c.b, front_forearm:c.b, back_upper_arm:c.b, back_forearm:c.b,
+    right_thigh:c.l, right_shin:c.l, left_thigh:c.l, left_shin:c.l };
+}
+function _pmAmmo(id){ return (typeof AMMO !== 'undefined') && !!AMMO[id]; }
+/* 死亡當下持有：_activeWeapon 優先，否則 primary → secondary → melee。只回傳一把。 */
+function _pmWeaponOf(en){
+  if(!en) return null;
+  var w = null;
+  if(typeof _enemyActiveWeapon === 'function'){ try{ w = _enemyActiveWeapon(en); }catch(e){} }
+  if(!w){
+    var ex = en._exhaustedWeapons || {};
+    w = en._activeWeapon
+      || (en.primaryWeapon && !ex[en.primaryWeapon.id] && en.primaryWeapon)
+      || (en.secondaryWeapon && !ex[en.secondaryWeapon.id] && en.secondaryWeapon)
+      || (en.melee && !ex[en.melee.id] && en.melee) || null;
+  }
+  if(!w || !w.id) return null;
+  var sl = (en.primaryWeapon && en.primaryWeapon.id === w.id) ? 'primary'
+    : (en.secondaryWeapon && en.secondaryWeapon.id === w.id) ? 'secondary' : 'melee';
+  return { id:w.id, slot:sl };
+}
+/* [v182 G13] 裝備快取：同一敵人兩次渲染不得換裝備 */
+function _pmEquip(en, drawId){
+  if(!en._corpseEquip){
+    var pool = _EQI[drawId] || _EQI.human_raider;
+    var aw = _pmWeaponOf(en);
+    var eq = { head: en.helmet || _pickR(pool.head), top: en.body || _pickR(pool.top) };
+    if(aw) eq[aw.slot] = aw.id; else eq.primary = _pickR(pool.primary);
+    en._corpseEquip = eq;
+    en._corpseSlot = aw ? aw.slot : 'primary';
+  }
+  return en._corpseEquip;
+}
+/* 屍體畫布：墨跡四邊距畫布緣恰好 pad；footX = 腳點在畫布內的 x。
+   呼叫端用 pad 讓墨跡下緣貼齊窗格下緣再下沉。 */
+function _renderEnemyCorpseCanvas(enemy, fxH){
+  var R = window.PuppetRig;
+  if(!R || !enemy || !(fxH > 0)) return null;
+  var eid = enemy.eid || enemy.id; if(!eid) return null;
+  var r = _resolveEnemyDef(eid);
+  var eq = _pmEquip(enemy, r ? r.resolvedId : 'human_raider');
+  var slot = enemy._corpseSlot || 'primary';
+  var id = eq[slot] || null;
+  var cfg = id ? R.weaponCfg(slot, id) : null;
+  var opt = { head:eq.head||null, top:eq.top||null, headEnv:!eq.head, topEnv:!eq.top };
+  var bb = R.bbox('dead', 9999, true, cfg, opt);
+  if(!bb || !(bb.w > 0) || !(bb.h > 0)) return null;
+  var sc = (fxH * CHAR_HEIGHT_FACTOR) / 386, pad = 4;
+  var dW = bb.w*sc + pad*2, dH = bb.h*sc + pad*2;
+  var px = pad - sc*(bb.x0 - 200);
+  var py = pad - sc*(bb.y0 - 515);
+  var cvs = document.createElement('canvas');
+  cvs.width = Math.max(2, Math.round(dW*2));
+  cvs.height = Math.max(2, Math.round(dH*2));
+  var g = cvs.getContext('2d');
+  g.setTransform(2, 0, 0, 2, 0, 0);
+  R.draw(g, px, py, sc, { anim:'dead', frame:9999, flip:true, slot:slot, weaponId:id,
+    head:eq.head, top:eq.top, colors:_pmColors('enemy'), ammoBox:_pmAmmo(id) });
+  return { canvas:cvs, drawW:dW, drawH:dH, footX:px, footY:py, pad:pad };
+}
+/* 後院屍體：墨跡水平置中於 x，下緣落在 y 再下沉 2px */
+function _pmCorpseAt(ctx, x, y, sc, eid, frame, unit){
+  var R = window.PuppetRig;
+  if(!R || !ctx || !(sc > 0)) return;
+  var r = _resolveEnemyDef(eid);
+  var eq = null, slot = null, id = null;
+  if(unit){
+    var aw = _pmWeaponOf(unit);
+    eq = { head: unit.helmet || null, top: unit.body || null };
+    if(aw){ eq[aw.slot] = aw.id; slot = aw.slot; id = aw.id; }
+  }
+  if(!id){
+    if(!window._pmRaidEq) window._pmRaidEq = {};
+    var key = r ? r.resolvedId : 'human_raider';
+    if(!window._pmRaidEq[key]){
+      window._pmRaidEq[key] = _getRandomEquipForEnemy(key) || { head:'ssh68', top:'6b231', primary:'ak74' };
+    }
+    eq = window._pmRaidEq[key];
+    slot = eq.primary ? 'primary' : (eq.secondary ? 'secondary' : (eq.melee ? 'melee' : null));
+    id = slot ? eq[slot] : null;
+  }
+  var cfg = id ? R.weaponCfg(slot, id) : null;
+  var fi = (frame == null ? 9999 : frame);
+  var bb = R.bbox('dead', fi, true, cfg, { head:eq.head||null, top:eq.top||null, headEnv:!eq.head, topEnv:!eq.top });
+  if(!bb) return;
+  var px = x - sc*((bb.x0 + bb.x1)/2 - 200);
+  var py = y + 2 - sc*(bb.y1 - 515);
+  R.draw(ctx, px, py, sc, { anim:'dead', frame:fi, flip:true, slot:slot, weaponId:id,
+    head:eq.head, top:eq.top, colors:_pmColors('enemy'), ammoBox:_pmAmmo(id) });
+}
+/* 舊簽名轉接 */
+function _drawHumanCorpse(ctx, drawId, s, ox, oy, def, anim, fi, eqD, isDeath){
+  var R = window.PuppetRig; if(!R || !ctx) return;
+  var cw = (def && def.canvas) ? def.canvas.w : 400;
+  var ch = (def && def.canvas) ? def.canvas.h : 500;
+  var eq = eqD || {};
+  var slot = eq.primary ? 'primary' : (eq.secondary ? 'secondary' : (eq.melee ? 'melee' : null));
+  var id = slot ? eq[slot] : null;
+  if(!isDeath){
+    R.draw(ctx, ox + cw*s/2, oy + ch*s, s, { anim:'idle', frame:0, flip:true,
+      slot:slot, weaponId:id, head:eq.head, top:eq.top, colors:_pmColors('enemy') });
+    return;
+  }
+  var cfg = id ? R.weaponCfg(slot, id) : null;
+  var f = (fi == null ? 9999 : fi);
+  var bb = R.bbox('dead', f, true, cfg, { head:eq.head||null, top:eq.top||null, headEnv:!eq.head, topEnv:!eq.top });
+  if(!bb) return;
+  R.draw(ctx, ox + cw*s/2 - s*((bb.x0+bb.x1)/2 - 200), oy + ch*s - s*(bb.y1 - 515), s,
+    { anim:'dead', frame:f, flip:true, slot:slot, weaponId:id,
+      head:eq.head, top:eq.top, colors:_pmColors('enemy'), ammoBox:_pmAmmo(id) });
+}
+/* 舊量測 API → rig 轉接 */
+function _measureDeathBBox(def, anim, frame){
+  var R = window.PuppetRig; if(!R) return null;
+  var b = R.bbox('dead', frame == null ? 9999 : frame, true, null, {});
+  if(!b) return null;
+  return { minX:b.x0, minY:b.y0, maxX:b.x1, maxY:b.y1, w:b.w, h:b.h };
+}
+function _measureLayerMaxY(def, anim, frame, layerId){
+  var R = window.PuppetRig; if(!R) return null;
+  var k = R.B.ix[layerId]; if(k == null) return null;
+  var q = R.fr('L', 'dead', frame == null ? 9999 : frame);
+  var d = q.d.L[k], m = R.lm(d);
+  return Math.max(R.P(m,0,0).y, R.P(m,d[3],0).y, R.P(m,0,d[4]).y, R.P(m,d[3],d[4]).y);
+}
+/* ===== 匯出 ===== */
+window._EQI = _EQI;
+window._pickR = _pickR;
+window._isMeleeWeapon = _isMeleeWeapon;
+window._getRandomEquipForEnemy = _getRandomEquipForEnemy;
+window._rev506_getRandomEquip = _getRandomEquipForEnemy;
+window._resolveEnemyDef = _resolveEnemyDef;
+window.resolveEnemyDef = _resolveEnemyDef;
+window._resolveEnemyAnims = _resolveEnemyAnims;
 window._measureDeathBBox = _measureDeathBBox;
 window._measureLayerMaxY = _measureLayerMaxY;
-window._resolveEnemyDef = _resolveEnemyDef;
-window._resolveEnemyAnims = _resolveEnemyAnims;
-window._getRandomEquipForEnemy = _getRandomEquipForEnemy;
+window._pmColors = _pmColors;
+window._pmWeaponOf = _pmWeaponOf;
+window._pmCorpseAt = _pmCorpseAt;
+window._renderEnemyCorpseCanvas = _renderEnemyCorpseCanvas;
+window._drawHumanCorpse = _drawHumanCorpse;
+window._rev506_drawHumanCorpse = _drawHumanCorpse;
+/* ===== 裝備圖示預載 ===== */
+(function(){
+  var ids = {}, k;
+  for(k in _EQI){
+    var p = _EQI[k];
+    if(p.head) p.head.forEach(function(x){ ids[x]=1; });
+    if(p.top) p.top.forEach(function(x){ ids[x]=1; });
+    if(p.primary) p.primary.forEach(function(x){ ids[x]=1; });
+  }
+  setTimeout(function(){
+    for(var id in ids){ try{ getHeroImg(window.getItemIconPath(id)); }catch(e){} }
+  }, 200);
+})();

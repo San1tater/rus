@@ -387,22 +387,22 @@ function _gardenTowerResolveAmmo(cfg, wDef){
 }
 
 /* ===== 守衛槍口世界座標 ===== */
-function _getRaidMuzzleWorld(u, scale){
-/* rev-arm45v3: 守衛槍口跟右手；actor 即時位置 + 21c 發布的 56px 字高；鏡像符號正確。 */
-if(!u || !u.equipped || !u.weaponSlot) return null;
-var wpId = u.equipped[u.weaponSlot];
-if(!wpId || typeof window.getCharWeaponMuzzleLocal !== 'function') return null;
-var act = u._actor || null;
-var px = (act && typeof act.x === 'number') ? act.x : u.x;
-var py = (act && typeof act.y === 'number') ? act.y : u.y;
-if(typeof px !== 'number' || typeof py !== 'number') return null;
-var sc = (typeof window._gardenActorCharPx === 'number' && window._gardenActorCharPx > 0) ? (window._gardenActorCharPx/386) : scale;
-if(!(sc > 0)) return null;
-var fx = !!u._facingLeft;
-var mz = window.getCharWeaponMuzzleLocal(u.weaponSlot, wpId, u.animName, u.animFrame, fx);
-if(!mz) return null;
-return { x: px + (fx ? -1 : 1)*sc*(mz.x - 200), y: py + sc*(mz.y - 515) };
-}
+/*PM23*/
+function _getRaidMuzzleWorld(u,scale){
+var R=window.PuppetRig;
+if(!R||!u||!u.equipped||!u.weaponSlot)return null;
+var wpId=u.equipped[u.weaponSlot];if(!wpId)return null;
+var act=u._actor||null;
+var px=(act&&typeof act.x==='number')?act.x:u.x;
+var py=(act&&typeof act.y==='number')?act.y:u.y;
+if(typeof px!=='number'||typeof py!=='number')return null;
+var sc=(typeof window._gardenActorCharPx==='number'&&window._gardenActorCharPx>0)
+?(window._gardenActorCharPx/386):scale;
+if(!(sc>0))return null;
+var an=(u.animName==='death')?'dead':(u.animName||'idle');
+var m=R.muzzle(u.weaponSlot,wpId,an,u.animFrame|0,!!u._facingLeft);
+if(!m)return null;
+return{x:px+sc*(m.x-200),y:py+sc*(m.y-515)};}
 
 /* ===== 啟動防禦戰 ===== */
 function _gardenRaidStart(guards){
@@ -855,13 +855,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
         }
         _animStart = u._animStart || now;
       }
-      let anim = null;
-      if(typeof _resolveEnemyAnims === 'function'){
-        const _eid = (typeof HUMAN_ENEMY_DATA !== 'undefined' && HUMAN_ENEMY_DATA['human_' + u.id]) ? 'human_' + u.id : u.id;
-        const _anims = _resolveEnemyAnims(_eid);
-        if(_anims && _anims[_animName]) anim = _anims[_animName];
-      }
-      if(!anim) anim = GAME_ANIMS[_animName] || GAME_ANIMS.idle;
+      let anim = GAME_ANIMS[_animName] || GAME_ANIMS.idle;
       if(!anim) return;
       const interval = 1000 / anim.fps;
       const elapsed = Math.max(0, now - _animStart);
@@ -1273,7 +1267,7 @@ _raidPart = window._partFromYRatio(b.impactWY / _hR);
         }
         /* rev-fix-corpse-timing: 敵人屍體移入獨立數組，不計時 */
         if(!toU.isGuard){
-          corpses.push({ x: toU.x, y: toU.y, id: toU.id, animStart: Date.now(), fadeStartAt: 0, fadeDuration: 1000 });
+          corpses.push({ x: toU.x, y: toU.y, id: toU.id, animStart: Date.now(), fadeStartAt: 0, fadeDuration: 1000, unit: toU });
           const _idx = enemyUnits.indexOf(toU);
           if(_idx >= 0) enemyUnits.splice(_idx, 1);
         }
@@ -1650,14 +1644,12 @@ function renderLoop(){
     var cc = _corpses[ci], _alpha = 1;
     if(cc.fadeStartAt > 0){ var _age = nowD - cc.fadeStartAt; if(_age > 0) _alpha = Math.max(0, 1 - _age / cc.fadeDuration);
       if(_alpha <= 0){ _corpses.splice(ci, 1); continue; } }
-    var _animKey = (typeof HUMAN_ENEMY_DATA !== 'undefined' && !HUMAN_ENEMY_DATA[cc.id] && HUMAN_ENEMY_DATA['human_' + cc.id]) ? 'human_' + cc.id : cc.id;
-    var _anims = (typeof _resolveEnemyAnims === 'function') ? _resolveEnemyAnims(_animKey) : null;
-    var _deathAnim = _anims && _anims.death;
-    var _fps = _deathAnim ? _deathAnim.fps : 8, _frameCount = _deathAnim ? _deathAnim.frameCount : 6;
+    var _deathAnim = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.dead) ? GAME_ANIMS.dead : null;
+var _fps = _deathAnim ? _deathAnim.fps : 12, _frameCount = _deathAnim ? _deathAnim.frameCount : 12;
     var _elapsed = (nowD - cc.animStart) / 1000;
     var _fi = Math.min(_frameCount - 1, Math.floor(_elapsed * _fps));
     ctx.save(); ctx.globalAlpha = _alpha;
-    _raidDrawEnemy(ctx, cc.x, cc.y, SCALE, 'death', _fi, cc.id);
+    window._pmCorpseAt(ctx, cc.x, cc.y, SCALE, cc.id, _fi, cc.unit);
     ctx.restore();
   }
   for(var ei = 0; ei < enemyUnits.length; ei++) drawUnit(enemyUnits[ei], nowD);
