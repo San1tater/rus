@@ -490,69 +490,40 @@ function _cleanPC(){
 }
 
 function _drawP(fx, key, px, fxH, item, evac, now, animOverride, legOverride, fallProgress){
-/* rev-arm45v3: 載員屍體統一走 _raidDrawHuman（同一條右手持槍 / 向後倒模型）。
-   畫布尺寸活↔死一致，避免切換時重建閃爍。 */
-var cw = fxH * ((animOverride === 'dead') ? 1.9 : 1.2), chh = fxH;
-var cvs = fx._pc[key];
-if(!cvs){
-cvs = document.createElement('canvas');
-cvs.style.cssText = 'position:absolute;bottom:0;pointer-events:none;';
-fx._pc[key] = cvs;
-}
-var pw = Math.round(cw*2), ph = Math.round(chh*2);
-if(cvs.width !== pw){ cvs.width = pw; cvs.style.width = cw + 'px'; }
-if(cvs.height !== ph){ cvs.height = ph; cvs.style.height = chh + 'px'; }
-var isDead = (animOverride === 'dead');
-var targetLayer = isDead
-? (typeof _getCorpseLayer === 'function' ? _getCorpseLayer() : fx)
-: (typeof _getPassengerLayer === 'function' ? _getPassengerLayer() : fx);
-if(targetLayer && cvs.parentNode !== targetLayer) targetLayer.appendChild(cvs);
-cvs.style.zIndex = isDead ? '21' : '7';
-cvs.style.left = (px - cw/2) + 'px'; cvs.style.bottom = isDead ? (-8)+'px' : '0px';
-var ctx = cvs.getContext('2d');
-ctx.setTransform(2, 0, 0, 2, 0, 0);
-ctx.clearRect(0, 0, cw, chh);
-if(typeof _raidDrawHuman !== 'function') return;
-var p = item.p;
-var eq = { head:p.helmet || null, top:p.body || null, primary:p.primaryWeapon || null };
-var eqR = { head:p.helmetRarity || '一般', top:p.bodyRarity || '一般', primary:p.primaryWeaponRarity || '一般' };
-var wps = p.primaryWeapon ? 'primary' : null;
-var ex = window._explore;
-var animN = animOverride || 'idle';
-if(!item.animStart || item._lastAnimN !== animN){ item.animStart = now; item._lastAnimN = animN; }
-var fi = (typeof computeAnimFrame === 'function') ? computeAnimFrame(animN, item.animStart, now) : 0;
-if(isDead){
-var da = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.dead) ? GAME_ANIMS.dead : { frameCount:8, fps:8 };
-var st = item._deathStart || item.animStart || now;
-fi = Math.min(da.frameCount - 1, Math.floor(Math.max(0, now - st)/(1000/da.fps)));
-}
-item.animFrame = fi;
-var sc = chh * CHAR_HEIGHT_FACTOR / 386;
-if(item.fadeIn < 1) item.fadeIn = Math.min(1, (item.fadeIn || 0) + 0.03);
-if(item.clipH === undefined) item.clipH = 1;
-else if(item.clipH < 1 && typeof item._spawnAt === 'number'){
-var el = now - item._spawnAt;
-item.clipH = (el >= 600) ? 1 : (el <= 0 ? 0 : el/600);
-}
-ctx.save();
-ctx.globalAlpha = item.fadeIn;
-if(item.clipH < 1 && !isDead){ ctx.beginPath(); ctx.rect(0, 0, cw, chh*item.clipH); ctx.clip(); }
-if(isDead && window.PuppetRig){
-    var _R = window.PuppetRig;
-    var _cfg = wps ? _R.weaponCfg(wps, eq[wps]) : null;
-    var _bb = _R.bbox('dead', fi, true, _cfg, { head:eq.head||null, top:eq.top||null, headEnv:!eq.head, topEnv:!eq.top });
-    if(_bb){
-      var _fx = cw/2 - sc*((_bb.x0 + _bb.x1)/2 - 200);
-      var _fy = chh - sc*(_bb.y1 - 515);
-      _R.draw(ctx, _fx, _fy, sc, { anim:'dead', frame:fi, flip:true, slot:wps, weaponId:eq[wps],
-        head:eq.head, top:eq.top, colors:(window._pmColors ? window._pmColors(item.srv ? item.srv.type : null) : null),
-        ammoBox:(typeof AMMO !== 'undefined' && !!AMMO[eq[wps]]) });
-    }
-  } else {
-    _raidDrawHuman(ctx, cw/2, chh*0.96, sc, eq, eqR, animN, fi, wps, item.srv ? item.srv.type : null, false, false, null, true, legOverride || null);
-  }
-ctx.restore();
-}
+/*PM-STANCE*/
+var isDead=(animOverride==='dead');
+var cw=fxH*(isDead?2.0:1.2),chh=fxH;
+var cvs=fx._pc[key];
+if(!cvs){cvs=document.createElement('canvas');cvs.style.cssText='position:absolute;bottom:0;pointer-events:none;';fx._pc[key]=cvs;}
+var pw=Math.round(cw*2),ph=Math.round(chh*2);
+if(cvs.width!==pw){cvs.width=pw;cvs.style.width=cw+'px';}
+if(cvs.height!==ph){cvs.height=ph;cvs.style.height=chh+'px';}
+var targetLayer=isDead?(typeof _getCorpseLayer==='function'?_getCorpseLayer():fx):(typeof _getPassengerLayer==='function'?_getPassengerLayer():fx);
+if(targetLayer&&cvs.parentNode!==targetLayer)targetLayer.appendChild(cvs);
+cvs.style.zIndex=isDead?'21':'7';
+cvs.style.left=(px-cw/2)+'px';
+cvs.style.bottom='0px';
+var ctx=cvs.getContext('2d');ctx.setTransform(2,0,0,2,0,0);ctx.clearRect(0,0,cw,chh);
+if(typeof _raidDrawHuman!=='function')return;
+var p=item.p;
+var eq={head:p.helmet||null,top:p.body||null,primary:p.primaryWeapon||null};
+var eqR={head:p.helmetRarity||'一般',top:p.bodyRarity||'一般',primary:p.primaryWeaponRarity||'一般'};
+var wps=p.primaryWeapon?'primary':null;
+var animN=animOverride||'idle';
+if(!item.animStart||item._lastAnimN!==animN){item.animStart=now;item._lastAnimN=animN;}
+var fi=(typeof computeAnimFrame==='function')?computeAnimFrame(animN,item.animStart,now):0;
+if(isDead){var da=(typeof GAME_ANIMS!=='undefined'&&GAME_ANIMS.dead)?GAME_ANIMS.dead:{frameCount:12,fps:12};
+var st=item._deathStart||item.animStart||now;
+fi=Math.min(da.frameCount-1,Math.floor(Math.max(0,now-st)/(1000/da.fps)));}
+item.animFrame=fi;
+var sc=chh*CHAR_HEIGHT_FACTOR/386;
+if(item.fadeIn<1)item.fadeIn=Math.min(1,(item.fadeIn||0)+0.03);
+if(item.clipH===undefined)item.clipH=1;
+else if(item.clipH<1&&typeof item._spawnAt==='number'){var el=now-item._spawnAt;item.clipH=(el>=600)?1:(el<=0?0:el/600);}
+ctx.save();ctx.globalAlpha=item.fadeIn;
+if(item.clipH<1&&!isDead){ctx.beginPath();ctx.rect(0,0,cw,chh*item.clipH);ctx.clip();}
+_raidDrawHuman(ctx,cw/2,chh*0.98,sc,eq,eqR,animN,fi,wps,item.srv?item.srv.type:null,false,false,null,true,legOverride||null);
+ctx.restore();}
 
 function _renderPass(now){
   const ex = window._explore;
@@ -839,11 +810,11 @@ catch(e){ r = null; }
 if(!r) continue;
 en._corpseRendered = true;
 const w = document.createElement('div');
-w.style.cssText = 'position:absolute;bottom:' + (-((r.pad||4) + 8)) + 'px;pointer-events:none;will-change:left;width:' + r.drawW + 'px;height:' + r.drawH + 'px;';
+w.style.cssText = 'position:absolute;bottom:0;pointer-events:none;will-change:left;width:' + r.drawW + 'px;height:' + r.drawH + 'px;';
 r.canvas.style.cssText = 'width:100%;height:100%;display:block;';
 w.appendChild(r.canvas);
 layer.appendChild(w);
-ex.corpses.push({ wrap: w, drawW: r.drawW, drawH: r.drawH, footX: (typeof r.footX === 'number' ? r.footX : r.drawW / 2), footY: (typeof r.footY === 'number' ? r.footY : r.drawH), worldX: wx, ev: ev });
+ex.corpses.push({ wrap: w, drawW: r.drawW, drawH: r.drawH, footX: (typeof r.footX === 'number' ? r.footX : r.drawW / 2), worldX: wx, ev: ev });
 made++;
 }
 return made;

@@ -72,13 +72,7 @@ function _pmColors(t){var c=_PM_COL[t];if(!c)return null;
 return{torso:c.b,front_upper_arm:c.b,front_forearm:c.b,back_upper_arm:c.b,back_forearm:c.b,
 right_thigh:c.l,right_shin:c.l,left_thigh:c.l,left_shin:c.l};}
 function _pmWorker(t,no){if(no)return null;return t==='foreman'?'#ffffff':(t==='farmer'?'#ff8800':null);}
-function _pmFit(px,py,s,W,H,flip,sl,id,eq,wk){var R=window.PuppetRig;
-var bb=R.deadBox(flip,id?R.weaponCfg(sl,id):null,{head:(eq&&eq.head)||null,top:(eq&&eq.top)||null,
-headEnv:!(eq&&eq.head),topEnv:!(eq&&eq.top),worker:!!wk});
-var nL=Math.max(0,200-bb.x0)*s+3,nR=Math.max(0,bb.x1-200)*s+3;
-var nA=Math.max(0,515-bb.y0)*s+3,nB=Math.max(0,bb.y1-515)*s+3;
-var x=Math.min(px,W-nR);x=Math.max(x,nL);var y=Math.min(py,H-nB);y=Math.max(y,nA);
-return{x:x,y:y};}
+function _pmFit(px,py){/*PM-STANCE*/return{x:px,y:py};}
 function computeWeaponCharLayout(cfg){var R=window.PuppetRig;if(!cfg)return null;
 var b=R.boxOf(cfg);if(!b)return null;
 return{anchorX:0,anchorY:0,rightX:b.bw,baseW:b.bw,baseH:b.bh,isTrimMode:true};}
@@ -371,9 +365,7 @@ var px=bt?bt.px:0.15;return{x:(px*W-sw/2+lx)/W,y:ly/H};}
 
 /* rev-corpse-fit: 倒地包圍盒防裁切 —— 僅在會被畫布邊緣裁切時最小位移（所有渲染器同一規則）。
    +90° 面朝右：頭/盔向右伸 ~500 原圖單位、盔下緣向地面下伸 ~82；flip 鏡像。 */
-window._corpseFit=function(px,py,s,W,H,hasHelmet,dir){
-var eq=(typeof state!=='undefined'&&state.player&&state.player.equipped)||{};
-var sl=_pmSlot(eq,null);return _pmFit(px,py,s,W,H,dir<0,sl,sl?eq[sl]:null,eq,null);};
+window._corpseFit=function(px,py){/*PM-STANCE*/return{x:px,y:py};};
 function drawBlockHero(ctx,canvasW,canvasH,animName,frameIdx,weaponSlotOverride,charHFactor,centerXRatio,legOverride,healItemId,fallProgress,flipXArg){
 var R=window.PuppetRig;
 var eq=(typeof state!=='undefined'&&state.player&&state.player.equipped)||{};
@@ -381,7 +373,7 @@ var s=(canvasH*(charHFactor||CHAR_HEIGHT_FACTOR))/386,gy=canvasH*0.95;
 var cx=canvasW*((centerXRatio!=null)?centerXRatio:0.5);
 var an=_pmAnim(animName),flip=!!flipXArg;
 var sl=_pmSlot(eq,weaponSlotOverride),id=sl?eq[sl]:null;
-if(an==='dead'){var f=_pmFit(cx,gy,s,canvasW,canvasH,flip,sl,id,eq,null);cx=f.x;gy=f.y;}
+
 R.draw(ctx,cx,gy,s,{anim:an,frame:frameIdx|0,flip:flip,slot:sl,weaponId:id,
 head:eq.head,top:eq.top,healId:healItemId,ammoBox:_pmAmmo(id)});}
 
@@ -620,8 +612,7 @@ var R=window.PuppetRig;var eq=equipped||{};
 var an=_pmAnim(animName),flip=!!flipX;
 var sl=_pmSlot(eq,weaponSlotOverride),id=sl?eq[sl]:null;
 var wk=_pmWorker(servantType,noWorkerHelmet);
-if(an==='dead'){var cv=ctx.canvas,CW=(cv&&cv.clientWidth)||400,CH=(cv&&cv.clientHeight)||500;
-var f=_pmFit(px,py,scale,CW,CH,flip,sl,id,eq,wk);px=f.x;py=f.y;}
+
 R.draw(ctx,px,py,scale,{anim:an,frame:frameIdx|0,flip:flip,slot:sl,weaponId:id,
 head:eq.head,top:eq.top,colors:_pmColors(servantType),
 bucket:!!hasBucket,handItem:handItem,worker:wk,ammoBox:_pmAmmo(id)});}
