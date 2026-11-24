@@ -296,7 +296,7 @@ window._rpgTrailDeposit = function(owner, b, t0, t1, P){
     var wy = b.startY + dy * t;
     owner.rpgSmoke.push({
       _wx: wx, _wy: wy + (Math.random() - 0.5) * 0.06,
-      age: 0, life: P.life,
+      age: 0, life: P.life * (0.7 + Math.random() * 0.6), /* rev-smoke-life-jitter: 壽命離散，斷裂同生同死的剛體柱 */
       r0: P.r0 * (0.85 + Math.random() * 0.3),
       grow: P.grow * (0.8 + Math.random() * 0.5),
       vy: (P.rise || 0.10) * (0.5 + Math.random()),
@@ -395,6 +395,9 @@ window._renderTrailSmoke = function(ctx,c,W,H){
     var sa=Math.pow(raw,0.7);
     var rM=(typeof s.r0==='number')?(s.r0+(s.grow||0)*s.age):((s.size||0.02)*W/ppm);
     var sr=Math.max(0.5,rM*ppm);
+/* rev-smoke-density: 質量守恆 —— 膨脹時投影光學厚度按 (r0/r)² 稀釋，
+   否則半徑長大而濃度不變，煙柱永不變淡。 */
+if(typeof s.r0==='number'&&rM>s.r0){var _dR=s.r0/rM;sa*=_dR*_dR;}
     var sy=(typeof s._wy==='number')?(H*0.95-s._wy*ppm):(s.y*H);
     var sx=(typeof s._wx==='number')?window._fxProjectPx(s,W):(s.x*W);
     var pv=(typeof s._pvPx==='number')?s._pvPx:null;s._pvPx=sx;

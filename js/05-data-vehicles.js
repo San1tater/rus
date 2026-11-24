@@ -390,6 +390,67 @@ const VEHICLE_FEATURES = {
   t80um: { ainet: false, arena: true, arenaAmmo: 22 }
 };
 /* rev-fix-era: 爆炸反應裝甲等效（對 KE / HEAT） */
+/* ===== rev-height-bands: 現實高度分段（公尺，離地） =====
+   h1 = 最小離地間隙（車體底緣）→ 以下判定為履帶／輪組
+   h2 = 首上／首下交界（車首折角）＝ 兩板延長線交點：
+        h2 = h1 + (h3-h1) × tanθ上/(tanθ上+tanθ下)，θ 為與垂直面夾角（от вертикали）
+        角度來源：BTR-80 60/48、BTR-90 64/45（圖量）、T-80 68/61、
+                  BMP-1/2 80/57、BMP-3 75/55、BMD-4 75/45
+   h3 = 車體頂甲板／炮塔座圈平面（BTR-80 1920、BTR-82 1950、BTR-90 2280、
+        T-80 系 1470、BMP-1 1630、BMP-2 1680、BMP-3 1680、BMD-4 1480）
+   h4 = 炮塔頂（不含車頂武器）；null = 無獨立車頂武器 → h4 = 全高，車頂段寬 0
+   全高不存此表：執行期讀 VEHICLE_REAL_HEIGHTS（渲染縮放唯一真相源）。 */
+const VEHICLE_HEIGHT_BANDS = {
+btr80:  { h1:0.475, h2:1.355, h3:1.920, h4:null },
+btr80a: { h1:0.475, h2:1.355, h3:1.920, h4:null },
+btr82:  { h1:0.475, h2:1.374, h3:1.950, h4:null },
+btr82a: { h1:0.475, h2:1.374, h3:1.950, h4:null },
+btr90:  { h1:0.510, h2:1.700, h3:2.280, h4:2.980 },
+t80:    { h1:0.450, h2:1.040, h3:1.470, h4:2.190 },
+t80b:   { h1:0.450, h2:1.040, h3:1.470, h4:2.200 },
+t80bv:  { h1:0.450, h2:1.040, h3:1.470, h4:2.200 },
+t80u:   { h1:0.450, h2:1.040, h3:1.470, h4:2.200 },
+t80uk:  { h1:0.450, h2:1.040, h3:1.470, h4:2.200 },
+t80um:  { h1:0.450, h2:1.040, h3:1.470, h4:2.200 },
+bmp1:   { h1:0.370, h2:1.361, h3:1.630, h4:1.920 },
+bmp1m:  { h1:0.370, h2:1.361, h3:1.630, h4:null },
+bmp2:   { h1:0.420, h2:1.411, h3:1.680, h4:2.250 },
+bmp3:   { h1:0.450, h2:1.340, h3:1.680, h4:null },
+bmp3m:  { h1:0.450, h2:1.340, h3:1.680, h4:null },
+bmd4:   { h1:0.450, h2:1.262, h3:1.480, h4:null }
+};
+window.VEHICLE_HEIGHT_BANDS = VEHICLE_HEIGHT_BANDS;
+
+/* ===== rev-internal-reach: 內部部件可達部位（依實車縱向佈局） =====
+   代碼：LF 首下 / UF 首上 / HS 車側 / HR 車尾 / TF 炮塔正 / TS 炮塔側 / TR 炮塔尾
+   空字串 = 該車無此部件（T-80 無載員艙）。
+   履帶與車頂武器不在此表：由命中段直接決定，100% 只破壞自己。
+   權重仍讀 _VEHICLE_INTERNAL_WEIGHTS，此表只做遮罩後歸一化。
+   要點：BTR-80/82 車長在車體前部右側；BTR-80A/82A/BMP-1M 無人炮塔 → 炮手在車體；
+         BTR-90 雙人炮塔（炮手左／車長右）；BMP-1/1M 車長在駕駛後方、引擎前置右側；
+         BMP-3/3M 車尾有備彈與飛彈架、引擎後置地板下；BMD-4 彈藥集中吊籃。
+   限制：高度帶不含縱向，車側帶無法區分前置／後置引擎。 */
+const VEHICLE_INTERNAL_REACH = {
+t80:   { driver:'LF,UF,HS', gunner:'TF,TS,TR', commander:'TF,TS,TR', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'', ammoRack:'LF,UF,HS,TF,TS', engine:'HR,HS', gun:'TF,TS', turret:'TF,TS,TR' },
+btr80: { driver:'LF,UF,HS', gunner:'TF,TS,TR', commander:'LF,UF,HS', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'LF,UF,HS,HR', ammoRack:'UF,HS,TF,TS', engine:'HR,HS', gun:'TF,TS', turret:'TF,TS,TR' },
+btr80a:{ driver:'LF,UF,HS', gunner:'UF,HS',    commander:'LF,UF,HS', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'LF,UF,HS,HR', ammoRack:'UF,HS,TF,TS', engine:'HR,HS', gun:'TF,TS', turret:'TF,TS,TR' },
+btr90: { driver:'LF,UF,HS', gunner:'TF,TS,TR', commander:'TF,TS,TR', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'LF,UF,HS,HR', ammoRack:'UF,HS,TF,TS', engine:'HR,HS', gun:'TF,TS', turret:'TF,TS,TR' },
+bmp1:  { driver:'LF,UF,HS', gunner:'TF,TS,TR', commander:'LF,UF,HS', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'HS,HR', ammoRack:'UF,HS,TF,TS', engine:'LF,UF,HS', gun:'TF,TS', turret:'TF,TS,TR' },
+bmp1m: { driver:'LF,UF,HS', gunner:'UF,HS',    commander:'LF,UF,HS', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'HS,HR', ammoRack:'UF,HS,TF,TS', engine:'LF,UF,HS', gun:'TF,TS', turret:'TF,TS,TR' },
+bmp2:  { driver:'LF,UF,HS', gunner:'TF,TS,TR', commander:'TF,TS,TR', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'HS,HR', ammoRack:'UF,HS,TF,TS', engine:'LF,UF,HS', gun:'TF,TS', turret:'TF,TS,TR' },
+bmp3:  { driver:'LF,UF,HS', gunner:'TF,TS,TR', commander:'TF,TS,TR', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'LF,UF,HS,HR', ammoRack:'UF,HS,HR,TF,TS', engine:'HR,HS', gun:'TF,TS', turret:'TF,TS,TR' },
+bmd4:  { driver:'LF,UF,HS', gunner:'TF,TS,TR', commander:'TF,TS,TR', player:'LF,UF,HS,HR,TF,TS,TR', passenger:'LF,UF,HS,HR', ammoRack:'UF,HS,TF,TS', engine:'HR,HS', gun:'TF,TS', turret:'TF,TS,TR' }
+};
+VEHICLE_INTERNAL_REACH.t80b  = VEHICLE_INTERNAL_REACH.t80;
+VEHICLE_INTERNAL_REACH.t80bv = VEHICLE_INTERNAL_REACH.t80;
+VEHICLE_INTERNAL_REACH.t80u  = VEHICLE_INTERNAL_REACH.t80;
+VEHICLE_INTERNAL_REACH.t80uk = VEHICLE_INTERNAL_REACH.t80;
+VEHICLE_INTERNAL_REACH.t80um = VEHICLE_INTERNAL_REACH.t80;
+VEHICLE_INTERNAL_REACH.btr82  = VEHICLE_INTERNAL_REACH.btr80;
+VEHICLE_INTERNAL_REACH.btr82a = VEHICLE_INTERNAL_REACH.btr80a;
+VEHICLE_INTERNAL_REACH.bmp3m  = VEHICLE_INTERNAL_REACH.bmp3;
+window.VEHICLE_INTERNAL_REACH = VEHICLE_INTERNAL_REACH;
+
 const ERA_TYPES = {
   kontakt_1:       { ke: 20,  heat: 300 },
   kontakt_5:       { ke: 135, heat: 525 },

@@ -620,8 +620,16 @@ window._tickWeaponBullets = function(owner, dt, allTargets){
           _lineB = { startX:b.startX, startY:b.startY, impactX:b.impactX, impactY:0 };
         }
         var _PD = (_mvD.smoke === 'tracer') ? window._RPG27 : window.MISSILE_TRAIL;
-        if(typeof window._rpgTrailDeposit === 'function') window._rpgTrailDeposit(_ccT, _lineB, _t0T, _tEnd, _PD);
-        b._trailT = _tEnd;
+/* rev-trail-param-domain: hit.t／aps.t 是彈道線（start→impact）的參數；
+   沉積線（start→視覺爆點）長度不同，同一 t 落在不同物理點。
+   _trailT 續存彈道域（跨幀可比），沉積時除以終端 t 歸一化到沉積線自身域 ——
+   終端幀恰好 t=1，煙鋪到爆點；射失 _tTerm=1，行為不變。 */
+var _tTermD = (_aps && typeof _aps.t === 'number') ? _aps.t : (_rayHit ? _rayHit.t : 1);
+if(!(_tTermD > 1e-6)) _tTermD = 1e-6;
+var _dnD = (_lineB === b) ? 1 : _tTermD;
+var _v0D = Math.min(1, _t0T / _dnD), _v1D = Math.min(1, _tEnd / _dnD);
+if(_v1D > _v0D && typeof window._rpgTrailDeposit === 'function') window._rpgTrailDeposit(_ccT, _lineB, _v0D, _v1D, _PD);
+b._trailT = _tEnd;
       }
     }
     if(_aps && typeof _aps.t === 'number' && _progress >= _aps.t){

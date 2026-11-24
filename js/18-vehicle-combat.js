@@ -1082,6 +1082,10 @@ function _vEnsureDamage(vid){
 
 /* rev-7part: 按部位 × 彈種查 LAYOUT + ERA_TYPES，一次返回最終等效（mm RHA） */
 function _vGetArmor(vid, partKey, isHeat, noEra){
+/* rev-band-component-armor: 履帶／車頂武器非裝甲板，以部件本體鋼材等效計。
+   20mm 履帶鋼、8mm 武器本體為工程預設值，非實車手冊數據。 */
+if(partKey === 'tracks') return 20;
+if(partKey === 'roofWeapon') return 8;
 const layout = (typeof VEHICLE_ARMOR_LAYOUT !== 'undefined') ? VEHICLE_ARMOR_LAYOUT[vid] : null;
 if(!layout) return 30;
 const part = layout[partKey];
@@ -1118,15 +1122,62 @@ function _vPickWeighted(list){
 
 function _vGetInternalWeights(vid){ return _VEHICLE_INTERNAL_WEIGHTS[vid] || _VEHICLE_INTERNAL_WEIGHTS.default; }
 
-function _vPickInternalKey(vid){
-  const w = _vGetInternalWeights(vid);
-  let total = 0;
-  for(const k in w) total += w[k];
-  let r = Math.random() * total;
-  let acc = 0;
-  for(const k in w){ acc += w[k]; if(r <= acc) return k; }
+/* ===== rev-internal-reach: 內部損傷可達性 =====
+   命中段決定候選集，權重沿用 _VEHICLE_INTERNAL_WEIGHTS 遮罩後歸一化。
+   打炮塔不可能死駕駛；履帶／車頂武器段 100% 只破壞自己。 */
+const _V_BAND_CODE = { LF:'hullLowerFront', UF:'hullUpperFront', HS:'hullSide', HR:'hullRear', TF:'turretFront', TS:'turretSide', TR:'turretRear' };
+var _V_REACH_CACHE = {};
+function _vReachMap(vid){
+if(_V_REACH_CACHE[vid]) return _V_REACH_CACHE[vid];
+var row = (typeof VEHICLE_INTERNAL_REACH !== 'undefined') ? VEHICLE_INTERNAL_REACH[vid] : null;
+var m = {};
+if(row){
+  for(var k in row){
+    var toks = String(row[k] || '').split(','), arr = [];
+    for(var i = 0; i < toks.length; i++){
+      var t = toks[i].trim();
+      if(t && _V_BAND_CODE[t]) arr.push(_V_BAND_CODE[t]);
+    }
+    m[k] = arr;
+  }
+}
+_V_REACH_CACHE[vid] = m;
+return m;
+}
+function _vCanReach(vid, internalKey, partKey){
+var m = _vReachMap(vid);
+var a = m[internalKey];
+if(!a) return true;            /* 表未定義該部件（如 crew 總類）→ 不限制 */
+return a.indexOf(partKey) >= 0;
+}
+window._vCanReach = _vCanReach;
+function _vRoofWeaponId(vid){
+var ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
+if(!ld) return null;
+if(ld.nsvt) return 'nsvt';
+if(ld.atgm) return 'atgm';
+return null;
+}
+function _vPickInternalForPart(vid, partKey){
+if(partKey === 'tracks') return 'tracks';
+if(partKey === 'roofWeapon') return 'roofWeapon';
+var w = _vGetInternalWeights(vid);
+var list = [], total = 0;
+for(var k in w){
+  if(k === 'tracks') continue;
+  if(!(w[k] > 0)) continue;
+  if(!_vCanReach(vid, k, partKey)) continue;
+  list.push({ k:k, w:w[k] }); total += w[k];
+}
+if(!list.length){
+  for(var k2 in w){ if(k2 !== 'tracks' && w[k2] > 0) return k2; }
   return 'turret';
 }
+var r = Math.random() * total, acc = 0;
+for(var i = 0; i < list.length; i++){ acc += list[i].w; if(r <= acc) return list[i].k; }
+return list[list.length - 1].k;
+}
+function _vPickInternalKey(vid){ return _vPickInternalForPart(vid, 'hullUpperFront'); }
 
 function _vCalcPassengerArmor(p){
   let a = 0;
@@ -1187,8 +1238,28 @@ const armorMM = _vGetArmor(vid, part.key, isHeat, !_eraHitC);
   }
   dmg = Math.max(1, Math.round(dmg * (_diff / penMM)));
 
-const key = _vPickInternalKey(vid);
+const key = _vPickInternalForPart(vid, part.key);
   d.lastHit = { part: part.key, internal: key, dmg: dmg };
+/* rev-roof-weapon-hit: 車頂武器段只破壞該武器，不觸及炮塔／乘員／彈藥架 */
+if(key === 'roofWeapon'){
+  var _rwId = _vRoofWeaponId(vid);
+  if(!_rwId || !d.weapons[_rwId]) return { penetrated:true, part:part.key, internal:'車頂武器', damage:0 };
+  var _rwPrev = d.weapons[_rwId].hp;
+  d.weapons[_rwId].hp = Math.max(0, _rwPrev - dmg);
+  _vehicleCombatFloat(_vehWX, '車頂武器 -' + Math.round(dmg), '');
+  if(d.weapons[_rwId].hp <= 0 && _rwPrev > 0){
+    d.repairUntil = Date.now() + 4 * 3600 * 1000;
+    if(typeof pushLog === 'function'){
+      var _rwName = VEHICLE_WEAPON_NAMES[_rwId] || _rwId;
+      var _remainRW = [];
+      for(var _rw2 in d.weapons){ if(d.weapons[_rw2].hp > 0) _remainRW.push(VEHICLE_WEAPON_NAMES[_rw2] || _rw2); }
+      var _sufRW = _remainRW.length ? ('（' + _remainRW.join('、') + ' 仍可開火）') : '';
+      pushLog('<span class="run">' + _rwName + '</span> <span class="lose">損壞</span>' + _sufRW, [], 'explore');
+    }
+    if(window._vehicleWeaponsDead && window._vehicleWeaponsDead()) _forceLeave(vid, veh, 'gun');
+  }
+  return { penetrated:true, part:part.key, internal:'車頂武器', damage:dmg };
+}
 
   if(key === 'ammoRack'){
     d.ammoRackDamage += dmg;
@@ -1202,17 +1273,21 @@ const key = _vPickInternalKey(vid);
 
   if(key === 'crew'){
     const pool = [];
-    if(d.members.driver > 0) pool.push({ t: 'crew', r: 'driver' });
-    if(d.members.gunner > 0) pool.push({ t: 'crew', r: 'gunner' });
-    if(d.members.commander > 0) pool.push({ t: 'crew', r: 'commander' });
-    if(d.members.player > 0) pool.push({ t: 'player' });
-    const _st = window._getLiveStation();
-    const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
-    var _roster = (typeof window._vehicleRosterMap === 'function') ? window._vehicleRosterMap() : [];
+/* rev-crew-reach: 乘員候選按命中部位可達性過濾 —— 打炮塔不會死駕駛／載員 */
+if(d.members.driver > 0 && _vCanReach(vid, 'driver', part.key)) pool.push({ t: 'crew', r: 'driver' });
+if(d.members.gunner > 0 && _vCanReach(vid, 'gunner', part.key)) pool.push({ t: 'crew', r: 'gunner' });
+if(d.members.commander > 0 && _vCanReach(vid, 'commander', part.key)) pool.push({ t: 'crew', r: 'commander' });
+if(d.members.player > 0 && _vCanReach(vid, 'player', part.key)) pool.push({ t: 'player' });
+const _st = window._getLiveStation();
+const _cap = (window.CARRIER_CAPACITY && window.CARRIER_CAPACITY[vid]) ? window.CARRIER_CAPACITY[vid] : 0;
+var _roster = (typeof window._vehicleRosterMap === 'function') ? window._vehicleRosterMap() : [];
+if(_vCanReach(vid, 'passenger', part.key)){
 for(var _ri = 0; _ri < _roster.length; _ri++){
 var _rr = _roster[_ri];
 if(_rr.srv && _rr.srv.hp > 0) pool.push({ t: 'passenger', srv: _rr.srv, p: _rr.p });
-}if(!pool.length) return { penetrated: true, part: part.key, internal: '乘員', damage: 0 };
+}
+}
+if(!pool.length) return { penetrated: true, part: part.key, internal: '乘員', damage: 0 };
     const tgt = pool[Math.floor(Math.random() * pool.length)];
 
     if(tgt.t === 'crew'){
@@ -1966,20 +2041,44 @@ var _V_FACE_BANDS_CACHE = {};
 window._vGetFaceBands = function(vid, facing){
 var key = vid + '|' + facing;
 if(_V_FACE_BANDS_CACHE[key]) return _V_FACE_BANDS_CACHE[key];
-var pr = _getPartProbForVid(vid), w = {};
-for(var i = 0; i < pr.length; i++) w[pr[i].key] = pr[i].w;
-var sumF = (w.hullUpperFront || 0) + (w.hullLowerFront || 0) + (w.turretFront || 0);
-if(!(sumF > 0)) sumF = 1;
-var lo = (w.hullLowerFront || 0) / sumF;
-var tl = lo + (w.hullUpperFront || 0) / sumF;
-if(!(tl > lo)) tl = Math.min(0.95, lo + 0.3);
+/* rev-height-bands-fn: 高度帶改讀現實規格（VEHICLE_HEIGHT_BANDS，05），不再從面積權重推導。
+   面積 ≠ 高度：炮塔比車體窄，面積占比系統性低估其高度占比。
+   正面五段：履帶／首下／首上／炮塔／車頂武器；側後四段（不分首上下）。
+   h5 = VEHICLE_REAL_HEIGHTS（渲染唯一真相源）；h4=null → 車頂段寬 0。 */
+var row = (typeof VEHICLE_HEIGHT_BANDS !== 'undefined') ? VEHICLE_HEIGHT_BANDS[vid] : null;
+var H = (typeof VEHICLE_REAL_HEIGHTS !== 'undefined' && VEHICLE_REAL_HEIGHTS[vid]) ? VEHICLE_REAL_HEIGHTS[vid] : 0;
 var out;
-if(facing === 'front'){
-out = [{part:'hullLowerFront',lo:0,hi:lo},{part:'hullUpperFront',lo:lo,hi:tl},{part:'turretFront',lo:tl,hi:1}];
-} else if(facing === 'rear'){
-out = [{part:'hullRear',lo:0,hi:tl},{part:'turretRear',lo:tl,hi:1}];
+if(row && H > 0){
+  var _c01 = function(v){ return Math.max(0, Math.min(1, v)); };
+  var b1 = _c01(row.h1 / H);
+  var b2 = Math.max(b1, _c01(row.h2 / H));
+  var b3 = Math.max(b2, _c01(row.h3 / H));
+  var b4 = Math.max(b3, _c01(((row.h4 != null) ? Math.min(row.h4, H) : H) / H));
+  var lo, mid, hi;
+  if(facing === 'front'){ lo='hullLowerFront'; mid='hullUpperFront'; hi='turretFront'; }
+  else if(facing === 'rear'){ lo='hullRear'; mid=null; hi='turretRear'; }
+  else { lo='hullSide'; mid=null; hi='turretSide'; }
+  out = [{ part:'tracks', lo:0, hi:b1 }];
+  if(mid){ out.push({ part:lo, lo:b1, hi:b2 }); out.push({ part:mid, lo:b2, hi:b3 }); }
+  else { out.push({ part:lo, lo:b1, hi:b3 }); }
+  out.push({ part:hi, lo:b3, hi:b4 });
+  if(b4 < 1) out.push({ part:'roofWeapon', lo:b4, hi:1 });
 } else {
-out = [{part:'hullSide',lo:0,hi:tl},{part:'turretSide',lo:tl,hi:1}];
+  /* 表缺該車 → 沿用舊面積推導（不靜默改變未列入車型的行為） */
+  var pr = _getPartProbForVid(vid), w = {};
+  for(var i = 0; i < pr.length; i++) w[pr[i].key] = pr[i].w;
+  var sumF = (w.hullUpperFront || 0) + (w.hullLowerFront || 0) + (w.turretFront || 0);
+  if(!(sumF > 0)) sumF = 1;
+  var lo2 = (w.hullLowerFront || 0) / sumF;
+  var tl = lo2 + (w.hullUpperFront || 0) / sumF;
+  if(!(tl > lo2)) tl = Math.min(0.95, lo2 + 0.3);
+  if(facing === 'front'){
+    out = [{part:'hullLowerFront',lo:0,hi:lo2},{part:'hullUpperFront',lo:lo2,hi:tl},{part:'turretFront',lo:tl,hi:1}];
+  } else if(facing === 'rear'){
+    out = [{part:'hullRear',lo:0,hi:tl},{part:'turretRear',lo:tl,hi:1}];
+  } else {
+    out = [{part:'hullSide',lo:0,hi:tl},{part:'turretSide',lo:tl,hi:1}];
+  }
 }
 _V_FACE_BANDS_CACHE[key] = out;
 return out;
