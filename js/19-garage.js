@@ -817,7 +817,7 @@ function _garageOpenTechTree(){
     { vid: 'bmp3',   x: 140, y: 330 },
     { vid: 'bmd4',   x: 140, y: 410 },
     { vid: 'bmp3m',  x: 140, y: 490 },
-    { vid: 'bmp3a',  x: 140, y: 560 },
+    { vid: 'bmp3a',  x: 140, y: 570 },
     { vid: 't80',    x: 260, y: 90 },
     { vid: 't80b',   x: 260, y: 170 },
     { vid: 't80bv',  x: 260, y: 250 },
@@ -826,23 +826,27 @@ function _garageOpenTechTree(){
     { vid: 't80um',  x: 380, y: 440 }
   ];
 
-  let svg = '<svg width="500" height="600" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
-  svg += '<path d="M 190 74 L 190 80 L 70 80 L 70 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-  svg += '<line x1="190" y1="74" x2="190" y2="90" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<path d="M 190 74 L 190 80 L 310 80 L 310 90" stroke="#8a5f18" stroke-width="2" fill="none"/>';
-  svg += '<line x1="70" y1="154" x2="70" y2="170" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="70" y1="234" x2="70" y2="250" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="70" y1="314" x2="70" y2="330" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="190" y1="154" x2="190" y2="170" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="190" y1="234" x2="190" y2="250" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="190" y1="314" x2="190" y2="330" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="190" y1="394" x2="190" y2="410" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="190" y1="474" x2="190" y2="490" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="310" y1="154" x2="310" y2="170" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="310" y1="234" x2="310" y2="250" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="310" y1="314" x2="310" y2="330" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<line x1="310" y1="394" x2="310" y2="440" stroke="#8a5f18" stroke-width="2"/>';
-  svg += '<path d="M 310 404 L 430 404 L 430 440" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+  /* rev-tech-edges: 連線由 nodes 座標 ＋ VEHICLES.next 生成 —— 與研發前置
+     判定讀同一份資料。舊版是寫死的 SVG 座標清單，加節點卻沒加線就不會畫，
+     bmp3m→bmp3a 即是此漏。同 x 畫直線，跨 x 畫直角路徑（轉折在源底 +6）。 */
+  const _nmap = {};
+  for(let i = 0; i < nodes.length; i++){ _nmap[nodes[i].vid] = nodes[i]; }
+  let svg = '<svg width="500" height="660" style="position:absolute;left:0;top:0;pointer-events:none" xmlns="http://www.w3.org/2000/svg">';
+  for(let i = 0; i < nodes.length; i++){
+    const a = nodes[i];
+    const nx = (VEHICLES[a.vid] && VEHICLES[a.vid].next) || [];
+    for(let j = 0; j < nx.length; j++){
+      const b = _nmap[nx[j]];
+      if(!b) continue;
+      const ax = a.x + NW/2, ay = a.y + NH, bx = b.x + NW/2, by = b.y;
+      if(ax === bx){
+        svg += '<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="#8a5f18" stroke-width="2"/>';
+      } else {
+        const my = ay + 6;
+        svg += '<path d="M ' + ax + ' ' + ay + ' L ' + ax + ' ' + my + ' L ' + bx + ' ' + my + ' L ' + bx + ' ' + by + '" stroke="#8a5f18" stroke-width="2" fill="none"/>';
+      }
+    }
+  }
   svg += '</svg>';
 
   const g = _garageInitState();
@@ -877,7 +881,7 @@ function _garageOpenTechTree(){
       + '</div>';
   }
 
-  const body = '<div class="wt-tech-custom-scroll" style="overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;max-height:60vh;"><div style="position:relative; width:500px; height:600px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + svg + nodesHtml + '</div></div>';
+  const body = '<div class="wt-tech-custom-scroll" style="overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;max-height:60vh;"><div style="position:relative; width:500px; height:660px; margin:0; padding:10px 0 10px 20px; box-sizing:border-box;">' + svg + nodesHtml + '</div></div>';
 
   const bd = openModal({ title: '科技樹', body: body });
 
