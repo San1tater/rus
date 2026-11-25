@@ -1357,16 +1357,20 @@ function _vApplyComponentHit(vid, veh, d, hit){
     return out;
   }
 
-  /* rev-bmp3a-radar: Arena 雷達 —— 外部薄殼，歸零即主動防禦失效，不影響武器開火。
-     HP 不進 d.parts（非結構件，不計車體血量）；只歸零 HP，不清 APS 彈量。 */
+    /* rev-arena-radar-nonstructural: Arena 雷達 —— 外部薄殼，非結構件。
+     毀損只失去主動防禦，武器／機動／乘員全不受影響，故不設 destroyed／decisive，
+     不得進任何「毀損 → 離場」判定。HP 不寫 d.parts，不計車體血量。
+     out.dmg 必須設：_vHitVehicle 收事件條件為 r.dmg>0 || r.destroyed，
+     兩者皆無則整個命中事件被丟棄（不計傷害、不進 lastHit）。 */
   if(hit.comp === 'arenaRadar'){
   if(typeof d.arenaRadarHp !== 'number') d.arenaRadarHp = 40;
   var rPrev = d.arenaRadarHp;
-  d.arenaRadarHp = Math.max(0, rPrev - dmg);
-  _vHitFloat(wx, '雷達 -' + dmg, 'crit');
+  var rLoss = Math.min(rPrev, Math.max(0, dmg));
+  d.arenaRadarHp = rPrev - rLoss;
+  out.dmg = rLoss;
+  if(rLoss > 0) _vHitFloat(wx, '雷達 -' + rLoss, 'crit');
   if(d.arenaRadarHp <= 0 && rPrev > 0){
   _vComponentLog(d, 'Arena 雷達', 'run', '損毀', '（主動防禦失效）');
-  out.destroyed = true;
   }
   return out;
   }
