@@ -314,13 +314,26 @@ window._fxViewH = function(cv){ return (cv && (cv.clientHeight || cv.height)) ||
 
 
 /* ===== rev-missile-visual: 導彈/火箭 icon 渲染數據（彈體長=飛行部分，不含藥筒/發射筒） ===== */
-window.MISSILE_VISUAL = {
+window.MISSILE_VISUAL = /* rev-smoke-caliber: 羽流尺度按實際口徑 —— r0=口徑(m)，grow 沿用 _RPG27 的 grow/r0 比例，
+   spacing=min(原間距, 1.6×r0) 保證沉積連續（最小直徑 2×0.85×r0 > spacing）。
+   09 選參數組時合併這三個欄位；未標者（ATGM / 舊 rpg）沿用參數組預設。 */
+{
   'rpg':     { icon:'pg27',    len:0.90,  smoke:'tracer' },
   '9m112':   { icon:'9m112',   len:0.96,  smoke:'rocket' },
   '9m119m':  { icon:'9m119m',  len:0.695, smoke:'rocket' },
   '9m117m1': { icon:'9m117m1', len:1.11,  smoke:'rocket' },
   '9m113':   { icon:'9m113',   len:1.165, smoke:'rocket' },
   '9m14':    { icon:null,      len:null,  smoke:'rocket', crop:true }
+,
+/* ===== rev-rpg-tier: 五級火箭 visual =====
+   四款無圖 → icon:null，_drawMissileIcon 回 false → 不畫彈體（只有尾煙）。
+   smoke:'tracer' 沿用已認可的 _RPG27 羽流參數（此旗標只是參數組選擇器）。
+   len = 真實彈體長（m），供鼻端錨定與掃描段裁切。 */
+'pg18':  { icon:null,   len:0.60, smoke:'tracer', r0:0.064, grow:0.0366, spacing:0.1024 },
+'pg22':  { icon:null,   len:0.66, smoke:'tracer', r0:0.0725, grow:0.0414, spacing:0.116 },
+'pg26':  { icon:null,   len:0.72, smoke:'tracer', r0:0.0725, grow:0.0414, spacing:0.116 },
+'pg7vl': { icon:null,   len:0.89, smoke:'tracer', r0:0.093, grow:0.0531, spacing:0.12 },
+'pg27':  { icon:'pg27', len:0.90, smoke:'tracer', r0:0.105, grow:0.06, spacing:0.12 },
 };
 /* 火箭排焰煙（續燃/排氣）與曳光煙（RPG-27）分參數；間距統一 */
 window.MISSILE_TRAIL = { r0:0.12, grow:0.25, spacing:0.12, life:2.0, alpha:0.30, rise:0.15 };
@@ -415,3 +428,46 @@ if(typeof s.r0==='number'&&rM>s.r0){var _dR=s.r0/rM;sa*=_dR*_dR;}
   }
   ctx.restore();
 };
+/* ===== rev-smoke-plow: 命中平面犁過尾煙 =====
+   爆炸煙歸屬目標、被命中平面推著走；尾煙若留在世界靜止，就會越過爆炸平面
+   掃到車體後方 —— 物理上不成立。
+   平面 = 實繪車頭前緣（與 _getTargetHitVisualWorld 同一換算），隨車體前進。
+   被犁到的煙：① 歸屬轉為跟車（與爆炸煙同一套 _ft/_fdx）
+             ② 貼齊平面後獲得前向散射衝量（係數讀實際推進速度；靜止車無衝量）
+             ③ 上浮 ×3、剩餘壽命壓到原壽命的 1/4 → 快速離散
+   摩擦 0.95 與爆炸粒子 _wvx 同一條慣例。
+   尚未被犁到的煙壽命與行為不變（自由空氣中的滯留是對的）。
+   射失落地的煙同樣會被車體犁過 —— 地面不是推進面，但車體是。
+   我方飛出的彈（GL-ATGM / ATGM）尾煙在車頭前方，永遠不會被犁到。 */
+window._plowTrailSmoke = function(c, dt){
+if(!c || !c.rpgSmoke || !c.rpgSmoke.length) return;
+var veh = (c.allies && c.allies[0] && c.allies[0].isVehicle) ? c.allies[0] : null;
+if(!veh || typeof window._vehicleHitScreenPos !== 'function') return;
+var hp = window._vehicleHitScreenPos(veh.vehicleId, null);
+if(!hp || typeof hp.nx !== 'number') return;
+var hr = (typeof EXPLORE_HERO_X_RATIO === 'number') ? EXPLORE_HERO_X_RATIO : 0.25;
+var sr = (c.sm && c.sm.screenRightWorld) || 2;
+var off = (hp.nx - hr) / Math.max(0.05, 1 - hr) * sr;
+var vwx = (typeof veh.worldX === 'number') ? veh.worldX : 0;
+var planeX = vwx + off;
+var vAdv = (typeof window._currentWorldSpeed === 'function') ? window._currentWorldSpeed() : 0;
+var fr = Math.pow(0.95, dt * 60);
+for(var i = 0; i < c.rpgSmoke.length; i++){
+var s = c.rpgSmoke[i];
+if(s._ft){
+s._fdx += (s._wvx || 0) * dt;
+s._wvx = (s._wvx || 0) * fr;
+s._wx = ((typeof s._ft.worldX === 'number') ? s._ft.worldX : 0) + s._fdx;
+continue;
+}
+if(typeof s._wx !== 'number' || s._wx > planeX) continue;
+s._ft = veh;
+s._fdx = off;
+s._wx = planeX;
+s._wvx = vAdv * (0.10 + Math.random() * 0.15);
+s.vy = (typeof s.vy === 'number' ? s.vy : 0.10) * 3;
+var lf = (typeof s.life === 'number' && s.life > 0) ? s.life : 1.2;
+s.life = s.age + lf * 0.25;
+}
+};
+

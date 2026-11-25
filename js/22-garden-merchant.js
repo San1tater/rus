@@ -712,7 +712,8 @@ function buyTradeItem(itemId, qty){
                  : item.id === 'ammo_supply_premium' ? '精品' : '傳奇';
     const count = item.id === 'ammo_supply_stock' ? 30
                  : item.id === 'ammo_supply_premium' ? 40 : 50;
-    const ids = Object.keys(AMMO).filter(function(k){ return AMMO[k].rarity === rarity; });
+    /* rev-enemy-only: 敵方專用彈頭不進補給池 */
+const ids = Object.keys(AMMO).filter(function(k){ return AMMO[k].rarity === rarity && !AMMO[k].enemyOnly; });
     const collected = {};
     for(let q = 0; q < qty; q++){
       if(!ids.length) break;

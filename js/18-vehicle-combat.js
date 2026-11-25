@@ -996,7 +996,9 @@ window._apsDecide = function(b, hit){
   if(!b.isEnemyBullet || b.isGrenade || !b.isRPG) return null;
   var tgt = b.target;
   if(!tgt || !tgt.isVehicle) return null;
-  var cal = (typeof window._rpg27Cal === 'function') ? window._rpg27Cal() : 105;
+  /* rev-rpg-tier-cal: 口徑讀實際彈頭，不再恆 RPG-27 的 105 */
+var _adCal = (typeof AMMO !== 'undefined' && b.ammoId && AMMO[b.ammoId]) ? AMMO[b.ammoId] : null;
+var cal = (_adCal && _adCal.caliberMM) ? _adCal.caliberMM : ((typeof window._rpg27Cal === 'function') ? window._rpg27Cal() : 105);
   b._apsDone = true;
   b._apsHit = false;
   if(!_apsRoll(tgt.vehicleId, b.flightSpeed, cal)) return null;
@@ -1104,7 +1106,9 @@ return base + eraBonus;
 const _HEAT_AMMO_SET = new Set([
   'atgm', 'pg27', '3bk29', 'pg15v',
   '9m14', '9m113', '9m112', '9m119m', '9m117m1'
-]);
+,
+/* rev-rpg-tier: 五級火箭彈頭皆 HEAT */
+'pg18', 'pg22', 'pg26', 'pg7vl']);
 function _vIsHeatAmmo(ammoId){
   return _HEAT_AMMO_SET.has(ammoId);
 }

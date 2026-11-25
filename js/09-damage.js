@@ -620,6 +620,14 @@ window._tickWeaponBullets = function(owner, dt, allTargets){
           _lineB = { startX:b.startX, startY:b.startY, impactX:b.impactX, impactY:0 };
         }
         var _PD = (_mvD.smoke === 'tracer') ? window._RPG27 : window.MISSILE_TRAIL;
+/* rev-smoke-caliber: 羽流尺度按實際口徑 —— visual 條目有 r0 就覆寫尺度三項，
+   壽命 / 濃度 / 上升仍沿用參數組。未標 r0 者（ATGM / 舊 rpg）行為不變。 */
+if(_PD && typeof _mvD.r0 === 'number'){
+_PD = { r0: _mvD.r0,
+grow: (typeof _mvD.grow === 'number') ? _mvD.grow : _PD.grow,
+spacing: (typeof _mvD.spacing === 'number') ? _mvD.spacing : _PD.spacing,
+life: _PD.life, alpha: _PD.alpha, rise: _PD.rise };
+}
 /* rev-trail-param-domain: hit.t／aps.t 是彈道線（start→impact）的參數；
    沉積線（start→視覺爆點）長度不同，同一 t 落在不同物理點。
    _trailT 續存彈道域（跨幀可比），沉積時除以終端 t 歸一化到沉積線自身域 ——

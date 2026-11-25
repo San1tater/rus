@@ -90,6 +90,8 @@ function generateEnemyInstance(e,t){
   var rpgRarity = null;
   var rpgPenMM = 0;
   var rpgDmg = 0;
+var rpgWeaponId = null;
+var rpgAmmoId = null;
 
   /* rev-fix-enemy-melee-all: 所有敵人（含 rocket_gunner）都配近戰武器 */
   var _meleeId = pick(['6kh2','6kh5','kukri']);
@@ -97,11 +99,20 @@ function generateEnemyInstance(e,t){
   var melee = _meleeDef ? { id: _meleeId, rarity: '一般' } : null;
 
   if(e === 'rocket_gunner'){
-    hasRPG = true;
-    rpgAmmo = 1;
-    rpgRarity = rarity;
-    rpgPenMM = 600;
-    rpgDmg = 100 * (RARITY_MULT[rarity] || 1);
+    /* rev-rpg-fail-closed: 表缺失時不配 RPG —— 舊版退回 rpg27 會讓所有稀有度都拿傳奇筒。
+   寧可不配，也不誤配；穿深／傷害一律從彈藥表推，不再有 600 殘留。 */
+var _rpgTier = (typeof RPG_TIERS !== 'undefined' && RPG_TIERS[rarity]) ? RPG_TIERS[rarity] : null;
+var _rpgAId = _rpgTier ? _rpgTier.a : null;
+var _rpgADef = (_rpgAId && typeof AMMO !== 'undefined' && AMMO[_rpgAId]) ? AMMO[_rpgAId] : null;
+if(_rpgTier && _rpgADef){
+hasRPG = true;
+rpgAmmo = 1;
+rpgRarity = rarity;
+rpgWeaponId = _rpgTier.w;
+rpgAmmoId = _rpgAId;
+rpgPenMM = _rpgADef.penMM || 0;
+rpgDmg = Math.round((_rpgADef.dmg || 100) * (RARITY_MULT[_rpgADef.rarity || rarity] || 1));
+}
 
     var w = pickEnemyWeapon(e, rarity, t);
     var wd = WEAPONS[w];
@@ -170,6 +181,8 @@ function generateEnemyInstance(e,t){
     rpgRarity: rpgRarity,
     rpgPenMM: rpgPenMM,
     rpgDmg: rpgDmg,
+rpgWeaponId: rpgWeaponId,
+rpgAmmoId: rpgAmmoId,
     helmet: helmet,
     helmetRarity: rarity,
     body: body,

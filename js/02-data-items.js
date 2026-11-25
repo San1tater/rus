@@ -83,9 +83,20 @@ const WEAPONS={
   rgn:{name:'RGN 手榴彈',slot:'throwable',type:'手榴彈',dmg:18,fragments:75,fragmentDamage:18,allFragmentsOnSingle:false,penMM:15,modes:['投擲'],rpm:60,range:0.6,explosive:true},
   vog17:{name:'VOG-17 手榴彈',slot:'throwable',type:'手榴彈',dmg:15,fragments:100,fragmentDamage:15,allFragmentsOnSingle:false,penMM:15,modes:['投擲'],rpm:60,range:0.55,explosive:true},
   vog25:{name:'VOG-25 手榴彈',slot:'throwable',type:'手榴彈',dmg:16,fragments:35,fragmentDamage:16,allFragmentsOnSingle:true,penMM:15,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+
+/* ===== rev-rpg-tier: 五級火箭筒（敵方專用） =====
+   slot:'rpg' —— 不在 primary/secondary/melee/throwable 任何玩家可裝備欄，
+   enemyOnly 供批發枚舉處過濾。穿深／彈速／口徑寫在對應彈頭（AMMO），此表只描述發射器。 */
+rpg18:  {name:'RPG-18 Mukha',   slot:'rpg', type:'火箭筒', enemyOnly:true, mag:1, modes:['點射'], rpm:12, range:0.60, aimY:0.85, burstFactor:0},
+rpg22:  {name:'RPG-22 Kolos',   slot:'rpg', type:'火箭筒', enemyOnly:true, mag:1, modes:['點射'], rpm:12, range:0.65, aimY:0.85, burstFactor:0},
+rpg26:  {name:'RPG-26 Aglen',   slot:'rpg', type:'火箭筒', enemyOnly:true, mag:1, modes:['點射'], rpm:12, range:0.70, aimY:0.85, burstFactor:0},
+rpg7v2: {name:'RPG-7V2',        slot:'rpg', type:'火箭筒', enemyOnly:true, mag:1, modes:['點射'], rpm:12, range:0.80, aimY:0.85, burstFactor:0},
+rpg27:  {name:'RPG-27 Tavolga', slot:'rpg', type:'火箭筒', enemyOnly:true, mag:1, modes:['點射'], rpm:12, range:0.85, aimY:0.85, burstFactor:0},
 };
 
-const AMMO={
+const AMMO=/* rev-enemy-only: 敵方專用彈頭 —— 不進商人補給池、不進掉落、不預載圖示。
+   cal 獨立（rpgXX），與任何玩家槍械口徑零交集。 */
+{
   '9x18_pst':{name:'9×18mm PSt',cal:'9x18',dmg:50,penMM:2,rarity:'破舊'},
   '9x18_ps':{name:'9×18mm PS',cal:'9x18',dmg:55,penMM:2,rarity:'一般'},
   '9x18_pmm':{name:'9×18mm PMM',cal:'9x18',dmg:58,penMM:3,rarity:'庫存'},
@@ -133,7 +144,31 @@ const AMMO={
   '23x75_shrapnel10':{name:'23×75mmR Shrapnel-10',cal:'23x75',dmg:87,penMM:1,rarity:'精品',pellets:8},
   '23x75_shrapnel10_legend':{name:'23×75mmR Shrapnel-10',cal:'23x75',dmg:87,penMM:1,rarity:'傳奇',pellets:8},
   '23x75_barrikada':{name:'23×75mmR Barrikada',cal:'23x75',dmg:192,penMM:11,rarity:'傳奇',pellets:1},
+
+/* ===== rev-rpg-tier: 五級火箭彈頭 =====
+   penMM = 最高穿深（無 ERA 之 RHA 貫穿值）；裝甲側 base+ERA 為總等效，直接比較。
+   dmg 五級皆 100 —— 100×RARITY_MULT 與舊 e.rpgDmg 完全等值，傷害量級不變，
+   威脅梯度全部來自穿深。cal 獨立（rpgXX），不與任何玩家槍械口徑重疊。
+   speed 供彈道與 APS 閘門；caliberMM 供 APS 口徑閘門（>=40 通過）。 */
+'pg18':  {name:'PG-18 破甲彈',   cal:'rpg64',  dmg:100, penMM:300, rarity:'破舊', caliberMM:64,   speed:114, enemyOnly:true },
+'pg22':  {name:'PG-22 破甲彈',   cal:'rpg72',  dmg:100, penMM:400, rarity:'一般', caliberMM:72.5, speed:133, enemyOnly:true },
+'pg26':  {name:'PG-26 破甲彈',   cal:'rpg72b', dmg:100, penMM:440, rarity:'庫存', caliberMM:72.5, speed:144, enemyOnly:true },
+'pg7vl': {name:'PG-7VL 破甲彈',  cal:'rpg93',  dmg:100, penMM:500, rarity:'精品', caliberMM:93,   speed:300, enemyOnly:true },
+'pg27':  {name:'PG-27V 串聯破甲彈', cal:'rpg105', dmg:100, penMM:750, rarity:'傳奇', caliberMM:105, speed:130, enemyOnly:true },
+}
+
+/* ===== rev-rpg-tier: 稀有度 → 發射器／彈頭（1:1） =====
+   敵人產生端按此派發；發射器稀有度＝敵人稀有度（精度），彈頭稀有度＝AMMO.rarity（殺傷力）。 */
+const RPG_TIERS = {
+'破舊': { w:'rpg18',  a:'pg18'  },
+'一般': { w:'rpg22',  a:'pg22'  },
+'庫存': { w:'rpg26',  a:'pg26'  },
+'精品': { w:'rpg7v2', a:'pg7vl' },
+'傳奇': { w:'rpg27',  a:'pg27'  },
+'具名': { w:'rpg27',  a:'pg27'  }
 };
+window.RPG_TIERS = RPG_TIERS;
+;
 
 const CONSUMABLES={bandage:{name:'繃帶',heal:25,healPct:0.10},water:{name:'瓶裝水',heal:15,healPct:0.05},painkiller:{name:'止痛藥',heal:20,healPct:0.08},splint:{name:'夾板',heal:20,healPct:0.08},tushonka:{name:'燉肉罐頭',heal:30,healPct:0.12},ai2:{name:'AI-2 急救包',heal:70,healPct:0.25},ifak:{name:'IFAK 急救包',heal:120,healPct:0.35},salewa:{name:'Salewa 急救包',heal:180,healPct:0.50},surv12:{name:'Surv12 野戰包',heal:250,healPct:0.70}};
 function calcConsumableHeal(item, medbayLv){

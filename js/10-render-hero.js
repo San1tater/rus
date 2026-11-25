@@ -115,7 +115,7 @@ function preloadStaticAssets(){
     // 武器
     if(typeof WEAPONS !== 'undefined'){
       for(var k in WEAPONS){
-        if(WEAPONS[k] && WEAPONS[k].slot){
+        if(WEAPONS[k] && WEAPONS[k].slot && !WEAPONS[k].enemyOnly){ /* rev-enemy-only: 敵方專用武器無圖，不預載 */
           getHeroImg(window.getItemIconPath(k)); _ok++;
         }
       }

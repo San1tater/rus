@@ -807,6 +807,8 @@ function _gardenRaidShowBattle(guards, enemies, region){
         hasRPG: !!e.hasRPG,
         rpgAmmo: e.rpgAmmo || 0,
         rpgRarity: e.rpgRarity || null,
+     rpgWeaponId: e.rpgWeaponId || null,
+     rpgAmmoId: e.rpgAmmoId || null,
         rpgDmg: e.rpgDmg || 0,
         rpgPenMM: e.rpgPenMM || 0,
         grenade: e.grenade || null,
@@ -1030,9 +1032,13 @@ function drawBullet(b){
      曳光 / 槍口焰落在函式外的戰鬥初始化作用域 → sx 未定義（ReferenceError）。
      此處把視覺段收攏回函式內，行為與參數完全原樣。 */
   if(!e || !target) return;
-  const _rar = e.rpgRarity || e.rarity || '一般';
-  const _baseDmg = e.rpgDmg || (100 * ((typeof RARITY_MULT !== 'undefined' && RARITY_MULT[_rar]) || 1));
-  const _penMM = e.rpgPenMM || 600;
+  /* rev-rpg-tier: 與探索同一條 —— 發射器／彈頭分離，穿深查彈藥表 */
+const _aId = e.rpgAmmoId || 'pg27';
+const _aDef = (typeof AMMO !== 'undefined' && AMMO[_aId]) ? AMMO[_aId] : null;
+const _rar = e.rpgRarity || e.rarity || '一般';
+const _aRar = _aDef ? (_aDef.rarity || '一般') : _rar;
+const _baseDmg = _aDef ? Math.round((_aDef.dmg || 100) * ((typeof RARITY_MULT !== 'undefined' && RARITY_MULT[_aRar]) || 1)) : (e.rpgDmg || Math.round(100 * ((typeof RARITY_MULT !== 'undefined' && RARITY_MULT[_rar]) || 1)));
+const _penMM = (typeof e.rpgPenMM === 'number' && e.rpgPenMM > 0) ? e.rpgPenMM : (_aDef ? (_aDef.penMM || 0) : 600);
   const hit = Math.random() < 0.6;
   const sx = e.x;
   const sy = e.y - 20;
@@ -1051,9 +1057,9 @@ function drawBullet(b){
     fromU: e, toU: target, rarity: _rar,
     _onHit: function(){
       if(!hit || !target.alive) return;
-      const _cm = (typeof calcCritMult === 'function') ? calcCritMult(_rar, _rar) : 1.5;
+      const _cm = (typeof calcCritMult === 'function') ? calcCritMult(_rar, _aRar) : 1.5;
       const r = _resolveSingleAttack({
-        ammoId: null, ammoRarity: _rar, weaponRarity: _rar,
+        ammoId: _aId, ammoRarity: _aRar, weaponRarity: _rar,
         penMM: _penMM, fallbackDmg: _baseDmg
       }, target);
       target.hp = Math.max(0, target.hp - r.hpLost);
