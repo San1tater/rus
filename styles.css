@@ -1615,3 +1615,12 @@ html,body{height:100%;overflow:hidden;background:#0e0c0a;color:#ddd;font-family:
 .boss-ghost .lbl{position:absolute;left:50%;top:6px;transform:translateX(-50%);font-size:9px;color:#39c6c0;background:rgba(10,14,14,.88);border:1px solid rgba(57,198,192,.4);border-radius:6px;padding:2px 7px;white-space:nowrap;text-shadow:0 0 4px #000;pointer-events:none}
 .boss-ghost .hint{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font-size:8px;color:#7a6f60;white-space:nowrap;pointer-events:none}
 /* ===== rev-hudroot:end ===== */
+
+/* ===== rev-log-unify:start ===== */
+/* 日誌連結與可點行 —— 唯一真相源。
+   舊版「點擊查看詳情」在 13／18 各自內聯 color+underline+dotted，
+   可點行的 cursor 在 15 用 style、在 14 用 inline attr，兩套寫法。 */
+.log-link{color:#4a90d9;text-decoration:underline;text-decoration-style:dotted}
+.logline.clickable{cursor:pointer}
+.logline.clickable:hover{background:rgba(74,144,217,.08)}
+/* ===== rev-log-unify:end ===== */
