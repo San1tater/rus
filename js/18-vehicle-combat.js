@@ -1926,6 +1926,9 @@ window._radioBTRTrigger = function(){
     d.parts = { engine: 800, tracks: 1000, turret: 400 };
     if(d.weapons){ for(const _wid in d.weapons){ d.weapons[_wid].hp = d.weapons[_wid].max; } }
     d.ammoRackDamage = 0;
+    /* rev-arena-radar-reset: 雷達隨出車／維修修復 —— 與同區塊 ammoRackDamage=0 同一慣例。
+       只補 APS 彈量不修雷達，該趟仍無主動防禦。 */
+    d.arenaRadarHp = 40;
     d.destroyed = false;
     d.disabled = false;
     d.repairUntil = 0;
