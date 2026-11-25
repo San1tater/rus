@@ -447,7 +447,13 @@ const _dep141 = _stDeployMap(s, cap); /* rev-deploy-render */
   if(ld){
     const _beltKeys = [];
     for(const _bk in ld){ if(_ST_BELT_WIDS[_bk]) _beltKeys.push(_bk); }
-    _beltKeys.sort(function(a, b){ return (_ST_CALIBER_MAP[a] || 999) - (_ST_CALIBER_MAP[b] || 999); });
+    /* rev-weapon-order: 與支援報告共用同一序（原按口徑 → PKT 排在 KPVT 前） */
+    _beltKeys.sort(function(a, b){
+    var ka = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(a, null) : (_ST_CALIBER_MAP[a] || 999);
+    var kb = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(b, null) : (_ST_CALIBER_MAP[b] || 999);
+    if(ka !== kb) return ka - kb;
+    return String(a).localeCompare(String(b));
+    });
     for(let _bi = 0; _bi < _beltKeys.length; _bi++){
       const wid = _beltKeys[_bi];
       let a = (state.vehicleAmmo && state.vehicleAmmo[vid] && state.vehicleAmmo[vid][wid]);
@@ -475,7 +481,13 @@ const _dep141 = _stDeployMap(s, cap); /* rev-deploy-render */
   if(ld){
     const _mainKeys = [];
     for(const _mk in ld){ if(VEHICLE_MAIN_AMMO_POOL && VEHICLE_MAIN_AMMO_POOL[_mk]) _mainKeys.push(_mk); }
-    _mainKeys.sort(function(a, b){ return (_ST_CALIBER_MAP[a] || 999) - (_ST_CALIBER_MAP[b] || 999); });
+    /* rev-weapon-order: 與支援報告共用同一序（原按口徑 → PKT 排在 KPVT 前） */
+    _mainKeys.sort(function(a, b){
+    var ka = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(a, null) : (_ST_CALIBER_MAP[a] || 999);
+    var kb = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(b, null) : (_ST_CALIBER_MAP[b] || 999);
+    if(ka !== kb) return ka - kb;
+    return String(a).localeCompare(String(b));
+    });
     for(let _mi2 = 0; _mi2 < _mainKeys.length; _mi2++){
       const wid2 = _mainKeys[_mi2];
       let a2 = (state.vehicleAmmo && state.vehicleAmmo[vid] && state.vehicleAmmo[vid][wid2]);
@@ -494,7 +506,12 @@ const _dep141 = _stDeployMap(s, cap); /* rev-deploy-render */
       }
       if(!a2.presetBreakdown) a2.presetBreakdown = JSON.parse(JSON.stringify(a2.breakdown || {}));
 
-      const defs = VEHICLE_MAIN_AMMO_POOL[wid2];
+      /* rev-weapon-order: 主炮彈種序 = 穿甲 → 高爆 → 破甲 → 導彈（原為 pool 陣列序） */
+      const defs = (VEHICLE_MAIN_AMMO_POOL[wid2] || []).slice().sort(function(a, b){
+      var ka = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(wid2, a.id) : 0;
+      var kb = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(wid2, b.id) : 0;
+      return ka - kb;
+      });
       let icons = '';
       for(let di = 0; di < defs.length; di++){
         const d = defs[di];
@@ -726,7 +743,12 @@ function _stPickBelt(vid, wid){
 function _stOpenMainAmmoPicker(vid, wid, onClose){
   const ld = (typeof _getLoadout === 'function') ? _getLoadout(vid) : null;
   if(!ld || !ld[wid]) return;
-  const defs = VEHICLE_MAIN_AMMO_POOL[wid];
+  /* rev-weapon-order: 主炮彈種序 = 穿甲 → 高爆 → 破甲 → 導彈（原為 pool 陣列序） */
+  const defs = (VEHICLE_MAIN_AMMO_POOL[wid] || []).slice().sort(function(a, b){
+  var ka = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(wid, a.id) : 0;
+  var kb = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(wid, b.id) : 0;
+  return ka - kb;
+  });
   if(!defs) return;
   const mr = ld[wid].rounds || 0;
   if(mr <= 0) return;

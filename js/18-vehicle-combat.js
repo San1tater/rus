@@ -833,12 +833,19 @@ var loot = (typeof rollEnemyLoot === 'function') ? rollEnemyLoot(target) : [];
 const VEHICLE_WEAPON_NAMES = { '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' };
 
 /* rev140: ATGM 依車型取專屬名稱（9M113 競賽 / 9M14 嬰兒 等） */
-/* rev-report-order: 武器表現排序唯一真相源 —— 與車站配置頁面同序：
-   車頂機槍 → 同軸機槍 → 重機槍 → 機炮 → 主炮（穿甲-高爆-破甲-導彈）→ 獨立導彈。
-   舊版報告用 for...in weaponKills = 擊殺先後，同一台車每場順序都不同。
-   主炮之間按口徑遞增（2a28 73 → 2a70 100 → 2a46 125），與車站 _ST_CALIBER_MAP 同向。 */
-const _VW_ORDER = { nsvt:10, nsvt_md:10, pkt:20, pkt_t46m:20, kpvt:30, kpvt_mdz:30,
-'2a72':40, '2a42':41, '2a28':50, '2a70':51, '2a46':52, '2a46m1':53, atgm:90 };
+/* rev-weapon-order: 武器排序唯一真相源 —— 車站配置頁面與支援報告共用。
+   同軸機槍(pkt) → 車頂機槍(nsvt/kpvt) → 機炮(2a72/2a42)
+   → 主炮(2a28/2a70/2a46/2a46m1，口徑遞增) → 獨立導彈(atgm)。
+   主炮內彈種：穿甲 → 高爆 → 破甲 → 導彈（見 _VW_AMMO_ORDER）。
+   nsvt_md / kpvt_mdz / pkt_t46m 只是 VEHICLE_WEAPON_STATS 的彈種 key，
+   從來不是 weaponId（loadout 只有 nsvt/kpvt/pkt），故不列檔位。 */
+const _VW_ORDER = {
+/* 同軸機槍 */ pkt:10,
+/* 車頂機槍 */ nsvt:20, kpvt:20,
+/* 機炮 */ '2a72':40, '2a42':41,
+/* 主炮 */ '2a28':50, '2a70':51, '2a46':52, '2a46m1':53,
+/* 獨立導彈 */ atgm:90
+};;
 const _VW_AMMO_ORDER = { '3bm42':0, '3of26':1, '3bk29':2, '9m112':3, '9m119m':3,
 '3uof17':1, '9m117m1':3, 'og15v':1, 'pg15v':2 };
 window._vehicleWeaponSortKey = function(wid, ammoId){

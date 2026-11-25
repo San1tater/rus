@@ -1067,7 +1067,22 @@ const _rar = e.rpgRarity || e.rarity || '一般';
 const _aRar = _aDef ? (_aDef.rarity || '一般') : _rar;
 const _baseDmg = _aDef ? Math.round((_aDef.dmg || 100) * ((typeof RARITY_MULT !== 'undefined' && RARITY_MULT[_aRar]) || 1)) : (e.rpgDmg || Math.round(100 * ((typeof RARITY_MULT !== 'undefined' && RARITY_MULT[_rar]) || 1)));
 const _penMM = (typeof e.rpgPenMM === 'number' && e.rpgPenMM > 0) ? e.rpgPenMM : (_aDef ? (_aDef.penMM || 0) : 600);
-  const hit = Math.random() < 0.6;
+  /* rev-raid-rpg-geom: 廢除 flat 0.6 —— 與探索／離線同一條幾何：
+     角散佈（hr → σ）→ 對目標盒發射線 → 相交才算命中。 */
+  var _rpgProxyR = (typeof window._raidWpProxy === 'function') ? window._raidWpProxy(target) : target;
+  var _rpgBoxR = (typeof window._getTargetBox === 'function') ? window._getTargetBox(_rpgProxyR) : null;
+  var _rpgDistR = Math.max(0.5, Math.abs((typeof target.worldX === 'number' ? target.worldX : 0) - (typeof e.worldX === 'number' ? e.worldX : 0)));
+  var _rpgScR = (typeof window._calcWeaponScatter3D === 'function' && _rpgBoxR)
+  ? window._calcWeaponScatter3D(150, Math.round((e.hitBase || 0.6) * 100), 1, 0, _rpgBoxR, 1,
+  { weaponId: (e.rpgWeaponId || 'rpg27'), platform: 'handheld', dist: _rpgDistR })
+  : null;
+  var _rpgHitR = (_rpgBoxR && _rpgScR && typeof window._raySegFrontFace === 'function')
+  ? window._raySegFrontFace((typeof e.worldX === 'number' ? e.worldX : 0), 1.3, 0,
+  (typeof target.worldX === 'number' ? target.worldX : 0),
+  (_rpgBoxR.yFoot || 0) + 0.85 + (_rpgScR.sy || 0), (_rpgScR.sz || 0),
+  (typeof target.worldX === 'number' ? target.worldX : 0), _rpgBoxR, _rpgProxyR)
+  : null;
+  const hit = !!_rpgHitR;
   const sx = e.x;
   const sy = e.y - 20;
   const tx = hit ? target.x : (target.x + (Math.random() - 0.5) * 80);

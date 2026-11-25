@@ -133,12 +133,16 @@ const VEHICLES = {
     supportDuration:48, next:['bmp3m'],
     researchCost:{ ammoCal:'7.62x54', ammoCount:3000, liquor:3000, exp:15000 }
   },
-  /* ---------- BMP-3M：UTD-32 660hp / 19.1t，前弧附加裝甲 + 熱像 FCS ---------- */
+  /* ---------- BMP-3M：UTD-32 660hp；掛 Kaktus 後 22.9t（BMP-3 18.7t + 4.2t），
+   功重比 28.8 hp/t，喪失兩棲浮渡。前弧附加裝甲 + 熱像 FCS。
+   公路 70 km/h = BMP-3M 公開值（數值不動 → _vehicleSpeedKmh 不受影響）；
+   越野 40-45 為工程估值 —— 同底盤接地面積下 +22% 質量使接地壓上升，
+   越野應低於 BMP-3 的 45-50。舊值 50-55 比 BMP-3 還快，方向錯。 ---------- */
   bmp3m: {
     id:'bmp3m', name:'BMP-3M', tier:6, line:'bmp',
     weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
     armorGrid:['70/40/22','65/45/30','Kaktus'],
-    speedFwd:70, speedRev:20, speedRoad:70, speedOffroad:'50-55',
+    speedFwd:70, speedRev:20, speedRoad:70, speedOffroad:'40-45',
     supportDuration:50, next:['bmp3a'],
     researchCost:{ ammoCal:'7.62x54', ammoCount:3500, liquor:3500, exp:18000 }
   },
@@ -276,11 +280,11 @@ const VEHICLE_ARMOR_LAYOUT = {
     hullSide:{baseKE:18,baseHEAT:18,era:null},       hullRear:{baseKE:14,baseHEAT:14,era:null},
     turretFront:{baseKE:38,baseHEAT:38,era:null},    turretSide:{baseKE:26,baseHEAT:26,era:null},  turretRear:{baseKE:20,baseHEAT:20,era:null}
   },
-  /* BMP-3M：Kaktus / 4S24 軟殼爆反（全車約 150~200 塊，增重 4.2t）。
-     base 維持 BMP-3 原值 —— 4S24 無抗 KE 增益，附加鋼板抗 12.7 B-32 / 23mm / 3UBR6 已由 base 涵蓋。
-     eraCoverage = 該部位掛載覆蓋率：炮塔周邊 70%、車側 62%、正面合計 36%
-     （首下較完整 0.65 / 首上避開駕駛艙蓋·潛望鏡·航向機槍射界僅 0.14；
-       按正面投影權重 32:24 加權回代 = 0.359）。車尾與炮塔尾為格柵，非爆反。 */
+  /* BMP-3M：Kaktus / 4S24（全車約 150~200 塊，增重 4.2t）。
+   base 維持 BMP-3 原值；era 提供 heat 500（模組獨立額定）+ ke 12（背板邊際）。
+   eraCoverage = 該部位掛載覆蓋率：炮塔周邊 70%、車側 62%、正面合計 36%
+   （首下 0.65 / 首上避開駕駛艙蓋·潛望鏡·航向機槍射界僅 0.14；
+   按正面投影權重 32:24 加權回代 = 0.359）。車尾與炮塔尾為格柵，非爆反。 */
   bmp3m: {
     hullUpperFront:{baseKE:70,baseHEAT:70,era:'kaktus',eraCoverage:0.14}, hullLowerFront:{baseKE:42,baseHEAT:42,era:'kaktus',eraCoverage:0.65},
     hullSide:{baseKE:40,baseHEAT:40,era:'kaktus',eraCoverage:0.62},       hullRear:{baseKE:22,baseHEAT:22,era:null},
@@ -459,9 +463,18 @@ const ERA_TYPES = {
   kontakt_1:       { ke: 20,  heat: 300 },
   kontakt_5:       { ke: 135, heat: 525 },
   kontakt_5_light: { ke: 65,  heat: 350 },
-/* Kaktus / 4S24 軟殼爆反：裝藥僅 K1 一半、飛板薄 → 無抗 KE 增益；
-   heat 470 使 bmp3m 五個掛載部位 base+470 落在實測 500~550mm 區間。 */
-kaktus: { ke: 0, heat: 470 }
+/* Kaktus / 4S24：結構鋼背板 + 間隙裝甲 + 軟殼爆反磚的複合模組。
+   heat 500 = 模組自身抗破額定（NII Stali / Kalashnikov 公開：Alabino 靶場
+   以 PG-7VS（>400mm RHA）90° 法線射擊模組＋模擬車體板，射流完全切斷、
+   背板未穿、僅 2~5mm 彈坑，確認不低於 500mm RHA）。
+   ★ 此值是模組獨立性能，不是 BMP-3 整車實測 —— 舊註解「base+470 回代
+   500~550」建立在錯誤前提上，已撤回。
+   ke 12 = 結構鋼背板／間隙裝甲的邊際貢獻（工程估值，非公開值）。
+   上限由「不抵禦 APDS」反推：base<65 的面（最大炮塔側 45）加 ke 後
+   仍須 <65（30mm APDS）→ ke < 20。首上 70／炮塔正 65 本就 ≥65，與 ERA 無關。
+   B-32(32) / 23mm API-T / 3UBR6(40) 已由 base 40~70 涵蓋，不需 ERA 增益。
+   <30mm 不引爆的免疫閾值不另實作：該級威脅穿深 ≤32，早被 base 擋掉。 */
+kaktus: { ke: 12, heat: 500 }
 };
 
 /* [v206] 載具武器真實彈速（m/s） */
