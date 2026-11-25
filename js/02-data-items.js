@@ -77,12 +77,12 @@ const WEAPONS={
   '6kh2':{name:'6Kh2 刺刀',slot:'melee',type:'刺刀',dmg:25,penMM:3,modes:['近戰'],rpm:120,range:0.15},
   '6kh5':{name:'6Kh5 刺刀',slot:'melee',type:'刺刀',dmg:26,penMM:3,modes:['近戰'],rpm:120,range:0.15},
   kukri:{name:'Kukri 彎刀',slot:'melee',type:'刀',dmg:32,penMM:3,modes:['近戰'],rpm:100,range:0.18},
-  f1:{name:'F-1 手榴彈',slot:'throwable',type:'手榴彈',dmg:16,fragments:90,fragmentDamage:16,allFragmentsOnSingle:false,penMM:15,modes:['投擲'],rpm:60,range:0.6,explosive:true},
-  rgd5:{name:'RGD-5 手榴彈',slot:'throwable',type:'手榴彈',dmg:12,fragments:70,fragmentDamage:12,allFragmentsOnSingle:false,penMM:15,modes:['投擲'],rpm:60,range:0.5,explosive:true},
-  rgo:{name:'RGO 手榴彈',slot:'throwable',type:'手榴彈',dmg:20,fragments:85,fragmentDamage:20,allFragmentsOnSingle:false,penMM:15,modes:['投擲'],rpm:60,range:0.6,explosive:true},
-  rgn:{name:'RGN 手榴彈',slot:'throwable',type:'手榴彈',dmg:18,fragments:75,fragmentDamage:18,allFragmentsOnSingle:false,penMM:15,modes:['投擲'],rpm:60,range:0.6,explosive:true},
-  vog17:{name:'VOG-17 手榴彈',slot:'throwable',type:'手榴彈',dmg:15,fragments:100,fragmentDamage:15,allFragmentsOnSingle:false,penMM:15,modes:['投擲'],rpm:60,range:0.55,explosive:true},
-  vog25:{name:'VOG-25 手榴彈',slot:'throwable',type:'手榴彈',dmg:16,fragments:35,fragmentDamage:16,allFragmentsOnSingle:true,penMM:15,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+  f1:{name:'F-1 手榴彈',slot:'throwable',type:'手榴彈',dmg:16,fragments:300,fragmentDamage:16,fuze:'delay',penMM:15,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  rgd5:{name:'RGD-5 手榴彈',slot:'throwable',type:'手榴彈',dmg:12,fragments:350,fragmentDamage:12,fuze:'delay',penMM:15,modes:['投擲'],rpm:60,range:0.5,explosive:true},
+  rgo:{name:'RGO 手榴彈',slot:'throwable',type:'手榴彈',dmg:20,fragments:600,fragmentDamage:20,fuze:'impact',penMM:15,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  rgn:{name:'RGN 手榴彈',slot:'throwable',type:'手榴彈',dmg:18,fragments:600,fragmentDamage:18,fuze:'impact',penMM:15,modes:['投擲'],rpm:60,range:0.6,explosive:true},
+  vog17:{name:'VOG-17 手榴彈',slot:'throwable',type:'手榴彈',dmg:15,fragments:300,fragmentDamage:15,fuze:'impact',penMM:15,modes:['投擲'],rpm:60,range:0.55,explosive:true},
+  vog25:{name:'VOG-25 手榴彈',slot:'throwable',type:'手榴彈',dmg:16,fragments:35,fragmentDamage:16,fuze:'impact',penMM:15,modes:['投擲'],rpm:60,range:0.55,explosive:true},
 
 /* ===== rev-rpg-tier: 五級火箭筒（敵方專用） =====
    slot:'rpg' —— 不在 primary/secondary/melee/throwable 任何玩家可裝備欄，
@@ -234,13 +234,10 @@ const WEAPON_MOD_RULES={
   pkp:{mags:[],scopes:['1P87','PSO-1'],grips:['RK-1']},ash12:{mags:[10,20],scopes:['1P87','PS320'],grips:['RK-1']},pp19:{mags:[],scopes:[],grips:[]},
   pm:{mags:[],scopes:[],grips:[]},pb:{mags:[],scopes:[],grips:[]},mp443:{mags:[],scopes:[],grips:[]},aps:{mags:[],scopes:[],grips:[]},saiga12:{mags:[5,10,20],scopes:['1P87'],grips:[]},
 };
-const SCOPE_BONUS = { '1P87': 0, 'PSO-1': 0, 'PS320': 0, 'EKP-8-02': 0, 'PK-06': 0, '1P59': 0 };
-/* rev-workbench: 瞄具距離加成 / 握把命中加成 */
+/* rev-mod-truth: 瞄具距離加成（命中加成已廢，見 _modEffects） */
 const SCOPE_RANGE_BONUS = { '1P87': 0.20, 'PSO-1': 0.50, 'PS320': 0.50, '1P59': 0.80 };
-const GRIP_HIT_BONUS = 6;
 /* rev-scope-sort: 瞄具排序唯一真相源 —— 一律按「射程增益」由小到大。
-   SCOPE_BONUS（命中）目前全為 0，用它排序會退化成不穩定的原始順序，
-   造成不同槍枝的選單順序不一致。同值時以顯示名稱穩定排序。 */
+   同值時以顯示名稱穩定排序，避免不同槍枝的選單順序不一致。 */
 window._scopeRangeBonus = function(id){
   return (typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[id]) || 0;
 };
@@ -252,12 +249,6 @@ window._sortScopesAsc = function(a, b){
   return String(na).localeCompare(String(nb), 'zh-Hant');
 };
 
-/* rev-fix-scope-mode-penalty: 高倍鏡連射精度懲罰（乘在 MODE_ACCURACY 上） */
-const SCOPE_MODE_PENALTY = {
-  'PSO-1': { '掃射': 0.5, '長點射': 0.75, '短點射': 0.9, '點射': 1.0 },
-  'PS320': { '掃射': 0.5, '長點射': 0.75, '短點射': 0.9, '點射': 1.0 },
-  '1P59':  { '掃射': 0.3, '長點射': 0.6, '短點射': 0.8, '點射': 1.0 }
-};
 const GRIP_NAME = { 'RK-1': 'RK-1 戰術握把' };
 /* rev-fix-grip-map: id 短碼映射（display 用原名，id 用短碼） */
 const GRIP_ID_SHORT = { 'RK-1': 'g' };
@@ -584,11 +575,7 @@ function getOrCreateNamedItem(baseId,mag,scope,grip){
     const baseRange=(typeof WEAPON_COMBAT_RANGE!=='undefined'&&WEAPON_COMBAT_RANGE[base.type])||15;
     const scopeRangeMult=scope?((typeof SCOPE_RANGE_BONUS!=='undefined'&&SCOPE_RANGE_BONUS[scope])||0):0;
     const combatRange=Math.round(baseRange*(1+scopeRangeMult)*100)/100;
-    /* rev-fix-grip-hit: 握把命中加成写入 scopeBonus（原代码从未生效） */
-    const scopeHit=(scope&&typeof SCOPE_BONUS!=='undefined')?(SCOPE_BONUS[scope]||0):0;
-    const gripHit=(grip&&typeof GRIP_HIT_BONUS!=='undefined')?GRIP_HIT_BONUS:0;
-    const totalHitBonus=scopeHit+gripHit;
-    ALL_ITEMS[id]={name:name,slot:base.slot,type:base.type,cal:base.cal,mag:effMag,modes:base.modes,rpm:base.rpm,range:base.range,named:true,scope:scope||null,scopeBonus:totalHitBonus,baseId:baseId,grip:grip||null,combatRange:combatRange};
+    ALL_ITEMS[id]={name:name,slot:base.slot,type:base.type,cal:base.cal,mag:effMag,modes:base.modes,rpm:base.rpm,range:base.range,named:true,scope:scope||null,baseId:baseId,grip:grip||null,combatRange:combatRange};
   }
   return id;
 }
@@ -745,3 +732,74 @@ function armorMMForSlot(id, slot){
   }
 })();
 
+
+/* ===== rev-aim-data:start ===== */
+/* 命中模型資料 —— 誤差源拆分，不再全部壓成 hr。
+   機械散佈：武器自身精度，與射手熟練無關（mrad, 1σ）。
+   瞄具：aimMult 同時改善瞄準點與角精度；rangeErrMult 改善測距；
+         burstMult 高倍鏡連射恢復更差。握把：只降後坐，第一發不變。
+   舊 SCOPE_BONUS / GRIP_HIT_BONUS / SCOPE_MODE_PENALTY / MODE_ACCURACY
+   不再進入命中路徑（保留供存檔遷移與 UI 顯示）。 */
+const WEAPON_DISPERSION_MRAD = {
+  'sv98':0.10, 'svd':0.25, 'asval':0.40, 'vss':0.40, 'ak74':0.50, 'aks74':0.55,
+  'ak74m':0.45, 'ak12':0.40, 'rpk16':0.55, 'rpk':0.70, 'rpd':0.80, 'pkm':0.75,
+  'pkp':0.70, 'aps':1.00, 'ash12':0.60, 'saiga':0.50
+};
+const WEAPON_TYPE_DISPERSION_MRAD = {
+  '手槍':1.0, '衝鋒槍':0.7, '突擊步槍':0.5, '機槍':0.8, '狙擊槍':0.25,
+  '霰彈槍':0.5, '火箭筒':5.0, '近戰':0, '投擲':2.0
+};
+const SCOPE_AIM_MULT      = { '1P87':0.85, 'EKP-8-02':0.85, 'PK-06':0.85, 'PSO-1':0.70, 'PS320':0.70, '1P59':0.55 };
+const SCOPE_RANGE_ERR_MULT= { '1P87':1.00, 'EKP-8-02':1.00, 'PK-06':1.00, 'PSO-1':0.60, 'PS320':0.60, '1P59':0.40 };
+const SCOPE_BURST_MULT    = { '1P87':1.00, 'EKP-8-02':1.00, 'PK-06':1.00, 'PSO-1':1.30, 'PS320':1.30, '1P59':1.80 };
+const GRIP_RECOIL_MULT    = { 'RK-1':0.80 };
+const MODE_BURST_MULT     = { '點射':1.0, '短點射':1.1, '長點射':1.3, '掃射':1.6, '近戰':1.0, '投擲':1.0 };
+window.WEAPON_DISPERSION_MRAD = WEAPON_DISPERSION_MRAD;
+window.WEAPON_TYPE_DISPERSION_MRAD = WEAPON_TYPE_DISPERSION_MRAD;
+window.SCOPE_AIM_MULT = SCOPE_AIM_MULT;
+window.SCOPE_RANGE_ERR_MULT = SCOPE_RANGE_ERR_MULT;
+window.SCOPE_BURST_MULT = SCOPE_BURST_MULT;
+window.GRIP_RECOIL_MULT = GRIP_RECOIL_MULT;
+window.MODE_BURST_MULT = MODE_BURST_MULT;
+/* ===== rev-aim-data:end ===== */
+
+/* ===== rev-mod-truth:start ===== */
+/* 配件效果唯一真相源 —— 面板列出的每一項都對應 09 命中模型實際讀取的係數。
+   舊制 SCOPE_BONUS（值全 0）與 GRIP_HIT_BONUS（+6）經 scopeBonus 傳進
+   getHitRate 第 3 參數，但 hr 純化後該參數已被忽略 —— 面板顯示的加成不存在。
+   真正生效的是下列係數（見 09 _aimMults / _calcWeaponScatter3D）：
+     SCOPE_RANGE_BONUS    → 可交戰距離（_rangeOfWeaponDef）
+     SCOPE_AIM_MULT       → σ_aim 與 σ_shooter 同乘（放大倍率的物理作用）
+     SCOPE_RANGE_ERR_MULT → 測距誤差 → 領前誤差
+     SCOPE_BURST_MULT     → 後坐累積（>1 = 連射恢復更差，是高倍鏡的代價）
+     GRIP_RECOIL_MULT     → 後坐累積（<1 = 連射更穩，第一發不變）
+   只列實際生效者：係數等於 1 的項目不出現，避免「+0%」這種假資訊。
+   查表 lexical 優先 —— 這些是 02 的頂層 const，不掛 window。 */
+window._modEffects = function(scope, grip){
+  var out = [];
+  var RB = (typeof SCOPE_RANGE_BONUS !== 'undefined') ? SCOPE_RANGE_BONUS : window.SCOPE_RANGE_BONUS;
+  var AM = (typeof SCOPE_AIM_MULT !== 'undefined') ? SCOPE_AIM_MULT : window.SCOPE_AIM_MULT;
+  var RE = (typeof SCOPE_RANGE_ERR_MULT !== 'undefined') ? SCOPE_RANGE_ERR_MULT : window.SCOPE_RANGE_ERR_MULT;
+  var BM = (typeof SCOPE_BURST_MULT !== 'undefined') ? SCOPE_BURST_MULT : window.SCOPE_BURST_MULT;
+  var GR = (typeof GRIP_RECOIL_MULT !== 'undefined') ? GRIP_RECOIL_MULT : window.GRIP_RECOIL_MULT;
+  if(scope){
+    var rb = (RB && typeof RB[scope] === 'number') ? RB[scope] : 0;
+    if(rb > 0) out.push('射程 +' + Math.round(rb*100) + '%');
+    var am = (AM && typeof AM[scope] === 'number') ? AM[scope] : 1;
+    if(am < 1) out.push('瞄準 −' + Math.round((1-am)*100) + '%');
+    var re = (RE && typeof RE[scope] === 'number') ? RE[scope] : 1;
+    if(re < 1) out.push('測距 −' + Math.round((1-re)*100) + '%');
+    var bm = (BM && typeof BM[scope] === 'number') ? BM[scope] : 1;
+    if(bm > 1) out.push('連射恢復 +' + Math.round((bm-1)*100) + '%');
+  }
+  if(grip){
+    var gr = (GR && typeof GR[grip] === 'number') ? GR[grip] : 1;
+    if(gr < 1) out.push('後坐 −' + Math.round((1-gr)*100) + '%');
+  }
+  return out;
+};
+window._modEffectText = function(scope, grip){
+  var a = window._modEffects(scope, grip);
+  return a.length ? a.join(' · ') : '無加成';
+};
+/* ===== rev-mod-truth:end ===== */

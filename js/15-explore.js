@@ -1891,29 +1891,18 @@ function renderZone3Log(){
   const logs = state.logs.filter(function(l){ return l.type !== 'combat'; }).slice(-60);
   for(const l of logs){
     const line = document.createElement('div');
-    line.className = 'logline';
+    /* rev-log-unify: 可點性／title／開啟動作改走 14 共用 helper，cursor 走 class */
+    const act = (typeof _logActionable === 'function') ? _logActionable(l) : false;
+    line.className = 'logline' + (act ? ' clickable' : '');
     line.innerHTML = '<span class="tm">' + fmtTime(l.t) + '</span> ' + l.html;
-    if(l.type === 'offline' && l.items && l.items.length){
-      line.style.cursor = 'pointer';
-      line.title = '點擊檢視獲得物資';
-      line.onclick = (function(entry){ return function(){ openOfflineDetail(entry); }; })(l);
-    }
-    if(l.type === 'btr'){
-      line.style.cursor = 'pointer';
-      line.title = '點擊檢視支援報告';
-      line.onclick = (function(entry){ return function(){ if(typeof window._openBTRSupportDetail === 'function') window._openBTRSupportDetail(entry); }; })(l);
-    }
-    if(l.type === 'vehicle_destroyed'){
-      line.style.cursor = 'pointer';
-      line.title = '點擊檢視擊毀報告';
-      line.onclick = (function(entry){ return function(){ if(typeof window._openVehicleDestroyedDetail === 'function') window._openVehicleDestroyedDetail(entry); }; })(l);
+    if(act){
+      line.title = (typeof _logTitle === 'function') ? _logTitle(l) : '';
+      line.onclick = (function(entry){ return function(){ if(typeof _logOpenDetail === 'function') _logOpenDetail(entry); }; })(l);
     }
     box.appendChild(line);
   }
   box.scrollTop = box.scrollHeight;
-}
-
-window.renderZone3Log = renderZone3Log;
+}window.renderZone3Log = renderZone3Log;
 
 window.renderExplore = function(){
   const z1 = document.getElementById('zone1');

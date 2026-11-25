@@ -43,8 +43,7 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
       const d = ARMOR[id];
       if(d && d.level) armorLevel = Math.max(armorLevel, d.level);
     }
-    const scopeBonus = (g.weaponDef && g.weaponDef.scopeBonus) || 0;
-    const hitRate = servantHitRate(s, '點射', scopeBonus, (g.weaponDef && g.weaponDef.scope) || null);
+        const hitRate = servantHitRate(s);
     const ammoId = g.ammoId;
     const ammoRarity = g.ammoRarity || '一般';
     const critRate = servantCritRate(g.weaponRarity, ammoRarity);
@@ -125,28 +124,49 @@ function _gardenRaidSimulateOffline(guards, region, enemies){
     else _chainMode = '掃射';
     let _hrVal;
     if(fromU.isGuard){
-      const _scopeB = (fromU.weaponDef && fromU.weaponDef.scopeBonus) || 0;
-      _hrVal = (typeof servantHitRate === 'function') ? servantHitRate(fromU.srv, _chainMode, _scopeB, (fromU.weaponDef && fromU.weaponDef.scope) || null) : fromU.hitRate;
+            _hrVal = (typeof servantHitRate === 'function') ? servantHitRate(fromU.srv) : fromU.hitRate;
     } else {
-      const _modeMult = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[_chainMode]) || 1.0;
-      _hrVal = 55 * _modeMult;
+      /* rev-hr-pure-raid: 模式係數已由 09 burstMult 表達，不再乘。 */
+      _hrVal = 55;
     }
     _simTime += SIM_SHOT_INTERVAL_MS;
 /* 幾何判定：與線上同一套（aimY + 連射累積 + Y/Z 散佈 → 高度段部位）
    不再用額外 random 判命中 —— scatter3D 已按 hr 標定通過率。 */
 var _raidPart = "top";
 {
+/* rev-raid-offline-geom: 與線上同一條幾何 —— 交戰距離 → 角散佈 → slab 求交，
+   部位由實際入射高度決定。舊版三處與線上分歧：
+     缺 opts.dist（距離軸恆 15m）、矩形閘門 |z|>D/2（非真實輪廓）、
+     部位取 aimY 比例（非 hit.y）。
+   離線無 worldX：以目標為原點、攻擊者置於 -交戰距離，幾何等價。
+   交戰距離 = min(自身射程, 目標可被發現半徑) —— 來襲方走到自身射程即停。 */
 var _boxR = (typeof window._getTargetBox === "function") ? window._getTargetBox(toU) : null;
-var _HR = (_boxR && _boxR.H > 0) ? _boxR.H : 1.7;
-var _DR = (_boxR && _boxR.D > 0) ? _boxR.D : 0.5;
+if(!_boxR) _boxR = { L:0.5, H:1.7, D:0.5, yFoot:0 };
 var _widR = fromU.weaponId || (fromU.weaponDef && fromU.weaponDef.id) || null;
+var _wdR = fromU.weaponDef || ((typeof WEAPONS !== "undefined" && _widR) ? WEAPONS[_widR] : null);
+var _rngR = (typeof _rangeOfWeaponDef === "function" && _wdR) ? _rangeOfWeaponDef(_wdR) : 15;
+var _sdR = (typeof SERVANT_DETECTABLE_R === "number") ? SERVANT_DETECTABLE_R : 80;
+var _edR = (typeof ENEMY_DETECTABLE_R !== "undefined" && ENEMY_DETECTABLE_R[toU.rarity]) ? ENEMY_DETECTABLE_R[toU.rarity] : 225;
+var _detR = toU.isGuard ? _sdR : _edR;
+var _distR = Math.max(0.5, Math.min(_rngR, _detR));
 var _bfR = (typeof window._getWeaponBurstFactor === "function") ? window._getWeaponBurstFactor(_widR, null) : 0.08;
 var _aimR = (typeof window._getWeaponAimY === "function") ? window._getWeaponAimY(_widR, fromU.ammoId, null) : 0.85;
-var _scR = window._calcWeaponScatter3D(15, _hrVal, _cn, _bfR, { H:_HR, D:_DR }, 1);
-var _yR = _aimR + (_scR.sy || 0);
-var _zR = _scR.sz || 0;
-if(_yR < 0 || _yR > _HR || Math.abs(_zR) > _DR / 2) return;
-if(typeof window._partFromYRatio === "function") _raidPart = window._partFromYRatio(_yR / _HR);
+var _tfR = Math.max(0.05, (_distR - _boxR.L/2)/_distR);
+var _scR = window._calcWeaponScatter3D(_rngR, _hrVal, _cn, _bfR, _boxR, _tfR,
+  { weaponId:_widR, weaponType:(_wdR && _wdR.type) || null, scope:(_wdR && _wdR.scope) || null, platform:"handheld", dist:_distR });
+var _footR = (typeof _boxR.yFoot === "number") ? _boxR.yFoot : 0;
+var _hitR = (typeof window._raySegFrontFace === "function")
+  ? window._raySegFrontFace(-_distR, 1.3, 0, 0, _footR + _aimR + (_scR.sy || 0), (_scR.sz || 0), 0, _boxR, toU)
+  : null;
+if(!_hitR) return;
+if(!toU.isVehicle && !toU.isBoss && typeof window._humanSilhouetteBands === "function"){
+  var _sbR = window._humanSilhouetteBands(), _kR = _boxR.H/1.7;
+  for(var _biR = 0; _biR < _sbR.length; _biR++){
+    if(_hitR.y >= _footR + _sbR[_biR].y0*_kR && _hitR.y < _footR + _sbR[_biR].y1*_kR){ _raidPart = _sbR[_biR].part; break; }
+  }
+} else if(typeof window._partFromYRatio === "function"){
+  _raidPart = window._partFromYRatio((_hitR.y - _footR)/_boxR.H);
+}
 }
     /* rev-fix-attack-unify: 統一結算 */
     let atkInfo;
@@ -207,22 +227,31 @@ if(typeof window._partFromYRatio === "function") _raidPart = window._partFromYRa
       var _simFireRes = (typeof _enemyTryFire === 'function') ? _enemyTryFire(e, _simTime) : null;
       if(!_simFireRes || !_simFireRes.ok) continue;
       if(_simFireRes.melee){
-        /* 近战简化：固定命中，直接扣 HP */
+        /* rev-melee-geom: 與線上同一條幾何。離線無 worldX → 以目標為原點、
+           攻擊者置於 -近戰射程，幾何等價。舊版固定 0.55×MODE_ACCURACY 機率。 */
         const _curW = _simFireRes.weapon;
         const _mDef = (typeof WEAPONS !== 'undefined' && _curW.id) ? WEAPONS[_curW.id] : null;
         if(!_mDef) continue;
-        const _mModeMult = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY['近戰']) || 1.0;
-        if(Math.random() < 0.55 * _mModeMult){
+        const _mRng = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(_mDef) : 0.75;
+        const _mT = aliveTargets[Math.floor(Math.random() * aliveTargets.length)];
+        var _msM = (_mT && typeof window._meleeStrike === 'function')
+          ? window._meleeStrike(-_mRng, _mT, { weaponId:_curW.id, weaponType:'近戰', hr:55, range:_mRng, dist:_mRng })
+          : null;
+        if(_msM){
           const _mdmg = Math.round((_mDef.dmg || 25) * ((typeof RARITY_MULT !== 'undefined' && RARITY_MULT[e.rarity]) || 1));
-          const _mT = aliveTargets[Math.floor(Math.random() * aliveTargets.length)];
           const _mProxy = { hp: _mT.hp, armor: _mT.armor || 0 };
-          applyDamage(_mProxy, _mdmg, _mDef.penMM || 3, {
-            armorProvider: function(part){
-              if(part === 'head' || part === 'face'){ const h2 = _mT.equipped && _mT.equipped.head; return h2 ? armorMMForSlot(h2, part) : 0; }
-              if(part === 'top'){ const t3 = _mT.equipped && _mT.equipped.top; return t3 ? armorMMForSlot(t3, 'top') : 0; }
-              return 0;
-            }
-          });
+          var _ctxM = window._hitCtx;
+          window._hitCtx = { target:_mProxy, part:_msM.part, face:_msM.face, x:_msM.x, y:_msM.y, z:_msM.z, isDirect:true, melee:true };
+          try {
+            applyDamage(_mProxy, _mdmg, _mDef.penMM || 3, {
+              part: _msM.part,
+              armorProvider: function(part){
+                if(part === 'head' || part === 'face'){ const h2 = _mT.equipped && _mT.equipped.head; return h2 ? armorMMForSlot(h2, part) : 0; }
+                if(part === 'top'){ const t3 = _mT.equipped && _mT.equipped.top; return t3 ? armorMMForSlot(t3, 'top') : 0; }
+                return 0;
+              }
+            });
+          } finally { window._hitCtx = _ctxM; }
           _mT.hp = _mProxy.hp;
           if(_mT.armor !== undefined) _mT.armor = _mProxy.armor;
           if(_mT.hp <= 0) _mT.alive = false;
@@ -695,8 +724,7 @@ function _gardenRaidShowBattle(guards, enemies, region){
         const d = ARMOR[id];
         if(d && d.level) armorLevel = Math.max(armorLevel, d.level);
       }
-      const scopeBonus = g.weaponDef.scopeBonus || 0;
-      const hitRate = (typeof servantHitRate === 'function') ? servantHitRate(s, '點射', scopeBonus, (g.weaponDef && g.weaponDef.scope) || null) : 20;
+            const hitRate = (typeof servantHitRate === 'function') ? servantHitRate(s) : 20;
       const ammoId = g.ammoId || cfg.ammoId;
       const ammoRarity = g.ammoRarity || (ammoId ? ((AMMO[ammoId] && AMMO[ammoId].rarity) || '一般') : '一般');
       const critRate = (typeof servantCritRate === 'function') ? servantCritRate(g.weaponRarity, ammoRarity) : 0.1;
@@ -1086,7 +1114,8 @@ const _penMM = (typeof e.rpgPenMM === 'number' && e.rpgPenMM > 0) ? e.rpgPenMM :
         _nearbyList.push({ target: g, worldX: (typeof g.worldX === 'number') ? g.worldX : 0 });
       }
       window._raidRpgSplash(target, _rpgWX, _nearbyList, dmg, CHAR_PX, {
-        maxR: 8, blastPen: 18, splashRatio: 0.35,
+        maxR: 8, ammoId: _aId,
+crit: { rate: (typeof calcCritRate === 'function') ? calcCritRate(_rar, _aRar) : 0.1, mult: (typeof calcCritMult === 'function') ? calcCritMult(_rar, _aRar) : 1.5 },
         armorProviderFn: function(g){
           return function(part){
             if(part === 'head' || part === 'face'){
@@ -1443,9 +1472,8 @@ _raidPart = window._partFromYRatio(b.impactWY / _hR);
             target = alive[0];
           }
           const _gMode = (typeof _getFireChainMode === 'function') ? _getFireChainMode(g) : '點射';
-          const _gScopeBonus = (g.weaponDef && g.weaponDef.scopeBonus) || 0;
-          const _gHitRate = (typeof servantHitRate === 'function')
-            ? servantHitRate(g.srv, _gMode, _gScopeBonus, (g.weaponDef && g.weaponDef.scope) || null)
+                    const _gHitRate = (typeof servantHitRate === 'function')
+            ? servantHitRate(g.srv)
             : (g.hitRate || 20);
           spawnBullet(g, target, _gHitRate, false);
           g.nextFireAt = now + Math.max(120, 60000 / g.rpm);
@@ -1485,37 +1513,44 @@ _raidPart = window._partFromYRatio(b.impactWY / _hR);
 if(_curW && _curW.id){ e.weaponId = _curW.id; e.ammoId = _curW.ammoId || null; e.weaponDef = (typeof WEAPONS !== 'undefined') ? WEAPONS[_curW.id] : null; }
           if(!_curW) continue;
           if(_eFireRes.melee){
-            /* 近战 */
+            /* rev-melee-geom: 與探索同一條幾何（09 _meleeStrike）。
+               舊版固定 0.55×MODE_ACCURACY 機率、且完全無射程閘門 ——
+               敵人可對 40m 外的守衛揮刀。此處補閘門並改幾何判定。 */
             var _mDef = (typeof WEAPONS !== 'undefined' && _curW.id) ? WEAPONS[_curW.id] : null;
             if(!_mDef) continue;
-            const _mModeMult = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY['近戰']) || 1.0;
-            const _mhc = 0.55 * _mModeMult;
-            const _mhit = Math.random() < _mhc;
-            if(_mhit){
+            var _mTargets = guardUnits.filter(function(g){ return g.alive; });
+            _mTargets.sort(function(a, b){ return Math.abs(a.worldX - _eWX) - Math.abs(b.worldX - _eWX); });
+            var _mT = _mTargets[0] || null;
+            var _mRng = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(_mDef) : 0.75;
+            var _msM = (_mT && Math.abs(_mT.worldX - _eWX) <= _mRng && typeof window._meleeStrike === 'function')
+              ? window._meleeStrike(e.worldX, _mT, { weaponId:_curW.id, weaponType:'近戰', hr:55, range:_mRng })
+              : null;
+            if(_msM){
               const _mdmg = Math.round((_mDef.dmg || 25) * ((typeof RARITY_MULT !== 'undefined' && RARITY_MULT[e.rarity]) || 1));
               const _mpen = _mDef.penMM || 3;
-              var _mTargets = guardUnits.filter(function(g){ return g.alive; });
-              if(_mTargets.length){
-                _mTargets.sort(function(a, b){ return Math.abs(a.worldX - _eWX) - Math.abs(b.worldX - _eWX); });
-                var _mT = _mTargets[0];
-                var _mProxy = { hp: _mT.hp, armor: _mT.armor || 0 };
-                var _mRes = applyDamage(_mProxy, _mdmg, _mpen, {
+              var _mProxy = { hp: _mT.hp, armor: _mT.armor || 0 };
+              var _ctxM = window._hitCtx;
+              window._hitCtx = { target:_mProxy, part:_msM.part, face:_msM.face, x:_msM.x, y:_msM.y, z:_msM.z, isDirect:true, melee:true };
+              var _mRes;
+              try {
+                _mRes = applyDamage(_mProxy, _mdmg, _mpen, {
+                  part: _msM.part,
                   armorProvider: function(part){
                     if(part === 'head' || part === 'face'){ const h2 = _mT.equipped && _mT.equipped.head; return h2 ? armorMMForSlot(h2, part) : 0; }
                     if(part === 'top'){ const t3 = _mT.equipped && _mT.equipped.top; return t3 ? armorMMForSlot(t3, 'top') : 0; }
                     return 0;
                   }
                 });
-                _mT.hp = _mProxy.hp;
-                if(_mT.armor !== undefined) _mT.armor = _mProxy.armor;
-                var _mShown = _mRes.hpLost > 0 ? _mRes.hpLost : _mRes.armorLost;
-                if(_mShown > 0){
-                  damageTexts.push({ x: _mT.x, y: _mT.y - CHAR_PX - 18, text: '-' + _mShown, crit: false, isEnemy: true, startTime: Date.now() });
-                }
-                if(_mT.hp <= 0){
-                  _mT.alive = false;
-                  if(_mT.srv){ _mT.srv.hp = 0; _mT.srv.injuredUntil = Date.now() + 4 * 3600 * 1000; _mT.srv._injuredDown = true; }
-                }
+              } finally { window._hitCtx = _ctxM; }
+              _mT.hp = _mProxy.hp;
+              if(_mT.armor !== undefined) _mT.armor = _mProxy.armor;
+              var _mShown = _mRes.hpLost > 0 ? _mRes.hpLost : _mRes.armorLost;
+              if(_mShown > 0){
+                damageTexts.push({ x: _mT.x, y: _mT.y - CHAR_PX - 18, text: '-' + _mShown, crit: false, isEnemy: true, startTime: Date.now() });
+              }
+              if(_mT.hp <= 0){
+                _mT.alive = false;
+                if(_mT.srv){ _mT.srv.hp = 0; _mT.srv.injuredUntil = Date.now() + 4 * 3600 * 1000; _mT.srv._injuredDown = true; }
               }
             }
             e.animName = 'walk';
@@ -1534,8 +1569,8 @@ if(_curW && _curW.id){ e.weaponId = _curW.id; e.ammoId = _curW.ammoId || null; e
           const target = alive[0];
           const _effMode = _getFireChainMode(e);
           const _hb = 0.55;
-          const _modeMult = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[_effMode]) || 1.0;
-          const hc = _hb * _modeMult;
+          /* rev-hr-pure-raid: 同上，模式係數不再於此乘。 */
+const hc = _hb;
           spawnBullet(e, target, hc * 100, true);
           e.nextFireAt = now + Math.max(200, 60000 / e.rpm);
         }

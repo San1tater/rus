@@ -1329,7 +1329,6 @@ battleHeroAnim.forcedEnd = performance.now() + 350;
 }
 }
 const _effectiveMode = (typeof _getFireChainMode === 'function') ? _getFireChainMode(battle) : (battle.fireMode || '點射');
-const isWeak = isWeakPointHit();
 /* ═══ rev-bossbox: 槍彈走統一武器核心（aimY/aimZ 幾何瞄準 + 散佈 → 部位） ═══ */
 if(def.cal){
 if(battle.ammoInMag <= 0){ triggerReload(); return false; }
@@ -1339,7 +1338,7 @@ const mz = getPlayerMuzzlePos();
 const _fxElB = document.getElementById('battle-fx');
 if(window.MuzzleFX) window.MuzzleFX.spawn(mz.x*(_fxElB?_fxElB.clientWidth:400), mz.y*(_fxElB?_fxElB.clientHeight:500), w.def.type==='機槍'?1.2:1.0, false, 'boss');
 const _spd = (window.AMMO_SPEED_MS && window.AMMO_SPEED_MS[def.cal]) || 800;
-const hitRate = getHitRate(def.type, _effectiveMode, def.scopeBonus || 0, def.scope);
+const hitRate = getHitRate(def.type);
 const _aRef = battle.ammoRef;
 const ammoPenMM = _aRef ? (AMMO[_aRef.id].penMM || 0) : 0;
 const pellets = _aRef ? (AMMO[_aRef.id].pellets || 1) : 1;
@@ -1423,60 +1422,48 @@ if(battle.weaponStates[battle.weaponSlot]) battle.weaponStates[battle.weaponSlot
 }
 /* rev-bossbox: 手雷 = 探索同一條鏈（真實拋物線 + casualtyRadius + 覆蓋引擎） */
 if(def.slot === 'throwable' && def.explosive && (def.fragments || 0) > 0){
-const _hitRate = getHitRate(def.type, battle.fireMode) + 10;
-const _pdB = 0.6 + clamp(Math.floor(state.proficiency[def.type] || 0) / MAX_PROF_LEVEL, 0, 1) * 0.9;
-const _amAnim = GAME_ANIMS.attack_melee;
-const _RELEASE_FRAME = 5;
-const _releaseDelay = _amAnim ? Math.round(_RELEASE_FRAME / _amAnim.fps * 1000) : 357;
-const _releaseAt = performance.now() + _releaseDelay;
-const _hand = _getBossThrowHandPosAtFrame(_RELEASE_FRAME);
-const _m = (typeof window._bossScreenMetrics === 'function') ? window._bossScreenMetrics() : {H:500,ppm:100,px:0.25,srw:4.2};
-const H0 = Math.max(0.2, (1 - _hand.y) * _m.H / _m.ppm);
-const _wsx = battle.playerWorldX + (_hand.x - _m.px) / (1 - _m.px) * _m.srw;
-const _aimM = (typeof window._bossAimMeters === 'function') ? window._bossAimMeters() : {aimWX:battle.bossWorldX};
-const _aimWX = (typeof _aimM.aimWX === 'number') ? _aimM.aimWX : battle.bossWorldX;
-const _dist = Math.max(0.01, Math.abs(_aimWX - _wsx));
-const _params = (typeof _calcGrenadeParams === 'function') ? _calcGrenadeParams(_dist, w.id, H0) : null;
-if(!_params) return false;
-const _dir = (_aimWX >= _wsx) ? 1 : -1;
-const _landWX = _wsx + _dir * _params.vx * _params.T;
-const _txN = _m.px + (_landWX - battle.playerWorldX) / _m.srw * (1 - _m.px);
-const _gDef = def, _gRar = w.rarity || '一般', _gW = w;
-{
-      /* rev-sweepcore: 手雷 = 探索 _playerThrowGrenade 同源資料（_calcGrenadeParams / _handYToH0） */
-      const _hS = _getBossThrowHandPosAtFrame(5);
-      const _mS = (typeof window._bossScreenMetrics === 'function') ? window._bossScreenMetrics() : { H:500, ppm:100, px:0.25, srw:4.2 };
-      const _H0S = (typeof _handYToH0 === 'function') ? _handYToH0(_hS.y) : Math.max(0.05, (0.95 - _hS.y) * _mS.H / _mS.ppm);
-      const _wsxS = battle.playerWorldX + (_hS.x - _mS.px) / (1 - _mS.px) * _mS.srw;
-      const _aimS = (typeof window._bossAimMeters === 'function') ? window._bossAimMeters() : { aimWX: battle.bossWorldX };
-      const _aimWXS = (typeof _aimS.aimWX === 'number') ? _aimS.aimWX : battle.bossWorldX;
-      const _distS = Math.max(0.01, Math.abs(_aimWXS - _wsxS));
-      const _parS = (typeof _calcGrenadeParams === 'function') ? _calcGrenadeParams(_distS, w.id, _H0S) : null;
-      if(_parS){
-        const _dirS = (_aimWXS >= _wsxS) ? 1 : -1;
-        const _landS = _wsxS + _dirS * _parS.vx * _parS.T;
-        const _amS = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.attack_melee) ? GAME_ANIMS.attack_melee : null;
-        const _relS = performance.now() + (_amS ? Math.round(5 / _amS.fps * 1000) : 357);
-        const _hrS = (typeof getHitRate === 'function') ? getHitRate(def.type, battle.fireMode) + 10 : 40;
-        const _pdBS = 0.6 + clamp(Math.floor(state.proficiency[def.type] || 0) / MAX_PROF_LEVEL, 0, 1) * 0.9;
-        const _txS = _mS.px + (_landS - battle.playerWorldX) / _mS.srw * (1 - _mS.px);
-        const _gDS = def, _gRS = w.rarity || '一般', _gWS = w;
-        battle.bullets.push({
-          isGrenade:true, grenadeId:_gWS.id, rarity:_gRS, player:true, big:true, arc:true, hit:true,
-          worldStartX:_wsxS, H0:_H0S, dir:_dirS, vx:_parS.vx, vy:_parS.vy, T:_parS.T,
-          start:_relS, releaseAt:_relS, startTime:_relS, duration:_parS.T * 1000,
-          sx:_hS.x, sy:_hS.y, tx:_txS, ty:0.95, t:0,
-          _onHit: function(){ if(typeof window._bossGrenadeBurst === 'function') window._bossGrenadeBurst(_gDS, _gRS, _hrS, _landS, _gWS, _pdBS); }
-        });
-      }
-    }
+/* rev-boss-throw-unify: 與探索 _playerThrowGrenade 同源 —— 手部釋放幀起點、
+   hr → 投擲距離誤差、引信決定爆點。
+   舊版外層算一整套變數後內層又重算一次，外層八個變數從未被讀；
+   熟練度傷害乘數在破片化後也成死值，一併刪除。
+   外層唯一的 live 作用是參數求解失敗時的 return false，移入內層保留。 */
+const _hS = _getBossThrowHandPosAtFrame(5);
+const _mS = (typeof window._bossScreenMetrics === 'function') ? window._bossScreenMetrics() : { H:500, ppm:100, px:0.25, srw:4.2 };
+const _H0S = (typeof _handYToH0 === 'function') ? _handYToH0(_hS.y) : Math.max(0.05, (0.95 - _hS.y) * _mS.H / _mS.ppm);
+const _wsxS = battle.playerWorldX + (_hS.x - _mS.px) / (1 - _mS.px) * _mS.srw;
+const _aimS = (typeof window._bossAimMeters === 'function') ? window._bossAimMeters() : { aimWX: battle.bossWorldX };
+const _aimWXS = (typeof _aimS.aimWX === 'number') ? _aimS.aimWX : battle.bossWorldX;
+const _hrS = (typeof getHitRate === 'function') ? getHitRate(def.type) + 10 : 40;
+const _rawDistS = Math.max(0.01, Math.abs(_aimWXS - _wsxS));
+const _distS = (typeof _grenadeThrowDist === 'function') ? _grenadeThrowDist(_rawDistS, _hrS / 100) : _rawDistS;
+const _parS = (typeof _calcGrenadeParams === 'function') ? _calcGrenadeParams(_distS, w.id, _H0S) : null;
+if(!_parS) return false;
+const _dirS = (_aimWXS >= _wsxS) ? 1 : -1;
+const _landS = _wsxS + _dirS * _parS.vx * _parS.T;
+const _amS = (typeof GAME_ANIMS !== 'undefined' && GAME_ANIMS.attack_melee) ? GAME_ANIMS.attack_melee : null;
+const _relS = performance.now() + (_amS ? Math.round(5 / _amS.fps * 1000) : 357);
+const _txS = _mS.px + (_landS - battle.playerWorldX) / _mS.srw * (1 - _mS.px);
+const _gDS = def, _gRS = w.rarity || '一般', _gWS = w;
+battle.bullets.push({
+isGrenade:true, grenadeId:_gWS.id, rarity:_gRS, player:true, big:true, arc:true, hit:true,
+worldStartX:_wsxS, H0:_H0S, dir:_dirS, vx:_parS.vx, vy:_parS.vy, T:_parS.T,
+start:_relS, releaseAt:_relS, startTime:_relS, duration:_parS.T * 1000,
+sx:_hS.x, sy:_hS.y, tx:_txS, ty:0.95, t:0,
+_onHit: function(){
+if(typeof window._bossGrenadeBurst !== 'function') return;
+var _bpS = (typeof _grenadeBurstPoint === 'function')
+? _grenadeBurstPoint(_gDS, _wsxS, _dirS, _parS, _H0S, battle.bossTarget, _landS)
+: null;
+window._bossGrenadeBurst(_gDS, _gRS, _hrS, _landS, _gWS, 0, _bpS);
+}
+});
 addProf(battle.weaponSlot, 0.01);
 if(def.type) addProf(def.type, 0.01);
 refreshBattleControlsLive();
 return true;
 }
 /* 近戰 / 無破片投擲：保留即時接觸結算 */
-const hitRate = getHitRate(def.type, battle.fireMode, def.scopeBonus || 0, def.scope) + 10;
+const hitRate = getHitRate(def.type) + 10;
 const baseDmg = Math.round((def.dmg || 0) * (RARITY_MULT[w.rarity] || 1));
 const critRate = calcCritRate(w.rarity, '一般');
 const critMult = calcCritMult(w.rarity, '一般');
@@ -1499,21 +1486,33 @@ for(let i = 0; i < hits; i++){
         if(_dN > _rngN + BOSS_HALF_WIDTH_M) return;
       }
 
-if(Math.random() * 100 < hitRate){
+/* rev-melee-geom: 接觸幀幾何 —— 玩家瞄準點 + 散佈 → slab 求交 */
+var _aimB = (typeof window._bossAimMeters === 'function') ? window._bossAimMeters() : { aimY:0.85, aimZ:0 };
+var _rngB = (typeof _rangeOfWeaponDef === 'function') ? _rangeOfWeaponDef(def) : 0.75;
+var _msB = (typeof window._meleeStrike === 'function')
+  ? window._meleeStrike(battle.playerWorldX, battle.bossTarget, { weaponId:w.id, weaponType:def.type, hr:hitRate, range:_rngB, aimY:_aimB.aimY, aimZ:_aimB.aimZ })
+  : null;
+if(_msB){
+/* rev-melee-geom: 命中由接觸幀幾何決定 —— 玩家選定瞄準點 + 散佈 → slab 求交，
+   部位由實際入射點經 _bossPartFromUV 判定，不再用 isWeakPointHit() 的布林。
+   統一走 applyBossDamage（單一 Boss 入口）：弱點 0 甲、Hydra 走頭部 HP、
+   Omega 手臂另扣 —— 舊版弱點分支直接扣 bossHp，對 Hydra 是錯的。 */
 let dmg = baseDmg;
 let isCrit = false;
 if(Math.random() < critRate){ dmg = Math.round(dmg * critMult); isCrit = true; }
-if(isWeak){
-battle.engaged = true;
-battle.bossHp = Math.max(0, battle.bossHp - dmg);
-battle.damageDealt += dmg;
-spawnHitFx('boss', 0, '-' + dmg + (isCrit ? '!' : ''), (dmg > 0) ? (isCrit ? 'crit' : 'weak') : 'armor', target.x, target.y);
-if(isBossType(battle.bossId, 'omega') && battle.arms) damageOmegaArm(battle.aimPart, dmg);
-if(battle.bossHp <= 0){ endBattle(true); return true; }
-} else {
-applyBossDamage(dmg, isCrit, def.penMM || 0, def.slot === 'throwable');
-if(battle.bossHp <= 0) return true;
+var _weakB = !!(_msB.part && _msB.part !== 'body');
+var _spB = (typeof window._bossWorldToScreenN === 'function') ? window._bossWorldToScreenN(_msB.x, _msB.y) : { x:target.x, y:target.y };
+var _h0B = battle.bossHp, _a0B = battle.bossArmor, _s0B = battle.shieldHp || 0;
+applyBossDamage(dmg, isCrit, def.penMM || 0, def.slot === 'throwable', true, false, _msB.part || 'body');
+if(!battle) return true;
+if(_weakB && isBossType(battle.bossId, 'omega') && battle.arms && typeof damageOmegaArm === 'function') damageOmegaArm(_msB.part, dmg);
+var _hlB = Math.max(0, _h0B - battle.bossHp);
+var _alB = Math.max(0, (_a0B - battle.bossArmor) + (_s0B - (battle.shieldHp || 0)));
+var _shownB = _hlB > 0 ? _hlB : _alB;
+if(_shownB > 0 && typeof spawnHitFx === 'function'){
+  spawnHitFx('boss', 0, '-' + Math.round(_shownB) + (isCrit ? '!' : ''), isCrit ? 'crit' : (_hlB > 0 ? (_weakB ? 'weak' : '') : 'armor'), _spB.x, _spB.y);
 }
+if(battle.bossHp <= 0){ endBattle(true); return true; }
 }
 
     };
@@ -2007,7 +2006,7 @@ function startBossBattle(bid, opts){
     for(var fi2 = 0; fi2 < battle.floats.length; fi2++){
       var ff = battle.floats[fi2];
       ctx.save();
-      ctx.fillStyle = ff.cls === 'crit' ? '#ff3030' : (ff.cls === 'miss' ? '#a89a85' : (ff.cls === 'armor' ? '#5ab0ff' : '#ffb300'));
+      ctx.fillStyle = ff.cls === 'crit' ? '#ff3030' : (ff.cls === 'miss' ? '#a89a85' : (ff.cls === 'armor' ? '#5ab0ff' : (ff.cls === 'heal' ? '#4caf50' : '#ffb300')));
       ctx.font = 'bold 16px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(ff.text, ff.x * W, ff.y * H - ff.age * 40);
@@ -2272,31 +2271,33 @@ return {aimY:aimY,aimZ:aimZ,aimWX:aimWX};
 
 ;
 /* 手雷結算：與探索同一條鏈（_calcGrenadeParams → _applyExplosionToBox） */
-window._bossGrenadeBurst = function(gDef,gRar,hitRate,landWX,w,pdB){
+window._bossGrenadeBurst = function(gDef,gRar,hitRate,landWX,w,pdB,burstPt){
 var b=(typeof battle!=='undefined')?battle:null;
 if(!b||!b.bossTarget||b.settling) return;
-var frags=gDef.fragments||1;
-var fragDmg=gDef.fragmentDamage||gDef.dmg||0;
-var mult=(typeof RARITY_MULT!=='undefined'&&RARITY_MULT[gRar])||1;
-var hr=Math.min(1,Math.max(0,(hitRate||0)/100));
-var ratio=(typeof gDef.splashRatio==='number')?gDef.splashRatio:((typeof window.GRENADE_SPLASH_RATIO==='number')?window.GRENADE_SPLASH_RATIO:0.08);
-if(gDef.allFragmentsOnSingle) ratio=1;
-var budget=frags*fragDmg*mult*hr*ratio*((typeof pdB==='number')?pdB:1);
-if(!(budget>0)) return;
+/* rev-frag-rays: 與探索手雷同一引擎、同一 N/eff 資料。
+   hitRate / splashRatio / allFragmentsOnSingle 三個補償旋鈕全部廢除 ——
+   舊版 ratio=1 分支只在此實作，16 沒有，VOG-25 兩邊差 12.5×。
+   爆點目前仍為落地點；Boss 投擲端的接觸判定待 17a 投擲呼叫端一併改。 */
+var N=gDef.fragments||1;
+var eff=(gDef.fragmentDamage||gDef.dmg||0)*((typeof RARITY_MULT!=='undefined'&&RARITY_MULT[gRar])||1);
+if(!(N>0)||!(eff>0)) return;
 var gid=(w&&w.id)||gDef.id;
 var phys=(typeof _getGrenadePhysics==='function')?_getGrenadePhysics(gid):null;
 var maxR=(phys&&phys.casualtyRadius>0)?phys.casualtyRadius:10;
+var pen=gDef.penMM||0;
 var critRate=(typeof calcCritRate==='function')?calcCritRate(gRar,'一般'):0.1;
 var critMult=(typeof calcCritMult==='function')?calcCritMult(gRar,'一般'):1.5;
-var isCrit=Math.random()<critRate;
-var total=budget*(isCrit?critMult:1);
-var pen=gDef.penMM||0;
-var sumShown=0;
-window._applyExplosionToBox(b.bossTarget,{x:landWX,y:0,z:0},{
-totalDmg:total,maxR:maxR,pen:pen,
+var sumHp=0,sumAr=0;
+var _bpB = (burstPt && typeof burstPt.x === 'number') ? burstPt : {x:landWX,y:0,z:0};
+var _chgB = (typeof window._blastChargeKg === 'function') ? window._blastChargeKg(gDef) : 0;
+window._applyExplosionToBox(b.bossTarget,_bpB,{
+fragments:N,fragEff:eff,maxR:maxR,pen:pen,
+crit:{rate:critRate,mult:critMult},
+chargeKg:_chgB,
+applyBlast:function(d){ if(battle){ battle.bossHp = Math.max(0, Math.round(battle.bossHp - d)); battle.damageDealt += d; } },
 applyBand:function(part,dmg,pg){
 if(!battle||battle.settling) return {hpLost:0,armorLost:0};
-var h0=battle.bossHp, a0=battle.bossArmor, s0=battle.shieldHp||0;
+var h0=battle.bossHp,a0=battle.bossArmor,s0=battle.shieldHp||0;
 var rd=Math.round(dmg);
 if(part&&part!=='body'){
 battle.engaged=true;
@@ -2310,17 +2311,16 @@ if(!battle) return {hpLost:0,armorLost:0};
 var dh=Math.max(0,h0-battle.bossHp);
 var da=Math.max(0,a0-battle.bossArmor);
 var ds=Math.max(0,s0-(battle.shieldHp||0));
-sumShown+=(dh>0?dh:(da+ds));
+sumHp+=dh; sumAr+=da+ds;
 return {hpLost:dh,armorLost:da+ds};
 }
 });
-if(battle&&!battle.settling&&sumShown>0){
+if(battle&&!battle.settling&&(sumHp+sumAr)>0){
 var _pos=(typeof getAimTargetPos==='function')?getAimTargetPos():{x:battle.bx,y:0.6};
-spawnHitFx('boss',0,'-'+Math.round(sumShown)+(isCrit?'!':''),(isCrit?'crit':'weak'),_pos.x,_pos.y);
+spawnHitFx('boss',0,'-'+Math.round(sumHp>0?sumHp:sumAr),sumHp>0?'weak':'armor',_pos.x,_pos.y);
 }
 if(battle&&!battle.settling&&battle.bossHp<=0) endBattle(true);
 };
-
 /* ===== rev-hudroot:start ===== */
 /* Boss 戰 UI 幾何（寫死；源自人偶繪製比例，不隨動畫 / 頭盔變動）
    腳底 = H*0.95；裸頭頂 = H*(0.95 - 455.74/386 * CHAR_HEIGHT_FACTOR) = H*0.2652

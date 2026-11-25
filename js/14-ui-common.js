@@ -559,27 +559,51 @@ function openOfflineDetail(log){
   });
 }
 
-function openLogHistory(){
+/* ===== rev-log-unify:start ===== */
+/* 日誌可點性與開啟動作唯一真相源 —— 探索欄（15）與歷史記錄（14）共用。
+   舊版兩處各自判斷：15 認 offline/btr/vehicle_destroyed，14 只認 offline，
+   同一筆記錄兩個入口行為不同（歷史記錄點不開支援報告與擊毀報告）。 */
+function _logActionable(l){
+  if(!l) return false;
+  if(l.type === 'offline') return !!(l.items && l.items.length);
+  if(l.type === 'btr') return true;
+  if(l.type === 'vehicle_destroyed') return true;
+  return false;
+}
+function _logOpenDetail(l){
+  if(!l) return;
+  if(l.type === 'offline'){ if(typeof openOfflineDetail === 'function') openOfflineDetail(l); }
+  else if(l.type === 'btr'){ if(typeof window._openBTRSupportDetail === 'function') window._openBTRSupportDetail(l); }
+  else if(l.type === 'vehicle_destroyed'){ if(typeof window._openVehicleDestroyedDetail === 'function') window._openVehicleDestroyedDetail(l); }
+}
+function _logTitle(l){
+  if(!l) return '';
+  if(l.type === 'offline') return '點擊檢視獲得物資';
+  if(l.type === 'btr') return '點擊檢視支援報告';
+  if(l.type === 'vehicle_destroyed') return '點擊檢視擊毀報告';
+  return '';
+}
+/* ===== rev-log-unify:end ===== */function openLogHistory(){
+  /* rev-log-unify: 與 renderZone3Log 同一套呈現與互動 ——
+     補時間戳、三類可點、cursor 走 .clickable class、開啟動作走共用 helper。 */
   const logs = state.logs.slice().reverse();
   let body = '<div style="font-size:10px">';
   if(!logs.length) body += '<div class="empty-hint">暫無記錄</div>';
-  for(const l of logs){
-    const clickable = (l.type === 'offline' && l.items && l.items.length);
-    const attr = clickable ? 'data-offline-idx="' + logs.indexOf(l) + '" style="padding:5px 0;cursor:pointer;color:#4a90d9"' : 'style="padding:5px 0"';
-    body += '<div class="logline" ' + attr + '>' + l.html + '</div>';
+  for(let i = 0; i < logs.length; i++){
+    const l = logs[i];
+    const act = _logActionable(l);
+    const cls = 'logline' + (act ? ' clickable' : '');
+    const attr = act ? ' data-log-idx="' + i + '" title="' + _logTitle(l) + '"' : '';
+    const ts = (typeof fmtTime === 'function') ? fmtTime(l.t) : '';
+    body += '<div class="' + cls + '"' + attr + ' style="padding:5px 0">' + (ts ? '<span class="tm">' + ts + '</span> ' : '') + l.html + '</div>';
   }
   body += '</div>';
   const bd = openModal({ title: '歷史記錄', body: body, full: true });
   bd.querySelectorAll('.itm').forEach(function(e){ e.onclick = function(){ openItemDetail(e.dataset.iid, e.dataset.irar); }; });
-  bd.querySelectorAll('[data-offline-idx]').forEach(function(e){
-    e.onclick = function(){
-      const l = logs[parseInt(e.dataset.offlineIdx, 10)];
-      if(l) openOfflineDetail(l);
-    };
+  bd.querySelectorAll('[data-log-idx]').forEach(function(e){
+    e.onclick = function(){ _logOpenDetail(logs[parseInt(e.dataset.logIdx, 10)]); };
   });
-}
-
-/* ============== 控制中心 / 偏好 ============== */
+}/* ============== 控制中心 / 偏好 ============== */
 
 /* rev-fix-position: renderEquipZone 是唯一实现，去掉 if(typeof) 包裹 */
 window.renderEquipZone = function(z2){

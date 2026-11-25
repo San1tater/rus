@@ -792,7 +792,7 @@ function openModdingOptions(baseId, baseRarity, equippedSlot, workbenchLv, state
         return (SCOPE_NAME[a] || a).localeCompare(SCOPE_NAME[b] || b, 'zh-Hant');
       });
       const sortedScopes = _scopesRaw;
-      for(const s of sortedScopes){body+='<div class="mod-opt '+(state_mod.scope===s?'on':'')+'" data-opt="scope" data-val="'+s+'"><div class="nm">'+(SCOPE_NAME[s]||s)+'</div><div class="bonus">命中 +'+(SCOPE_BONUS[s]||0)+'%</div></div>';}
+      for(const s of sortedScopes){body+='<div class="mod-opt '+(state_mod.scope===s?'on':'')+'" data-opt="scope" data-val="'+s+'"><div class="nm">'+(SCOPE_NAME[s]||s)+'</div><div class="bonus">'+(typeof window._modEffectText==='function'?window._modEffectText(s,null):'')+'</div></div>';}
     }
     const mag=state_mod.mag;const scope=state_mod.scope;
     if(mag||scope){
@@ -1054,22 +1054,27 @@ function _wkGetCandidates(){
 
 /* 計算改造前後的屬性 */
 function _wkCalcStats(baseId, draftMag, draftScope, draftGrip){
+  /* rev-mod-truth: 摘要改列實際生效係數。
+     舊 baseRecoil/newRecoil 讀 GRIP_HIT_BONUS，那是已廢的「命中 +6%」。
+     後坐取「握把 × 瞄具連射」淨值 —— 只報握把 +20% 會隱瞞高倍鏡的代價：
+       PSO-1 + RK-1 = 0.80 × 1.30 = 1.04 → 淨 −4%（比無配件更差）。 */
   var wdef = WEAPONS[baseId] || {};
   var baseMag = wdef.mag || 0;
   var newMag = draftMag || baseMag;
   var baseRange = (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[wdef.type]) ? WEAPON_COMBAT_RANGE[wdef.type] : 0;
   var scopeMult = draftScope ? (1 + ((typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[draftScope]) || 0)) : 1;
   var newRange = baseRange * scopeMult;
-  var baseHit = 0;
-  var newHit = draftGrip ? ((typeof GRIP_HIT_BONUS !== 'undefined' ? GRIP_HIT_BONUS : 0)) : 0;
+  var rm = (draftGrip && typeof GRIP_RECOIL_MULT !== 'undefined' && typeof GRIP_RECOIL_MULT[draftGrip] === 'number') ? GRIP_RECOIL_MULT[draftGrip] : 1;
+  var bm = (draftScope && typeof SCOPE_BURST_MULT !== 'undefined' && typeof SCOPE_BURST_MULT[draftScope] === 'number') ? SCOPE_BURST_MULT[draftScope] : 1;
+  var am = (draftScope && typeof SCOPE_AIM_MULT !== 'undefined' && typeof SCOPE_AIM_MULT[draftScope] === 'number') ? SCOPE_AIM_MULT[draftScope] : 1;
   return {
     baseMag: baseMag, newMag: newMag,
     baseRange: baseRange, newRange: newRange,
-    baseHit: baseHit, newHit: newHit
+    baseRecoil: 0, newRecoil: Math.round((1 - rm * bm) * 100),
+    baseAim: 0, newAim: Math.round((1 - am) * 100),
+    effectText: (typeof window._modEffectText === 'function') ? window._modEffectText(draftScope, draftGrip) : ''
   };
-}
-
-function _wkRender(p){
+}function _wkRender(p){
   var wbLv = getBuildingLv('workbench');
   var s = window._wkState;
   var candidates = _wkGetCandidates();
@@ -1140,15 +1145,17 @@ function _wkRender(p){
   html += '<div class="wk-slot ' + (s.draftGrip ? 'filled' : '') + (_hasGrips ? '' : ' disabled') + '" data-slot="grip"><div class="lbl">握把</div><div class="val">' + gripDisp + '</div></div>';
   html += '</div>';
 
-  /* 數據對比（固定 3 行） */
+  /* 數據對比（4 行：彈匣／射程／後坐改善／瞄準改善） */
   var st = _wkCalcStats(baseId, s.draftMag, s.draftScope, s.draftGrip);
   var _magUp = st.newMag > st.baseMag ? 'up' : (st.newMag < st.baseMag ? 'down' : 'same');
   var _rangeUp = st.newRange > st.baseRange + 0.001 ? 'up' : (st.newRange < st.baseRange - 0.001 ? 'down' : 'same');
-  var _hitUp = st.newHit > st.baseHit ? 'up' : (st.newHit < st.baseHit ? 'down' : 'same');
-  html += '<div class="wk-stats">';
+  var _recoilUp = st.newRecoil > st.baseRecoil ? 'up' : (st.newRecoil < st.baseRecoil ? 'down' : 'same');
+  var _aimUp = st.newAim > st.baseAim ? 'up' : (st.newAim < st.baseAim ? 'down' : 'same');
+  html += '<div class="wk-stats" style="height:auto;min-height:0">';
   html += '<div class="wk-stat-row"><span class="k">彈匣</span><span class="v-cur">' + st.baseMag + ' 發</span><span class="v-arrow">→</span><span class="v-new ' + _magUp + '">' + st.newMag + ' 發</span></div>';
   html += '<div class="wk-stat-row"><span class="k">射程</span><span class="v-cur">' + st.baseRange.toFixed(1) + ' m</span><span class="v-arrow">→</span><span class="v-new ' + _rangeUp + '">' + st.newRange.toFixed(1) + ' m</span></div>';
-  html += '<div class="wk-stat-row"><span class="k">命中</span><span class="v-cur">+' + st.baseHit + '%</span><span class="v-arrow">→</span><span class="v-new ' + _hitUp + '">+' + st.newHit + '%</span></div>';
+  html += '<div class="wk-stat-row"><span class="k">後坐改善</span><span class="v-cur">' + (st.baseRecoil>0?'+':'') + st.baseRecoil + '%</span><span class="v-arrow">→</span><span class="v-new ' + _recoilUp + '">' + (st.newRecoil>0?'+':'') + st.newRecoil + '%</span></div>';
+  html += '<div class="wk-stat-row"><span class="k">瞄準改善</span><span class="v-cur">+' + st.baseAim + '%</span><span class="v-arrow">→</span><span class="v-new ' + _aimUp + '">+' + st.newAim + '%</span></div>';
   html += '</div>';
 
   /* 材料需求（固定 5 行，2 列網格） */
@@ -1417,20 +1424,13 @@ function _wkOpenPicker(slot){
       return (typeof window._sortScopesAsc === "function") ? window._sortScopesAsc(a, b) : 0; /* rev-scope-sort */
     });
     for(var j = 0; j < scopes.length; j++){
-      var _rg = Math.round((SCOPE_RANGE_BONUS[scopes[j]] || 0) * 100);
-      var _pen = (typeof SCOPE_MODE_PENALTY !== 'undefined' && SCOPE_MODE_PENALTY[scopes[j]]) ? SCOPE_MODE_PENALTY[scopes[j]] : null;
-      var _penStr = '';
-      if(_pen){
-        var _maxPen = Math.round((1 - (_pen['掃射'] || 1)) * 100);
-        if(_maxPen > 0) _penStr = ' · 掃射-' + _maxPen + '%';
-      }
-      options.push({ label: (SCOPE_NAME[scopes[j]] || scopes[j]) + '（射程+' + _rg + '%' + _penStr + '）', val: scopes[j] });
+      options.push({ label: (SCOPE_NAME[scopes[j]] || scopes[j]) + '（' + (typeof window._modEffectText === 'function' ? window._modEffectText(scopes[j], null) : '') + '）', val: scopes[j] });
     }
   } else if(slot === 'grip'){
     options.push({ label: '不安裝握把', val: null });
     var grips = rules.grips || [];
     for(var k = 0; k < grips.length; k++){
-      options.push({ label: (GRIP_NAME[grips[k]] || grips[k]) + '（命中+' + GRIP_HIT_BONUS + '%）', val: grips[k] });
+      options.push({ label: (GRIP_NAME[grips[k]] || grips[k]) + '（' + (typeof window._modEffectText === 'function' ? window._modEffectText(null, grips[k]) : '') + '）', val: grips[k] });
     }
   }
   var cur = slot === 'mag' ? s.draftMag : slot === 'scope' ? s.draftScope : s.draftGrip;

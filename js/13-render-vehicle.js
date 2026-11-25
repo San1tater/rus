@@ -5,7 +5,8 @@ const VEHICLE_REAL_HEIGHTS = {
 /* rev-veh-realh2: 實車高 = 地面 → 圖片最頂端可見部件（含車頂武器）。使用者提供，勿改。 */
 btr80: 2.50, btr80a: 2.85, btr82: 2.85, btr82a: 2.88, btr90: 3.05,
 t80: 2.75, t80b: 2.78, t80bv: 2.78, t80u: 2.75, t80uk: 2.80, t80um: 2.80,
-bmp1: 2.15, bmp1m: 2.35, bmp2: 2.45, bmp3: 2.65, bmp3m: 2.65, bmd4: 2.45
+bmp1: 2.15, bmp1m: 2.35, bmp2: 2.45, bmp3: 2.65, bmp3m: 2.65,
+  bmp3a: 3.15, bmd4: 2.45
 };
 /* rev-veh-scale-fn: 縮放唯一真相源（只回傳繪製高，不涉及定位 / 下沉）。
    人偶實際視覺高 = H×CHAR_HEIGHT_FACTOR×(455.74/386)；
@@ -1962,7 +1963,7 @@ if(!this.erasedMissileImgs) this.erasedMissileImgs = [];
         if(this.killCount > 0) parts.push('擊殺 ' + this.killCount + ' 名敵人');
         if(loot.length) parts.push('獲得戰利品');
         if(exp > 0) parts.push('經驗 +' + exp);
-        pushLog('<span class="pl">' + vehName + '</span> ' + parts.join(' · ') + '，<span style="color:#4a90d9;text-decoration:underline;text-decoration-style:dotted">點擊查看詳情</span>', loot.slice(), 'btr');
+        pushLog('<span class="pl">' + vehName + '</span> ' + parts.join(' · ') + '，<span class="log-link">點擊查看詳情</span>', loot.slice(), 'btr');
         state.logs[state.logs.length - 1].btrKills = Object.assign({}, kills);
         state.logs[state.logs.length - 1].btrWeaponKills = Object.assign({}, this.weaponKills || {});
         state.logs[state.logs.length - 1].btrExp = exp;
@@ -2163,7 +2164,15 @@ window._openBTRSupportDetail = function(log){
     if(!wkc){
       const _weaponNameMap = { '2a46':'125mm 2A46','2a46m1':'125mm 2A46M-1','2a70':'100mm 2A70','2a28':'73mm 2A28','2a42':'30mm 2A42','2a72':'30mm 2A72','kpvt':'14.5mm KPVT','nsvt':'12.7mm NSVT','pkt':'7.62mm PKT','atgm':'ATGM' };
       const _ammoNameMap = { '3bm42':'3BM42 穿甲','3of26':'3OF26 高爆','3bk29':'3BK29 破甲','3uof17':'3UOF17 高爆','pg15v':'PG-15V 破甲','og15v':'OG-15V 高爆' };
-      for(const wk in weaponKills){
+      /* rev-report-order: 固定按車站配置序，不再用擊殺先後（for...in 插入序） */
+      const _wkKeys = Object.keys(weaponKills).sort(function(a, b){
+      var pa = a.split(':'), pb = b.split(':');
+      var ka = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(pa[0], pa[1]) : 0;
+      var kb = (typeof window._vehicleWeaponSortKey === 'function') ? window._vehicleWeaponSortKey(pb[0], pb[1]) : 0;
+      if(ka !== kb) return ka - kb;
+      return a.localeCompare(b);
+      });
+      for(const wk of _wkKeys){
         const parts = wk.split(':');
         const wName = (parts[0] === 'atgm' && typeof window._vehicleWeaponDisplayName === 'function')
           ? window._vehicleWeaponDisplayName('atgm', vehId)

@@ -288,13 +288,9 @@ function load(){
           var _p = nid.split('_');
           _d.grip = (_p.length === 5 && _p[4] !== 'x') ? (_gl[_p[4]] || _p[4]) : null;
         }
-        /* rev-fix-grip-hit-migrate: 修正老具名武器的 scopeBonus（含握把） */
-        var _scopeHit = _d.scope ? ((typeof SCOPE_BONUS !== 'undefined' && SCOPE_BONUS[_d.scope]) || 0) : 0;
-        var _gripHit = _d.grip ? ((typeof GRIP_HIT_BONUS !== 'undefined') ? GRIP_HIT_BONUS : 0) : 0;
-        var _correctHit = _scopeHit + _gripHit;
-        if(typeof _d.scopeBonus !== 'number' || _d.scopeBonus !== _correctHit){
-          _d.scopeBonus = _correctHit;
-        }
+        /* rev-mod-truth: scopeBonus 已廢（hr 不再平加配件），清除舊存檔殘留 */
+        if(typeof _d.scopeBonus !== 'undefined') delete _d.scopeBonus;
+        if(typeof _d.detectBonus !== 'undefined') delete _d.detectBonus;
       }
       for(var _k in state.inventory) _patch(_k.split('@')[0]);
       for(var _s in state.player.equipped) if(state.player.equipped[_s]) _patch(state.player.equipped[_s]);
@@ -397,14 +393,10 @@ function load(){
         }
         if(!_newScope) return;
         _d.scope = _newScope;
-        /* 重算 scopeBonus / combatRange / detectBonus */
-        var _scopeHit = (typeof SCOPE_BONUS !== 'undefined' && SCOPE_BONUS[_newScope]) || 0;
-        var _gripHit = _d.grip ? ((typeof GRIP_HIT_BONUS !== 'undefined') ? GRIP_HIT_BONUS : 0) : 0;
-        _d.scopeBonus = _scopeHit + _gripHit;
+        /* 重算 combatRange */
         var _baseRange = (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[_d.type]) || 15;
         var _rangeMult = (typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[_newScope]) || 0;
         _d.combatRange = Math.round(_baseRange * (1 + _rangeMult) * 100) / 100;
-        _d.detectBonus = (typeof SCOPE_DETECT_BONUS !== 'undefined' && SCOPE_DETECT_BONUS[_newScope]) || 0;
         console.log('[fix-named-scope]', nid, _oldScope, '→', _newScope);
       }
       for(var _k in state.inventory) _fixScope(_k.split('@')[0]);
@@ -467,14 +459,10 @@ function load(){
           console.log('[fix-named-name-2]', nid, 'name:', d.name, '→', newName);
           d.name = newName;
         }
-        /* 5. 重算 scopeBonus / combatRange / detectBonus */
-        var sHit = (d.scope && typeof SCOPE_BONUS !== 'undefined' && SCOPE_BONUS[d.scope]) || 0;
-        var gHit = d.grip ? ((typeof GRIP_HIT_BONUS !== 'undefined') ? GRIP_HIT_BONUS : 0) : 0;
-        d.scopeBonus = sHit + gHit;
+        /* 5. 重算 combatRange */
         var baseRange = (typeof WEAPON_COMBAT_RANGE !== 'undefined' && WEAPON_COMBAT_RANGE[d.type]) || 15;
         var rMult = (d.scope && typeof SCOPE_RANGE_BONUS !== 'undefined' && SCOPE_RANGE_BONUS[d.scope]) || 0;
         d.combatRange = Math.round(baseRange * (1 + rMult) * 100) / 100;
-        d.detectBonus = (d.scope && typeof SCOPE_DETECT_BONUS !== 'undefined' && SCOPE_DETECT_BONUS[d.scope]) || 0;
       }
       for(var _k in state.inventory) _fix(_k.split('@')[0]);
       for(var _s in state.player.equipped) if(state.player.equipped[_s]) _fix(state.player.equipped[_s]);
@@ -1486,7 +1474,7 @@ function addProf(cat, n){
   var m = 1 + tl * 0.02;
   state.proficiency[cat] = Math.min(MAX_PROF_RAW, (state.proficiency[cat] || 0) + n * m);
 }
-function getHitRate(weaponType, mode, scopeBonus, scope){
+function getHitRate(weaponType){
   var base = 10, p = 0;
   var w = state.player.equipped.primary;
   var s = state.player.equipped.secondary;
@@ -1498,13 +1486,9 @@ function getHitRate(weaponType, mode, scopeBonus, scope){
   if(_md && _md.type === weaponType) p += Math.floor(state.proficiency.melee || 0);
   if(_td && _td.type === weaponType) p += Math.floor(state.proficiency.throwable || 0);
   p += Math.floor(state.proficiency[weaponType] || 0);
-  /* rev-fix-scope-mode-penalty: 高倍鏡的連射精度懲罰 */
-  var modeMult = MODE_ACCURACY[mode] || 1;
-  if(scope && typeof SCOPE_MODE_PENALTY !== 'undefined' && SCOPE_MODE_PENALTY[scope]){
-    var pen = SCOPE_MODE_PENALTY[scope][mode];
-    if(typeof pen === 'number') modeMult *= pen;
-  }
-  return clamp(Math.round((base + p) * modeMult + (scopeBonus || 0)), 5, 75);
+  /* rev-hr-pure: hr = 射手熟練指數，不再平加瞄具/握把、不再乘模式係數。
+   模式與握把改走後坐累積（09），瞄具改走 aimMult/rangeErrMult。 */
+return clamp(Math.round(base + p), 5, 75);
 }
 function calcCritRate(wr, ar){
   /* rev-fix-crit-separate: 暴率只讀武器稀有度（精度）；ar 參數保留以兼容調用點 */

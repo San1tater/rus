@@ -728,9 +728,8 @@ function _renderGarageDockList(){
         const vid = card.dataset.vid;
         const owned = g.ownedVehicles.indexOf(vid) >= 0;
         if(owned){
-          if(g.currentVehicle !== vid){
-            g.currentVehicle = vid;
-            save();
+          if(window._garageCurrentVehicle() !== vid){
+            window._garageSetCurrentVehicle(vid);
             const p = document.getElementById('garage-page');
             if(p){
               p.innerHTML = _garageRenderHtml();
@@ -746,6 +745,22 @@ function _renderGarageDockList(){
   listEl.onscroll = function(){ window._garageScrollLeft = listEl.scrollLeft; };
 }
 
+/* rev-garage-current-live: 換車唯一入口 —— 一律寫 live state.garage 再存檔。
+   舊版兩個 handler 各自 mutate bind 時捕獲的 g；若該引用不是 state.garage 本體，
+   save() 寫的就是舊值 → 刷新重置。此處寫入目標與物件身分無關。 */
+window._garageCurrentVehicle = function(){
+var g = (typeof _garageInitState === 'function') ? _garageInitState() : (state.garage || null);
+return (g && g.currentVehicle) ? g.currentVehicle : 'btr80';
+};
+window._garageSetCurrentVehicle = function(vid){
+if(typeof VEHICLES === 'undefined' || !VEHICLES[vid]) return false;
+var g = (typeof _garageInitState === 'function') ? _garageInitState() : (state.garage || null);
+if(!g) return false;
+if(Array.isArray(g.ownedVehicles) && g.ownedVehicles.indexOf(vid) < 0) return false;
+g.currentVehicle = vid;
+if(typeof save === 'function') save();
+return true;
+};
 function _garageBind(){
   const p = document.getElementById('garage-page');
   if(!p) return;
@@ -802,6 +817,7 @@ function _garageOpenTechTree(){
     { vid: 'bmp3',   x: 140, y: 330 },
     { vid: 'bmd4',   x: 140, y: 410 },
     { vid: 'bmp3m',  x: 140, y: 490 },
+    { vid: 'bmp3a',  x: 140, y: 560 },
     { vid: 't80',    x: 260, y: 90 },
     { vid: 't80b',   x: 260, y: 170 },
     { vid: 't80bv',  x: 260, y: 250 },
@@ -1099,7 +1115,7 @@ function _garageShowTechDetail(vid){
   }
 
   const sw = bd.querySelector('#m-switch');
-  if(sw) sw.onclick = function(){ g.currentVehicle = vid; save(); _garageShowTechDetail(vid); _refreshGaragePage(); };
+  if(sw) sw.onclick = function(){ window._garageSetCurrentVehicle(vid); _garageShowTechDetail(vid); _refreshGaragePage(); };
 
   /* rev-fix-garage-dead-cancel: body 只生成 data-mode="start"，'cancel' 分支不可达，已删 */
   const rs = bd.querySelector('#m-research');

@@ -11,7 +11,7 @@ const VEHICLE_ANNOTATION_BTR90 = {
   "orientation": "right",
   "imageSize": {
     "w": 598,
-    "h": 248
+    "h": 243
   },
   "anchor": {
     "groundY": 1,
@@ -80,27 +80,27 @@ const VEHICLE_ANNOTATION_BTR90 = {
   ],
   "wheels": [
     {
-      "cx": 0.1582,
-      "cy": 0.7959,
-      "r": 0.0799,
+      "cx": 0.1562,
+      "cy": 0.8058,
+      "r": 0.0825,
       "rotSpeed": 1
     },
     {
-      "cx": 0.3411,
-      "cy": 0.7951,
-      "r": 0.0799,
+      "cx": 0.3402,
+      "cy": 0.807,
+      "r": 0.0825,
       "rotSpeed": 1
     },
     {
-      "cx": 0.5821,
-      "cy": 0.7976,
-      "r": 0.0799,
+      "cx": 0.582,
+      "cy": 0.8089,
+      "r": 0.0825,
       "rotSpeed": 1
     },
     {
-      "cx": 0.7603,
-      "cy": 0.7978,
-      "r": 0.0799,
+      "cx": 0.7587,
+      "cy": 0.8097,
+      "r": 0.0825,
       "rotSpeed": 1
     }
   ],

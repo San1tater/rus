@@ -681,6 +681,7 @@ function _stOpenRepairDialog(vid){
       d.disabled = false;
       d.parts = { engine: 800, tracks: 1000, turret: 400 };
       if(d.weapons){ for(const _wid in d.weapons){ d.weapons[_wid].hp = d.weapons[_wid].max; } }
+      d.arenaRadarHp = 40; /* rev-bmp3a-radar: 維修一併修復雷達 */
       d.members = { driver: 1, gunner: 1, commander: 1, player: 1 };
       d.ammoRackDamage = 0;
     }

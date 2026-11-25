@@ -15,7 +15,8 @@ const RARITY_MULT = {'破舊':0.8,'一般':1.0,'庫存':1.5,'精品':2.5,'傳奇
 const RARITY_ICON = {'破舊':'▪','一般':'▫','庫存':'◆','精品':'★','傳奇':'✦','具名':'✦'};
 const RARITY_BG = {'破舊':'#4a2e1a','一般':'#3a3a3a','庫存':'#1e4a1e','精品':'#1e3a5a','傳奇':'#5a4410','具名':'#4a205a'};
 
-const MODE_ACCURACY = {'點射':1.6,'短點射':1.25,'長點射':1.0,'掃射':0.65,'近戰':1.0,'投擲':1.0};
+/* rev-hr-pure: MODE_ACCURACY 已刪 —— 模式對命中的影響改由 09 burstMult
+   表達（後坐累積），07／16／23 全部停止讀取，實測零引用。 */
 const MAX_PROF_LEVEL = 50;
 /* rev-fix-building-lv-cap: 所有建築等級上限 */
 const BUILDING_LV_MAX = 50;

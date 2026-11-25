@@ -19,20 +19,15 @@ function servantMaxHp(srv){
   const base = 1 + 0.10883;
   return Math.round(100 * Math.pow(base, (srv.lv || 1) - 1));
 }
-function servantHitRate(srv, mode, scopeBonus, scope){
+function servantHitRate(srv){
   if(!srv) return 5;
+  /* rev-hr-pure-servant: hr = 僕人熟練指數，與玩家 getHitRate 同語義。
+     模式／瞄具連射懲罰已由 09 burstMult 表達；握把改走 GRIP_RECOIL_MULT。
+     舊版 +scopeBonus 使僕人握把憑空 +6 hr，玩家側卻已忽略 —— 兩套尺度。 */
   const base = 10;
   const p = (srv.lv || 1) - 1;
-  const acc = (typeof MODE_ACCURACY !== 'undefined' && MODE_ACCURACY[mode]) ? MODE_ACCURACY[mode] : 1;
-  /* rev-fix-scope-mode-penalty-servant: 載員同步連射懲罰 */
-  let modeMult = acc;
-  if(scope && typeof SCOPE_MODE_PENALTY !== 'undefined' && SCOPE_MODE_PENALTY[scope]){
-    const pen = SCOPE_MODE_PENALTY[scope][mode];
-    if(typeof pen === 'number') modeMult *= pen;
-  }
-  return Math.max(5, Math.min(75, Math.round((base + p) * modeMult + (scopeBonus || 0))));
-}
-function servantCritRate(wRarity, aRarity){
+  return Math.max(5, Math.min(75, Math.round(base + p)));
+}function servantCritRate(wRarity, aRarity){
   /* rev-fix-servant-crit-delegate: 調用統一函數，與玩家一致 */
   if(typeof calcCritRate === 'function') return calcCritRate(wRarity, aRarity);
   const wm = (RARITY_MULT && RARITY_MULT[wRarity]) || 1;
