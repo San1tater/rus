@@ -91,7 +91,59 @@ window.getActiveRegions = function(){
 
 function save(){
   state.lastSeen = Date.now();
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e){}
+  /* rev-save-quota-heal: 配額滿時逐級自愈，不再靜默失敗。
+     舊版 catch(e){} 讓研發／選車／換裝備／彈藥配置全部無聲不保存。
+     順序：清自家舊版存檔鍵 → 無損合併批次 → 日誌上限 → 每步重試。 */
+  function _put(){ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+  try { _put(); return; } catch(e){}
+  try {
+    var _pre = String(SAVE_KEY).replace(/v[0-9_]+$/, "");
+    var _dead = [];
+    for(var i = 0; i < localStorage.length; i++){
+      var k = localStorage.key(i);
+      if(k && k !== SAVE_KEY && _pre && k.indexOf(_pre) === 0) _dead.push(k);
+    }
+    for(var j = 0; j < _dead.length; j++) localStorage.removeItem(_dead[j]);
+  } catch(e){}
+  try { _put(); return; } catch(e){}
+  try { _saveCompactBatches(); } catch(e){}
+  try { _put(); return; } catch(e){}
+  try { _saveTrimLogs(); } catch(e){}
+  try { _put(); return; } catch(e){}
+}
+/* 無損合併：除 count 外所有欄位完全相同才併（保鮮／ rarity 等語義不變） */
+function _saveCompactBatches(){
+  var g = state.garden; if(!g || !g.storageBatches) return;
+  var SB = g.storageBatches, out = {};
+  for(var k in SB){
+    var arr = SB[k];
+    if(!Array.isArray(arr)){ out[k] = arr; continue; }
+    var map = {}, order = [];
+    for(var i = 0; i < arr.length; i++){
+      var b = arr[i];
+      if(!b || typeof b !== "object"){ continue; }
+      var rest = {}, keys = Object.keys(b).sort();
+      for(var m = 0; m < keys.length; m++){ if(keys[m] !== "count") rest[keys[m]] = b[keys[m]]; }
+      var sig = JSON.stringify(rest);
+      if(!(sig in map)){ map[sig] = { base: rest, n: 0 }; order.push(sig); }
+      map[sig].n += (b.count || 0);
+    }
+    var merged = [];
+    for(var o = 0; o < order.length; o++){
+      var e = map[order[o]], obj = {};
+      for(var kk in e.base) obj[kk] = e.base[kk];
+      obj.count = e.n; merged.push(obj);
+    }
+    out[k] = merged;
+  }
+  g.storageBatches = out;
+}
+/* 有界修剪：只砍日誌，不動裝備／研發／車庫／彈藥 */
+function _saveTrimLogs(){
+  if(Array.isArray(state.logs) && state.logs.length > 400) state.logs = state.logs.slice(-400);
+  var g = state.garden;
+  if(g && Array.isArray(g.log) && g.log.length > 200) g.log = g.log.slice(-200);
+  if(g && Array.isArray(g.battleLog) && g.battleLog.length > 30) g.battleLog = g.battleLog.slice(-30);
 }
 
 function load(){

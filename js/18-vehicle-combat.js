@@ -2016,15 +2016,15 @@ function _grantBTRCrewExp(exp){
    ============================================================ */
 const VEHICLE_DIM = {
 btr80:{frontWidth:2.90,height:2.41}, btr80a:{frontWidth:2.90,height:2.41},
-btr82:{frontWidth:2.90,height:2.41}, btr82a:{frontWidth:2.90,height:2.41},
-btr90:{frontWidth:3.12,height:2.65},
+btr82:{frontWidth:2.95,height:2.41}, btr82a:{frontWidth:2.90,height:2.41},
+btr90:{frontWidth:3.20,height:2.65},
 bmp1:{frontWidth:2.94,height:2.07},  bmp1m:{frontWidth:2.94,height:2.07},
-bmp2:{frontWidth:3.15,height:2.26},  bmp3:{frontWidth:3.30,height:2.30},
-bmd4:{frontWidth:3.15,height:2.17},
-bmp3m:{frontWidth:3.30,height:2.30},
-  bmp3a: {frontWidth:3.30,height:2.30},
-t80:{frontWidth:3.60,height:2.20},   t80b:{frontWidth:3.60,height:2.20},
-t80bv:{frontWidth:3.60,height:2.20}, t80u:{frontWidth:3.60,height:2.20},
+bmp2:{frontWidth:3.15,height:2.26},  bmp3:{frontWidth:3.20,height:2.30},
+bmd4:{frontWidth:3.11,height:2.17},
+bmp3m:{frontWidth:3.20,height:2.30},
+  bmp3a: {frontWidth:3.20,height:2.30},
+t80:{frontWidth:3.60,height:2.20},   t80b:{frontWidth:3.40,height:2.20},
+t80bv:{frontWidth:3.40,height:2.20}, t80u:{frontWidth:3.60,height:2.20},
 t80uk:{frontWidth:3.60,height:2.20}, t80um:{frontWidth:3.60,height:2.20}
 };
 window.VEHICLE_DIM = VEHICLE_DIM;

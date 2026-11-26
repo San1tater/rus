@@ -1713,12 +1713,25 @@ if(battleHeroAnim.legTransitionStart){
 const _el = now - battleHeroAnim.legTransitionStart;
 if(_el < 150){
 const _t = _el / 150;
+/* rev-leg-registry-ids: override 的鍵必須是 drawBlockHero 認得的 layer id。
+   id 由 __PUPPET_BAKE__.ids 烘焙進 GAME_ANIMS／GAME_LAYERS，腿部實際是
+   right_thigh / right_shin / left_thigh / left_shin；舊版寫死 right_leg /
+   left_leg 不在 registry，取 undefined 再索引幀號即拋（走／跑→停 150ms 窗）。
+   這裡遍歷 registry 取值，不寫死層名，語義仍是把該幀腿部姿態衰減到 0。 */
 const _wf = battleHeroAnim.legTransitionFrom || 0;
-const _wl = GAME_ANIMS.walk.keys;
-battleHeroAnim.legOverride = {
-right_leg: { rot: (_wl.right_leg[_wf] ? _wl.right_leg[_wf].rot : 0) * (1 - _t) },
-left_leg: { rot: (_wl.left_leg[_wf] ? _wl.left_leg[_wf].rot : 0) * (1 - _t) }
-};
+const _wl = (GAME_ANIMS.walk && GAME_ANIMS.walk.keys) || {};
+const _ids = (typeof GAME_LAYERS !== "undefined" && GAME_LAYERS && GAME_LAYERS.length)
+? GAME_LAYERS.map(function(l){ return l && l.id; })
+: Object.keys(_wl);
+const _ov = {};
+for(let _li = 0; _li < _ids.length; _li++){
+const _id = _ids[_li];
+if(!_id || !/thigh|shin|leg|foot/i.test(_id)) continue;
+const _arr = _wl[_id];
+const _k = (_arr && _arr[_wf]) ? _arr[_wf] : null;
+  _ov[_id] = { rot: ((_k && _k.rot) || 0) * (1 - _t) };
+}
+battleHeroAnim.legOverride = _ov;
 } else {
 battleHeroAnim.legTransitionStart = null;
 battleHeroAnim.legOverride = null;

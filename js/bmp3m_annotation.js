@@ -111,58 +111,16 @@ const VEHICLE_ANNOTATION_BMP3M = {
   ],
   "weapons": [
     {
-      "id": "kpvt",
-      "name": "14.5mm KPVT",
-      "type": "機槍",
-      "caliber": "14.5mm"
-    },
-    {
       "id": "pkt",
       "name": "7.62mm PKT",
       "type": "機槍",
       "caliber": "7.62mm"
     },
     {
-      "id": "nsvt",
-      "name": "12.7mm NSVT",
-      "type": "機槍",
-      "caliber": "12.7mm"
-    },
-    {
       "id": "2a72",
       "name": "30mm 2A72",
       "type": "機炮",
       "caliber": "30mm"
-    },
-    {
-      "id": "2a42",
-      "name": "30mm 2A42",
-      "type": "機炮",
-      "caliber": "30mm"
-    },
-    {
-      "id": "atgm",
-      "name": "ATGM 發射筒",
-      "type": "反坦克導彈",
-      "caliber": "—"
-    },
-    {
-      "id": "2a46",
-      "name": "125mm 2A46",
-      "type": "主炮",
-      "caliber": "125mm"
-    },
-    {
-      "id": "2a46m1",
-      "name": "125mm 2A46M-1",
-      "type": "主炮",
-      "caliber": "125mm"
-    },
-    {
-      "id": "2a28",
-      "name": "73mm 2A28",
-      "type": "低壓炮",
-      "caliber": "73mm"
     },
     {
       "id": "2a70",

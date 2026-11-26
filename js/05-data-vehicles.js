@@ -133,11 +133,11 @@ const VEHICLES = {
     supportDuration:48, next:['bmp3m'],
     researchCost:{ ammoCal:'7.62x54', ammoCount:3000, liquor:3000, exp:15000 }
   },
-  /* ---------- BMP-3M：UTD-32 660hp；掛 Kaktus 後 22.9t（BMP-3 18.7t + 4.2t），
-   功重比 28.8 hp/t，喪失兩棲浮渡。前弧附加裝甲 + 熱像 FCS。
-   公路 70 km/h = BMP-3M 公開值（數值不動 → _vehicleSpeedKmh 不受影響）；
-   越野 40-45 為工程估值 —— 同底盤接地面積下 +22% 質量使接地壓上升，
-   越野應低於 BMP-3 的 45-50。舊值 50-55 比 BMP-3 還快，方向錯。 ---------- */
+  /* ---------- BMP-3M：UTD-32 660hp；掛 Kaktus / 4S24 後戰鬥全重 22.0t
+   （Army Recognition；Topwar 21t、wiki 22.2t，來源分歧）。
+   ★ 仍可兩棲浮渡 —— Army Recognition 明載水中 10 km/h，需排水泵＋通氣管＋前浪板。
+   先前自行推算的增重後重量與「喪失浮渡」說法與來源不符，已撤回。
+   公路 70 km/h；越野 40-45 為工程估值。 ---------- */
   bmp3m: {
     id:'bmp3m', name:'BMP-3M', tier:6, line:'bmp',
     weapon:'100mm 2A70 + 30mm 2A72 + 7.62mm PKT', weaponSpecial:'無',
@@ -332,10 +332,10 @@ const VEHICLE_ARMOR_LAYOUT = {
 
 /* rev-veh-length: 載具半車長（世界米），供投擲/濺射落點部位判定 */
 const VEHICLE_HALF_LENGTH_WORLD = {
-  btr80:3.85, btr80a:3.85, btr82:3.85, btr82a:3.85, btr90:4.0,
+  btr80:3.85, btr80a:3.85, btr82:3.85, btr82a:3.85, btr90:3.82,
   bmp1:3.37, bmp1m:3.37, bmp2:3.36, bmp3:3.57, bmp3m:3.57,
   bmp3a: 3.57, bmd4:3.05,
-  t80:3.5, t80b:3.5, t80bv:3.5, t80u:3.5, t80uk:3.5, t80um:3.5
+  t80:3.5, t80b:3.7, t80bv:3.7, t80u:3.5, t80uk:3.5, t80um:3.5
 };
 window.getVehicleHalfLengthWorld = function(vid){
   return VEHICLE_HALF_LENGTH_WORLD[vid] || 3.6;
@@ -718,110 +718,130 @@ function _pbWeaponSlots(vid){
   return out;
 }
 /* T-80：駕駛前中半躺、彈盤吊籃下方環形、燃氣渦輪後置平置、BPK 分置兩側 */
-function _pbTank(H){
-  return [
-    { comp:'crew', seat:'driver', x:[0.27,0.41], y:[0.45,1.05], z:[-0.10,0.10], f:0.015, v:1.0 },
-    { comp:'obstacle', x:[0.41,0.47], y:[0.45,1.20], z:[0.14,0.42], f:0.11 },
-    { comp:'obstacle', x:[0.41,0.47], y:[0.45,1.20], z:[-0.42,-0.14], f:0.11 },
-    { comp:'ammoRack', ring:{ro:0.95,ri:0.55}, y:[0.45,0.95], f:0.17, v:0.2 },
-    { comp:'engine', x:[-0.43,-0.21], y:[0.45,1.34], z:[-0.14,0.14], f:'ENG', v:0.25 },
-    { comp:'tracks', x:[-0.43,-0.33], y:[0.45,1.05], z:[-0.50,-0.375], f:0.17, v:0.25 },
-    { comp:'tracks', x:[-0.43,-0.33], y:[0.45,1.05], z:[0.375,0.50], f:0.17, v:0.25 },
-    { comp:'turret', x:[-0.13,0.13], y:[1.47,2.20], z:[-0.25,0.25], f:0.08, v:0.25 },
-    { comp:'weapon', slot:'main', x:[-0.07,0.00], y:[1.55,2.00], z:[-0.063,0.063], f:0.50, v:0.25 },
-    { comp:'weapon', slot:'coax', x:[0.00,0.06], y:[1.55,1.80], z:[0.06,0.12], f:0.30, v:0.5 },
-    { comp:'crew', seat:'gunner', x:[-0.043,0.043], y:[1.47,2.10], z:[-0.25,-0.083], f:0.015, v:1.0 },
-    { comp:'crew', seat:'commander', x:[-0.043,0.043], y:[1.47,2.10], z:[0.083,0.25], f:0.015, v:1.0 },
-    { comp:'crew', seat:'player', x:[0.05,0.13], y:[1.47,2.10], z:[-0.08,0.08], f:0.015, v:1.0 },
-    { comp:'weapon', slot:'roof', x:[-0.03,0.03], y:[2.20,H], z:[0.083,0.194], eqFix:8, pathFix:40, v:10 },
-    { comp:'tracks', x:[-0.50,0.50], y:[0,0.45], z:[-0.50,-0.375], eqFix:20, pathFix:100, v:5 },
-    { comp:'tracks', x:[-0.50,0.50], y:[0,0.45], z:[0.375,0.50], eqFix:20, pathFix:100, v:5 }
-  ];
-}
-/* BMP-1/2：引擎前置右側、駕駛前置左側、單／雙人炮塔、後部載員艙 */
-function _pbIFVFront(H, twoMan){
+function _pbTank(vid,H){
+  var _b=(typeof VEHICLE_HEIGHT_BANDS!=='undefined')?VEHICLE_HEIGHT_BANDS[vid]:null;
+  /* 組件按實高就位：F=h1 車底；D=h3 車體頂(炮塔環基)；R=h4 炮塔頂；H 含車頂武器。
+     車體組件高度＝該組件自身實高（引擎＝機組高），不填滿車體。 */
+  var F=_b?_b.h1:0.45, D=_b?_b.h3:1.47, R=(_b&&_b.h4!=null)?Math.min(_b.h4,H):H;
   var a = [
-    { comp:'crew', seat:'driver', x:[0.30,0.44], y:[0.40,1.10], z:[-0.30,-0.06], f:0.015, v:1.0 },
-    { comp:'engine', x:[0.24,0.42], y:[0.40,1.16], z:[0.06,0.34], f:'ENG', v:0.25 },
-    { comp:'tracks', x:[0.24,0.36], y:[0.40,1.00], z:[-0.50,-0.375], f:0.17, v:0.25 },
-    { comp:'tracks', x:[0.24,0.36], y:[0.40,1.00], z:[0.375,0.50], f:0.17, v:0.25 },
-    { comp:'ammoRack', x:[-0.16,0.10], y:[0.40,0.95], z:[-0.34,-0.10], f:0.17, v:0.2 },
-    { comp:'turret', x:[-0.10,0.14], y:[1.36,H*0.80], z:[-0.22,0.22], f:0.08, v:0.25 },
-    { comp:'weapon', slot:'main', x:[0.00,0.08], y:[1.40,H*0.76], z:[-0.05,0.05], f:0.50, v:0.25 },
-    { comp:'weapon', slot:'coax', x:[0.00,0.06], y:[1.40,H*0.70], z:[0.06,0.12], f:0.30, v:0.5 },
-    { comp:'crew', seat:'gunner', x:[-0.06,0.06], y:[1.36,H*0.78], z:[-0.20,-0.04], f:0.015, v:1.0 },
-    { comp:'crew', seat:'player', x:[-0.20,-0.10], y:[0.45,1.30], z:[-0.10,0.10], f:0.015, v:1.0 },
-    { comp:'obstacle', x:[-0.42,-0.20], y:[0.40,0.90], z:[-0.30,0.30], f:0.11 }
+    { comp:'crew', seat:'driver', x:[0.27,0.41], y:[F,F+0.60], z:[-0.10,0.10], f:0.015, v:1.0 },
+    { comp:'obstacle', x:[0.41,0.47], y:[F,F+0.75], z:[0.14,0.42], f:0.11 },
+    { comp:'obstacle', x:[0.41,0.47], y:[F,F+0.75], z:[-0.42,-0.14], f:0.11 },
+    { comp:'ammoRack', ring:{ro:0.95,ri:0.55}, y:[F,F+0.50], f:0.17, v:0.2 },
+    /* GTD-1000T/1250 燃氣渦輪機組高 0.89 */
+    { comp:'engine', x:[-0.43,-0.21], y:[F,F+0.89], z:[-0.14,0.14], f:'ENG', v:0.25 },
+    { comp:'tracks', x:[-0.43,-0.33], y:[F,F+0.60], z:[-0.50,-0.375], f:0.17, v:0.25 },
+    { comp:'tracks', x:[-0.43,-0.33], y:[F,F+0.60], z:[0.375,0.50], f:0.17, v:0.25 },
+    { comp:'turret', x:[-0.13,0.13], y:[D,R], z:[-0.25,0.25], f:0.08, v:0.25 },
+    { comp:'weapon', slot:'main', x:[-0.07,0.00], y:[D+0.08,R-0.20], z:[-0.063,0.063], f:0.50, v:0.25 },
+    { comp:'weapon', slot:'coax', x:[0.00,0.06], y:[D+0.08,R-0.40], z:[0.06,0.12], f:0.30, v:0.5 },
+    { comp:'crew', seat:'gunner', x:[-0.043,0.043], y:[D,R-0.10], z:[-0.25,-0.083], f:0.015, v:1.0 },
+    { comp:'crew', seat:'commander', x:[-0.043,0.043], y:[D,R-0.10], z:[0.083,0.25], f:0.015, v:1.0 },
+    { comp:'crew', seat:'player', x:[0.05,0.13], y:[D,R-0.10], z:[-0.08,0.08], f:0.015, v:1.0 },
+    { comp:'tracks', x:[-0.50,0.50], y:[0,F], z:[-0.50,-0.375], eqFix:20, pathFix:100, v:5 },
+    { comp:'tracks', x:[-0.50,0.50], y:[0,F], z:[0.375,0.50], eqFix:20, pathFix:100, v:5 }
   ];
-  if(twoMan) a.push({ comp:'crew', seat:'commander', x:[-0.06,0.06], y:[1.36,H*0.78], z:[0.04,0.20], f:0.015, v:1.0 });
-  for(var i=0;i<3;i++){
-    a.push({ comp:'crew', seat:'passenger', seatIdx:i*2,   x:[-0.40+i*0.13,-0.30+i*0.13], y:[0.45,1.30], z:[-0.36,-0.14], f:0.015, v:1.0 });
-    a.push({ comp:'crew', seat:'passenger', seatIdx:i*2+1, x:[-0.40+i*0.13,-0.30+i*0.13], y:[0.45,1.30], z:[0.14,0.36], f:0.015, v:1.0 });
-  }
-  a.push({ comp:'weapon', slot:'roof', x:[-0.03,0.03], y:[H*0.80,H], z:[0.06,0.17], eqFix:8, pathFix:40, v:10 });
-  a.push({ comp:'tracks', x:[-0.50,0.50], y:[0,0.42], z:[-0.50,-0.375], eqFix:20, pathFix:100, v:5 });
-  a.push({ comp:'tracks', x:[-0.50,0.50], y:[0,0.42], z:[0.375,0.50], eqFix:20, pathFix:100, v:5 });
+  if(H-R>0.01) a.push({ comp:'weapon', slot:'roof', x:[-0.03,0.03], y:[R,H], z:[0.083,0.194], eqFix:8, pathFix:40, v:10 });
   return a;
-}
-/* BMP-3 / BMD-4：引擎後置扁平、駕駛前中、彈盤戰鬥室地板、前側與後部載員 */
-function _pbIFVRear(H){
-  return [
-    { comp:'crew', seat:'driver', x:[0.32,0.44], y:[0.45,1.10], z:[-0.10,0.10], f:0.015, v:1.0 },
-    { comp:'crew', seat:'passenger', seatIdx:0, x:[0.28,0.40], y:[0.45,1.20], z:[-0.36,-0.14], f:0.015, v:1.0 },
-    { comp:'crew', seat:'passenger', seatIdx:1, x:[0.28,0.40], y:[0.45,1.20], z:[0.14,0.36], f:0.015, v:1.0 },
-    { comp:'ammoRack', ring:{ro:0.85,ri:0.45}, y:[0.45,1.00], f:0.17, v:0.2 },
-    { comp:'turret', x:[-0.10,0.12], y:[1.34,H*0.86], z:[-0.24,0.24], f:0.08, v:0.25 },
-    { comp:'weapon', slot:'main', x:[-0.02,0.06], y:[1.40,H*0.80], z:[-0.06,0.06], f:0.50, v:0.25 },
-    { comp:'weapon', slot:'secondary', x:[-0.02,0.06], y:[1.40,H*0.78], z:[0.07,0.13], f:0.30, v:0.5 },
-    { comp:'weapon', slot:'coax', x:[-0.02,0.05], y:[1.38,H*0.72], z:[-0.13,-0.07], f:0.30, v:0.5 },
-    { comp:'crew', seat:'gunner', x:[-0.06,0.05], y:[1.34,H*0.84], z:[-0.22,-0.05], f:0.015, v:1.0 },
-    { comp:'crew', seat:'commander', x:[-0.06,0.05], y:[1.34,H*0.84], z:[0.05,0.22], f:0.015, v:1.0 },
-    { comp:'crew', seat:'player', x:[-0.26,-0.14], y:[0.45,1.15], z:[-0.08,0.08], f:0.015, v:1.0 },
-    { comp:'crew', seat:'passenger', seatIdx:2, x:[-0.26,-0.14], y:[0.45,1.15], z:[-0.30,-0.08], f:0.015, v:1.0 },
-    { comp:'crew', seat:'passenger', seatIdx:3, x:[-0.26,-0.14], y:[0.45,1.15], z:[0.08,0.30], f:0.015, v:1.0 },
-    { comp:'engine', x:[-0.46,-0.28], y:[0.45,1.05], z:[-0.20,0.20], f:'ENG', v:0.25 },
-    { comp:'tracks', x:[-0.46,-0.36], y:[0.45,1.00], z:[-0.50,-0.375], f:0.17, v:0.25 },
-    { comp:'tracks', x:[-0.46,-0.36], y:[0.45,1.00], z:[0.375,0.50], f:0.17, v:0.25 },
-    { comp:'tracks', x:[-0.50,0.50], y:[0,0.45], z:[-0.50,-0.375], eqFix:20, pathFix:100, v:5 },
-    { comp:'tracks', x:[-0.50,0.50], y:[0,0.45], z:[0.375,0.50], eqFix:20, pathFix:100, v:5 }
-  ];
-}
-/* BTR：引擎後置、駕駛前左／車長前右、中部載員側壁對坐、頂部槍塔 */
-function _pbWheeled(H){
+}/* BMP-1/2：引擎前置右側、駕駛前置左側、單／雙人炮塔、後部載員艙 */
+function _pbIFVFront(vid,H,twoMan){
+  var _b=(typeof VEHICLE_HEIGHT_BANDS!=='undefined')?VEHICLE_HEIGHT_BANDS[vid]:null;
+  /* 組件按實高就位：F=h1 車底；D=h3 車體頂(炮塔環基)；R=h4 炮塔頂；H 含車頂武器。
+     車體組件高度＝該組件自身實高（引擎＝機組高），不填滿車體。 */
+  var F=_b?_b.h1:0.40, D=_b?_b.h3:1.63, R=(_b&&_b.h4!=null)?Math.min(_b.h4,H):H;
   var a = [
-    { comp:'crew', seat:'driver', x:[0.32,0.45], y:[0.48,1.25], z:[-0.30,-0.06], f:0.015, v:1.0 },
-    { comp:'crew', seat:'commander', x:[0.32,0.45], y:[0.48,1.25], z:[0.06,0.30], f:0.015, v:1.0 },
-    { comp:'ammoRack', x:[-0.06,0.14], y:[0.48,1.20], z:[-0.40,-0.24], f:0.17, v:0.2 },
-    { comp:'ammoRack', x:[-0.06,0.14], y:[0.48,1.20], z:[0.24,0.40], f:0.17, v:0.2 },
-    { comp:'turret', x:[-0.02,0.16], y:[1.36,H*0.88], z:[-0.20,0.20], f:0.08, v:0.25 },
-    { comp:'weapon', slot:'main', x:[0.04,0.12], y:[1.42,H*0.84], z:[-0.05,0.05], f:0.50, v:0.25 },
-    { comp:'weapon', slot:'coax', x:[0.04,0.10], y:[1.40,H*0.78], z:[0.06,0.12], f:0.30, v:0.5 },
-    { comp:'crew', seat:'gunner', x:[0.00,0.12], y:[1.36,H*0.86], z:[-0.16,0.16], f:0.015, v:1.0 },
-    { comp:'crew', seat:'player', x:[-0.04,0.05], y:[0.50,1.35], z:[-0.10,0.10], f:0.015, v:1.0 },
-    { comp:'engine', x:[-0.46,-0.26], y:[0.48,1.58], z:[-0.24,0.24], f:'ENG', v:0.25 },
-    { comp:'obstacle', x:[-0.24,-0.10], y:[0.48,1.00], z:[-0.42,-0.28], f:0.11 },
-    { comp:'obstacle', x:[-0.24,-0.10], y:[0.48,1.00], z:[0.28,0.42], f:0.11 }
+    { comp:'crew', seat:'driver', x:[0.30,0.44], y:[F,F+0.70], z:[-0.30,-0.06], f:0.015, v:1.0 },
+    /* UTD-20 機組高 0.76；前置右側，與駕駛左右相鄰 */
+    { comp:'engine', x:[0.24,0.42], y:[F,F+0.76], z:[0.06,0.34], f:'ENG', v:0.25 },
+    { comp:'tracks', x:[0.24,0.36], y:[F,F+0.60], z:[-0.50,-0.375], f:0.17, v:0.25 },
+    { comp:'tracks', x:[0.24,0.36], y:[F,F+0.60], z:[0.375,0.50], f:0.17, v:0.25 },
+    { comp:'ammoRack', x:[-0.16,0.10], y:[F,F+0.55], z:[-0.34,-0.10], f:0.17, v:0.2 },
+    { comp:'turret', x:[-0.10,0.14], y:[D,R], z:[-0.22,0.22], f:0.08, v:0.25 },
+    { comp:'weapon', slot:'main', x:[0.00,0.08], y:[D+0.04,R-0.09], z:[-0.05,0.05], f:0.50, v:0.25 },
+    { comp:'weapon', slot:'coax', x:[0.00,0.06], y:[D+0.04,R-0.23], z:[0.06,0.12], f:0.30, v:0.5 },
+    { comp:'crew', seat:'gunner', x:[-0.06,0.06], y:[D,R-0.045], z:[-0.20,-0.04], f:0.015, v:1.0 },
+    { comp:'crew', seat:'player', x:[-0.20,-0.10], y:[F+0.05,F+0.90], z:[-0.10,0.10], f:0.015, v:1.0 },
+    { comp:'obstacle', x:[-0.42,-0.20], y:[F,F+0.50], z:[-0.30,0.30], f:0.11 }
+  ];
+  if(twoMan) a.push({ comp:'crew', seat:'commander', x:[-0.06,0.06], y:[D,R-0.045], z:[0.04,0.20], f:0.015, v:1.0 });
+  else a.push({ comp:'crew', seat:'commander', x:[0.16,0.28], y:[F,F+0.70], z:[-0.30,-0.06], f:0.015, v:1.0 }); /* BMP-1：車長在駕駛後方車體內 */
+  for(var i=0;i<3;i++){
+    a.push({ comp:'crew', seat:'passenger', seatIdx:i*2,   x:[-0.40+i*0.13,-0.30+i*0.13], y:[F+0.05,F+0.90], z:[-0.36,-0.14], f:0.015, v:1.0 });
+    a.push({ comp:'crew', seat:'passenger', seatIdx:i*2+1, x:[-0.40+i*0.13,-0.30+i*0.13], y:[F+0.05,F+0.90], z:[0.14,0.36], f:0.015, v:1.0 });
+  }
+  if(H-R>0.01) a.push({ comp:'weapon', slot:'roof', x:[-0.03,0.03], y:[R,H], z:[0.06,0.17], eqFix:8, pathFix:40, v:10 });
+  a.push({ comp:'tracks', x:[-0.50,0.50], y:[0,F], z:[-0.50,-0.375], eqFix:20, pathFix:100, v:5 });
+  a.push({ comp:'tracks', x:[-0.50,0.50], y:[0,F], z:[0.375,0.50], eqFix:20, pathFix:100, v:5 });
+  return a;
+}/* BMP-3 / BMD-4：引擎後置扁平、駕駛前中、彈盤戰鬥室地板、前側與後部載員 */
+function _pbIFVRear(vid,H){
+  var _b=(typeof VEHICLE_HEIGHT_BANDS!=='undefined')?VEHICLE_HEIGHT_BANDS[vid]:null;
+  /* 組件按實高就位：F=h1 車底；D=h3 車體頂(炮塔環基)；R=h4 炮塔頂；H 含車頂武器。
+     車體組件高度＝該組件自身實高（引擎＝機組高），不填滿車體。 */
+  var F=_b?_b.h1:0.45, D=_b?_b.h3:1.68, R=(_b&&_b.h4!=null)?Math.min(_b.h4,H):H;
+  return [
+    { comp:'crew', seat:'driver', x:[0.32,0.44], y:[F,F+0.65], z:[-0.10,0.10], f:0.015, v:1.0 },
+    { comp:'crew', seat:'passenger', seatIdx:0, x:[0.28,0.40], y:[F,F+0.75], z:[-0.36,-0.14], f:0.015, v:1.0 },
+    { comp:'crew', seat:'passenger', seatIdx:1, x:[0.28,0.40], y:[F,F+0.75], z:[0.14,0.36], f:0.015, v:1.0 },
+    { comp:'ammoRack', ring:{ro:0.85,ri:0.45}, y:[F,F+0.55], f:0.17, v:0.2 },
+    { comp:'turret', x:[-0.10,0.12], y:[D,R], z:[-0.24,0.24], f:0.08, v:0.25 },
+    { comp:'weapon', slot:'main', x:[-0.02,0.06], y:[D+0.06,R-0.15], z:[-0.06,0.06], f:0.50, v:0.25 },
+    { comp:'weapon', slot:'secondary', x:[-0.02,0.06], y:[D+0.06,R-0.20], z:[0.07,0.13], f:0.30, v:0.5 },
+    { comp:'weapon', slot:'coax', x:[-0.02,0.05], y:[D+0.04,R-0.36], z:[-0.13,-0.07], f:0.30, v:0.5 },
+    { comp:'crew', seat:'gunner', x:[-0.06,0.05], y:[D,R-0.05], z:[-0.22,-0.05], f:0.015, v:1.0 },
+    { comp:'crew', seat:'commander', x:[-0.06,0.05], y:[D,R-0.05], z:[0.05,0.22], f:0.015, v:1.0 },
+    { comp:'crew', seat:'player', x:[-0.26,-0.14], y:[F,F+0.70], z:[-0.08,0.08], f:0.015, v:1.0 },
+    { comp:'crew', seat:'passenger', seatIdx:2, x:[-0.26,-0.14], y:[F,F+0.70], z:[-0.30,-0.08], f:0.015, v:1.0 },
+    { comp:'crew', seat:'passenger', seatIdx:3, x:[-0.26,-0.14], y:[F,F+0.70], z:[0.08,0.30], f:0.015, v:1.0 },
+    /* UTD-29/32 扁平機組高 0.60，後置 */
+    { comp:'engine', x:[-0.46,-0.28], y:[F,F+0.60], z:[-0.20,0.20], f:'ENG', v:0.25 },
+    { comp:'tracks', x:[-0.46,-0.36], y:[F,F+0.55], z:[-0.50,-0.375], f:0.17, v:0.25 },
+    { comp:'tracks', x:[-0.46,-0.36], y:[F,F+0.55], z:[0.375,0.50], f:0.17, v:0.25 },
+    { comp:'tracks', x:[-0.50,0.50], y:[0,F], z:[-0.50,-0.375], eqFix:20, pathFix:100, v:5 },
+    { comp:'tracks', x:[-0.50,0.50], y:[0,F], z:[0.375,0.50], eqFix:20, pathFix:100, v:5 }
+  ];
+}/* BTR：引擎後置、駕駛前左／車長前右、中部載員側壁對坐、頂部槍塔 */
+function _pbWheeled(vid,H){
+  var _b=(typeof VEHICLE_HEIGHT_BANDS!=='undefined')?VEHICLE_HEIGHT_BANDS[vid]:null;
+  /* 組件按實高就位：F=h1 車底；D=h3 車體頂(炮塔環基)；R=h4 炮塔頂；H 含車頂武器。
+     車體組件高度＝該組件自身實高（引擎＝機組高），不填滿車體。 */
+  var F=_b?_b.h1:0.48, D=_b?_b.h3:1.92, R=(_b&&_b.h4!=null)?Math.min(_b.h4,H):H;
+  var a = [
+    { comp:'crew', seat:'driver', x:[0.32,0.45], y:[F,F+0.775], z:[-0.30,-0.06], f:0.015, v:1.0 },
+    { comp:'crew', seat:'commander', x:[0.32,0.45], y:[F,F+0.775], z:[0.06,0.30], f:0.015, v:1.0 },
+    { comp:'ammoRack', x:[-0.06,0.14], y:[F,F+0.72], z:[-0.40,-0.24], f:0.17, v:0.2 },
+    { comp:'ammoRack', x:[-0.06,0.14], y:[F,F+0.72], z:[0.24,0.40], f:0.17, v:0.2 },
+    { comp:'turret', x:[-0.02,0.16], y:[D,R], z:[-0.20,0.20], f:0.08, v:0.25 },
+    { comp:'weapon', slot:'main', x:[0.04,0.12], y:[D+0.06,R-0.11], z:[-0.05,0.05], f:0.50, v:0.25 },
+    { comp:'weapon', slot:'coax', x:[0.04,0.10], y:[D+0.04,R-0.27], z:[0.06,0.12], f:0.30, v:0.5 },
+    { comp:'crew', seat:'gunner', x:[0.00,0.12], y:[D,R-0.055], z:[-0.16,0.16], f:0.015, v:1.0 },
+    { comp:'crew', seat:'player', x:[-0.04,0.05], y:[F+0.02,F+0.875], z:[-0.10,0.10], f:0.015, v:1.0 },
+    /* KamAZ-7403 機組高 1.10，後置 */
+    { comp:'engine', x:[-0.46,-0.26], y:[F,F+1.10], z:[-0.24,0.24], f:'ENG', v:0.25 },
+    { comp:'obstacle', x:[-0.24,-0.10], y:[F,F+0.52], z:[-0.42,-0.28], f:0.11 },
+    { comp:'obstacle', x:[-0.24,-0.10], y:[F,F+0.52], z:[0.28,0.42], f:0.11 }
   ];
   for(var i=0;i<3;i++){
-    a.push({ comp:'crew', seat:'passenger', seatIdx:i*2,   x:[-0.04+i*0.11,0.05+i*0.11], y:[0.50,1.35], z:[-0.40,-0.20], f:0.015, v:1.0 });
-    a.push({ comp:'crew', seat:'passenger', seatIdx:i*2+1, x:[-0.04+i*0.11,0.05+i*0.11], y:[0.50,1.35], z:[0.20,0.40], f:0.015, v:1.0 });
+    a.push({ comp:'crew', seat:'passenger', seatIdx:i*2,   x:[-0.04+i*0.11,0.05+i*0.11], y:[F+0.02,F+0.875], z:[-0.40,-0.20], f:0.015, v:1.0 });
+    a.push({ comp:'crew', seat:'passenger', seatIdx:i*2+1, x:[-0.04+i*0.11,0.05+i*0.11], y:[F+0.02,F+0.875], z:[0.20,0.40], f:0.015, v:1.0 });
   }
-  a.push({ comp:'weapon', slot:'roof', x:[-0.03,0.03], y:[H*0.88,H], z:[0.06,0.17], eqFix:8, pathFix:40, v:10 });
+  if(H-R>0.01) a.push({ comp:'weapon', slot:'roof', x:[-0.03,0.03], y:[R,H], z:[0.06,0.17], eqFix:8, pathFix:40, v:10 });
+  /* 輪位：五台 BTR annotation cx 一致量得間距比 0.307/0.390/0.303、跨距 0.562L、
+     跨距中心略偏後 0.015L；輪半徑 annotation r≈0.58m → 0.075L。舊等距 0.22L 是錯的。 */
+  var _wx=[0.266,0.094,-0.126,-0.296];
   for(var w=0;w<4;w++){
-    var wx = 0.34 - w*0.22;
-    a.push({ comp:'tracks', x:[wx-0.05,wx+0.05], y:[0,0.48], z:[-0.50,-0.36], eqFix:20, pathFix:100, v:5 });
-    a.push({ comp:'tracks', x:[wx-0.05,wx+0.05], y:[0,0.48], z:[0.36,0.50], eqFix:20, pathFix:100, v:5 });
+    var wx=_wx[w];
+    a.push({ comp:'tracks', x:[wx-0.075,wx+0.075], y:[0,F], z:[-0.50,-0.36], eqFix:20, pathFix:100, v:5 });
+    a.push({ comp:'tracks', x:[wx-0.075,wx+0.075], y:[0,F], z:[0.36,0.50], eqFix:20, pathFix:100, v:5 });
   }
   return a;
-}
-const VEHICLE_PART_BOXES = {
+}const VEHICLE_PART_BOXES = {
   t80:'tank', t80b:'tank', t80bv:'tank', t80u:'tank', t80uk:'tank', t80um:'tank',
   bmp1:'ifvFront1', bmp1m:'ifvFront1', bmp2:'ifvFront2',
   bmp3:'ifvRear', bmp3m:'ifvRear',
   bmp3a: 'ifvRear', bmd4:'ifvRear',
   btr80:'wheeled', btr80a:'wheeled', btr82:'wheeled', btr82a:'wheeled', btr90:'wheeled'
 };
-const VEHICLE_BOX_BODY_H = { bmp3a: 2.65 };
 var _PB_CACHE = {};
 /* 展開為米空間盒（車體局部座標）。尺寸表啟動後不變，按 vid 快取。 */
 window._vehPartBoxes = function(vid){
@@ -833,15 +853,12 @@ window._vehPartBoxes = function(vid){
   var L = (typeof window.getVehicleHalfLengthWorld === 'function') ? 2*window.getVehicleHalfLengthWorld(vid) : 0;
   if(!(L>0)) L = 7.0;
   var D = (typeof window.VEHICLE_DIM !== 'undefined' && window.VEHICLE_DIM[vid] && window.VEHICLE_DIM[vid].frontWidth > 0) ? window.VEHICLE_DIM[vid].frontWidth : 3.0;
-  /* rev-bmp3a-radar: 車體佈局身高與實車總高分離。BMP-3A 總高 3.15 含雷達桅，
-     炮塔頂仍在 2.30；用 3.15 生成佈局會使炮塔／乘員盒整體膨脹。 */
-  var BH = (typeof VEHICLE_BOX_BODY_H !== 'undefined' && VEHICLE_BOX_BODY_H[vid]) ? VEHICLE_BOX_BODY_H[vid] : H;
   var raw;
-  if(fam === 'tank') raw = _pbTank(BH);
-  else if(fam === 'ifvFront1') raw = _pbIFVFront(BH, false);
-  else if(fam === 'ifvFront2') raw = _pbIFVFront(BH, true);
-  else if(fam === 'ifvRear') raw = _pbIFVRear(BH);
-  else raw = _pbWheeled(BH);
+  if(fam === 'tank') raw = _pbTank(vid, H);
+  else if(fam === 'ifvFront1') raw = _pbIFVFront(vid, H, false);
+  else if(fam === 'ifvFront2') raw = _pbIFVFront(vid, H, true);
+  else if(fam === 'ifvRear') raw = _pbIFVRear(vid, H);
+  else raw = _pbWheeled(vid, H);
   var slots = _pbWeaponSlots(vid);
   var ef = _PB_ENGINE_F[vid] || 0.12;
   var out = [];
@@ -872,10 +889,10 @@ window._vehPartBoxes = function(vid){
     out.push(b);
   }
   /* Arena-E 都卜勒雷達：炮塔後上方桅杆，2.30 → 實車總高。擊毀 → APS 失效。 */
-  if(vid === 'bmp3a' && H > 2.30){
+  if(vid === 'bmp3a' && VEHICLE_HEIGHT_BANDS[vid] && VEHICLE_HEIGHT_BANDS[vid].h4 != null && H > VEHICLE_HEIGHT_BANDS[vid].h4){
   out.push({ comp:'arenaRadar', seat:null, seatIdx:-1, weaponId:null, internal:'arenaRadar',
   v:0.5, f:0.1, eqFix:8, pathFix:40, ring:null,
-  x0:-0.12*L, x1:0.00*L, z0:-0.08*D, z1:0.08*D, y0:2.30, y1:H });
+  x0:-0.12*L, x1:0.00*L, z0:-0.08*D, z1:0.08*D, y0:VEHICLE_HEIGHT_BANDS[vid].h4, y1:H });
   }
   _PB_CACHE[vid] = out;
   return out;
