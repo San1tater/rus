@@ -5,6 +5,7 @@
  * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
  * - fusion：融合車門（純實色多邊形）
  * - missiles：單發實體導彈
+ * - muzzles[].angle：砲管仰角（度），遊戲端 _setupMuzzles 讀取後驅動曳光／煙jet 方向
  */
 const VEHICLE_ANNOTATION_BMP2 = {
   "id": "bmp2",
@@ -13,16 +14,12 @@ const VEHICLE_ANNOTATION_BMP2 = {
     "w": 545,
     "h": 215
   },
-  "anchor": {
-    "groundY": 0.85,
-    "centerX": 0.5
-  },
   "trackMask": {
     "enabled": true,
     "points": [
       {
-        "x": 0.0029,
-        "y": 0.5709
+        "x": 0.0204,
+        "y": 0.8338
       },
       {
         "x": 0.0467,
@@ -45,16 +42,16 @@ const VEHICLE_ANNOTATION_BMP2 = {
         "y": 0.5446
       },
       {
-        "x": 0.0471,
-        "y": 0.6285
+        "x": 0.0381,
+        "y": 0.6281
       },
       {
-        "x": 0.0464,
-        "y": 0.7794
+        "x": 0.0403,
+        "y": 0.7928
       },
       {
-        "x": 0.0876,
-        "y": 0.8603
+        "x": 0.0854,
+        "y": 0.8717
       },
       {
         "x": 0.1706,
@@ -86,9 +83,9 @@ const VEHICLE_ANNOTATION_BMP2 = {
     "lightAlpha": 0.12,
     "followWheel": 0,
     "useTexture": true,
-    "textureX0": 0.3463,
-    "textureX1": 0.3657,
-    "textureY0": 0.9426,
+    "textureX0": 0.3518,
+    "textureX1": 0.3716,
+    "textureY0": 0.9342,
     "textureY1": 1,
     "bandHeight": 0.08,
     "textureOpacity": 0.85,
@@ -127,9 +124,9 @@ const VEHICLE_ANNOTATION_BMP2 = {
   ],
   "wheels": [
     {
-      "cx": 0.0954,
-      "cy": 0.7234,
-      "r": 0.0482,
+      "cx": 0.0917,
+      "cy": 0.7187,
+      "r": 0.043,
       "rotSpeed": 1
     },
     {
@@ -139,8 +136,8 @@ const VEHICLE_ANNOTATION_BMP2 = {
       "rotSpeed": 1
     },
     {
-      "cx": 0.306,
-      "cy": 0.8648,
+      "cx": 0.3047,
+      "cy": 0.8655,
       "r": 0.0482,
       "rotSpeed": 1
     },
@@ -169,8 +166,8 @@ const VEHICLE_ANNOTATION_BMP2 = {
       "rotSpeed": 1
     },
     {
-      "cx": 0.8159,
-      "cy": 0.6889,
+      "cx": 0.8139,
+      "cy": 0.6971,
       "r": 0.0353,
       "rotSpeed": 1
     }
@@ -298,23 +295,23 @@ const VEHICLE_ANNOTATION_BMP2 = {
   ],
   "weaponAreas": [
     {
-      "id": "ov6a9s2x",
+      "id": "omq3vxb1",
       "polygon": [
         {
-          "x": 0.5965,
-          "y": 0.234
+          "x": 0.5983,
+          "y": 0.2318
         },
         {
-          "x": 0.5962,
-          "y": 0.2836
+          "x": 0.598,
+          "y": 0.2814
         },
         {
-          "x": 0.8454,
-          "y": 0.2749
+          "x": 0.8472,
+          "y": 0.2727
         },
         {
-          "x": 0.8453,
-          "y": 0.2329
+          "x": 0.8471,
+          "y": 0.2307
         }
       ],
       "name": "武器 1",
@@ -328,21 +325,24 @@ const VEHICLE_ANNOTATION_BMP2 = {
       "y": 0.2535,
       "name": "槍口 1",
       "weaponId": "2a42",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.5435,
       "y": 0.2579,
       "name": "槍口 2",
       "weaponId": "pkt",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.4309,
       "y": 0.0347,
       "name": "槍口 3",
       "weaponId": "atgm",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     }
   ],
   "btrDoorTimeline": {

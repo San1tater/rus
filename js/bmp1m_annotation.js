@@ -5,6 +5,7 @@
  * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
  * - fusion：融合車門（純實色多邊形）
  * - missiles：單發實體導彈
+ * - muzzles[].angle：砲管仰角（度），遊戲端 _setupMuzzles 讀取後驅動曳光／煙jet 方向
  */
 const VEHICLE_ANNOTATION_BMP1M = {
   "id": "bmp1m",
@@ -12,10 +13,6 @@ const VEHICLE_ANNOTATION_BMP1M = {
   "imageSize": {
     "w": 545,
     "h": 204
-  },
-  "anchor": {
-    "groundY": 0.85,
-    "centerX": 0.5
   },
   "trackMask": {
     "enabled": true,
@@ -114,6 +111,12 @@ const VEHICLE_ANNOTATION_BMP1M = {
     },
     {
       "id": "2a72",
+      "name": "30mm 2A72",
+      "type": "機炮",
+      "caliber": "30mm"
+    },
+    {
+      "id": "2a42",
       "name": "30mm 2A42",
       "type": "機炮",
       "caliber": "30mm"
@@ -189,24 +192,24 @@ const VEHICLE_ANNOTATION_BMP1M = {
             "y": 0.6053
           },
           {
-            "x": 0.0144,
-            "y": 0.6329
+            "x": 0.0112,
+            "y": 0.6572
           },
           {
-            "x": -0.023,
-            "y": 0.6322
+            "x": -0.0388,
+            "y": 0.6578
           },
           {
-            "x": -0.0332,
-            "y": 0.6148
+            "x": -0.0499,
+            "y": 0.6156
           },
           {
-            "x": -0.0339,
-            "y": 0.4541
+            "x": -0.0497,
+            "y": 0.4571
           },
           {
-            "x": -0.0291,
-            "y": 0.4219
+            "x": -0.0413,
+            "y": 0.4196
           }
         ],
         "fillColor": "#000000",
@@ -226,35 +229,35 @@ const VEHICLE_ANNOTATION_BMP1M = {
   "missiles": [],
   "weaponAreas": [
     {
-      "id": "onpjf5i7",
+      "id": "oos2576w",
       "polygon": [
         {
           "x": 0.4033,
           "y": 0.0894
         },
         {
-          "x": 0.4025,
-          "y": 0.1345
+          "x": 0.403,
+          "y": 0.1312
         },
         {
-          "x": 0.6976,
-          "y": 0.1439
+          "x": 0.4148,
+          "y": 0.1318
         },
         {
-          "x": 0.7049,
-          "y": 0.1373
+          "x": 0.4151,
+          "y": 0.1383
         },
         {
-          "x": 0.7049,
-          "y": 0.1055
+          "x": 0.5089,
+          "y": 0.143
         },
         {
-          "x": 0.6955,
-          "y": 0.09
+          "x": 0.6936,
+          "y": 0.1428
         },
         {
-          "x": 0.4358,
-          "y": 0.0905
+          "x": 0.6932,
+          "y": 0.0971
         }
       ],
       "name": "武器 1",
@@ -268,14 +271,16 @@ const VEHICLE_ANNOTATION_BMP1M = {
       "y": 0.141,
       "name": "槍口 1",
       "weaponId": "pkt",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.6924,
       "y": 0.1216,
       "name": "槍口 2",
       "weaponId": "2a72",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     }
   ],
   "btrDoorTimeline": {

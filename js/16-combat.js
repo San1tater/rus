@@ -803,7 +803,7 @@ window._drawBulletShape = function(ctx, px, py, opts){
   /* 手雷图标 */
   if(opts.isGrenade && opts.grenadeId){
     var _gimg = (typeof getHeroImg === 'function') ? getHeroImg(window.getItemIconPath(opts.grenadeId)) : null;
-    var _gsize = 20 * scale;
+    var _gsize = (window.GRENADE_ICON_PX || 20) * scale;
     if(_gimg && _gimg.complete && _gimg.naturalWidth){
       ctx.save();
       ctx.translate(px, py);

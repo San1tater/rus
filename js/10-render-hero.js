@@ -366,7 +366,7 @@ var px=bt?bt.px:0.15;return{x:(px*W-sw/2+lx)/W,y:ly/H};}
 /* rev-corpse-fit: 倒地包圍盒防裁切 —— 僅在會被畫布邊緣裁切時最小位移（所有渲染器同一規則）。
    +90° 面朝右：頭/盔向右伸 ~500 原圖單位、盔下緣向地面下伸 ~82；flip 鏡像。 */
 window._corpseFit=function(px,py){/*PM-STANCE*/return{x:px,y:py};};
-function drawBlockHero(ctx,canvasW,canvasH,animName,frameIdx,weaponSlotOverride,charHFactor,centerXRatio,legOverride,healItemId,fallProgress,flipXArg){
+function drawBlockHero(ctx,canvasW,canvasH,animName,frameIdx,weaponSlotOverride,charHFactor,centerXRatio,legOverride,healItemId,fallProgress,flipXArg,throwItemId){
 var R=window.PuppetRig;
 var eq=(typeof state!=='undefined'&&state.player&&state.player.equipped)||{};
 var s=(canvasH*(charHFactor||CHAR_HEIGHT_FACTOR))/386,gy=canvasH*0.95;
@@ -375,7 +375,7 @@ var an=_pmAnim(animName),flip=!!flipXArg;
 var sl=_pmSlot(eq,weaponSlotOverride),id=sl?eq[sl]:null;
 
 R.draw(ctx,cx,gy,s,{anim:an,frame:frameIdx|0,flip:flip,slot:sl,weaponId:id,
-head:eq.head,top:eq.top,healId:healItemId,ammoBox:_pmAmmo(id)});}
+head:eq.head,top:eq.top,healId:healItemId,throwId:throwItemId,ammoBox:_pmAmmo(id)});}
 
 function renderExploreHeroCanvas(){
   if(typeof currentTab === 'undefined' || currentTab !== 'explore') return;
@@ -426,10 +426,15 @@ function renderBattleHeroCanvas(){
   if(typeof battle === 'undefined' || !battle) return;
   const canvas = document.getElementById('hero-battle-canvas');
   if(!canvas) return;
+  /* rev-hero-canvas-dpr: 背板對齊裝置像素，邏輯座標不變（drawBlockHero 仍收 w/h）。
+     clientWidth 取整與 CSS 實寬有亞像素差，1:1 背板會再被縮放一次 → 邊緣糊。 */
   const w = canvas.clientWidth || 220;
   const h = canvas.clientHeight || 118;
-  if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
+  const _dpr = Math.max(1, Math.min(2, (window.devicePixelRatio || 1)));
+  const _bw = Math.round(w * _dpr), _bh = Math.round(h * _dpr);
+  if(canvas.width !== _bw || canvas.height !== _bh){ canvas.width = _bw; canvas.height = _bh; }
   const ctx = canvas.getContext('2d');
+  ctx.setTransform(_dpr, 0, 0, _dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
   const btr = window.BTRSupport;
   const _onBoard = !!(btr && btr.active);
@@ -441,6 +446,14 @@ function renderBattleHeroCanvas(){
   const offsetX = (_onBoard && !_isWreck) ? (btr.playerXOffset || 0) : 0;
   const overrideSlot = battle.consuming ? 'hidden'
     : (battleHeroAnim.eqSlot || ((battle.weaponSlot === 'throwable') ? 'hidden' : battle.weaponSlot));
+  /* rev-grenade-hand-state:start —— 手上內容由狀態推導，消耗品與手雷互斥。
+     手雷是武器：走 throwId（尺寸同飛行彈），不走消耗品的 healId。
+     投擲欄＋有庫存 → 手上就是那顆；釋放後庫存遞減，自動換下一顆。 */
+  var _handHealId = battle.consuming ? (battleHeroAnim.healItem || null) : null;
+  var _handThrowId = (!battle.consuming && battle.weaponSlot === 'throwable'
+    && typeof getThrowableCount === 'function' && getThrowableCount() > 0)
+    ? ((state.player.equipped && state.player.equipped.throwable) || null) : null;
+  /* rev-grenade-hand-state:end */
   if(clipH < 1.0){
     ctx.save();
     ctx.beginPath();
@@ -448,7 +461,7 @@ function renderBattleHeroCanvas(){
     ctx.clip();
   }
   drawBlockHero(ctx, w, h, battleHeroAnim.name, battleHeroAnim.frame, overrideSlot,
-    CHAR_HEIGHT_FACTOR, 0.5 + offsetX, battleHeroAnim.legOverride || null, battleHeroAnim.healItem || null);
+    CHAR_HEIGHT_FACTOR, 0.5 + offsetX, battleHeroAnim.legOverride || null, _handHealId, undefined, undefined, _handThrowId);
   if(clipH < 1.0) ctx.restore();
 }
 

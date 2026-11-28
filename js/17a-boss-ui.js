@@ -82,7 +82,14 @@ function _getBossThrowHandPosAtFrame(frameIdx){
   const spriteH = (typeof battle.playerCanvasH === 'number' && battle.playerCanvasH > 0) ? battle.playerCanvasH : BATTLE_HERO_SPRITE_H;
   const scale = (spriteH * CHAR_HEIGHT_FACTOR) / 386;
   const pxN = (typeof battle.px === 'number') ? battle.px : 0.25;
-  return window.getCharLayerCornerN('front_arm', 1, 0, {
+  /* rev-throw-hand-anchor: front_arm 不在 registry（id 由 __PUPPET_BAKE__.ids 烘焙，
+     實為 front_forearm），find 失敗 → 回傳固定預設 (0.25,0.5)，手雷才會憑空出現在定點。
+     錨點 (.88,.15) 對齊 PuppetRig 的 healId point()，釋放瞬間無跳變。 */
+  /* rev-grenade-hand-anchor: 手部錨點 = front_forearm 角點 (1,0)，翻面 (0,0) ——
+     標注工具原文「方向線為此面所有武器共用」。手雷是武器，手持中心與此釋放起點
+     必須同一個點；先前誤用消耗品內部點 (.88,.15)，兩者不同故釋放跳變。
+     front_arm 不在 registry，find 失敗會回傳固定預設 (0.25,0.5)。 */
+  return window.getCharLayerCornerN('front_forearm', 1, 0, {
     animName: 'attack_melee',
     frameIdx: frameIdx,
     canvasW: W, canvasH: H,
@@ -1035,27 +1042,41 @@ function buildBattleWeaponInfo(){
   return wdef.name + ' ｜ ' + battle.ammoInMag + '/' + (wdef.mag || 0) + rarityIcon + '備彈 ' + ammoTotal + (battle.reloading ? '｜裝填中…' : '');
 }
 
+var _bclPrev = null;
 function refreshBattleControlsLive(){
   if(!battle) return;
+  /* rev-fire-live: 可用性是連續變化狀態（射程／發現／裝填／使用中）的推導值。
+     舊版只在離散事件重算 → 走進射程後按鈕仍灰。現在 battleLoop 每幀呼叫，
+     判據沿用同一條（不新增第二套定義），但只在值真的改變時寫 DOM，
+     避免每幀重建 innerHTML。renderBattleControls 重建 DOM 後元素身分改變，
+     快取自動失效，heal-btn 等無模板初值的狀態會被重新套用。 */
   const info = document.getElementById('battle-ammo-info');
-  if(info) info.innerHTML = buildBattleWeaponInfo();
   const fb = document.getElementById('fire-btn');
+  const hb = document.getElementById('heal-btn');
+  const ds = document.getElementById('battle-dmg-status');
+  if(!_bclPrev || _bclPrev.b !== battle || _bclPrev.fb !== fb || _bclPrev.hb !== hb || _bclPrev.info !== info){
+    _bclPrev = { b:battle, fb:fb, hb:hb, info:info, html:null, fire:null, label:null, heal:null, dmg:null };
+  }
+  if(info){
+    const _html = buildBattleWeaponInfo();
+    if(_html !== _bclPrev.html){ info.innerHTML = _html; _bclPrev.html = _html; }
+  }
   if(fb){
     const canFire = !battle.reloading && !battle.consuming && (typeof isAimPartInRange !== 'function' || isAimPartInRange()); /* rev-detect: 未發現/超射程即灰掉 */
-    fb.classList.toggle('disabled', !canFire);
-    fb.textContent = battle.reloading ? '裝填' : (battle.consuming ? '使用中' : '攻擊');
+    if(canFire !== _bclPrev.fire){ fb.classList.toggle('disabled', !canFire); _bclPrev.fire = canFire; }
+    const _label = battle.reloading ? '裝填' : (battle.consuming ? '使用中' : '攻擊');
+    if(_label !== _bclPrev.label){ fb.textContent = _label; _bclPrev.label = _label; }
   }
-  const hb = document.getElementById('heal-btn');
   if(hb){
     const now = performance.now();
     const canHeal = !battle.consuming && !battle.reloading && now >= (battle.healDisabledUntil || 0) && battle.playerHp < battle.playerMaxHp;
-    hb.classList.toggle('disabled', !canHeal);
+    if(canHeal !== _bclPrev.heal){ hb.classList.toggle('disabled', !canHeal); _bclPrev.heal = canHeal; }
   }
-  const ds = document.getElementById('battle-dmg-status');
-  if(ds) ds.textContent = '對 Boss 傷害：' + Math.round(battle.damageDealt) + ' ｜ ' + (battle.engaged ? '⚔️ 已交戰' : '⏸️ 準備中');
-}
-
-function renderBattleControls(z3){
+  if(ds){
+    const _dmg = '對 Boss 傷害：' + Math.round(battle.damageDealt) + ' ｜ ' + (battle.engaged ? '⚔️ 已交戰' : '⏸️ 準備中');
+    if(_dmg !== _bclPrev.dmg){ ds.textContent = _dmg; _bclPrev.dmg = _dmg; }
+  }
+}function renderBattleControls(z3){
   const w = battle.weapon;
   const wdef = w ? w.def : null;
   const _allModes = wdef && wdef.modes ? wdef.modes : ['點射'];
@@ -1666,21 +1687,9 @@ _bgEl.style.backgroundSize = 'auto 100%';
 _bgEl.style.backgroundRepeat = 'repeat-x';
 }
 }
-/* 走路幀 */
-if(battle._walkFrame === undefined) battle._walkFrame = 0;
-if(battle._walkTick === undefined) battle._walkTick = now;
-{
-const _walkAnim = GAME_ANIMS.walk;
-const _walkInterval = 1000 / _walkAnim.fps;
-if(canMove && hasMoveInput){
-if(now - battle._walkTick >= _walkInterval){
-battle._walkTick = now;
-battle._walkFrame = (battle._walkFrame + 1) % _walkAnim.frameCount;
-}
-} else {
-battle._walkTick = now;
-}
-}
+/* rev-anim-single-clock: 幀唯一擁有者 = updateBattleHeroAnim（依當前動畫自身 fps）。
+   舊版 _walkFrame 恆以 walk.fps(10) 推進，updateBattleHeroAnim 再依 run.fps(16) 推一次，
+   兩時鐘疊加 → 偶爾跳 2 格偶爾停 1 格；跑步時 fps 不同更產生拍頻抖動。 */
 /* 玩家動畫優先級：攻擊流程 > 受擊 > 治療 > 移動 > idle */
 {
 let _wantAnim;
@@ -1705,9 +1714,7 @@ battleHeroAnim.legTransitionFrom = battleHeroAnim.frame || 0;
 }
 battleHeroAnim.name = _wantAnim;
 battleHeroAnim.lastUpdate = now;
-battleHeroAnim.frame = (_wantAnim === 'walk' || _wantAnim === 'run') ? battle._walkFrame : 0;
-} else if(_wantAnim === 'walk' || _wantAnim === 'run'){
-battleHeroAnim.frame = battle._walkFrame;
+battleHeroAnim.frame = 0; /* rev-anim-single-clock: 換動畫才歸零 */
 }
 if(battleHeroAnim.legTransitionStart){
 const _el = now - battleHeroAnim.legTransitionStart;
@@ -1785,6 +1792,9 @@ if(_hap) _hap.style.width = Math.max(0, battle.playerArmor / battle.playerMaxArm
 if(_bhp) _bhp.style.width = Math.max(0, battle.bossHp / battle.bossMaxHp * 100) + '%';
 if(_bap) _bap.style.width = Math.max(0, battle.bossArmor / battle.bossMaxArmor * 100) + '%';
 if(_bsh && battle.shieldMaxHp > 0) _bsh.style.width = Math.max(0, battle.shieldHp / battle.shieldMaxHp * 100) + '%';
+/* rev-fire-live: 每幀重算攻擊／治療可用性 —— 射程與發現狀態連續變化，
+   離散事件重算會讓玩家走進射程後按鈕仍灰。DOM 寫入已在函式內做變更偵測。 */
+refreshBattleControlsLive();
 try{ if(window._bossOffscreenUpdate) window._bossOffscreenUpdate(); }catch(e){}
 requestAnimationFrame(battleLoop);
 }
@@ -1985,8 +1995,8 @@ function startBossBattle(bid, opts){
     var bx, by, _tD = 0;
     if(typeof bb.worldStartX === 'number' && typeof bb.vx === 'number' && bb.T > 0){
       if(bb.releaseAt && nowMs < bb.releaseAt){
-        var _hp = _getBossThrowHandPos();
-        bx = _hp.x * W; by = _hp.y * H;
+      /* rev-throw-hand-anchor: 釋放前由 rig 繪於前手之下，FX 層（z10）不再搶畫 */
+      continue;
       } else {
         var _el = Math.max(0, (nowMs - bb.start) / 1000);
         if(_el > bb.T + 0.5) continue;

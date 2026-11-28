@@ -209,7 +209,7 @@ function _stPassW(p){
       const g = p.grenades[i];
       if(!g) continue;
       const gid = typeof g === 'string' ? g : g.id;
-      if(gid) w += (ITEM_WEIGHT[gid] || 0.5);
+      if(gid) w += getItemWeight(gid, (g && g.rarity) || '一般'); /* rev-weight-per-slot */
     }
   }
   return w;
@@ -1086,7 +1086,7 @@ function _stDetail(idx){
 const gi = p.grenades[g];
 const gid = gi ? (typeof gi === 'string' ? gi : gi.id) : null;
 const gr = gi ? (typeof gi === 'string' ? '一般' : (gi.rarity || '一般')) : null;
-const gw = gid ? (ITEM_WEIGHT[gid] || 0.5) : 0;
+const gw = gid ? getItemWeight(gid, gr || '一般') : 0; /* rev-weight-per-slot */
 const bg = gid ? rarityBg(gr) : '';
 const _stock141 = gid ? ((typeof invCount === 'function') ? invCount(gid, gr) : 0) : 0;
 const _oos141 = !!(gid && _stock141 <= 0);
@@ -1319,7 +1319,7 @@ function _stPickGrenade(idx, gi){
   const ci = p.grenades[gi];
   const cid = ci ? (typeof ci === 'string' ? ci : ci.id) : null;
   const cr = ci ? (typeof ci === 'string' ? '一般' : (ci.rarity || '一般')) : null;
-  const cw = cid ? (ITEM_WEIGHT[cid] || 0.5) : 0;
+  const cw = cid ? getItemWeight(cid) : 0; /* rev-weight-per-slot */
   const bw = tw - cw;
 
   /* rev141: 手榴彈 = 配置；裝/卸不扣庫存，投擲時才扣。列表含「當前已配置」即使庫存 0 */
@@ -1355,7 +1355,7 @@ function _stPickGrenade(idx, gi){
   if(!list.length) body += '<div class="empty-hint">庫存沒有手榴彈</div>';
   for(let li = 0; li < list.length; li++){
     const it = list[li];
-    const gw = ITEM_WEIGHT[it.id] || 0.5;
+    const gw = getItemWeight(it.id, it.rarity || '一般'); /* rev-weight-per-slot */
     const dis = (bw + gw) > mw;
     const _stockCol = it.count > 0 ? '#4caf50' : '#e05252';
     const _stockTxt = it.count > 0 ? ('×' + it.count) : '缺貨';

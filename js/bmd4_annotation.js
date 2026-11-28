@@ -5,6 +5,7 @@
  * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
  * - fusion：融合車門（純實色多邊形）
  * - missiles：單發實體導彈
+ * - muzzles[].angle：砲管仰角（度），遊戲端 _setupMuzzles 讀取後驅動曳光／煙jet 方向
  */
 const VEHICLE_ANNOTATION_BMD4 = {
   "id": "bmd4",
@@ -12,10 +13,6 @@ const VEHICLE_ANNOTATION_BMD4 = {
   "imageSize": {
     "w": 556,
     "h": 193
-  },
-  "anchor": {
-    "groundY": 0.85,
-    "centerX": 0.5
   },
   "trackMask": {
     "enabled": true,
@@ -258,7 +255,7 @@ const VEHICLE_ANNOTATION_BMD4 = {
   "missiles": [],
   "weaponAreas": [
     {
-      "id": "omtiwlzc",
+      "id": "om7oproz",
       "polygon": [
         {
           "x": 0.6394,
@@ -289,8 +286,8 @@ const VEHICLE_ANNOTATION_BMD4 = {
           "y": 0.2816
         },
         {
-          "x": 1.0026,
-          "y": 0.2794
+          "x": 0.9964,
+          "y": 0.2808
         },
         {
           "x": 0.9958,
@@ -304,25 +301,28 @@ const VEHICLE_ANNOTATION_BMD4 = {
   ],
   "muzzles": [
     {
-      "x": 0.9926,
-      "y": 0.2389,
+      "x": 0.9912,
+      "y": 0.2428,
       "name": "槍口 1",
       "weaponId": "2a70",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.6229,
       "y": 0.246,
       "name": "槍口 2",
       "weaponId": "pkt",
-      "layerOrder": "below"
+      "layerOrder": "below",
+      "angle": 0
     },
     {
       "x": 0.9449,
       "y": 0.2423,
       "name": "槍口 3",
       "weaponId": "2a72",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     }
   ],
   "btrDoorTimeline": {

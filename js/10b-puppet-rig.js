@@ -135,7 +135,7 @@ for(i=0;i<ord.length;i++){var id=ord[i];
 if(id==='@R'){
 if(o.ammoBox){var ap=anchorPt(f,q.d.L[B.gun]);fitImg(ctx,pathImg('icons/garden/ammo_pack.png'),ap.x,ap.y,120,0);}
 else if(c)drawGun(ctx,f,q,c,o);
-if(o.healId){var hp=point('front_forearm',.88,.15,q.name,q.i,f==='L');if(hp)fitImg(ctx,iconImg(o.healId),hp.x,hp.y,140,45);}
+if(o.healId){var hp=point('front_forearm',.88,.15,q.name,q.i,f==='L');if(hp)fitImg(ctx,iconImg(o.healId),hp.x,hp.y,140,45);}/* rev-grenade-is-weapon */if(o.throwId&&window._drawBulletShape){var tu=(f==='L')?0:1;var tp=point('front_forearm',tu,0,q.name,q.i,f==='L');if(tp)window._drawBulletShape(ctx,tp.x,tp.y,{isGrenade:true,grenadeId:o.throwId,t:0,scale:1/s});}
 for(var a1=0;a1<pl.R.length;a1++)drawProp(ctx,pl.R[a1]);continue;}
 if(id==='@L'){for(var a2=0;a2<pl.L.length;a2++)drawProp(ctx,pl.L[a2]);continue;}
 var k=B.ix[id];if(k==null)continue;var d=q.d.L[k],M=lm(d);

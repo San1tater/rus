@@ -5,6 +5,7 @@
  * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
  * - fusion：融合車門（純實色多邊形）
  * - missiles：單發實體導彈
+ * - muzzles[].angle：砲管仰角（度），遊戲端 _setupMuzzles 讀取後驅動曳光／煙jet 方向
  */
 const VEHICLE_ANNOTATION_BTR90 = {
   "id": "btr90",
@@ -12,10 +13,6 @@ const VEHICLE_ANNOTATION_BTR90 = {
   "imageSize": {
     "w": 598,
     "h": 243
-  },
-  "anchor": {
-    "groundY": 1,
-    "centerX": 0.5
   },
   "trackMask": {
     "enabled": false,
@@ -147,12 +144,12 @@ const VEHICLE_ANNOTATION_BTR90 = {
             "y": 0.5057
           },
           {
-            "x": 0.4279,
-            "y": 0.754
+            "x": 0.4359,
+            "y": 0.7124
           },
           {
-            "x": 0.4895,
-            "y": 0.7515
+            "x": 0.4782,
+            "y": 0.7121
           },
           {
             "x": 0.5037,
@@ -161,12 +158,12 @@ const VEHICLE_ANNOTATION_BTR90 = {
         ],
         "fillColor": "#000000",
         "hingeP1": {
-          "x": 0.4279,
-          "y": 0.754
+          "x": 0.4359,
+          "y": 0.7124
         },
         "hingeP2": {
-          "x": 0.4895,
-          "y": 0.7515
+          "x": 0.4782,
+          "y": 0.7121
         },
         "openRotation": 110,
         "frontUses": "image_crop",
@@ -179,7 +176,7 @@ const VEHICLE_ANNOTATION_BTR90 = {
   "missiles": [],
   "weaponAreas": [
     {
-      "id": "onn7x5pj",
+      "id": "od01uatx",
       "polygon": [
         {
           "x": 0.778,
@@ -209,25 +206,28 @@ const VEHICLE_ANNOTATION_BTR90 = {
   ],
   "muzzles": [
     {
-      "x": 0.9968,
-      "y": 0.2322,
+      "x": 0.9964,
+      "y": 0.2369,
       "name": "槍口 1",
       "weaponId": "2a42",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
-      "x": 0.7215,
-      "y": 0.2348,
+      "x": 0.7216,
+      "y": 0.2378,
       "name": "槍口 2",
       "weaponId": "pkt",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.6367,
       "y": 0.0554,
       "name": "槍口 3",
       "weaponId": "atgm",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": -1
     }
   ],
   "btrDoorTimeline": {

@@ -1441,18 +1441,18 @@ function getItemWeight(id, rarity){
   return w;
 }
 function getTotalWeight(){
+  /* rev-weight-per-slot: 每個裝備框算一件 —— 投擲框亦然，堆疊幾顆都不影響負重。
+     舊版此迴圈已把 throwable 計過一次，尾段又 (ITEM_WEIGHT[tid]||0.5)*tcount
+     再加一次 → 實算 (1+N) 顆，且 fallback 與 getItemWeight 的 ||0 不一致。
+     根修：刪除重複實作，重量一律由 getItemWeight 決定。 */
   var w = 0;
   for(var slot in state.player.equipped){
     var id = state.player.equipped[slot];
     if(!id) continue;
     w += getItemWeight(id, state.player.equippedRarity[slot] || '一般');
   }
-  var tcount = getThrowableCount();
-  var tid = state.player.equipped.throwable;
-  if(tid && tcount > 0) w += (ITEM_WEIGHT[tid] || 0.5) * tcount;
   return Math.round(w * 100) / 100;
-}
-function getWeightColor(w){
+}function getWeightColor(w){
   if(w < WEIGHT_FREE_KG) return '#4caf50';
   var excess = w - WEIGHT_FREE_KG;
   var ratio = Math.min(1, excess / 30);
@@ -1786,16 +1786,40 @@ function findNextConsumable(){
 }
 
 // ===== 投擲物 =====
+/* rev-throw-slot-refresh: 投擲欄唯一刷新入口。
+   equipThrowable / unequipThrowable / ensureThrowableFromBackpack 三處早就呼叫它，
+   但全專案從未定義 → typeof 守衛讓三個入口全是死呼叫，換彈種後圖示不更新。
+   這裡定義一次，三處同時生效；重入守衛防止 renderEquipZone 內的自動遞補回呼造成遞迴。 */
+function _refreshThrowableSlot(){
+  if(_refreshThrowableSlot._busy) return;
+  _refreshThrowableSlot._busy = true;
+  try{
+    var _z2 = (typeof document !== 'undefined') ? document.getElementById('zone2') : null;
+    if(_z2 && typeof window.renderEquipZone === 'function') window.renderEquipZone(_z2);
+    if(typeof battle !== 'undefined' && battle && typeof refreshBattleControlsLive === 'function'){
+      refreshBattleControlsLive();
+    }
+  }catch(e){}
+  finally{ _refreshThrowableSlot._busy = false; }
+}
 function equipThrowable(id, rarity){
+  /* rev-throw-swap-refund: 換裝前先把手上那疊回沖倉庫。
+     舊版直接覆蓋 throwableStock / equipped，舊那疊（可能 400+）憑空消失；
+     unequipThrowable 本來就有回沖，equipThrowable 漏了 —— 補在源頭，所有呼叫者受益。
+     同 id 同稀有度視為續補，兩邊數量相加，不經倉庫繞一圈。 */
+  var _oldId = state.player.equipped.throwable;
+  var _oldRar = state.player.equippedRarity.throwable || '一般';
+  var _oldCnt = state.player.throwableStock || 0;
+  var _same = (_oldId === id && _oldRar === rarity);
+  if(_oldId && _oldCnt > 0 && !_same) invAddRaw(_oldId, _oldRar, _oldCnt);
   var k = invKey(id, rarity);
-  var total = state.inventory[k] || 0;
+  var total = (state.inventory[k] || 0) + (_same ? _oldCnt : 0);
   delete state.inventory[k];
   state.player.throwableStock = total;
   state.player.equipped.throwable = id;
   state.player.equippedRarity.throwable = rarity;
   if(typeof _refreshThrowableSlot === 'function') _refreshThrowableSlot();
-}
-function unequipThrowable(){
+}function unequipThrowable(){
   var id = state.player.equipped.throwable;
   if(!id) return;
   var rarity = state.player.equippedRarity.throwable || '一般';

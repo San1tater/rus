@@ -5,6 +5,7 @@
  * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
  * - fusion：融合車門（純實色多邊形）
  * - missiles：單發實體導彈
+ * - muzzles[].angle：砲管仰角（度），遊戲端 _setupMuzzles 讀取後驅動曳光／煙jet 方向
  */
 const VEHICLE_ANNOTATION_T80UK = {
   "id": "t80uk",
@@ -12,10 +13,6 @@ const VEHICLE_ANNOTATION_T80UK = {
   "imageSize": {
     "w": 790,
     "h": 235
-  },
-  "anchor": {
-    "groundY": 1,
-    "centerX": 0.5
   },
   "trackMask": {
     "enabled": true,
@@ -239,7 +236,7 @@ const VEHICLE_ANNOTATION_T80UK = {
   "missiles": [],
   "weaponAreas": [
     {
-      "id": "oawm0ixo",
+      "id": "oq8udrp9",
       "polygon": [
         {
           "x": 0.5204,
@@ -268,30 +265,33 @@ const VEHICLE_ANNOTATION_T80UK = {
       ],
       "name": "武器 1",
       "weaponId": "2a46m1",
-      "recoilDist": 0.10
+      "recoilDist": 0.1
     }
   ],
   "muzzles": [
     {
-      "x": 0.9983,
-      "y": 0.4098,
+      "x": 1,
+      "y": 0.4179,
       "name": "槍口 1",
       "weaponId": "2a46m1",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.546,
       "y": 0.1021,
       "name": "槍口 2",
       "weaponId": "nsvt",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.5435,
       "y": 0.4307,
       "name": "槍口 3",
       "weaponId": "pkt",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     }
   ],
   "btrDoorTimeline": {

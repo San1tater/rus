@@ -471,3 +471,9 @@ s.life = s.age + lf * 0.25;
 }
 };
 
+/* ===== rev-grenade-is-weapon:start ===== */
+/* 手雷圖標尺寸唯一真相（螢幕 CSS px）。手雷是武器，不是消耗品：
+   消耗品在 rig 走 healId 的 140 rig 單位；手雷手持與飛行必須同一尺寸，
+   否則釋放瞬間會大小跳變。rig 端以 GRENADE_ICON_PX / rigScale 換算 rig 單位。 */
+window.GRENADE_ICON_PX = 20;
+/* ===== rev-grenade-is-weapon:end ===== */

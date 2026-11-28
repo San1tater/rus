@@ -1,10 +1,11 @@
-/* 載具配置：btr80 (由載具標注編輯器 v1.9 生成) */
+/* 載具配置：btr80 (由載具標注編輯器 v2.0 生成) */
 /* - 車輪完整圓形旋轉 + 遮罩下緣鏡像補全
  * - trackMask：車體遮罩折線（遮住輪子上半部），與履帶滾動無關
- * - trackLine：履帶帶子上邊界折線（履帶滾動 + 原圖擦除用），只用於履帶
- * - trackScroll：沿 trackLine 弧長參數化滾動（A 層原圖紋理 + B 層條紋，v = ω·r）
- * - 渲染順序：image → eraseOriginalTrack → trackScroll → wheels → trackMask → doors → muzzles → effects
- *   （原圖 trackLine 以下且 trackMask 以下被擦除，保護車體；履帶在輪子下層）
+ * - trackLoop：履帶環多邊形（閉合），遊戲端需按此多邊形執行擦除與貼圖
+ * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
+ * - fusion：融合車門（純實色多邊形）
+ * - missiles：單發實體導彈
+ * - muzzles[].angle：砲管仰角（度），遊戲端 _setupMuzzles 讀取後驅動曳光／煙jet 方向
  */
 const VEHICLE_ANNOTATION_BTR80 = {
   "id": "btr80",
@@ -12,10 +13,6 @@ const VEHICLE_ANNOTATION_BTR80 = {
   "imageSize": {
     "w": 636,
     "h": 213
-  },
-  "anchor": {
-    "groundY": 1,
-    "centerX": 0.5
   },
   "trackMask": {
     "enabled": false,
@@ -76,25 +73,25 @@ const VEHICLE_ANNOTATION_BTR80 = {
     {
       "cx": 0.1976,
       "cy": 0.7762,
-      "r": 0.0776,
+      "r": 0.0742,
       "rotSpeed": 1
     },
     {
       "cx": 0.3747,
       "cy": 0.7762,
-      "r": 0.0776,
+      "r": 0.0742,
       "rotSpeed": 1
     },
     {
       "cx": 0.6012,
       "cy": 0.7825,
-      "r": 0.0776,
+      "r": 0.0742,
       "rotSpeed": 1
     },
     {
       "cx": 0.7778,
-      "cy": 0.7762,
-      "r": 0.0776,
+      "cy": 0.7746,
+      "r": 0.0742,
       "rotSpeed": 1
     }
   ],
@@ -103,73 +100,41 @@ const VEHICLE_ANNOTATION_BTR80 = {
       {
         "polygon": [
           {
-            "x": 0.4471,
-            "y": 0.3318
+            "x": 0.4383,
+            "y": 0.3266
           },
           {
-            "x": 0.4307,
-            "y": 0.4923
+            "x": 0.4393,
+            "y": 0.4767
           },
           {
-            "x": 0.5252,
-            "y": 0.4931
+            "x": 0.5215,
+            "y": 0.4797
           },
           {
-            "x": 0.5189,
-            "y": 0.3396
+            "x": 0.5205,
+            "y": 0.3218
           }
         ],
         "fillColor": "#000000",
         "hingeP1": {
-          "x": 0.5189,
-          "y": 0.3396
+          "x": 0.5205,
+          "y": 0.3218
         },
         "hingeP2": {
-          "x": 0.5252,
-          "y": 0.4931
+          "x": 0.5215,
+          "y": 0.4797
         },
         "openRotation": 180,
         "frontUses": "image_crop",
         "backUses": "solid_color"
       }
     ],
-    "lower": [
-      {
-        "polygon": [
-          {
-            "x": 0.4321,
-            "y": 0.4867
-          },
-          {
-            "x": 0.4641,
-            "y": 0.7496
-          },
-          {
-            "x": 0.4919,
-            "y": 0.7496
-          },
-          {
-            "x": 0.5244,
-            "y": 0.493
-          }
-        ],
-        "fillColor": "#000000",
-        "hingeP1": {
-          "x": 0.4641,
-          "y": 0.7496
-        },
-        "hingeP2": {
-          "x": 0.4919,
-          "y": 0.7496
-        },
-        "openRotation": 110,
-        "frontUses": "image_crop",
-        "backUses": "solid_color"
-      }
-    ],
+    "lower": [],
     "hatch": [],
     "fusion": []
   },
+  "missiles": [],
   "weaponAreas": [],
   "muzzles": [
     {
@@ -177,17 +142,18 @@ const VEHICLE_ANNOTATION_BTR80 = {
       "y": 0.1706,
       "name": "槍口 1",
       "weaponId": "kpvt",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.7285,
       "y": 0.1831,
       "name": "槍口 2",
       "weaponId": "pkt",
-      "layerOrder": "below"
+      "layerOrder": "below",
+      "angle": 0
     }
   ],
-  "missiles": [],
   "btrDoorTimeline": {
     "cycle": 20,
     "segments": [

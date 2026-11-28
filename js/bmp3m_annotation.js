@@ -5,6 +5,7 @@
  * - trackScroll：沿 trackLoop 弧長參數化滾動（原圖紋理，方向正向）
  * - fusion：融合車門（純實色多邊形）
  * - missiles：單發實體導彈
+ * - muzzles[].angle：砲管仰角（度），遊戲端 _setupMuzzles 讀取後驅動曳光／煙jet 方向
  */
 const VEHICLE_ANNOTATION_BMP3M = {
   "id": "bmp3m",
@@ -12,10 +13,6 @@ const VEHICLE_ANNOTATION_BMP3M = {
   "imageSize": {
     "w": 626,
     "h": 234
-  },
-  "anchor": {
-    "groundY": 0.85,
-    "centerX": 0.5
   },
   "trackMask": {
     "enabled": true,
@@ -234,7 +231,7 @@ const VEHICLE_ANNOTATION_BMP3M = {
   "missiles": [],
   "weaponAreas": [
     {
-      "id": "otaygqqz",
+      "id": "o9p1lvq3",
       "polygon": [
         {
           "x": 0.6892,
@@ -261,36 +258,36 @@ const VEHICLE_ANNOTATION_BMP3M = {
           "y": 0.2907
         },
         {
-          "x": 0.8335,
-          "y": 0.2913
+          "x": 0.8289,
+          "y": 0.2924
         },
         {
-          "x": 0.8341,
-          "y": 0.3011
+          "x": 0.8286,
+          "y": 0.3027
         },
         {
-          "x": 0.9862,
-          "y": 0.2967
+          "x": 0.9733,
+          "y": 0.304
         },
         {
-          "x": 0.9855,
+          "x": 0.9735,
+          "y": 0.2363
+        },
+        {
+          "x": 0.9056,
           "y": 0.2354
         },
         {
-          "x": 0.9195,
-          "y": 0.2349
+          "x": 0.9052,
+          "y": 0.2209
         },
         {
-          "x": 0.9191,
-          "y": 0.224
+          "x": 0.8275,
+          "y": 0.2217
         },
         {
-          "x": 0.8231,
-          "y": 0.2234
-        },
-        {
-          "x": 0.8227,
-          "y": 0.2344
+          "x": 0.8276,
+          "y": 0.23
         }
       ],
       "name": "武器 1",
@@ -304,21 +301,24 @@ const VEHICLE_ANNOTATION_BMP3M = {
       "y": 0.2658,
       "name": "槍口 1",
       "weaponId": "2a70",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     },
     {
       "x": 0.6907,
       "y": 0.265,
       "name": "槍口 2",
       "weaponId": "pkt",
-      "layerOrder": "below"
+      "layerOrder": "below",
+      "angle": 0
     },
     {
       "x": 0.9165,
       "y": 0.2649,
       "name": "槍口 3",
       "weaponId": "2a72",
-      "layerOrder": "above"
+      "layerOrder": "above",
+      "angle": 0
     }
   ],
   "btrDoorTimeline": {
