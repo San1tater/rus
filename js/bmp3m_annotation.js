@@ -190,8 +190,8 @@ const VEHICLE_ANNOTATION_BMP3M = {
       {
         "polygon": [
           {
-            "x": 0.0395,
-            "y": 0.4152
+            "x": 0.0408,
+            "y": 0.4346
           },
           {
             "x": 0.0393,
@@ -206,18 +206,18 @@ const VEHICLE_ANNOTATION_BMP3M = {
             "y": 0.6692
           },
           {
-            "x": -0.0196,
-            "y": 0.4424
+            "x": -0.0209,
+            "y": 0.4599
           },
           {
-            "x": -0.0068,
-            "y": 0.4158
+            "x": -0.0118,
+            "y": 0.4336
           }
         ],
         "fillColor": "#000000",
         "hingeP1": {
-          "x": 0.0395,
-          "y": 0.4152
+          "x": 0.0408,
+          "y": 0.4346
         },
         "hingeP2": {
           "x": 0.0393,
@@ -231,7 +231,7 @@ const VEHICLE_ANNOTATION_BMP3M = {
   "missiles": [],
   "weaponAreas": [
     {
-      "id": "o9p1lvq3",
+      "id": "o3gr5hbc",
       "polygon": [
         {
           "x": 0.6892,
